@@ -1,0 +1,54 @@
+{
+    "_meta": {
+        "hash": {
+            "sha256": "6dcdd37e892b4cfa8b51b5d64d0fd5ad49c3ecec1226f9c2d424548a27cb8578"
+        },
+        "host-environment-markers": {
+            "implementation_name": "cpython",
+            "implementation_version": "3.6.2",
+            "os_name": "posix",
+            "platform_machine": "x86_64",
+            "platform_python_implementation": "CPython",
+            "platform_release": "4.9.0-deepin12-amd64",
+            "platform_system": "Linux",
+            "platform_version": "#1 SMP PREEMPT Deepin 4.9.40-3 (2017-09-19)",
+            "python_full_version": "3.6.2",
+            "python_version": "3.6",
+            "sys_platform": "linux"
+        },
+        "pipfile-spec": 6,
+        "requires": {
+            "python_version": "3.6"
+        },
+        "sources": [
+            {
+                "name": "pypi",
+                "url": "https://pypi.python.org/simple",
+                "verify_ssl": true
+            }
+        ]
+    },
+    "default": {
+        "certifi": {
+            "hashes": [
+                "sha256:54a07c09c586b0e4c619f02a5e94e36619da8e2b053e20f594348c0611803704",
+                "sha256:40523d2efb60523e113b44602298f0960e900388cf3bb6043f645cf57ea9e3f5"
+            ],
+            "version": "==2017.7.27.1"
+        },
+        "future": {
+            "hashes": [
+                "sha256:e39ced1ab767b5936646cedba8bcce582398233d6a627067d4c6a454c90cfedb"
+            ],
+            "version": "==0.16.0"
+        },
+        "python-telegram-bot": {
+            "hashes": [
+                "sha256:a4ca3ffc25e68bb8484be182abf568eb9b6696681661c953d0fde65b3378b142",
+                "sha256:b648845f9d5c3ed569066be25e5efdfa36148a24d87e7b5219b4eb8e64853b4d"
+            ],
+            "version": "==8.0"
+        }
+    },
+    "develop": {}
+}
