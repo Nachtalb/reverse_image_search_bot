@@ -3,7 +3,7 @@ import logging
 from telegram import Bot, TelegramError, Update
 from telegram.ext import CommandHandler, Filters, MessageHandler, Updater
 
-from animu_image_search_bot.commands import image_search_link, start, unknown
+from .commands import image_search_link, start, unknown
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)

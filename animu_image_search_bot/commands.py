@@ -3,7 +3,7 @@ import io
 from telegram import Bot, ChatAction, Update
 from telegram.parsemode import ParseMode
 
-from animu_image_search_bot.image_search import GoogleReverseImageSearchEngine, IQDBReverseImageSearchEngine
+from .image_search import GoogleReverseImageSearchEngine, IQDBReverseImageSearchEngine
 
 
 def start(bot: Bot, update: Update):
