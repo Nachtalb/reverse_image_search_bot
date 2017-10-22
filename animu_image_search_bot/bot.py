@@ -4,6 +4,7 @@ from telegram import Bot, TelegramError, Update
 from telegram.ext import CommandHandler, Filters, MessageHandler, Updater
 
 from .commands import image_search_link, start, unknown
+from . import settings
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -21,7 +22,7 @@ def error(bot: Bot, update: Update, error: TelegramError):
 
 
 def main():
-    updater = Updater('YOUR_API_TOKEN')
+    updater = Updater(settings.TELEGRAM_API_TOKEN)
     dispatcher = updater.dispatcher
 
     dispatcher.add_handler(CommandHandler("start", start))
