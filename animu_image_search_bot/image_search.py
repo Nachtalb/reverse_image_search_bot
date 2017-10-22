@@ -14,6 +14,7 @@ class ReverseImageSearchEngine:
         url_path (:obj:`str`): The url path to the actual reverse image search function. The google url would look like
             this: `/searchbyimage?&image_url={image_url}`
         name (:obj:`str`): Name of thi search engine
+        search_html (:obj:`str`): The html of the last searched image
         search_url (:obj:`str`): The image url of the last searched image
 
     Args:
@@ -26,6 +27,7 @@ class ReverseImageSearchEngine:
     name = 'Base Reverse Image Search Engine'
     logger = logging.getLogger(__name__)
 
+    search_html = None
     search_url = None
 
     def __init__(self, url_base, url_path, name=None):
@@ -101,6 +103,29 @@ class ReverseImageSearchEngine:
         error_message = 'Cold not upload image because of an unknown error.'
         self.logger.warning(error_message)
         raise Exception(error_message)
+
+    def get_html(self, url=None):
+        """Get the HTML of the image search site.
+
+        Args:
+            url (:obj:`str`): Link to the image, if no url is given it takes the last searched image url
+
+        Returns:
+            :obj:`str`: HTML of the image search site
+
+        Raises:
+            ValueError: If no url is defined and no last_searched_url is available
+        """
+        if not url:
+            if not self.search_url:
+                raise ValueError('No url defined and no last_searched_url available!')
+            url = self.search_url
+        if url == self.search_url and self.search_html == '':
+            return self.search_html
+
+        request = requests.get(self.get_search_link_by_url(url))
+        self.search_html = request.text
+        return self.search_html
 
 
 class GoogleReverseImageSearchEngine(ReverseImageSearchEngine):
