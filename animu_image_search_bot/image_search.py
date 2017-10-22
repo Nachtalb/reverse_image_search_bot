@@ -193,9 +193,13 @@ class IQDBReverseImageSearchEngine(ReverseImageSearchEngine):
         size_match = re.match('\d*×\d*', table.find('td', text=re.compile('×')).text)
         size = size_match[0]
         safe = size_match.string.replace(size, '').strip(' []')
+
+        website = table.select('td.image a')[0].attrs['href']
+        if not website.startswith('http'):
+            website = 'http://' + website.lstrip('/ ')
         best_match = {
             'thumbnail': self.url_base + table.select('td.image img')[0].attrs['src'],
-            'website': table.select('td.image a')[0].attrs['href'],
+            'website': website,
             'website_name': table
                 .find('img', {'class': 'service-icon'})
                 .find_parent('td')
@@ -210,3 +214,14 @@ class IQDBReverseImageSearchEngine(ReverseImageSearchEngine):
         }
 
         return best_match
+
+
+class TinEyeReverseImageSearchEngine(ReverseImageSearchEngine):
+    """A :class:`ReverseImageSearchEngine` configured for tineye.com"""
+
+    def __init__(self):
+        super(TinEyeReverseImageSearchEngine, self).__init__(
+            url_base='https://tineye.com',
+            url_path='/search?url={image_url}',
+            name='TinEye'
+        )
