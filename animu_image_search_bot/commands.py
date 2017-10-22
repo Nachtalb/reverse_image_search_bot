@@ -55,6 +55,8 @@ def image_search_link(bot: Bot, update: Update):
             [InlineKeyboardButton(text='Best Match', url=best_match['website'])],
         ]
         bot.send_photo(chat_id=update.message.chat_id, photo=best_match['thumbnail'])
+    else:
+        reply = 'You can search for the image on the following site:'
     button_list.append([
         InlineKeyboardButton(text='IQDB', url=iqdb_url),
         InlineKeyboardButton(text='GOOGLE', url=google_url)
