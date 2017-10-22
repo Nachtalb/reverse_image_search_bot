@@ -14,6 +14,7 @@ class ReverseImageSearchEngine:
         url_path (:obj:`str`): The url path to the actual reverse image search function. The google url would look like
             this: `/searchbyimage?&image_url={image_url}`
         name (:obj:`str`): Name of thi search engine
+        search_url (:obj:`str`): The image url of the last searched image
 
     Args:
         url_base (:obj:`str`): The base url of the image search engine eg. `https://www.google.com`
@@ -24,6 +25,8 @@ class ReverseImageSearchEngine:
     """
     name = 'Base Reverse Image Search Engine'
     logger = logging.getLogger(__name__)
+
+    search_url = None
 
     def __init__(self, url_base, url_path, name=None):
         self.url_base = url_base
@@ -39,6 +42,8 @@ class ReverseImageSearchEngine:
         Returns:
             :obj:`str`: Generated reverse image search engine for the given image
         """
+        self.search_url = url
+        self.search_html = ''
         return self.url_base + self.url_path.format(image_url=quote_plus(url))
 
     def get_search_link_by_file(self, file_):
