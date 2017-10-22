@@ -3,7 +3,7 @@ import io
 from telegram import Bot, ChatAction, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.parsemode import ParseMode
 
-from .image_search import GoogleReverseImageSearchEngine, IQDBReverseImageSearchEngine
+from .image_search import GoogleReverseImageSearchEngine, IQDBReverseImageSearchEngine, TinEyeReverseImageSearchEngine
 
 
 def start(bot: Bot, update: Update):
@@ -33,9 +33,13 @@ def image_search_link(bot: Bot, update: Update):
         with io.BufferedReader(image_buffer) as image_file:
             iqdb_search = IQDBReverseImageSearchEngine()
             google_search = GoogleReverseImageSearchEngine()
+            tineye_search = TinEyeReverseImageSearchEngine()
+
             image_url = iqdb_search.upload_image(image_file)
+
             iqdb_url = iqdb_search.get_search_link_by_url(image_url)
             google_url = google_search.get_search_link_by_url(image_url)
+            tineye_url = tineye_search.get_search_link_by_url(image_url)
 
     best_match = iqdb_search.best_match
     reply = ''
@@ -59,7 +63,8 @@ def image_search_link(bot: Bot, update: Update):
         reply = 'You can search for the image on the following site:'
     button_list.append([
         InlineKeyboardButton(text='IQDB', url=iqdb_url),
-        InlineKeyboardButton(text='GOOGLE', url=google_url)
+        InlineKeyboardButton(text='GOOGLE', url=google_url),
+        InlineKeyboardButton(text='TINEYE', url=tineye_url),
     ])
 
     reply_markup = InlineKeyboardMarkup(button_list)
