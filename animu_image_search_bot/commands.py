@@ -14,7 +14,7 @@ def start(bot: Bot, update: Update):
         bot (:obj:`telegram.bot.Bot`): Telegram Api Bot Object.
         update (:obj:`telegram.update.Update`): Telegram Api Update Object
     """
-    update.message.reply_text('Send me an image to search for it on iqdb or google.')
+    update.message.reply_text('Send me an image to search for it on iqdb, Google, TinEye and Bing.')
 
 
 def image_search_link(bot: Bot, update: Update):
