@@ -1,6 +1,6 @@
 import io
 
-from telegram import Bot, ChatAction, Update
+from telegram import Bot, ChatAction, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.parsemode import ParseMode
 
 from .image_search import GoogleReverseImageSearchEngine, IQDBReverseImageSearchEngine
@@ -24,7 +24,7 @@ def image_search_link(bot: Bot, update: Update):
         update (:obj:`telegram.update.Update`): Telegram Api Update Object
     """
 
-    update.message.reply_text('Getting your links ...')
+    update.message.reply_text('Please wait for your results ...')
     bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
 
     photo = bot.getFile(update.message.photo[-1].file_id)
@@ -36,8 +36,34 @@ def image_search_link(bot: Bot, update: Update):
             image_url = iqdb_search.upload_image(image_file)
             iqdb_url = iqdb_search.get_search_link_by_url(image_url)
             google_url = google_search.get_search_link_by_url(image_url)
+
+    best_match = iqdb_search.best_match
+    reply = ''
+    button_list = []
+    if best_match:
+        reply += ('Best Match:\n'
+                  'Link: [{website_name}]({website})\n'
+                  'Similarity: {similarity}%\n'
+                  'Size: {width}x{height}px').format(
+            website_name=best_match['website_name'],
+            website=best_match['website'],
+            similarity=best_match['similarity'],
+            width=best_match['size']['width'],
+            height=best_match['size']['height']
+        )
+        button_list = [
+            [InlineKeyboardButton(text='Best Match', url=best_match['website'])],
+        ]
+        bot.send_photo(chat_id=update.message.chat_id, photo=best_match['thumbnail'])
+    button_list.append([
+        InlineKeyboardButton(text='IQDB', url=iqdb_url),
+        InlineKeyboardButton(text='GOOGLE', url=google_url)
+    ])
+
+    reply_markup = InlineKeyboardMarkup(button_list)
     update.message.reply_text(
-        text='Search on [IQDB Search]({iqdb}) or on [Google]({google})'.format(iqdb=iqdb_url, google=google_url),
+        text=reply,
+        reply_markup=reply_markup,
         parse_mode=ParseMode.MARKDOWN
     )
 
