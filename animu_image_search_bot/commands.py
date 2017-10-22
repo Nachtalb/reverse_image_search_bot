@@ -1,4 +1,5 @@
 import io
+import os
 
 from PIL import Image
 from telegram import Bot, ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -15,7 +16,31 @@ def start(bot: Bot, update: Update):
         bot (:obj:`telegram.bot.Bot`): Telegram Api Bot Object.
         update (:obj:`telegram.update.Update`): Telegram Api Update Object
     """
-    update.message.reply_text('Send me an image to search for it on iqdb, Google, TinEye and Bing.')
+    reply = ('Send me images or stickers and I will send you direct reverse image search links for IQDB, Google, '
+             'TinEye and Bing. For anime images I recommend IQDB and TinEye, for other images I recommend to use '
+             'Google or TinEye.'
+             '\n\n*Features:*'
+             '\n- Give you image reverse search links'
+             '\n- Supports IQDB, Google, TinEye and Bing'
+             '\n- Supports normal images like JPG, PNG, WEBP'
+             '\n- Supports stickers'
+             '\n- Best Match information by IQDB'
+             '\n\n*ToDo:*'
+             '\n- Support for GIFs'
+             '\n- Best Match information by TinEye'
+             '\n\n*Commands:* The only commands I have are /help and /start which shows this message.'
+             '\n\n*Attention whore stuff*: Please share this bot with your friends so that I ('
+             '[the magician](https://github.com/Nachtalb/) behind this project) have enough motivation to continue and '
+             'maintain this bot.'
+             '\n\n*Contributions:* If you have found a bug or want a new feature, please make an issue here: '
+             '[Nachtalb/animu_image_search_bot](https://github.com/Nachtalb/animu_image_search_bot)'
+             '\n\nThank you for using @anime\_image\_search\_bot.')
+
+    update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)
+
+    current_dir = os.path.dirname(os.path.realpath(__file__))
+    image_dir = os.path.join(current_dir, 'images/example_usage.png')
+    bot.send_photo(update.message.chat_id, photo=open(image_dir, 'rb'), caption='Example Usage')
 
 
 def sticker_image_search(bot: Bot, update: Update):
@@ -64,7 +89,7 @@ def general_image_search(bot: Bot, update: Update, image_file):
     Args:
         bot (:obj:`telegram.bot.Bot`): Telegram Api Bot Object.
         update (:obj:`telegram.update.Update`): Telegram Api Update Object
-        file: File like image to search for
+        image_file: File like image to search for
     """
     iqdb_search = IQDBReverseImageSearchEngine()
     google_search = GoogleReverseImageSearchEngine()
