@@ -1,4 +1,5 @@
 import logging
+import re
 from urllib.parse import quote_plus
 
 import requests
@@ -120,12 +121,40 @@ class ReverseImageSearchEngine:
             if not self.search_url:
                 raise ValueError('No url defined and no last_searched_url available!')
             url = self.search_url
-        if url == self.search_url and self.search_html == '':
+        if url == self.search_url and self.search_html != '':
             return self.search_html
 
         request = requests.get(self.get_search_link_by_url(url))
         self.search_html = request.text
         return self.search_html
+
+    @property
+    def best_match(self):
+        """Get info about the best matching image found
+
+        Notes:
+            This function must be individually made for every new search engine. This is because every search engine
+            gives other data. Normally the return value should look something like this:
+            ```
+            {
+                'thumbnail': str 'LINK_TO_THUMBNAIL',
+                'website': str 'LINK_TO_FOUND_IMAGE',
+                'website_name': str 'NAME_OF_WEBSITE_IMAGE_FOUND_ON',
+                'size': {
+                    'width': int 'IMAGE_WIDTH',
+                    'height': int 'IMAGE_HEIGHT'
+                },
+                'SIMILARITY': float 'SIMILARITY_IN_%_TO_ORIGINAL'
+            }
+            ```
+
+        Returns:
+            :obj:`dict`: Dictionary of the found image
+
+        Raises:
+            ValueError: If not image was given to this class yet
+        """
+        return None
 
 
 class GoogleReverseImageSearchEngine(ReverseImageSearchEngine):
@@ -148,3 +177,36 @@ class IQDBReverseImageSearchEngine(ReverseImageSearchEngine):
             url_path='?url={image_url}',
             name='iqdb'
         )
+
+    @property
+    def best_match(self):
+        if not self.search_html:
+            if not self.search_url:
+                raise ValueError('No image given yet!')
+            self.get_html(self.search_url)
+        soup = BeautifulSoup(self.search_html, "html.parser")
+        best_match = soup.find('th', text='Best match')
+
+        if not best_match:
+            return
+        table = best_match.find_parent('table')
+        size_match = re.match('\d*×\d*', table.find('td', text=re.compile('×')).text)
+        size = size_match[0]
+        safe = size_match.string.replace(size, '').strip(' []')
+        best_match = {
+            'thumbnail': self.url_base + table.select('td.image img')[0].attrs['src'],
+            'website': table.select('td.image a')[0].attrs['href'],
+            'website_name': table
+                .find('img', {'class': 'service-icon'})
+                .find_parent('td')
+                .find(text=True, recursive=False)
+                .strip(),
+            'size': {
+                'width': int(size.split('×')[0]),
+                'height': int(size.split('×')[1])
+            },
+            'sfw': safe,
+            'similarity': float(re.match('\d*', table.find('td', text=re.compile('similarity')).text)[0]),
+        }
+
+        return best_match
