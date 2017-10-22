@@ -1,6 +1,8 @@
 import io
 import os
 
+from botanio import botan
+from .settings import BOTAN_API_TOKEN
 from PIL import Image
 from telegram import Bot, ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.parsemode import ParseMode
@@ -16,6 +18,8 @@ def start(bot: Bot, update: Update):
         bot (:obj:`telegram.bot.Bot`): Telegram Api Bot Object.
         update (:obj:`telegram.update.Update`): Telegram Api Update Object
     """
+    print(botan.track(BOTAN_API_TOKEN, update.message.from_user.id, update.message.to_dict(), '/start'))
+
     reply = ('Send me images or stickers and I will send you direct reverse image search links for IQDB, Google, '
              'TinEye and Bing. For anime images I recommend IQDB and TinEye, for other images I recommend to use '
              'Google or TinEye.'
@@ -50,6 +54,8 @@ def sticker_image_search(bot: Bot, update: Update):
         bot (:obj:`telegram.bot.Bot`): Telegram Api Bot Object.
         update (:obj:`telegram.update.Update`): Telegram Api Update Object
     """
+    print(botan.track(BOTAN_API_TOKEN, update.message.from_user.id, update.message.to_dict(), '/sticker_image_search'))
+
     update.message.reply_text('Please wait for your results ...')
     bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
 
@@ -72,6 +78,7 @@ def image_search_link(bot: Bot, update: Update):
         bot (:obj:`telegram.bot.Bot`): Telegram Api Bot Object.
         update (:obj:`telegram.update.Update`): Telegram Api Update Object
     """
+    print(botan.track(BOTAN_API_TOKEN, update.message.from_user.id, update.message.to_dict(), '/image_search_link'))
 
     update.message.reply_text('Please wait for your results ...')
     bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
@@ -147,4 +154,5 @@ def unknown(bot: Bot, update: Update):
         bot (:obj:`telegram.bot.Bot`): Telegram Api Bot Object.
         update (:obj:`telegram.update.Update`): Telegram Api Update Object
     """
+    print(botan.track(BOTAN_API_TOKEN, update.message.from_user, update.message.to_dict(), 'unknown'))
     update.message.reply_text("Sorry, I didn't understand that command.")
