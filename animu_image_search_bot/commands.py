@@ -1,10 +1,11 @@
 import io
 
-from telegram import Bot, ChatAction, Update, InlineKeyboardButton, InlineKeyboardMarkup
+from PIL import Image
+from telegram import Bot, ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.parsemode import ParseMode
 
-from .image_search import GoogleReverseImageSearchEngine, IQDBReverseImageSearchEngine, TinEyeReverseImageSearchEngine, \
-    BingReverseImageSearchEngine
+from .image_search import BingReverseImageSearchEngine, GoogleReverseImageSearchEngine, IQDBReverseImageSearchEngine, \
+    TinEyeReverseImageSearchEngine
 
 
 def start(bot: Bot, update: Update):
@@ -15,6 +16,28 @@ def start(bot: Bot, update: Update):
         update (:obj:`telegram.update.Update`): Telegram Api Update Object
     """
     update.message.reply_text('Send me an image to search for it on iqdb, Google, TinEye and Bing.')
+
+
+def sticker_image_search(bot: Bot, update: Update):
+    """Send a reverse image search link for the image of the sticker sent to us
+
+    Args:
+        bot (:obj:`telegram.bot.Bot`): Telegram Api Bot Object.
+        update (:obj:`telegram.update.Update`): Telegram Api Update Object
+    """
+    update.message.reply_text('Please wait for your results ...')
+    bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
+
+    sticker_image = bot.getFile(update.message.sticker.file_id)
+    converted_image = io.BytesIO()
+
+    with io.BytesIO() as image_buffer:
+        sticker_image.download(out=image_buffer)
+        with io.BufferedReader(image_buffer) as image_file:
+            pil_image = Image.open(image_file).convert("RGB")
+            pil_image.save(converted_image, 'jpeg')
+
+            general_image_search(bot, update, converted_image)
 
 
 def image_search_link(bot: Bot, update: Update):
@@ -32,17 +55,28 @@ def image_search_link(bot: Bot, update: Update):
     with io.BytesIO() as image_buffer:
         photo.download(out=image_buffer)
         with io.BufferedReader(image_buffer) as image_file:
-            iqdb_search = IQDBReverseImageSearchEngine()
-            google_search = GoogleReverseImageSearchEngine()
-            tineye_search = TinEyeReverseImageSearchEngine()
-            bing_search = BingReverseImageSearchEngine()
+            general_image_search(bot, update, image_file)
 
-            image_url = iqdb_search.upload_image(image_file)
 
-            iqdb_url = iqdb_search.get_search_link_by_url(image_url)
-            google_url = google_search.get_search_link_by_url(image_url)
-            tineye_url = tineye_search.get_search_link_by_url(image_url)
-            bing_url = bing_search.get_search_link_by_url(image_url)
+def general_image_search(bot: Bot, update: Update, image_file):
+    """Send a reverse image search link for the image sent to us
+
+    Args:
+        bot (:obj:`telegram.bot.Bot`): Telegram Api Bot Object.
+        update (:obj:`telegram.update.Update`): Telegram Api Update Object
+        file: File like image to search for
+    """
+    iqdb_search = IQDBReverseImageSearchEngine()
+    google_search = GoogleReverseImageSearchEngine()
+    tineye_search = TinEyeReverseImageSearchEngine()
+    bing_search = BingReverseImageSearchEngine()
+
+    image_url = iqdb_search.upload_image(image_file)
+
+    iqdb_url = iqdb_search.get_search_link_by_url(image_url)
+    google_url = google_search.get_search_link_by_url(image_url)
+    tineye_url = tineye_search.get_search_link_by_url(image_url)
+    bing_url = bing_search.get_search_link_by_url(image_url)
 
     best_match = iqdb_search.best_match
     reply = ''

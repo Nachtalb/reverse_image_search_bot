@@ -10,6 +10,7 @@ name = "pypi"
 python-telegram-bot = "*"
 "bs4" = "*"
 requests = "*"
+pillow = "*"
 
 
 [dev-packages]

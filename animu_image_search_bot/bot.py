@@ -3,7 +3,7 @@ import logging
 from telegram import Bot, TelegramError, Update
 from telegram.ext import CommandHandler, Filters, MessageHandler, Updater
 
-from .commands import image_search_link, start, unknown
+from .commands import image_search_link, start, unknown, sticker_image_search
 from . import settings
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -28,6 +28,7 @@ def main():
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CommandHandler("help", start))
 
+    dispatcher.add_handler(MessageHandler(Filters.sticker, sticker_image_search))
     dispatcher.add_handler(MessageHandler(Filters.photo, image_search_link))
     dispatcher.add_handler(MessageHandler(Filters.command, unknown))
 
