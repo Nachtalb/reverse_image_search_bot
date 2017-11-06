@@ -144,7 +144,7 @@ class ReverseImageSearchEngine:
                     'width': int 'IMAGE_WIDTH',
                     'height': int 'IMAGE_HEIGHT'
                 },
-                'SIMILARITY': float 'SIMILARITY_IN_%_TO_ORIGINAL'
+                'similarity': float 'SIMILARITY_IN_%_TO_ORIGINAL'
             }
             ```
 
@@ -225,6 +225,39 @@ class TinEyeReverseImageSearchEngine(ReverseImageSearchEngine):
             url_path='/search?url={image_url}',
             name='TinEye'
         )
+
+    @property
+    def best_match(self):
+        """
+
+        Returns:
+
+        """
+        if not self.search_html:
+            if not self.search_url:
+                raise ValueError('No image given yet!')
+            self.get_html(self.search_url)
+        soup = BeautifulSoup(self.search_html, 'html.parser')
+        match_row = soup.find('div', {'class': 'match-row'})
+        if not match_row:
+            return
+        match_thumb = match_row.find('div', {'class': 'match-thumb'})
+        match = match_row.find('div', {'class', 'match'})
+        info = match_thumb.find('p').text
+        info = [element.strip() for element in info.split(',')]
+
+        return {
+            'thumbnail': match_thumb.find('img').get('src'),
+            'website_name': match.find('h4').text,
+            'website': match.find('span', text='Found on: ').find_next('a').get('href'),
+            'image_url': match.find('p', {'class': 'image-link'}).find('a').get('href'),
+            'type': info[0],
+            'size': {
+                'width': int(info[1].split('x')[0]),
+                'height': int(info[1].split('x')[1])
+            },
+            'volume': info[2],
+        }
 
 
 class BingReverseImageSearchEngine(ReverseImageSearchEngine):
