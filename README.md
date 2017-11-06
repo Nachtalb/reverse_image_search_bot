@@ -25,11 +25,11 @@ For anime images I recommend IQDB and TinEye, for other images I recommend to us
 - Supports IQDB, Google, TinEye and Bing
 - Supports normal images like JPG, PNG, WEBP
 - Supports stickers
-- Best Match information by IQDB
+- Best Match information by TinEye
+- Best Match information by IQDB as fallback
 
 ## ToDo:
 - Support for GIFs
-- Best Match information by TinEye
 
 ## Commands:
 - /help, /start: show a help message with information about the bot and it's usage.

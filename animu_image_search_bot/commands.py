@@ -1,14 +1,15 @@
 import io
 import os
 
-from botanio import botan
-from .settings import BOTAN_API_TOKEN
 from PIL import Image
+from botanio import botan
 from telegram import Bot, ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.parsemode import ParseMode
 
+from animu_image_search_bot.utils import dict_to_str
 from .image_search import BingReverseImageSearchEngine, GoogleReverseImageSearchEngine, IQDBReverseImageSearchEngine, \
     TinEyeReverseImageSearchEngine
+from .settings import BOTAN_API_TOKEN
 
 
 def start(bot: Bot, update: Update):
@@ -33,11 +34,11 @@ For anime images I recommend IQDB and TinEye, for other images I recommend to us
 - Supports IQDB, Google, TinEye and Bing
 - Supports normal images like JPG, PNG, WEBP
 - Supports stickers
-- Best Match information by IQDB
+- Best Match information by TinEye
+- Best Match information by IQDB as fallback
 
 *ToDo*
 - Support for GIFs
-- Best Match information by TinEye
 
 *Commands*
 - /help, /start: show a help message with information about the bot and it's usage.
@@ -131,26 +132,32 @@ def general_image_search(bot: Bot, update: Update, image_file):
     tineye_url = tineye_search.get_search_link_by_url(image_url)
     bing_url = bing_search.get_search_link_by_url(image_url)
 
-    best_match = iqdb_search.best_match
     reply = ''
     button_list = []
+
+    best_match = tineye_search.best_match
+    if not best_match:
+        best_match = iqdb_search.best_match
     if best_match:
-        reply += ('Best Match:\n'
-                  'Link: [{website_name}]({website})\n'
-                  'Similarity: {similarity}%\n'
-                  'Size: {width}x{height}px').format(
-            website_name=best_match['website_name'],
-            website=best_match['website'],
-            similarity=best_match['similarity'],
-            width=best_match['size']['width'],
-            height=best_match['size']['height']
+        reply += (
+            'Best Match:\n'
+            'Link: [{website_name}]({website})\n'.format(
+                website_name=best_match['website_name'],
+                website=best_match['website'],
+            )
         )
+        reply += dict_to_str(best_match, ignore=['website_name', 'website', 'image_url', 'thumbnail'])
+
+        image_url = best_match.get('image_url', None) or best_match.get('website', None)
+        thumbnail = best_match.get('image_url', None) or best_match.get('thumbnail', None)
         button_list = [
-            [InlineKeyboardButton(text='Best Match', url=best_match['website'])],
+            [InlineKeyboardButton(text='Best Match',
+                                  url=image_url)],
         ]
-        bot.send_photo(chat_id=update.message.chat_id, photo=best_match['thumbnail'])
+        bot.send_photo(chat_id=update.message.chat_id, photo=thumbnail)
     else:
         reply = 'You can search for the image on the following site:'
+
     button_list.append([
         InlineKeyboardButton(text='IQDB', url=iqdb_url),
         InlineKeyboardButton(text='GOOGLE', url=google_url),
