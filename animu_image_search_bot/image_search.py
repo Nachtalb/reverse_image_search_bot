@@ -211,6 +211,7 @@ class IQDBReverseImageSearchEngine(ReverseImageSearchEngine):
             },
             'sfw': safe,
             'similarity': float(re.match('\d*', table.find('td', text=re.compile('similarity')).text)[0]),
+            'provided by': '[IQDB](http://iqdb.org/)',
         }
 
         return best_match
@@ -257,6 +258,7 @@ class TinEyeReverseImageSearchEngine(ReverseImageSearchEngine):
                 'height': int(info[1].split('x')[1])
             },
             'volume': info[2],
+            'provided by': '[TinEye](https://tineye.com/)',
         }
 
 
