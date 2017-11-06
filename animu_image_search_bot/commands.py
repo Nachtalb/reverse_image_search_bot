@@ -1,5 +1,6 @@
 import io
 import os
+from uuid import uuid4
 
 from PIL import Image
 from botanio import botan
@@ -125,7 +126,7 @@ def general_image_search(bot: Bot, update: Update, image_file):
     tineye_search = TinEyeReverseImageSearchEngine()
     bing_search = BingReverseImageSearchEngine()
 
-    image_url = iqdb_search.upload_image(image_file)
+    image_url = iqdb_search.upload_image(image_file, 'irs-' + str(uuid4())[:8] + '.jpg')
 
     iqdb_url = iqdb_search.get_search_link_by_url(image_url)
     google_url = google_search.get_search_link_by_url(image_url)

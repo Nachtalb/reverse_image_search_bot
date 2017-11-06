@@ -1,10 +1,18 @@
 import logging
+import os
 import re
+from importlib import import_module
 from urllib.parse import quote_plus
 
 import requests
 from bs4 import BeautifulSoup
-from requests import HTTPError
+
+from animu_image_search_bot.settings import UPLOADER
+
+uploader_pkg_name, uploader_class_name = UPLOADER['uploader'].rsplit('.', 1)
+uploader_module = import_module(uploader_pkg_name)
+uploader_class = getattr(uploader_module, uploader_class_name)
+uploader = uploader_class(UPLOADER['configuration'])
 
 
 class ReverseImageSearchEngine:
@@ -60,50 +68,30 @@ class ReverseImageSearchEngine:
         """
         return self.get_search_link_by_url(self.upload_image(file_))
 
-    def upload_image(self, image_file):
-        """Upload the given image to a image hoster
-
-        At the moment bayimg.com is used as a hoster. In the future this may change.
+    def upload_image(self, image_file, file_name: str = None):
+        """Upload the given image to the in the settings specified place.
 
         Args:
-            image_file: File like object of an image
+            image_file: File like object of an image or path to an image
+            file_name (:obj:`str`): Name of the given file. Can be left empty if image_file is a file path
         Returns:
             :obj:`str`: Url to the uploaded image
         Raises:
-            TypeError: If the given image is not a file like object
-            HTTPError: If the server sent a response with an status code other than 200
-            Exception: If we know there was an error but we do not know why
+            ValueError: If the image_file is an file like object and the file_name has not been set.
         """
-        if not hasattr(image_file, 'read'):
-            error_message = 'Given object is not a file ot file like object. "read()" method must be integrated.'
-            self.logger.warning(error_message)
-            raise TypeError(error_message)
+        if not file_name:
+            if not isinstance(image_file, str):
+                error_message = 'When image_file is a file like object the file_name must be set.'
+                self.logger.warning(error_message)
+                raise ValueError(error_message)
+            file_name = os.path.basename(image_file)
 
-        if hasattr(image_file, 'seek'):
-            image_file.seek(0)
+        uploader.connect()
+        uploader.upload(image_file, file_name)
+        uploader.close()
 
-        url_base = 'http://bayimg.com'
-        upload_path = '/upload'
-
-        data_payload = {'code': 'removal_code_must_be_set_on_bayimg'}
-        files_payload = {'file': image_file}
-
-        response = requests.request("POST", (url_base + upload_path), data=data_payload, files=files_payload)
-
-        if response.status_code != 200:
-            error_message = ('Could not upload image. Instead of expected 200 response, we got a %s status code.' %
-                             response.status_code)
-            self.logger.warning(error_message)
-            raise HTTPError(error_message, response=response)
-
-        soup = BeautifulSoup(response.text, "html.parser")
-        image = soup.find('img', {'class': 'image-setting'})
-
-        if image:
-            return url_base + image['src'][2:]
-        error_message = 'Cold not upload image because of an unknown error.'
-        self.logger.warning(error_message)
-        raise Exception(error_message)
+        path = UPLOADER.get('url', None) or UPLOADER['configuration'].get('path', None) or ''
+        return os.path.join(path, file_name)
 
     def get_html(self, url=None):
         """Get the HTML of the image search site.
