@@ -135,8 +135,12 @@ def general_image_search(bot: Bot, update: Update, image_file):
     reply = ''
     button_list = []
 
+    message = update.message.reply_text('Searching for best match on TinEye...')
     best_match = tineye_search.best_match
     if not best_match:
+        bot.edit_message_text('Nothing found on TinEye, searching on IQDB...',
+                              chat_id=update.message.chat_id,
+                              message_id=message.message_id)
         best_match = iqdb_search.best_match
     if best_match:
         reply += (
@@ -156,7 +160,8 @@ def general_image_search(bot: Bot, update: Update, image_file):
         ]
         bot.send_photo(chat_id=update.message.chat_id, photo=thumbnail)
     else:
-        reply = 'You can search for the image on the following site:'
+        reply = 'Nothing found on TinEye nor IQDB. You can search for the image on the following sites:'
+    bot.delete_message(chat_id=update.message.chat_id, message_id=message.message_id)
 
     button_list.append([
         InlineKeyboardButton(text='IQDB', url=iqdb_url),
