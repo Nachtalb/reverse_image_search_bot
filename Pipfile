@@ -12,6 +12,7 @@ python-telegram-bot = "*"
 requests = "*"
 pillow = "*"
 botanio = "*"
+paramiko = "*"
 
 
 [dev-packages]
