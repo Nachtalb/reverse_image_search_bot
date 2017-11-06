@@ -227,11 +227,22 @@ class TinEyeReverseImageSearchEngine(ReverseImageSearchEngine):
                 raise ValueError('No image given yet!')
             self.get_html(self.search_url)
         soup = BeautifulSoup(self.search_html, 'html.parser')
-        match_row = soup.find('div', {'class': 'match-row'})
-        if not match_row:
+
+        match = soup.find('div', {'class', 'match'})
+        if not match:
             return
+        image_url = match.find('p', {'class': 'image-link'}).find('a').get('href')
+
+        if not self.check_image_availability(image_url):
+            match = match.find_next('div', {'class', 'match'})
+            if not match:
+                return
+            image_url = match.find('p', {'class': 'image-link'}).find('a').get('href')
+            if not self.check_image_availability(image_url):
+                return
+
+        match_row = match.find_parent('div', {'class': 'match-row'})
         match_thumb = match_row.find('div', {'class': 'match-thumb'})
-        match = match_row.find('div', {'class', 'match'})
         info = match_thumb.find('p').text
         info = [element.strip() for element in info.split(',')]
 
@@ -239,7 +250,7 @@ class TinEyeReverseImageSearchEngine(ReverseImageSearchEngine):
             'thumbnail': match_thumb.find('img').get('src'),
             'website_name': match.find('h4').text,
             'website': match.find('span', text='Found on: ').find_next('a').get('href'),
-            'image_url': match.find('p', {'class': 'image-link'}).find('a').get('href'),
+            'image_url': image_url,
             'type': info[0],
             'size': {
                 'width': int(info[1].split('x')[0]),
@@ -248,6 +259,17 @@ class TinEyeReverseImageSearchEngine(ReverseImageSearchEngine):
             'volume': info[2],
             'provided by': '[TinEye](https://tineye.com/)',
         }
+
+    def check_image_availability(self, url: str):
+        """Check if image is still available
+
+        Args:
+            url (:obj:`str`): Url to image to check
+        """
+        try:
+            return requests.head(url) == 200
+        except:
+            pass
 
 
 class BingReverseImageSearchEngine(ReverseImageSearchEngine):
