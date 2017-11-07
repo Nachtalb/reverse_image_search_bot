@@ -223,6 +223,7 @@ def best_match(bot: Bot, update: Update, args: list):
 
     if not args:
         update.message.reply_text('You have to give me an URL to make this work.')
+        return
     tineye = TinEyeReverseImageSearchEngine()
     iqdb = IQDBReverseImageSearchEngine()
     tineye.search_url = args[0]
