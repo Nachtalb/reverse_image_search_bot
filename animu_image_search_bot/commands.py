@@ -48,7 +48,7 @@ day to a max of 150 searches per week. And I will not pay for the TinEye atm bec
 
 *Commands*
 - /help, /start: show a help message with information about the bot and it's usage.
-- /best_match URL: Search for the best match on TinEye (and IQDB when nothing is found on TinEye). The `URL` is a link 
+- /best\_match URL: Search for the best match on TinEye (and IQDB when nothing is found on TinEye). The `URL` is a link 
     to an image
 
 *Attention whore stuff* 
