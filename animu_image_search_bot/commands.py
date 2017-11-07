@@ -203,7 +203,7 @@ def callback_best_match(bot: Bot, update: Update):
         bot (:obj:`telegram.bot.Bot`): Telegram Api Bot Object.
         update (:obj:`telegram.update.Update`): Telegram Api Update Object
     """
-    print(botan.track(BOTAN_API_TOKEN, update.message.from_user.id, update.message.to_dict(), '/callback_best_match'))
+    print(botan.track(BOTAN_API_TOKEN, update.effective_user.id, update.callback_query.to_dict(), '/callback_best_match'))
 
     bot.answer_callback_query(update.callback_query.id, show_alert=False)
     url = update.callback_query.data.split(' ')[1]
@@ -218,7 +218,7 @@ def best_match(bot: Bot, update: Update, args: list):
         update (:obj:`telegram.update.Update`): Telegram Api Update Object
         args (:obj:`list`): List of arguments passed by the user
     """
-    if not update.message:
+    if update.message:
         print(botan.track(BOTAN_API_TOKEN, update.message.from_user.id, update.message.to_dict(), '/best_match'))
 
     if not args:
