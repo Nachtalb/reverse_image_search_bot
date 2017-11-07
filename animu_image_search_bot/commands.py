@@ -94,10 +94,10 @@ def sticker_image_search(bot: Bot, update: Update):
     with io.BytesIO() as image_buffer:
         sticker_image.download(out=image_buffer)
         with io.BufferedReader(image_buffer) as image_file:
-            pil_image = Image.open(image_file).convert("RGB")
-            pil_image.save(converted_image, 'jpeg')
+            pil_image = Image.open(image_file).convert("RGBA")
+            pil_image.save(converted_image, 'png')
 
-            general_image_search(bot, update, converted_image)
+            general_image_search(bot, update, converted_image, 'png')
 
 
 def image_search_link(bot: Bot, update: Update):
@@ -119,20 +119,23 @@ def image_search_link(bot: Bot, update: Update):
             general_image_search(bot, update, image_file)
 
 
-def general_image_search(bot: Bot, update: Update, image_file):
+def general_image_search(bot: Bot, update: Update, image_file, image_extension: str=None):
     """Send a reverse image search link for the image sent to us
 
     Args:
         bot (:obj:`telegram.bot.Bot`): Telegram Api Bot Object.
         update (:obj:`telegram.update.Update`): Telegram Api Update Object
         image_file: File like image to search for
+        image_extension (:obj:`str`): What extension the image should have. Default is 'jpg'
     """
+    image_extension = image_extension or 'jpg'
+
     iqdb_search = IQDBReverseImageSearchEngine()
     google_search = GoogleReverseImageSearchEngine()
     tineye_search = TinEyeReverseImageSearchEngine()
     bing_search = BingReverseImageSearchEngine()
 
-    image_url = iqdb_search.upload_image(image_file, 'irs-' + str(uuid4())[:8] + '.jpg')
+    image_url = iqdb_search.upload_image(image_file, 'irs-' + str(uuid4())[:8] + '.' + image_extension)
 
     iqdb_url = iqdb_search.get_search_link_by_url(image_url)
     google_url = google_search.get_search_link_by_url(image_url)
