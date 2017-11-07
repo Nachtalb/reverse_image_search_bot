@@ -31,8 +31,6 @@ day to a max of 150 searches per week. And I will not pay for the TinEye atm bec
 - Supports stickers
 - Best Match information by TinEye
 - Best Match information by IQDB as fallback
-
-## ToDo:
 - Support for GIFs
 
 ## Commands:

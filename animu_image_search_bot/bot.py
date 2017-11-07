@@ -7,7 +7,8 @@ from telegram import Bot, TelegramError, Update
 from telegram.ext import CallbackQueryHandler, CommandHandler, Filters, MessageHandler, Updater
 
 from . import settings
-from .commands import best_match, callback_best_match, image_search_link, start, sticker_image_search, unknown
+from .commands import best_match, callback_best_match, gif_image_search, image_search_link, start, \
+    sticker_image_search, unknown
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -52,6 +53,7 @@ def main():
 
     dispatcher.add_handler(MessageHandler(Filters.sticker, sticker_image_search))
     dispatcher.add_handler(MessageHandler(Filters.photo, image_search_link))
+    dispatcher.add_handler(MessageHandler(Filters.video | Filters.document, gif_image_search))
     dispatcher.add_handler(MessageHandler(Filters.command, unknown))
 
     # log all errors

@@ -1,9 +1,11 @@
 import io
 import os
+from tempfile import NamedTemporaryFile
 from uuid import uuid4
 
 from PIL import Image
 from botanio import botan
+from moviepy.video.io.VideoFileClip import VideoFileClip
 from telegram import Bot, ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.parsemode import ParseMode
 
@@ -41,8 +43,6 @@ day to a max of 150 searches per week. And I will not pay for the TinEye atm bec
 - Supports stickers
 - Best Match information by TinEye
 - Best Match information by IQDB as fallback
-
-*ToDo*
 - Support for GIFs
 
 *Commands*
@@ -74,6 +74,38 @@ Thank you for using [@anime_image_search_bot](https://t.me/anime_image_search_bo
     current_dir = os.path.dirname(os.path.realpath(__file__))
     image_dir = os.path.join(current_dir, 'images/example_usage.png')
     bot.send_photo(update.message.chat_id, photo=open(image_dir, 'rb'), caption='Example Usage')
+
+
+def gif_image_search(bot: Bot, update: Update):
+    """Send a reverse image search link for the GIF sent to us
+
+    Args:
+        bot (:obj:`telegram.bot.Bot`): Telegram Api Bot Object.
+        update (:obj:`telegram.update.Update`): Telegram Api Update Object
+    """
+    print(botan.track(BOTAN_API_TOKEN, update.message.from_user.id, update.message.to_dict(), '/gif_image_search'))
+
+    update.message.reply_text('Please wait for your results ...')
+    bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
+
+    document = update.message.document or update.message.video
+    video = bot.getFile(document.file_id)
+
+    with NamedTemporaryFile() as video_file:
+        video.download(out=video_file)
+        video_clip = VideoFileClip(video_file.name, audio=False)
+
+        with NamedTemporaryFile(suffix='.gif') as gif_file:
+            video_clip.write_gif(gif_file.name)
+
+            dirname = os.path.dirname(gif_file.name)
+            file_name = os.path.splitext(gif_file.name)[0]
+            compressed_gif_path = os.path.join(dirname, file_name + '-min.gif')
+
+            os.system('gifsicle -O3 --lossy=50 -o {dst} {src}'.format(dst=compressed_gif_path, src=gif_file.name))
+            if os.path.isfile(compressed_gif_path):
+                general_image_search(bot, update, compressed_gif_path, 'gif')
+            general_image_search(bot, update, gif_file.name, 'gif')
 
 
 def sticker_image_search(bot: Bot, update: Update):
