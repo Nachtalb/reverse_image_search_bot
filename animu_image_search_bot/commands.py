@@ -177,6 +177,8 @@ def general_image_search(bot: Bot, update: Update, image_file, image_extension: 
     button_list = [[
         InlineKeyboardButton(text='Best Match', callback_data='best_match ' + image_url)
     ], [
+        InlineKeyboardButton(text='Go To Image', url=image_url)
+    ], [
         InlineKeyboardButton(text='IQDB', url=iqdb_url),
         InlineKeyboardButton(text='GOOGLE', url=google_url),
     ], [
