@@ -105,7 +105,8 @@ def gif_image_search(bot: Bot, update: Update):
             os.system('gifsicle -O3 --lossy=50 -o {dst} {src}'.format(dst=compressed_gif_path, src=gif_file.name))
             if os.path.isfile(compressed_gif_path):
                 general_image_search(bot, update, compressed_gif_path, 'gif')
-            general_image_search(bot, update, gif_file.name, 'gif')
+            else:
+                general_image_search(bot, update, gif_file.name, 'gif')
 
 
 def sticker_image_search(bot: Bot, update: Update):
