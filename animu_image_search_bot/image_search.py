@@ -109,7 +109,7 @@ class ReverseImageSearchEngine:
             if not self.search_url:
                 raise ValueError('No url defined and no last_searched_url available!')
             url = self.search_url
-        if url == self.search_url and self.search_html != '':
+        if url == self.search_url and self.search_html:
             return self.search_html
 
         request = requests.get(self.get_search_link_by_url(url))

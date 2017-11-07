@@ -30,6 +30,10 @@ def start(bot: Bot, update: Update):
 Send me images or stickers and I will send you direct reverse image search links for IQDB, Google, TinEye and Bing. 
 For anime images I recommend IQDB and TinEye, for other images I recommend to use Google or TinEye.
 
+Attention: The best match feature sometimes does not find a best match on TinEye, even though you do when you open the 
+link. Why is this? This is because TinEye I reached the limit of TinEye's free service. TinEye provides 50 searches per 
+day to a max of 150 searches per week. And I will not pay for the TinEye atm because it is way too expensive for me.
+
 *Features*
 - Give you image reverse search links
 - Supports IQDB, Google, TinEye and Bing
@@ -43,6 +47,8 @@ For anime images I recommend IQDB and TinEye, for other images I recommend to us
 
 *Commands*
 - /help, /start: show a help message with information about the bot and it's usage.
+- /best_match URL: Search for the best match on TinEye (and IQDB when nothing is found on TinEye). The `URL` is a link 
+    to an image
 
 *Attention whore stuff* 
 Please share this bot with your friends so that I ([the magician](https://github.com/Nachtalb/) behind this project) 
@@ -133,52 +139,92 @@ def general_image_search(bot: Bot, update: Update, image_file):
     tineye_url = tineye_search.get_search_link_by_url(image_url)
     bing_url = bing_search.get_search_link_by_url(image_url)
 
-    reply = ''
-    button_list = []
-
-    message = update.message.reply_text('Searching for best match on TinEye...')
-    best_match = tineye_search.best_match
-    if not best_match:
-        bot.edit_message_text('Nothing found on TinEye, searching on IQDB...',
-                              chat_id=update.message.chat_id,
-                              message_id=message.message_id)
-        best_match = iqdb_search.best_match
-    if best_match:
-        reply += (
-            'Best Match:\n'
-            'Link: [{website_name}]({website})\n'.format(
-                website_name=best_match['website_name'],
-                website=best_match['website'],
-            )
-        )
-        reply += dict_to_str(best_match, ignore=['website_name', 'website', 'image_url', 'thumbnail'])
-
-        image_url = best_match.get('image_url', None) or best_match.get('website', None)
-        thumbnail = best_match.get('image_url', None) or best_match.get('thumbnail', None)
-        button_list = [
-            [InlineKeyboardButton(text='Best Match',
-                                  url=image_url)],
-        ]
-        bot.send_photo(chat_id=update.message.chat_id, photo=thumbnail)
-    else:
-        reply = 'Nothing found on TinEye nor IQDB. You can search for the image on the following sites:'
-    bot.delete_message(chat_id=update.message.chat_id, message_id=message.message_id)
-
-    button_list.append([
+    button_list = [[
+        InlineKeyboardButton(text='Best Match', callback_data='best_match ' + image_url)
+    ], [
         InlineKeyboardButton(text='IQDB', url=iqdb_url),
         InlineKeyboardButton(text='GOOGLE', url=google_url),
-    ])
-    button_list.append([
+    ], [
         InlineKeyboardButton(text='TINEYE', url=tineye_url),
         InlineKeyboardButton(text='BING', url=bing_url),
-    ])
+    ]]
 
+    reply = 'You can either use "Best Match" to get your best match right here or search for yourself.'
     reply_markup = InlineKeyboardMarkup(button_list)
     update.message.reply_text(
         text=reply,
-        reply_markup=reply_markup,
-        parse_mode=ParseMode.MARKDOWN
+        reply_markup=reply_markup
     )
+
+
+def callback_best_match(bot: Bot, update: Update):
+    """Find best matches for an image for a :class:`telegram.callbackquery.CallbackQuery`.
+
+    Args:
+        bot (:obj:`telegram.bot.Bot`): Telegram Api Bot Object.
+        update (:obj:`telegram.update.Update`): Telegram Api Update Object
+    """
+    bot.answer_callback_query(update.callback_query.id, show_alert=False)
+    url = update.callback_query.data.split(' ')[1]
+    best_match(bot, update, [url, ])
+
+
+def best_match(bot: Bot, update: Update, args: list):
+    """Find best matches for an image.
+
+    Args:
+        bot (:obj:`telegram.bot.Bot`): Telegram Api Bot Object.
+        update (:obj:`telegram.update.Update`): Telegram Api Update Object
+        args (:obj:`list`): List of arguments passed by the user
+    """
+    if not args:
+        update.message.reply_text('You have to give me an URL to make this work.')
+    tineye = TinEyeReverseImageSearchEngine()
+    iqdb = IQDBReverseImageSearchEngine()
+    tineye.search_url = args[0]
+    iqdb.search_url = args[0]
+
+    chat_id = update.effective_chat.id
+    message = bot.send_message(chat_id, 'Searching for best match on TinEye...')
+
+    match = tineye.best_match
+    if not match:
+        bot.edit_message_text(
+            text='Nothing found on TinEye, searching on IQDB...',
+            chat_id=chat_id,
+            message_id=message.message_id
+        )
+        match = iqdb.best_match
+
+    if match:
+        reply = (
+            'Best Match:\n'
+            'Link: [{website_name}]({website})\n'.format(
+                website_name=match['website_name'],
+                website=match['website'],
+            )
+        )
+        reply += dict_to_str(match, ignore=['website_name', 'website', 'image_url', 'thumbnail'])
+
+        image_url = match.get('image_url', None) or match.get('website', None)
+        thumbnail = match.get('image_url', None) or match.get('thumbnail', None)
+
+        reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(text='Open', url=image_url), ], ])
+        bot.delete_message(chat_id, message.message_id)
+
+        bot.send_photo(chat_id=chat_id, photo=thumbnail)
+        bot.send_message(
+            chat_id=chat_id,
+            text=reply,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.MARKDOWN
+        )
+    else:
+        bot.edit_message_text(
+            text='Nothing found on TinEye nor IQDB.',
+            chat_id=chat_id,
+            message_id=message.message_id,
+        )
 
 
 def unknown(bot: Bot, update: Update):

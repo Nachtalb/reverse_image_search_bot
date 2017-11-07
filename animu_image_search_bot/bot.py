@@ -4,10 +4,10 @@ import sys
 from threading import Thread
 
 from telegram import Bot, TelegramError, Update
-from telegram.ext import CommandHandler, Filters, MessageHandler, Updater
+from telegram.ext import CallbackQueryHandler, CommandHandler, Filters, MessageHandler, Updater
 
 from . import settings
-from .commands import image_search_link, start, sticker_image_search, unknown
+from .commands import best_match, callback_best_match, image_search_link, start, sticker_image_search, unknown
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -47,6 +47,8 @@ def main():
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CommandHandler("help", start))
     dispatcher.add_handler(CommandHandler('restart', restart, filters=Filters.user(username='@Nachtalb')))
+    dispatcher.add_handler(CommandHandler('best_match', best_match, pass_args=True))
+    dispatcher.add_handler(CallbackQueryHandler(callback_best_match))
 
     dispatcher.add_handler(MessageHandler(Filters.sticker, sticker_image_search))
     dispatcher.add_handler(MessageHandler(Filters.photo, image_search_link))

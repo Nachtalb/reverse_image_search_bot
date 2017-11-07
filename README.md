@@ -20,6 +20,10 @@
 Send me images or stickers and I will send you direct reverse image search links for IQDB, Google, TinEye and Bing. 
 For anime images I recommend IQDB and TinEye, for other images I recommend to use Google or TinEye.
 
+Attention: The best match feature sometimes does not find a best match on TinEye, even though you do when you open the 
+link. Why is this? This is because TinEye I reached the limit of TinEye's free service. TinEye provides 50 searches per 
+day to a max of 150 searches per week. And I will not pay for the TinEye atm because it is way too expensive for me.
+
 ## Features:
 - Give you image reverse search links
 - Supports IQDB, Google, TinEye and Bing
@@ -33,6 +37,8 @@ For anime images I recommend IQDB and TinEye, for other images I recommend to us
 
 ## Commands:
 - /help, /start: show a help message with information about the bot and it's usage.
+- /best_match URL: Search for the best match on TinEye (and IQDB when nothing is found on TinEye). The `URL` is a link 
+    to an image
 
 ## Attention whore stuff: 
 Please share this bot with your friends so that I ([the magician](https://github.com/Nachtalb/) behind this project) 
