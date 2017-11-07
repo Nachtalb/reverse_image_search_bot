@@ -24,16 +24,17 @@ Attention: The best match feature sometimes does not find a best match on TinEye
 link. Why is this? This is because TinEye I reached the limit of TinEye's free service. TinEye provides 50 searches per 
 day to a max of 150 searches per week. And I will not pay for the TinEye atm because it is way too expensive for me.
 
+![](animu_image_search_bot/images/example_usage.png)
+
 ## Features:
 - Give you image reverse search links
 - Supports IQDB, Google, TinEye and Bing
 - Supports normal images like JPG, PNG, WEBP
 - Supports stickers
+- Supports GIFs (can take some time till the GIFs are ready)
+- Supports Videos (will be searched as GIFs)
 - Best Match information by TinEye
 - Best Match information by IQDB as fallback
-
-## ToDo:
-- Support for GIFs
 
 ## Commands:
 - /help, /start: show a help message with information about the bot and it's usage.

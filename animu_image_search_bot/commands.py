@@ -1,9 +1,11 @@
 import io
 import os
+from tempfile import NamedTemporaryFile
 from uuid import uuid4
 
 from PIL import Image
 from botanio import botan
+from moviepy.video.io.VideoFileClip import VideoFileClip
 from telegram import Bot, ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.parsemode import ParseMode
 
@@ -39,15 +41,14 @@ day to a max of 150 searches per week. And I will not pay for the TinEye atm bec
 - Supports IQDB, Google, TinEye and Bing
 - Supports normal images like JPG, PNG, WEBP
 - Supports stickers
+- Supports GIFs (can take some time till the GIFs are ready)
+- Supports Videos (will be searched as GIFs)
 - Best Match information by TinEye
 - Best Match information by IQDB as fallback
 
-*ToDo*
-- Support for GIFs
-
 *Commands*
 - /help, /start: show a help message with information about the bot and it's usage.
-- /best_match URL: Search for the best match on TinEye (and IQDB when nothing is found on TinEye). The `URL` is a link 
+- /best\_match URL: Search for the best match on TinEye (and IQDB when nothing is found on TinEye). The `URL` is a link 
     to an image
 
 *Attention whore stuff* 
@@ -74,6 +75,39 @@ Thank you for using [@anime_image_search_bot](https://t.me/anime_image_search_bo
     current_dir = os.path.dirname(os.path.realpath(__file__))
     image_dir = os.path.join(current_dir, 'images/example_usage.png')
     bot.send_photo(update.message.chat_id, photo=open(image_dir, 'rb'), caption='Example Usage')
+
+
+def gif_image_search(bot: Bot, update: Update):
+    """Send a reverse image search link for the GIF sent to us
+
+    Args:
+        bot (:obj:`telegram.bot.Bot`): Telegram Api Bot Object.
+        update (:obj:`telegram.update.Update`): Telegram Api Update Object
+    """
+    print(botan.track(BOTAN_API_TOKEN, update.message.from_user.id, update.message.to_dict(), '/gif_image_search'))
+
+    update.message.reply_text('Please wait for your results ...')
+    bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
+
+    document = update.message.document or update.message.video
+    video = bot.getFile(document.file_id)
+
+    with NamedTemporaryFile() as video_file:
+        video.download(out=video_file)
+        video_clip = VideoFileClip(video_file.name, audio=False)
+
+        with NamedTemporaryFile(suffix='.gif') as gif_file:
+            video_clip.write_gif(gif_file.name)
+
+            dirname = os.path.dirname(gif_file.name)
+            file_name = os.path.splitext(gif_file.name)[0]
+            compressed_gif_path = os.path.join(dirname, file_name + '-min.gif')
+
+            os.system('gifsicle -O3 --lossy=50 -o {dst} {src}'.format(dst=compressed_gif_path, src=gif_file.name))
+            if os.path.isfile(compressed_gif_path):
+                general_image_search(bot, update, compressed_gif_path, 'gif')
+            else:
+                general_image_search(bot, update, gif_file.name, 'gif')
 
 
 def sticker_image_search(bot: Bot, update: Update):
@@ -145,6 +179,8 @@ def general_image_search(bot: Bot, update: Update, image_file, image_extension: 
     button_list = [[
         InlineKeyboardButton(text='Best Match', callback_data='best_match ' + image_url)
     ], [
+        InlineKeyboardButton(text='Go To Image', url=image_url)
+    ], [
         InlineKeyboardButton(text='IQDB', url=iqdb_url),
         InlineKeyboardButton(text='GOOGLE', url=google_url),
     ], [
@@ -167,6 +203,8 @@ def callback_best_match(bot: Bot, update: Update):
         bot (:obj:`telegram.bot.Bot`): Telegram Api Bot Object.
         update (:obj:`telegram.update.Update`): Telegram Api Update Object
     """
+    print(botan.track(BOTAN_API_TOKEN, update.message.from_user.id, update.message.to_dict(), '/callback_best_match'))
+
     bot.answer_callback_query(update.callback_query.id, show_alert=False)
     url = update.callback_query.data.split(' ')[1]
     best_match(bot, update, [url, ])
@@ -180,8 +218,12 @@ def best_match(bot: Bot, update: Update, args: list):
         update (:obj:`telegram.update.Update`): Telegram Api Update Object
         args (:obj:`list`): List of arguments passed by the user
     """
+    if not update.message:
+        print(botan.track(BOTAN_API_TOKEN, update.message.from_user.id, update.message.to_dict(), '/best_match'))
+
     if not args:
         update.message.reply_text('You have to give me an URL to make this work.')
+        return
     tineye = TinEyeReverseImageSearchEngine()
     iqdb = IQDBReverseImageSearchEngine()
     tineye.search_url = args[0]
