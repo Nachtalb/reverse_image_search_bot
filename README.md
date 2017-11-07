@@ -33,6 +33,8 @@ For anime images I recommend IQDB and TinEye, for other images I recommend to us
 
 ## Commands:
 - /help, /start: show a help message with information about the bot and it's usage.
+- /best_match URL: Search for the best match on TinEye (and IQDB when nothing is found on TinEye). The `URL` is a link 
+    to an image
 
 ## Attention whore stuff: 
 Please share this bot with your friends so that I ([the magician](https://github.com/Nachtalb/) behind this project) 
