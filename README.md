@@ -29,9 +29,10 @@ day to a max of 150 searches per week. And I will not pay for the TinEye atm bec
 - Supports IQDB, Google, TinEye and Bing
 - Supports normal images like JPG, PNG, WEBP
 - Supports stickers
+- Supports GIFs (can take some time till the GIFs are ready)
+- Supports Videos (will be searched as GIFs)
 - Best Match information by TinEye
 - Best Match information by IQDB as fallback
-- Support for GIFs
 
 ## Commands:
 - /help, /start: show a help message with information about the bot and it's usage.
