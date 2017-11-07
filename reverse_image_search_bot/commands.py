@@ -24,9 +24,9 @@ def start(bot: Bot, update: Update):
     """
     print(botan.track(BOTAN_API_TOKEN, update.message.from_user.id, update.message.to_dict(), '/start'))
 
-    reply = """*Anime Image Search Bot*
+    reply = """*Reverse Image Search Bot*
 
-[@anime_image_search_bot](https://t.me/anime_image_search_bot)
+[@reverse_image_search_bot](https://t.me/reverse_image_search_bot)
 
 *How to use me*
 Send me images or stickers and I will send you direct reverse image search links for IQDB, Google, TinEye and Bing. 
@@ -67,7 +67,7 @@ If you have found a bug or want a new feature, please make an issue here: [Nacht
 _Code Contribution / Pull Requests_
 Please use a line length of 120 characters and [Google Style Python Docstrings](http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html). 
 
-Thank you for using [@anime_image_search_bot](https://t.me/anime_image_search_bot).
+Thank you for using [@reverse_image_search_bot](https://t.me/reverse_image_search_bot).
 """
 
     update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)

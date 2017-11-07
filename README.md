@@ -1,6 +1,6 @@
-# Anime Image Search Bot
+# Reverse Image Search Bot
 
-[@anime_image_search_bot](https://t.me/anime_image_search_bot)
+[@reverse_image_search_bot](https://t.me/reverse_image_search_bot)
 
 <!-- toc -->
 
@@ -81,4 +81,4 @@ python run_bot.py
 In the `settings.py` you can additionally add a [botan.io](http://botan.io) API Token which let's you create 
 statistics.
 
-Thank you for using [@anime_image_search_bot](https://t.me/anime_image_search_bot).
+Thank you for using [@reverse_image_search_bot](https://t.me/reverse_image_search_bot).
