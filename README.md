@@ -6,7 +6,6 @@
 
 - [How to use me](#how-to-use-me)
 - [Features:](#features)
-- [ToDo:](#todo)
 - [Commands:](#commands)
 - [Attention whore stuff:](#attention-whore-stuff)
 - [Contributions:](#contributions)
