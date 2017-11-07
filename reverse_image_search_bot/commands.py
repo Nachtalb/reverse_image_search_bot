@@ -9,7 +9,7 @@ from moviepy.video.io.VideoFileClip import VideoFileClip
 from telegram import Bot, ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.parsemode import ParseMode
 
-from animu_image_search_bot.utils import dict_to_str
+from reverse_image_search_bot.utils import dict_to_str
 from .image_search import BingReverseImageSearchEngine, GoogleReverseImageSearchEngine, IQDBReverseImageSearchEngine, \
     TinEyeReverseImageSearchEngine
 from .settings import BOTAN_API_TOKEN
@@ -24,9 +24,9 @@ def start(bot: Bot, update: Update):
     """
     print(botan.track(BOTAN_API_TOKEN, update.message.from_user.id, update.message.to_dict(), '/start'))
 
-    reply = """*Anime Image Search Bot*
+    reply = """*Reverse Image Search Bot*
 
-[@anime_image_search_bot](https://t.me/anime_image_search_bot)
+[@reverse_image_search_bot](https://t.me/reverse_image_search_bot)
 
 *How to use me*
 Send me images or stickers and I will send you direct reverse image search links for IQDB, Google, TinEye and Bing. 
@@ -62,12 +62,12 @@ Telegram
 
 *Contributions*
 _Bug report / Feature request_
-If you have found a bug or want a new feature, please make an issue here: [Nachtalb/animu_image_search_bot](https://github.com/Nachtalb/animu_image_search_bot)
+If you have found a bug or want a new feature, please make an issue here: [Nachtalb/reverse_image_search_bot](https://github.com/Nachtalb/reverse_image_search_bot)
 
 _Code Contribution / Pull Requests_
 Please use a line length of 120 characters and [Google Style Python Docstrings](http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html). 
 
-Thank you for using [@anime_image_search_bot](https://t.me/anime_image_search_bot).
+Thank you for using [@reverse_image_search_bot](https://t.me/reverse_image_search_bot).
 """
 
     update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)

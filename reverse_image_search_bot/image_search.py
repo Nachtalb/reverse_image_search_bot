@@ -7,7 +7,7 @@ from urllib.parse import quote_plus
 import requests
 from bs4 import BeautifulSoup
 
-from animu_image_search_bot.settings import UPLOADER
+from reverse_image_search_bot.settings import UPLOADER
 
 uploader_pkg_name, uploader_class_name = UPLOADER['uploader'].rsplit('.', 1)
 uploader_module = import_module(uploader_pkg_name)

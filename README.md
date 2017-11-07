@@ -1,6 +1,6 @@
-# Anime Image Search Bot
+# Reverse Image Search Bot
 
-[@anime_image_search_bot](https://t.me/anime_image_search_bot)
+[@reverse_image_search_bot](https://t.me/reverse_image_search_bot)
 
 <!-- toc -->
 
@@ -24,7 +24,7 @@ Attention: The best match feature sometimes does not find a best match on TinEye
 link. Why is this? This is because TinEye I reached the limit of TinEye's free service. TinEye provides 50 searches per 
 day to a max of 150 searches per week. And I will not pay for the TinEye atm because it is way too expensive for me.
 
-![](animu_image_search_bot/images/example_usage.png)
+![](reverse_image_search_bot/images/example_usage.png)
 
 ## Features:
 - Give you image reverse search links
@@ -81,4 +81,4 @@ python run_bot.py
 In the `settings.py` you can additionally add a [botan.io](http://botan.io) API Token which let's you create 
 statistics.
 
-Thank you for using [@anime_image_search_bot](https://t.me/anime_image_search_bot).
+Thank you for using [@reverse_image_search_bot](https://t.me/reverse_image_search_bot).
