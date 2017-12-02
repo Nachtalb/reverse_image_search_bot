@@ -4,7 +4,6 @@ from tempfile import NamedTemporaryFile
 from uuid import uuid4
 
 from PIL import Image
-from botanio import botan
 from moviepy.video.io.VideoFileClip import VideoFileClip
 from telegram import Bot, ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.parsemode import ParseMode
@@ -12,7 +11,6 @@ from telegram.parsemode import ParseMode
 from reverse_image_search_bot.utils import dict_to_str
 from .image_search import BingReverseImageSearchEngine, GoogleReverseImageSearchEngine, IQDBReverseImageSearchEngine, \
     TinEyeReverseImageSearchEngine
-from .settings import BOTAN_API_TOKEN
 
 
 def start(bot: Bot, update: Update):
@@ -22,8 +20,6 @@ def start(bot: Bot, update: Update):
         bot (:obj:`telegram.bot.Bot`): Telegram Api Bot Object.
         update (:obj:`telegram.update.Update`): Telegram Api Update Object
     """
-    print(botan.track(BOTAN_API_TOKEN, update.message.from_user.id, update.message.to_dict(), '/start'))
-
     reply = """*Reverse Image Search Bot*
 
 [@reverse_image_search_bot](https://t.me/reverse_image_search_bot)
@@ -84,8 +80,6 @@ def gif_image_search(bot: Bot, update: Update):
         bot (:obj:`telegram.bot.Bot`): Telegram Api Bot Object.
         update (:obj:`telegram.update.Update`): Telegram Api Update Object
     """
-    print(botan.track(BOTAN_API_TOKEN, update.message.from_user.id, update.message.to_dict(), '/gif_image_search'))
-
     update.message.reply_text('Please wait for your results ...')
     bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
 
@@ -117,8 +111,6 @@ def sticker_image_search(bot: Bot, update: Update):
         bot (:obj:`telegram.bot.Bot`): Telegram Api Bot Object.
         update (:obj:`telegram.update.Update`): Telegram Api Update Object
     """
-    print(botan.track(BOTAN_API_TOKEN, update.message.from_user.id, update.message.to_dict(), '/sticker_image_search'))
-
     update.message.reply_text('Please wait for your results ...')
     bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
 
@@ -141,8 +133,6 @@ def image_search_link(bot: Bot, update: Update):
         bot (:obj:`telegram.bot.Bot`): Telegram Api Bot Object.
         update (:obj:`telegram.update.Update`): Telegram Api Update Object
     """
-    print(botan.track(BOTAN_API_TOKEN, update.message.from_user.id, update.message.to_dict(), '/image_search_link'))
-
     update.message.reply_text('Please wait for your results ...')
     bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
 
@@ -203,8 +193,6 @@ def callback_best_match(bot: Bot, update: Update):
         bot (:obj:`telegram.bot.Bot`): Telegram Api Bot Object.
         update (:obj:`telegram.update.Update`): Telegram Api Update Object
     """
-    print(botan.track(BOTAN_API_TOKEN, update.effective_user.id, update.callback_query.to_dict(), '/callback_best_match'))
-
     bot.answer_callback_query(update.callback_query.id, show_alert=False)
     url = update.callback_query.data.split(' ')[1]
     best_match(bot, update, [url, ])
@@ -218,9 +206,6 @@ def best_match(bot: Bot, update: Update, args: list):
         update (:obj:`telegram.update.Update`): Telegram Api Update Object
         args (:obj:`list`): List of arguments passed by the user
     """
-    if update.message:
-        print(botan.track(BOTAN_API_TOKEN, update.message.from_user.id, update.message.to_dict(), '/best_match'))
-
     if not args:
         update.message.reply_text('You have to give me an URL to make this work.')
         return
@@ -279,5 +264,4 @@ def unknown(bot: Bot, update: Update):
         bot (:obj:`telegram.bot.Bot`): Telegram Api Bot Object.
         update (:obj:`telegram.update.Update`): Telegram Api Update Object
     """
-    print(botan.track(BOTAN_API_TOKEN, update.message.from_user, update.message.to_dict(), 'unknown'))
     update.message.reply_text("Sorry, I didn't understand that command.")

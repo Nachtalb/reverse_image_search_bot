@@ -78,12 +78,6 @@
             ],
             "version": "==4.6.0"
         },
-        "botanio": {
-            "hashes": [
-                "sha256:3f0a371533e78c89c50cf32dcdbaae2611adf34556b6ed74558e040e02ca892a"
-            ],
-            "version": "==1.0.0"
-        },
         "bs4": {
             "hashes": [
                 "sha256:36ecea1fd7cc5c0c6e4a1ff075df26d50da647b75376626cc186e2212886dd3a"
