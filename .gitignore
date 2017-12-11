@@ -102,3 +102,5 @@ ENV/
 
 ### Animu Image Search Bot
 settings.py
+log/
+tmp/

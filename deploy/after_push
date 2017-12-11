@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -e
+
+echo files changed: $(git diff $oldrev $newrev --diff-filter=ACDMR --name-only | wc -l)
+
+umask 002
+
+git submodule sync && git submodule update --init --recursive
+echo "Restarting reverse_image_search_bot.service"
+systemctl --user restart reverse_image_search_bot.service
+echo "Restarted"

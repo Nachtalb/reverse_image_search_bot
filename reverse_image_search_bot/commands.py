@@ -73,6 +73,17 @@ Thank you for using [@reverse_image_search_bot](https://t.me/reverse_image_searc
     bot.send_photo(update.message.chat_id, photo=open(image_dir, 'rb'), caption='Example Usage')
 
 
+def group_image_reply_search(bot: Bot, update: Update):
+    """Reverse search for reply mentions to images in groups
+
+    Args:
+        bot (:obj:`telegram.bot.Bot`): Telegram Api Bot Object.
+        update (:obj:`telegram.update.Update`): Telegram Api Update Object
+    """
+    print(update.message.reply_to_message.document.file_id)
+    pass
+
+
 def gif_image_search(bot: Bot, update: Update):
     """Send a reverse image search link for the GIF sent to us
 
