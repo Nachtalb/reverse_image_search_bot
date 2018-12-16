@@ -1,5 +1,12 @@
 # Reverse Image Search Bot
 
+## ATTENTION
+As you may see when you look at the commits of this repo, it is not maintained anymore. I dropped all my bots except XenianBot. This is because XenianBot includes all of my other bots functionalities. See more at:
+- [@XenianBot](https://t.me/XenianBot) 
+- [Github/XenianBot](https://github.com/Nachtalb/XenianBot)]
+
+---
+
 [@reverse_image_search_bot](https://t.me/reverse_image_search_bot)
 
 <!-- toc -->
