@@ -1,9 +1,15 @@
 # Reverse Image Search Bot
 
 ## ATTENTION
-As you may see when you look at the commits of this repo, it is not maintained anymore. I dropped all my bots except XenianBot. This is because XenianBot includes all of my other bots functionalities. See more at:
-- [@XenianBot](https://t.me/XenianBot) 
-- [Github/XenianBot](https://github.com/Nachtalb/XenianBot)]
+
+If you just want to use the reverse search you can use my other bot [@XenianBot](https://t.me/XenianBot) intead. 
+It has more search engines and is up and running.
+
+- [XenianBot on Telegram](https://t.me/XenianBot) 
+- [XenianBot on GitHub](https://github.com/Nachtalb/XenianBot)
+
+This repository here is just for archival purposes. I probably won't work on this anymore. Any new features would
+go to XenianBot. 
 
 ---
 
