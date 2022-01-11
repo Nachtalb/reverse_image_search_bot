@@ -24,48 +24,44 @@ def start(bot: Bot, update: Update):
     """
     reply = """*Reverse Image Search Bot*
 
-[@reverse_image_search_bot](https://t.me/reverse_image_search_bot)
-
 *How to use me*
-Send me images or stickers and I will send you direct reverse image search links for IQDB, Google, TinEy, Yandex and
-Bing. For anime images I recommend IQDB and TinEye, for other images I recommend to use Google, Yandex or TinEye.
+Send me an image, sticker, video/gif or url and I will send you direct reverse image search links for SauceNao, Google, Yandex and the like.
+For anime images I recommend SauceNao, for other images I recommend to use Google, Yandex.
 
-Attention: The best match feature sometimes does not find a best match on TinEye, even though you do when you open the
-link. Why is this? This is because TinEye I reached the limit of TinEye's free service. TinEye provides 50 searches per
-day to a max of 150 searches per week. And I will not pay for the TinEye atm because it is way too expensive for me.
+Supported engines:
+- General: Goolge, Yandex, Bing & TinEye
+- Artworks & Anime: SauceNAO, IQDB, Trace & ascii2d
 
-*Features*
-- Give you image reverse search links
-- Supports IQDB, Google, TinEye, Yandex and Bing
-- Supports normal images like JPG, PNG, WEBP
-- Supports stickers
-- Supports GIFs (can take some time till the GIFs are ready)
-- Supports Videos (will be searched as GIFs)
-- Best Match information by TinEye
-- Best Match information by IQDB as fallback
+Inline search results:
+- IQDB unlimited
+- Trace 1000/month
+- TineEye 50/day 150/week
+- SauceNAO 6/30s 200/24h
 
 *Commands*
-- /help, /start: show a help message with information about the bot and it's usage.
-- /best\_match URL: Search for the best match on TinEye (and IQDB when nothing is found on TinEye). The `URL` is a link
-    to an image
+- /help, /start: show this help message
 
-*Attention whore stuff*
-Please share this bot with your friends so that I ([the magician](https://github.com/Nachtalb/) behind this project)
-have enough motivation to continue and maintain this bot.
+*Author*
+https://github.com/Nachtalb
 
-Check out my other project\[s\]:
-- [@insta_looter_bot](https://github.com/Nachtalb/insta_looter_bot) - Download images and videos from Instagram via
-Telegram
+*Donations*
+- BTC: 3E6Pw8gwLJSyfumpjuJ6CWNKjZJLCmXZ2G
+- BTC/BSC: 0x3c5211340Db470A31F1a37E343E326db69FF2F5C
+- ETH: 0x3c5211340Db470A31F1a37E343E326db69FF2F5C
+- USDC: 0x3c5211340Db470A31F1a37E343E326db69FF2F5C
+- PayString: nachtalb$paystring.crypto.com
 
 
-*Contributions*
-_Bug report / Feature request_
-If you have found a bug or want a new feature, please make an issue here: [Nachtalb/reverse_image_search_bot](https://github.com/Nachtalb/reverse_image_search_bot)
+*Other Bots*
+- @XenianBot All general purpose but with tons of functionality
 
-_Code Contribution / Pull Requests_
-Please use a line length of 120 characters and [Google Style Python Docstrings](http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html).
 
-Thank you for using [@reverse_image_search_bot](https://t.me/reverse_image_search_bot).
+*Issues / Contributions*
+- Code repository: https://github.com/Nachtalb/reverse_image_search_bot
+- @Nachtalb
+- via /support at @XenianBot
+
+Thank you for using @reverse_image_search_bot.
 """
 
     update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)
