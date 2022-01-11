@@ -166,7 +166,7 @@ def general_image_search(bot: Bot, update: Update, image_file, image_extension: 
     saucenao_search = SauceNaoReverseImageSearchEngine()
     trace_search = TraceReverseImageSearchEngine()
 
-    image_url = iqdb_search.upload_image(image_file, 'irs-' + str(uuid4())[:8] + '.' + image_extension)
+    image_url = iqdb_search.upload_image(image_file, image_name + '.' + image_extension)
 
     button_list = [[
         InlineKeyboardButton(text='Best Match (TinyEye & IQDB)', callback_data='best_match ' + image_url)
@@ -222,14 +222,15 @@ def best_match(bot: Bot, update: Update, args: list):
     iqdb.search_url = args[0]
 
     chat_id = update.effective_chat.id
-    message = bot.send_message(chat_id, 'Searching for best match on TinEye...')
+    message = bot.send_message(chat_id, 'Searching on <b>TinEye</b>, IQDB..', parse_mode=ParseMode.HTML)
 
     match = tineye.best_match
     if not match:
         bot.edit_message_text(
-            text='Nothing found on TinEye, searching on IQDB...',
+            text='Searching on TinEye, <b>IQDB</b>....',
             chat_id=chat_id,
-            message_id=message.message_id
+            message_id=message.message_id,
+            parse_mode=ParseMode.HTML
         )
         match = iqdb.best_match
 
@@ -258,9 +259,10 @@ def best_match(bot: Bot, update: Update, args: list):
         )
     else:
         bot.edit_message_text(
-            text='Nothing found on TinEye nor IQDB.',
+            text='Searching on TinEye, IQDB.... yielded no results',
             chat_id=chat_id,
             message_id=message.message_id,
+            parse_mode=ParseMode.MARKDOWN
         )
 
 
