@@ -103,18 +103,9 @@ def gif_image_search(bot: Bot, update: Update):
         video.download(out=video_file)
         video_clip = VideoFileClip(video_file.name, audio=False)
 
-        with NamedTemporaryFile(suffix='.gif') as gif_file:
-            video_clip.write_gif(gif_file.name)
-
-            dirname = os.path.dirname(gif_file.name)
-            file_name = os.path.splitext(gif_file.name)[0]
-            compressed_gif_path = os.path.join(dirname, file_name + '-min.gif')
-
-            os.system('gifsicle -O3 --lossy=50 -o {dst} {src}'.format(dst=compressed_gif_path, src=gif_file.name))
-            if os.path.isfile(compressed_gif_path):
-                general_image_search(bot, update, compressed_gif_path, 'gif')
-            else:
-                general_image_search(bot, update, gif_file.name, 'gif')
+        with NamedTemporaryFile(suffix='.jpg') as jpg_file:
+            video_clip.save_frame(jpg_file.name)
+            general_image_search(bot, update, jpg_file, 'jpg')
 
 
 def sticker_image_search(bot: Bot, update: Update):
