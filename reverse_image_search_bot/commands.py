@@ -11,7 +11,8 @@ from telegram.parsemode import ParseMode
 from reverse_image_search_bot.utils import dict_to_str
 from .image_search import BingReverseImageSearchEngine, \
     GoogleReverseImageSearchEngine, IQDBReverseImageSearchEngine, \
-    TinEyeReverseImageSearchEngine, YandexReverseImageSearchEngine
+    TinEyeReverseImageSearchEngine, YandexReverseImageSearchEngine, \
+    SauceNaoReverseImageSearchEngine, TraceReverseImageSearchEngine
 
 
 def start(bot: Bot, update: Update):
@@ -26,11 +27,11 @@ def start(bot: Bot, update: Update):
 [@reverse_image_search_bot](https://t.me/reverse_image_search_bot)
 
 *How to use me*
-Send me images or stickers and I will send you direct reverse image search links for IQDB, Google, TinEy, Yandex and 
+Send me images or stickers and I will send you direct reverse image search links for IQDB, Google, TinEy, Yandex and
 Bing. For anime images I recommend IQDB and TinEye, for other images I recommend to use Google, Yandex or TinEye.
 
-Attention: The best match feature sometimes does not find a best match on TinEye, even though you do when you open the 
-link. Why is this? This is because TinEye I reached the limit of TinEye's free service. TinEye provides 50 searches per 
+Attention: The best match feature sometimes does not find a best match on TinEye, even though you do when you open the
+link. Why is this? This is because TinEye I reached the limit of TinEye's free service. TinEye provides 50 searches per
 day to a max of 150 searches per week. And I will not pay for the TinEye atm because it is way too expensive for me.
 
 *Features*
@@ -45,15 +46,15 @@ day to a max of 150 searches per week. And I will not pay for the TinEye atm bec
 
 *Commands*
 - /help, /start: show a help message with information about the bot and it's usage.
-- /best\_match URL: Search for the best match on TinEye (and IQDB when nothing is found on TinEye). The `URL` is a link 
+- /best\_match URL: Search for the best match on TinEye (and IQDB when nothing is found on TinEye). The `URL` is a link
     to an image
 
-*Attention whore stuff* 
-Please share this bot with your friends so that I ([the magician](https://github.com/Nachtalb/) behind this project) 
+*Attention whore stuff*
+Please share this bot with your friends so that I ([the magician](https://github.com/Nachtalb/) behind this project)
 have enough motivation to continue and maintain this bot.
 
-Check out my other project\[s\]: 
-- [@insta_looter_bot](https://github.com/Nachtalb/insta_looter_bot) - Download images and videos from Instagram via 
+Check out my other project\[s\]:
+- [@insta_looter_bot](https://github.com/Nachtalb/insta_looter_bot) - Download images and videos from Instagram via
 Telegram
 
 
@@ -62,7 +63,7 @@ _Bug report / Feature request_
 If you have found a bug or want a new feature, please make an issue here: [Nachtalb/reverse_image_search_bot](https://github.com/Nachtalb/reverse_image_search_bot)
 
 _Code Contribution / Pull Requests_
-Please use a line length of 120 characters and [Google Style Python Docstrings](http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html). 
+Please use a line length of 120 characters and [Google Style Python Docstrings](http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html).
 
 Thank you for using [@reverse_image_search_bot](https://t.me/reverse_image_search_bot).
 """
@@ -171,27 +172,26 @@ def general_image_search(bot: Bot, update: Update, image_file, image_extension: 
     tineye_search = TinEyeReverseImageSearchEngine()
     bing_search = BingReverseImageSearchEngine()
     yandex_search = YandexReverseImageSearchEngine()
+    saucenao_search = SauceNaoReverseImageSearchEngine()
+    trace_search = TraceReverseImageSearchEngine()
 
     image_url = iqdb_search.upload_image(image_file, 'irs-' + str(uuid4())[:8] + '.' + image_extension)
 
-    iqdb_url = iqdb_search.get_search_link_by_url(image_url)
-    google_url = google_search.get_search_link_by_url(image_url)
-    tineye_url = tineye_search.get_search_link_by_url(image_url)
-    bing_url = bing_search.get_search_link_by_url(image_url)
-    yandex_url = yandex_search.get_search_link_by_url(image_url)
-
     button_list = [[
-        InlineKeyboardButton(text='Best Match', callback_data='best_match ' + image_url)
+        InlineKeyboardButton(text='Best Match (TinyEye & IQDB)', callback_data='best_match ' + image_url)
     ], [
         InlineKeyboardButton(text='Go To Image', url=image_url)
     ], [
-        InlineKeyboardButton(text='IQDB', url=iqdb_url),
-        InlineKeyboardButton(text='GOOGLE', url=google_url),
+        saucenao_search.button(image_url),
+        google_search.button(image_url),
     ], [
-        InlineKeyboardButton(text='TINEYE', url=tineye_url),
-        InlineKeyboardButton(text='BING', url=bing_url),
+        iqdb_search.button(image_url),
+        yandex_search.button(image_url),
     ], [
-        InlineKeyboardButton(text='YANDEX', url=yandex_url),
+        bing_search.button(image_url),
+        tineye_search.button(image_url),
+    ], [
+        trace_search.button(image_url),
     ]]
 
     reply = 'You can either use "Best Match" to get your best match right here or search for yourself.'

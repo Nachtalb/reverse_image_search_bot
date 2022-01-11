@@ -6,6 +6,7 @@ from urllib.parse import quote_plus
 
 import requests
 from bs4 import BeautifulSoup
+from telegram import InlineKeyboardButton
 
 from reverse_image_search_bot.settings import UPLOADER
 
@@ -43,6 +44,10 @@ class ReverseImageSearchEngine:
         self.url_base = url_base
         self.url_path = url_path
         self.name = name
+
+    def button(self, url):
+        url = self.get_search_link_by_url(url)
+        return InlineKeyboardButton(text=self.name, url=url)
 
     def get_search_link_by_url(self, url):
         """Get the reverse image search link for the given url
@@ -291,4 +296,26 @@ class YandexReverseImageSearchEngine(ReverseImageSearchEngine):
             url_base='https://yandex.com',
             url_path='/images/search?url={image_url}&rpt=imageview',
             name='Yandex'
+        )
+
+class SauceNaoReverseImageSearchEngine(ReverseImageSearchEngine):
+    """A :class:`ReverseImageSearchEngine` configured for saucenao.com"""
+
+    def __init__(self):
+        super(SauceNaoReverseImageSearchEngine, self).__init__(
+            url_base='https://saucenao.com',
+            url_path='/search.php?url={image_url}',
+            name='SauceNao'
+        )
+
+
+class TraceReverseImageSearchEngine(ReverseImageSearchEngine):
+    """A :class:`ReverseImageSearchEngine` configured for trace.moe
+    """
+
+    def __init__(self):
+        super(TraceReverseImageSearchEngine, self).__init__(
+            url_base='https://trace.moe',
+            url_path='/?auto&url={image_url}',
+            name='Trace'
         )
