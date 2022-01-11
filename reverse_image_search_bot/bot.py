@@ -26,7 +26,7 @@ def error(bot: Bot, update: Update, error: TelegramError):
 
 
 def main():
-    updater = Updater(settings.TELEGRAM_API_TOKEN)
+    updater = Updater(settings.TELEGRAM_API_TOKEN, use_context=False)
     dispatcher = updater.dispatcher
 
     def stop_and_restart():
