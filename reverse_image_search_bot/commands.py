@@ -45,11 +45,12 @@ Inline search results:
 https://github.com/Nachtalb
 
 *Donations*
-- BTC: 3E6Pw8gwLJSyfumpjuJ6CWNKjZJLCmXZ2G
-- BTC/BSC: 0x3c5211340Db470A31F1a37E343E326db69FF2F5C
-- ETH: 0x3c5211340Db470A31F1a37E343E326db69FF2F5C
-- USDC: 0x3c5211340Db470A31F1a37E343E326db69FF2F5C
-- PayString: nachtalb$paystring.crypto.com
+- [PayPal](https://paypal.me/Espig)
+- BTC: `3E6Pw8gwLJSyfumpjuJ6CWNKjZJLCmXZ2G`
+- BTC/BSC: `0x3c5211340Db470A31F1a37E343E326db69FF2F5C`
+- ETH: `0x3c5211340Db470A31F1a37E343E326db69FF2F5C`
+- USDC: `0x3c5211340Db470A31F1a37E343E326db69FF2F5C`
+- PayString: `nachtalb$paystring.crypto.com`
 
 
 *Other Bots*
@@ -57,11 +58,11 @@ https://github.com/Nachtalb
 
 
 *Issues / Contributions*
-- Code repository: https://github.com/Nachtalb/reverse_image_search_bot
+- Code repository: https://github.com/Nachtalb/reverse\\_image\\_search\\_bot
 - @Nachtalb
 - via /support at @XenianBot
 
-Thank you for using @reverse_image_search_bot.
+Thank you for using @reverse\\_image\\_search\\_bot.
 """
 
     update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)
