@@ -1,7 +1,6 @@
 import io
 import os
 from tempfile import NamedTemporaryFile
-from uuid import uuid4
 
 from PIL import Image
 from moviepy.video.io.VideoFileClip import VideoFileClip
@@ -120,11 +119,11 @@ def sticker_image_search(bot: Bot, update: Update):
 
     with io.BytesIO() as image_buffer:
         sticker_image.download(out=image_buffer)
-        with io.BufferedReader(image_buffer) as image_file:
-            pil_image = Image.open(image_file).convert("RGBA")
-            pil_image.save(converted_image, 'png')
+        image_buffer.seek(0)
 
-            general_image_search(bot, update, converted_image, 'png')
+        pil_image = Image.open(image_buffer).convert("RGBA")
+        pil_image.save(converted_image, 'png')
+        general_image_search(bot, update, converted_image, 'png')
 
 
 def image_search_link(bot: Bot, update: Update):
@@ -140,8 +139,8 @@ def image_search_link(bot: Bot, update: Update):
     photo = bot.getFile(update.message.photo[-1].file_id)
     with io.BytesIO() as image_buffer:
         photo.download(out=image_buffer)
-        with io.BufferedReader(image_buffer) as image_file:
-            general_image_search(bot, update, image_file)
+        image_buffer.seek(0)
+        general_image_search(bot, update, image_buffer)
 
 
 def general_image_search(bot: Bot, update: Update, image_file, image_extension: str=None):
