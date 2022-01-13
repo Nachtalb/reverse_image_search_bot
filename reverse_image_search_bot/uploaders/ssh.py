@@ -1,5 +1,7 @@
 import os
+from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import IO
 
 import paramiko
 
@@ -22,56 +24,57 @@ class SSHUploader(UploaderBase):
     _mandatory_configuration = {'host': str, 'user': str, 'password': str, 'upload_dir': str}
 
     def __init__(self, configuration: dict, connect: bool = False):
-        self.ssh = None
-        self.sftp = None
-
+        self.ssh: paramiko.SSHClient = None  # type: ignore
+        self.sftp: paramiko.SFTPClient = None  # type: ignore
         super().__init__(configuration, connect)
 
     def connect(self):
+        username, host = self.configuration['user'], self.configuration['host']
+        self.logger.debug('connecting to "%s@%s"...', username, host)
+
         self.ssh = paramiko.SSHClient()
         self.ssh.load_host_keys(os.path.expanduser(os.path.join("~", ".ssh", "known_hosts")))
 
         if self.configuration.get('key_filename', None):
-            self.ssh.connect(self.configuration['host'],
-                             username=self.configuration['user'],
+            self.ssh.connect(host,
+                             username=username,
                              password=self.configuration['password'],
                              key_filename=self.configuration['key_filename'])
+            self.logger.debug('connection established with key file')
         else:
-            self.ssh.connect(self.configuration['host'],
-                             username=self.configuration['user'],
+            self.ssh.connect(host,
+                             username=username,
                              password=self.configuration['password'])
+            self.logger.debug('connection established with password')
         self.sftp = self.ssh.open_sftp()
 
     def close(self):
         self.sftp.close()
         self.ssh.close()
+        self.logger.debug('connection closed')
 
-    def upload(self, file, filename: str = None, upload_dir: str = None):
+    def upload(self, file: IO | Path, filename: str):
         """Upload file to the ssh server
 
         Args:
-            file: Path to file on file system or a file like object
-            filename (:obj:`str`): Filename on the server. This is mandatory if your file is a file like object.
-            upload_dir (:obj:`str`): Upload directory on server. Joins with the configurations upload_dir
+            file (:obj:`Path` | :obj:`IO`): Path or file like that will be uploaded
+            filename (:obj:`str`): Filename at the destination, optional if `file` is :obj:`Path`
         """
-        is_file_object = bool(getattr(file, 'read', False))
-        if is_file_object:
-            if filename is None:
-                raise ValueError('filename must be set when file is a file like object')
+        self.logger.debug('Uploading')
+
+        if not isinstance(file, Path):
             with NamedTemporaryFile(delete=False) as new_file:
                 file.seek(0)
                 new_file.write(file.read())
 
-                real_file = new_file.name
-                filename = filename
+                real_file = Path(new_file.name)
         else:
             real_file = file
-            filename = filename or os.path.basename(real_file)
 
-        upload_dir = os.path.join(self.configuration['upload_dir'], upload_dir) if upload_dir else \
-            self.configuration['upload_dir']
-        upload_path = os.path.join(upload_dir, filename)
+        upload_path = Path(self.configuration['upload_dir']) / filename
 
-        self.sftp.put(real_file, upload_path)
-        if is_file_object:
-            os.unlink(real_file)
+        self.sftp.put(str(real_file), str(upload_path))
+        self.logger.info('Uploaded file from "%s" to "%s:%s"', real_file, self.configuration['host'], upload_path)
+
+        if not isinstance(file, Path):
+            real_file.unlink()

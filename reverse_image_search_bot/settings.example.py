@@ -1,8 +1,8 @@
 TELEGRAM_API_TOKEN = 'YOUR_API_TOKEN'
 
 UPLOADER = {
-    'uploader': 'reverse_image_search_bot.uploaders.ssh.SSHUploader',  # What uploader to use
-    'url': 'YOUR_DOMAIN_FILES_DIR' 
+    'uploader': 'local',  # What uploader to use 'local' or 'ssh'
+    'url': 'YOUR_DOMAIN_FILES_DIR',
     'configuration': {
         'host': 'YOUR_HOST_IP',
         'user': 'YOUR_USERNAME',
