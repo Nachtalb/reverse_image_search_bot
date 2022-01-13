@@ -11,7 +11,6 @@ Supported engines:
 Inline search results:
 - IQDB unlimited
 - Trace 1000/month
-- TineEye 50/day 150/week
 - SauceNAO 6/30s 200/24h
 
 *Commands*
