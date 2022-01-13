@@ -102,7 +102,7 @@ def general_image_search(update: Update, image_url: URL):
 
     button_list.extend(chunks([en(image_url) for en in engines], 2))
 
-    reply = 'Use **Best Match** to directly find the best match from here withing telegram.'
+    reply = f'Use **Best Match** to directly find the best match from here withing telegram.[​]({image_url})'
     reply_markup = InlineKeyboardMarkup(button_list)
     update.message.reply_text(
         text=reply,
