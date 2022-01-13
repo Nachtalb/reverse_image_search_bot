@@ -22,7 +22,10 @@ def start(update: Update, context: CallbackContext):
     update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)
 
     image = Path(__file__).parent / 'images/example_usage.png'
-    context.bot.send_photo(update.message.chat_id, photo=image, caption='Example Usage')
+
+    context.bot.send_photo(update.message.chat_id,
+                           photo=io.BytesIO(image.read_bytes()),  # For some reason it didn't want to accept the path itself ¯\_(ツ)_/¯
+                           caption='Example Usage')
 
 
 def image_search(update: Update, context: CallbackContext):
