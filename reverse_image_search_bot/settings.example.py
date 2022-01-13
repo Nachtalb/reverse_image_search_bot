@@ -11,3 +11,5 @@ UPLOADER = {
         'key_filename': 'PATH_TO_PUBLIC_SSH_KEY',  # This is not mandatory but some server configurations require it
     }
 }
+
+SAUCENAO_API = ''  # SauceNAO api key https://saucenao.com/user.php?page=search-api

@@ -162,7 +162,7 @@ def build_reply(match: dict) -> str:
 
     for key, value in match.items():
         if key not in ['thumbnail', 'provider']:
-            if isinstance(value, (str, URL)) and URL(value).scheme:
+            if isinstance(value, (str, URL)) and URL(value).scheme.startswith('http'):
                 md.append(f'<b>{key}</b>: {value}')
             else:
                 md.append(f'<b>{key}</b>: <code>{value}</code>')
