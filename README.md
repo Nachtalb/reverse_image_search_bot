@@ -50,8 +50,7 @@ Thank you for using [@reverse_image_search_bot](https://t.me/reverse_image_searc
 
 ### Installation
 
-Initial development was in Python 3.6 I upgrade my locally installed versions to
-the latest ones (as of writing this 3.10.1).  I do not test against older versions.
+Requires at least **Python 3.10**.
 
 Best if you create a python virtualenv.
 
