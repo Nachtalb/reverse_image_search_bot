@@ -1,5 +1,7 @@
 import re
 
+from telegram import InlineKeyboardButton
+from cachetools import cached
 from requests_html import HTMLSession
 from yarl import URL
 
@@ -14,29 +16,32 @@ class IQDBEngine(GenericRISEngine):
         super().__init__(*args, **kwargs)
         self.session = HTMLSession()
 
-    def best_match(self, url: str | URL):
+    @cached(GenericRISEngine._cache)
+    def best_match(self, url: str | URL) -> tuple[dict[str, str | int | URL], list[InlineKeyboardButton]]:
         response = self.session.get(str(self.get_search_link_by_url(url)))
 
         if response.status_code != 200:
-            return {}
+            return {}, []
 
-        best_match = response.html.find('th', text='Best match')
+        best_match = response.html.find('table', containing='Best match', first=True)
 
         if not best_match:
-            return {}
+            return {}, []
 
-        rows = best_match.find_parent('table td')
+        rows = best_match.find('td')
 
-        link = URL(rows[0].find('a')[0].attrs['href']).with_scheme('https')
-        thumbnail = URL(self.url).with_path(rows[0].find('img')[0].attrs['src'])
-        site_name = rows[1].find(text=True, recursive=False).strip()
+        link = URL(rows[0].find('a', first=True).attrs['href']).with_scheme('https')
+        thumbnail = URL(self.url).with_path(rows[0].find('img', first=True).attrs['src'])
+        site_name = rows[1].lxml.xpath('td/text()')[0].strip()
 
         match = re.match(r'(\d+)×(\d+) \[(\w+)\]', rows[2].text)
         width, height, rating = match.groups()
         width, height = int(width), int(height)
 
-        similarity = int(re.match(r'\d+', rows[3].text)[0])
+        similarity = re.match(r'\d+%', rows[3].text)[0]
 
+        icon = '📦' if link.host == 'danbooru.donmai.us' else '🌐'
+        buttons = [InlineKeyboardButton(icon, url=str(link))]
 
         return {
             'link': link,
@@ -49,4 +54,4 @@ class IQDBEngine(GenericRISEngine):
             'similarity': similarity,
             'provider': 'IQDB',
             'provider_url': 'https://iqdb.org/'
-        }
+        }, buttons

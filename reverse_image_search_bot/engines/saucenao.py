@@ -1,3 +1,5 @@
+from cachetools import cached
+from telegram import InlineKeyboardButton
 from requests import Session
 from yarl import URL
 
@@ -12,8 +14,9 @@ class SauceNaoEngine(GenericRISEngine):
         super().__init__(*args, **kwargs)
         self.session = Session()
 
-    def best_match(self, url: str | URL):
-        return {}
+    @cached(GenericRISEngine._cache)
+    def best_match(self, url: str | URL) -> tuple[dict[str, str | int | URL], list[InlineKeyboardButton]]:
+        return {}, []
         return {
             'link': link,
             'site_name': site_name,

@@ -1,11 +1,13 @@
 import logging
 from urllib.parse import quote_plus
 
-from yarl import URL
+from cachetools import TTLCache, cached
 from telegram import InlineKeyboardButton
+from yarl import URL
 
 
 class GenericRISEngine:
+    _cache = TTLCache(maxsize=1e4, ttl=24 * 60 * 60)
     name: str = 'GenericRISEngine'
     url: str = ''
 
@@ -14,7 +16,7 @@ class GenericRISEngine:
         self.url = url or self.url
         self.logger = logging.getLogger('RISEngine [{self.name}]')
 
-    def __call__(self, url: str | URL) -> InlineKeyboardButton:
+    def __call__(self, url: str | URL, text: str = None) -> InlineKeyboardButton:
         """Create the :obj:`InlineKeyboardButton` button for the telegram but to use
 
         Args:
@@ -23,7 +25,7 @@ class GenericRISEngine:
         Returns:
             :obj:`InlineKeyboardButton`: Telegram button with name and url target
         """
-        return InlineKeyboardButton(text=self.name,
+        return InlineKeyboardButton(text=text or self.name,
                                     url=str(self.get_search_link_by_url(url)))
 
     def get_search_link_by_url(self, url: str | URL) -> URL:
@@ -37,7 +39,8 @@ class GenericRISEngine:
         """
         return URL(self.url.format(query_url=quote_plus(str(url))))
 
-    def best_match(self, url: str | URL) -> dict:
+    @cached(cache=_cache)
+    def best_match(self, url: str | URL) -> tuple[dict[str, str | int | URL], list[InlineKeyboardButton]]:
         """Get info about the best matching image found
 
         Notes:
@@ -59,4 +62,4 @@ class GenericRISEngine:
         Returns:
             :obj:`dict`: Dictionary of the found image
         """
-        return {}
+        return {}, []

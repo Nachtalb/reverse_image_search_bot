@@ -1,3 +1,5 @@
+from cachetools import cached
+from telegram import InlineKeyboardButton
 from requests import Session
 from yarl import URL
 
@@ -26,13 +28,14 @@ class TraceEngine(GenericRISEngine):
             'provider_url': 'https://iqdb.org/'
         }
 
-    def best_match(self):
+    @cached(GenericRISEngine._cache)
+    def best_match(self, url: str | URL) -> tuple[dict[str, str | int | URL], list[InlineKeyboardButton]]:
         """
 
         Returns:
 
         """
-        return {}
+        return {}, []
         if not self.search_html:
             if not self.search_url:
                 raise ValueError('No image given yet!')

@@ -1,6 +1,7 @@
 import io
 from tempfile import NamedTemporaryFile
 from pathlib import Path
+from logging import getLogger
 
 from yarl import URL
 from PIL import Image
@@ -13,6 +14,9 @@ from telegram.parsemode import ParseMode
 from reverse_image_search_bot.utils import chunks, upload_file
 from reverse_image_search_bot.engines import engines
 from reverse_image_search_bot.uploaders import uploader
+
+
+logger = getLogger('BEST MATCH')
 
 
 def start(update: Update, context: CallbackContext):
@@ -34,7 +38,7 @@ def image_search(update: Update, context: CallbackContext):
 
     attachment = update.message.effective_attachment
     if isinstance(attachment, list):
-        attachment = attachment[0]
+        attachment = attachment[-1]
     try:
         match attachment:
             case i if (isinstance(i, Document) and i.mime_type.startswith('video')) or isinstance(i, (Video, Animation)):
@@ -98,8 +102,6 @@ def general_image_search(update: Update, image_url: URL):
         InlineKeyboardButton(text='Go To Image', url=str(image_url))
     ]]
 
-    button_list.pop(0)
-
     button_list.extend(chunks([en(image_url) for en in engines], 2))
 
     reply = f'Use **Best Match** to directly find the best match from here withing telegram.[​]({image_url})'
@@ -122,15 +124,23 @@ def callback_best_match(update: Update, context: CallbackContext):
 def best_match(update: Update, context: CallbackContext, url: str | URL):
     """Find best matches for an image.
     """
-    message = context.bot.send_message('Searching...')
+    message = update.callback_query.message
+    message = context.bot.send_message(text='Searching...', chat_id=message.chat_id, reply_to_message_id=message.message_id)
 
     match_found = False
     for engine in engines:
-        if match := engine.best_match(url):
-            if thumbnail := match.get('thumbnail'):
-                update.message.reply_photo(thumbnail)
-            update.message.reply_markdown_v2(build_reply(match))
-            match_found = True
+        try:
+            match, buttons = engine.best_match(url)
+            if match:
+                button_list = [ engine(url=url, text='More') ]
+                button_list.extend(buttons)
+                button_list = list(chunks(button_list, 3))
+
+                message.reply_html(build_reply(match), reply_markup=InlineKeyboardMarkup(button_list))
+                match_found = True
+        except Exception as error:
+            logger.error('Engine failure: %s')
+            logger.exception(error)
 
     if not match_found:
         message.edit_text('Searching... No results')
@@ -139,8 +149,15 @@ def best_match(update: Update, context: CallbackContext, url: str | URL):
 
 
 def build_reply(match: dict) -> str:
-    md = []
+    md = [f'<b>Provider: {match["provider"]}</b>']
+
+    if thumbnail := match.get('thumbnail'):
+        md.append(f'<a href="{thumbnail}">​</a>')
+
     for key, value in match.items():
-        if key not in ['thumbnail']:
-            md.append(f'**{key}**: `{value}`')
+        if key not in ['thumbnail', 'provider']:
+            if isinstance(value, (str, URL)) and URL(value).scheme:
+                md.append(f'<b>{key}</b>: {value}')
+            else:
+                md.append(f'<b>{key}</b>: <code>{value}</code>')
     return '\n'.join(md)
