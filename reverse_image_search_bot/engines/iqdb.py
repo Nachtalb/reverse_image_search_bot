@@ -45,7 +45,7 @@ class IQDBEngine(GenericRISEngine):
 
         return {
             'link': link,
-            'site_name': site_name,
+            'site name': site_name,
             'thumbnail': thumbnail,
             'size': f'{width}x{height}',
             'width': width,
@@ -53,5 +53,5 @@ class IQDBEngine(GenericRISEngine):
             'rating': rating,
             'similarity': similarity,
             'provider': 'IQDB',
-            'provider_url': 'https://iqdb.org/'
+            'provider url': 'https://iqdb.org/'
         }, buttons
