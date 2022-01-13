@@ -13,6 +13,7 @@ from telegram.parsemode import ParseMode
 
 from reverse_image_search_bot.utils import chunks, upload_file
 from reverse_image_search_bot.engines import engines
+from reverse_image_search_bot.engines.generic import GenericRISEngine
 from reverse_image_search_bot.uploaders import uploader
 
 
@@ -129,17 +130,22 @@ def best_match(update: Update, context: CallbackContext, url: str | URL):
 
     match_found = False
     for engine in engines:
+        if type(engine) is GenericRISEngine:
+            continue
+
+        logger.info('Searching %s for %s', engine.name, url)
         try:
             match, buttons = engine.best_match(url)
             if match:
-                button_list = [ engine(url=url, text='More') ]
+                logger.info('Found something UmU')
+                button_list = [ engine(url=str(url), text='More') ]
                 button_list.extend(buttons)
                 button_list = list(chunks(button_list, 3))
 
                 message.reply_html(build_reply(match), reply_markup=InlineKeyboardMarkup(button_list))
                 match_found = True
         except Exception as error:
-            logger.error('Engine failure: %s')
+            logger.error('Engine failure: %s', engine)
             logger.exception(error)
 
     if not match_found:
