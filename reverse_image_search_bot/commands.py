@@ -137,12 +137,12 @@ def best_match(update: Update, context: CallbackContext, url: str | URL):
         if type(engine) is GenericRISEngine:
             continue
 
-        logger.info("Searching %s for %s", engine.name, url)
+        logger.debug("Searching %s for %s", engine.name, url)
         message.edit_text(f'⏳ *{engine.name}*', parse_mode=ParseMode.MARKDOWN)
         try:
             match, buttons = engine.best_match(url)
             if match:
-                logger.info("Found something UmU")
+                logger.debug("Found something UmU")
                 button_list = [engine(url=str(url), text="More")]
                 button_list.extend(buttons)
                 button_list = list(chunks(button_list, 3))

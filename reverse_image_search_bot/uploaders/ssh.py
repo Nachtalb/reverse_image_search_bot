@@ -74,7 +74,7 @@ class SSHUploader(UploaderBase):
         upload_path = Path(self.configuration["upload_dir"]) / filename
 
         self.sftp.put(str(real_file), str(upload_path))
-        self.logger.info('Uploaded file from "%s" to "%s:%s"', real_file, self.configuration["host"], upload_path)
+        self.logger.debug('Uploaded file from "%s" to "%s:%s"', real_file, self.configuration["host"], upload_path)
 
         if not isinstance(file, Path):
             real_file.unlink()
