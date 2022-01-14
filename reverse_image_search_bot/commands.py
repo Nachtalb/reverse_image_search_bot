@@ -34,6 +34,8 @@ def start(update: Update, context: CallbackContext):
 
 
 def image_search(update: Update, context: CallbackContext):
+    if not update.message:
+        return
     message = update.message.reply_text('...')
     context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
 
