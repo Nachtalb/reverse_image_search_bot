@@ -25,13 +25,14 @@ def start(update: Update, context: CallbackContext):
     reply = Path(__file__).with_name("start.md").read_text()
     update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)
 
-    image = Path(__file__).parent / "images/example_usage.png"
+    file = Path(__file__).parent / "images/example.mp4"
 
-    context.bot.send_photo(
-        update.message.chat_id,
-        photo=io.BytesIO(image.read_bytes()),  # For some reason it didn't want to accept the path itself ¯\_(ツ)_/¯
-        caption="Example Usage",
-    )
+    with file.open('br') as ffile:
+        context.bot.send_animation(
+            chat_id=update.message.chat_id,
+            animation=ffile,
+            caption="Example Usage"
+        )
 
 
 def image_search(update: Update, context: CallbackContext):

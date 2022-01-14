@@ -17,6 +17,8 @@ Inline search results:
 - Trace 1000/month
 - SauceNAO 6/30s 200/24h
 
+![example](https://raw.githubusercontent.com/Nachtalb/reverse_image_search_bot/master/reverse_image_search_bot/images/example.gif)
+
 ## Commands
 
 - /help, /start: show this help message
