@@ -1,4 +1,5 @@
 import io
+import json
 from logging import getLogger
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -18,6 +19,11 @@ from reverse_image_search_bot.utils import chunks, upload_file
 
 
 logger = getLogger("BEST MATCH")
+
+
+def show_id(update: Update, context: CallbackContext):
+    if update.effective_chat:
+        update.message.reply_html("<pre>%s</pre>" % json.dumps(update.effective_chat.to_dict(), sort_keys=True, indent=4))
 
 
 def start(update: Update, context: CallbackContext):

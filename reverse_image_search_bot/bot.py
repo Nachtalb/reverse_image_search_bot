@@ -14,7 +14,7 @@ from telegram.ext import (
 )
 
 from . import settings
-from .commands import callback_best_match, image_search, start
+from .commands import callback_best_match, image_search, show_id, start
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +51,7 @@ def main():
         Thread(target=stop_and_restart).start()
 
     dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(CommandHandler("id", show_id))
     dispatcher.add_handler(CommandHandler("help", start))
     dispatcher.add_handler(CommandHandler("restart", restart, filters=Filters.user(username="@Nachtalb")))
     dispatcher.add_handler(CallbackQueryHandler(callback_best_match))
