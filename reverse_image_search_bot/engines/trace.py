@@ -1,3 +1,4 @@
+from datetime import datetime
 from urllib.parse import quote_plus
 
 from cachetools import cached
@@ -5,7 +6,9 @@ from requests import Session
 from telegram import InlineKeyboardButton
 from yarl import URL
 
-from .generic import GenericRISEngine
+from reverse_image_search_bot.utils import url_button
+
+from .generic import GenericRISEngine, MetaData, ProviderData
 
 
 class TraceEngine(GenericRISEngine):
@@ -17,53 +20,67 @@ class TraceEngine(GenericRISEngine):
         self.session = Session()
 
     @cached(GenericRISEngine._cache)
-    def best_match(self, url: str | URL) -> tuple[dict[str, str | int | URL], list[InlineKeyboardButton]]:
+    def best_match(self, url: str | URL) -> ProviderData:
         api_link = "https://api.trace.moe/search?url={}".format(quote_plus(str(url)))
         response = self.session.get(api_link)
 
         if response.status_code != 200:
-            return {}, []
+            return {}, {}
 
         data = next(iter(response.json()["result"]), None)
         if not data or data["similarity"] < 0.9:
-            return {}, []
+            return {}, {}
 
-        buttons = []
+        buttons: list[InlineKeyboardButton] = []
+        result = {}
+        meta: MetaData = {}
 
-        anilist, anilist_link, is_adult, mal_link = {}, None, None, None
-        if isinstance(data["anilist"], int):
-            anilist_link = URL("https://anilist.co/anime/%d" % data["anilist"])
-            buttons.append(InlineKeyboardButton(text="AniList", url=str(anilist_link)))
-        else:
-            anilist = data["anilist"]
+        anilist_id = data["anilist"]
+        if isinstance(data["anilist"], dict):
+            anilist_id = data["anilist"]["id"]
 
-            is_adult = "Yes" if anilist["isAdult"] else "No"
-            anilist_link = URL("https://anilist.co/anime/%d" % anilist["id"])
-            mal_link = URL("https://myanimelist.net/anime/%d" % anilist["idMal"])
-            buttons.append(InlineKeyboardButton(text="AniList", url=str(anilist_link)))
-            buttons.append(InlineKeyboardButton(text="MAL", url=str(mal_link)))
+        result, meta = self._anilist_provider(int(anilist_id), data["episode"])
 
-        result_data = {
-            "link": anilist_link,
-            "mal link": mal_link,
-            "file name": data["filename"],
-            "thumbnail": URL(data["video"]),
-            "image": URL(data["image"]),
-            "title romaji": anilist.get("title", {}).get("romaji"),
-            "title english": anilist.get("title", {}).get("english"),
-            "title native": anilist.get("title", {}).get("native"),
-            "synonyms": ", ".join(anilist.get("synonyms", [])) or None,
-            "episode": data["episode"],
-            "from": data["from"],
-            "to": data["to"],
-            "is adult": is_adult,
-            "similarity": data["similarity"],
-            "provider": self.name,
-            "provider url": "https://trace.moe/",
-        }
+        if meta:
+            buttons = meta.get("buttons", [])
 
-        for key, value in list(result_data.items()):
-            if value is None:
-                del result_data[key]
+        if not result:
+            titles = {}
+            if isinstance(data["anilist"], int):
+                buttons.append(url_button("https://anilist.co/anime/%d" % data["anilist"]))
+            else:
+                anilist = data["anilist"]
+                titles = anilist["titles"]
+                buttons.append(url_button("https://anilist.co/anime/%d" % anilist["id"]))
+                buttons.append(url_button("https://myanimelist.net/anime/%d" % anilist["idMal"]))
 
-        return result_data, buttons
+            result.update(
+                {
+                    "Title": titles.get("english"),
+                    "Title [romaji]": titles.get("romaji"),
+                    "Episode": data["episode"],
+                    "Filename": data["filename"],
+                }
+            )
+
+        from_t = datetime.fromtimestamp(data["from"]).strftime("%H:%M:%S")
+        to_t = datetime.fromtimestamp(data["to"]).strftime("%H:%M:%S")
+        result.update(
+            {
+                "Est. Time": f"{from_t} / {to_t}",
+            }
+        )
+
+        meta.update(
+            {
+                "thumbnail": URL(data["video"]),
+                "provider": self.name,
+                "provider_url": URL("https://trace.moe/"),
+                "similarity": round(data["similarity"] * 100, 2),
+                "buttons": buttons,
+            }
+        )
+
+        result = self._clean_privider_data(result)
+
+        return result, meta

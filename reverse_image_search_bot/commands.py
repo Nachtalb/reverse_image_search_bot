@@ -7,13 +7,17 @@ from tempfile import NamedTemporaryFile
 from PIL import Image
 from moviepy.video.io.VideoFileClip import VideoFileClip
 from telegram import ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram import Animation, Document, PhotoSize, Sticker, Video
+from telegram import Animation, Document, Message, PhotoSize, Sticker, Video
 from telegram.ext import CallbackContext
 from telegram.parsemode import ParseMode
 from yarl import URL
 
 from reverse_image_search_bot.engines import engines
-from reverse_image_search_bot.engines.generic import GenericRISEngine
+from reverse_image_search_bot.engines.generic import (
+    GenericRISEngine,
+    MetaData,
+    ResultData,
+)
 from reverse_image_search_bot.uploaders import uploader
 from reverse_image_search_bot.utils import chunks, upload_file
 
@@ -23,7 +27,9 @@ logger = getLogger("BEST MATCH")
 
 def show_id(update: Update, context: CallbackContext):
     if update.effective_chat:
-        update.message.reply_html("<pre>%s</pre>" % json.dumps(update.effective_chat.to_dict(), sort_keys=True, indent=4))
+        update.message.reply_html(
+            "<pre>%s</pre>" % json.dumps(update.effective_chat.to_dict(), sort_keys=True, indent=4)
+        )
 
 
 def start(update: Update, context: CallbackContext):
@@ -33,12 +39,8 @@ def start(update: Update, context: CallbackContext):
 
     file = Path(__file__).parent / "images/example.mp4"
 
-    with file.open('br') as ffile:
-        context.bot.send_animation(
-            chat_id=update.message.chat_id,
-            animation=ffile,
-            caption="Example Usage"
-        )
+    with file.open("br") as ffile:
+        context.bot.send_animation(chat_id=update.message.chat_id, animation=ffile, caption="Example Usage")
 
 
 def image_search(update: Update, context: CallbackContext):
@@ -133,10 +135,8 @@ def callback_best_match(update: Update, context: CallbackContext):
 
 def best_match(update: Update, context: CallbackContext, url: str | URL):
     """Find best matches for an image."""
-    message = update.callback_query.message
-    message = context.bot.send_message(
-        text="⏳", chat_id=message.chat_id, reply_to_message_id=message.message_id
-    )
+    message: Message = update.effective_message  # type: ignore
+    search_message = context.bot.send_message(text="⏳", chat_id=message.chat_id, reply_to_message_id=message.message_id)
 
     match_found = False
     for engine in engines:
@@ -144,37 +144,54 @@ def best_match(update: Update, context: CallbackContext, url: str | URL):
             continue
 
         logger.debug("Searching %s for %s", engine.name, url)
-        message.edit_text(f'⏳ *{engine.name}*', parse_mode=ParseMode.MARKDOWN)
+        search_message.edit_text(f"⏳ *{engine.name}*", parse_mode=ParseMode.MARKDOWN)
         try:
-            match, buttons = engine.best_match(url)
-            if match:
+            result, meta = engine.best_match(url)
+            if meta:
                 logger.debug("Found something UmU")
                 button_list = [engine(url=str(url), text="More")]
-                button_list.extend(buttons)
+                if buttons := meta.get("buttons"):
+                    button_list.extend(buttons)
+
                 button_list = list(chunks(button_list, 3))
 
-                message.reply_html(build_reply(match), reply_markup=InlineKeyboardMarkup(button_list))
+                message.reply_html(
+                    text=build_reply(result, meta),
+                    reply_markup=InlineKeyboardMarkup(button_list),
+                    reply_to_message_id=message.message_id
+                )
                 match_found = True
         except Exception as error:
             logger.error("Engine failure: %s", engine)
             logger.exception(error)
 
     if not match_found:
-        message.edit_text("❌ No results")
+        search_message.edit_text("❌ No results")
     else:
-        message.delete()
+        search_message.delete()
 
 
-def build_reply(match: dict) -> str:
-    md = [f'<b>Provider: {match["provider"]}</b>']
+def build_reply(result: ResultData, meta: MetaData) -> str:
+    reply = f'Provided by: <b><a href="{meta["provider_url"]}">{meta["provider"]}</a></b>'  # type: ignore
 
-    if thumbnail := match.get("thumbnail"):
-        md.append(f'<a href="{thumbnail}">​</a>')
+    if via := meta.get("provided_via"):
+        via = f"<b>{via}</b>"
+        if via_url := meta.get("provided_via_url"):
+            via = f'<a href="{via_url}">{via}</a>'
+        reply += f" via {via}"
 
-    for key, value in match.items():
-        if key not in ["thumbnail", "provider"]:
-            if isinstance(value, (str, URL)) and URL(value).scheme.startswith("http"):
-                md.append(f"<b>{key}</b>: {value}")
-            else:
-                md.append(f"<b>{key}</b>: <code>{value}</code>")
-    return "\n".join(md)
+    if similarity := meta.get("similarity"):
+        reply += f" with <b>{similarity}%</b> similarity"
+
+    if thumbnail := meta.get("thumbnail"):
+        reply = f'<a href="{thumbnail}">​</a>' + reply
+
+    reply += "\n\n"
+
+    for key, value in result.items():
+        if isinstance(value, str) and value.startswith('#'):  # Tags
+            reply += f'<b>{key}</b>: {value}\n'
+        else:
+            reply += f"<b>{key}</b>: <code>{value}</code>\n"
+
+    return reply
