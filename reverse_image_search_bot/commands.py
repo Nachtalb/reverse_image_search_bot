@@ -69,6 +69,7 @@ def image_search(update: Update, context: CallbackContext):
         message.edit_text("An error occurred please contact the @Nachtalb for help.")
         raise
     message.delete()
+    best_match(update, context, image_url)
 
 
 def video_to_url(attachment: Document | Video) -> URL:
