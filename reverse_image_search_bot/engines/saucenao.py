@@ -27,7 +27,8 @@ class SauceNaoEngine(GenericRISEngine):
         if response.status_code != 200:
             return {}, []
 
-        results = response.json().get('results', [])
+        results = filter(lambda d: float(d['header']['similarity']) >= 75,
+                         response.json().get('results', []))
 
         priority = 21, 5, 9
         datas = [{}, {}, {}]
