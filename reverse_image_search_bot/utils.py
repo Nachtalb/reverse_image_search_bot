@@ -26,3 +26,28 @@ def upload_file(file: Path | BinaryIO, file_name: str) -> URL:
         uploader.upload(file, file_name)
 
     return URL(UPLOADER["url"]) / file_name
+
+
+def url_icon(url: URL | str, text_fallback: bool = False, with_text: bool = False) -> str:
+    url = URL(url)
+
+    match url.host:
+        case "twitter.com":
+            text = "Twitter"
+            icon = "🐦"
+        case "www.pixiv.net" | "pixiv.net":
+            text = "Pixiv"
+            icon = "🅿"
+        case "danbooru.donmai.us":
+            text = "Danbooru"
+            icon = "📦"
+        case _:
+            text = url.host.split(".")[-2].title()  # type: ignore
+            icon = "🌐"
+            if text_fallback:
+                icon = text
+                text = ""
+
+    if not with_text:
+        text = ""
+    return f"{icon} {text}"

@@ -5,6 +5,8 @@ from requests_html import HTMLSession
 from telegram import InlineKeyboardButton
 from yarl import URL
 
+from reverse_image_search_bot.utils import url_icon
+
 from .generic import GenericRISEngine
 
 
@@ -40,8 +42,7 @@ class IQDBEngine(GenericRISEngine):
 
         similarity = re.match(r"\d+%", rows[3].text)[0]
 
-        icon = "📦" if link.host == "danbooru.donmai.us" else "🌐"
-        buttons = [InlineKeyboardButton(icon, url=str(link))]
+        buttons = [InlineKeyboardButton(url_icon(link, with_text=True), url=str(link))]
 
         return {
             "link": link,
