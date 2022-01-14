@@ -129,7 +129,7 @@ def best_match(update: Update, context: CallbackContext, url: str | URL):
     """Find best matches for an image."""
     message = update.callback_query.message
     message = context.bot.send_message(
-        text="Searching...", chat_id=message.chat_id, reply_to_message_id=message.message_id
+        text="⏳", chat_id=message.chat_id, reply_to_message_id=message.message_id
     )
 
     match_found = False
@@ -138,6 +138,7 @@ def best_match(update: Update, context: CallbackContext, url: str | URL):
             continue
 
         logger.info("Searching %s for %s", engine.name, url)
+        message.edit_text(f'⏳ *{engine.name}*', parse_mode=ParseMode.MARKDOWN)
         try:
             match, buttons = engine.best_match(url)
             if match:
@@ -153,7 +154,7 @@ def best_match(update: Update, context: CallbackContext, url: str | URL):
             logger.exception(error)
 
     if not match_found:
-        message.edit_text("Searching... No results")
+        message.edit_text("❌ No results")
     else:
         message.delete()
 
