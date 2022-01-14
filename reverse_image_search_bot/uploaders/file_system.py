@@ -7,10 +7,9 @@ from .base_uploader import UploaderBase
 
 
 class FileSystemUploader(UploaderBase):
-    """Save files on file system
-    """
+    """Save files on file system"""
 
-    _mandatory_configuration = {'path': str}
+    _mandatory_configuration = {"path": str}
 
     def upload(self, file: Path | IO, filename: str):
         """Upload file to the ssh server
@@ -24,7 +23,7 @@ class FileSystemUploader(UploaderBase):
         """
         file_is_obj = not isinstance(file, Path)
 
-        destination = Path(self.configuration['path']) / filename  # type: ignore
+        destination = Path(self.configuration["path"]) / filename  # type: ignore
         if destination.is_file():
             self.logger.info('File at "%s" already exists', destination)
             return
@@ -40,8 +39,8 @@ class FileSystemUploader(UploaderBase):
 
         os.makedirs(destination.parent, exist_ok=True)
 
-        os.system('mv {src} {dst} && chmod 664 {dst}'.format(src=real_file, dst=destination))
+        os.system("mv {src} {dst} && chmod 664 {dst}".format(src=real_file, dst=destination))
         self.logger.info('Saved file to "%s"', destination)
 
     def file_exists(self, file_name: str | Path) -> bool:
-        return (Path(self.configuration['path']) / file_name).is_file()
+        return (Path(self.configuration["path"]) / file_name).is_file()

@@ -1,10 +1,11 @@
 from logging import getLogger
-from typing import IO
 from pathlib import Path
+from typing import IO
 
 from yarl import URL
 
 from reverse_image_search_bot.settings import UPLOADER
+
 
 class UploaderBase:
     """Base class for other uploader's to inherit from to ensure to use the same methods and attributes.
@@ -25,7 +26,7 @@ class UploaderBase:
             - type is a python object like :class:`str`
     """
 
-    def __init__(self, configuration: dict, connect: bool=False):
+    def __init__(self, configuration: dict, connect: bool = False):
         self.logger = getLogger(self.__class__.__name__)
         for key, type_ in self._mandatory_configuration.items():
             if key not in configuration:
@@ -36,7 +37,7 @@ class UploaderBase:
         self.configuration = configuration
         if connect:
             self.connect()
-        self.logger.info('Initialised')
+        self.logger.info("Initialised")
 
     def __enter__(self):
         self.connect()
@@ -66,4 +67,4 @@ class UploaderBase:
         return False
 
     def get_url(self, file_name: str) -> URL:
-        return URL(UPLOADER['url']) / file_name
+        return URL(UPLOADER["url"]) / file_name

@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import BinaryIO
+
 from yarl import URL
 
 from reverse_image_search_bot.settings import UPLOADER
@@ -9,7 +10,7 @@ from reverse_image_search_bot.uploaders import uploader
 def chunks(lst, n):
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):
-        yield lst[i:i + n]
+        yield lst[i : i + n]
 
 
 def upload_file(file: Path | BinaryIO, file_name: str) -> URL:
@@ -24,4 +25,4 @@ def upload_file(file: Path | BinaryIO, file_name: str) -> URL:
     with uploader:
         uploader.upload(file, file_name)
 
-    return URL(UPLOADER['url']) / file_name
+    return URL(UPLOADER["url"]) / file_name

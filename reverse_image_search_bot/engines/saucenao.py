@@ -1,11 +1,12 @@
 from urllib.parse import quote_plus
 
 from cachetools import cached
-from telegram import InlineKeyboardButton
 from requests import Session
+from telegram import InlineKeyboardButton
 from yarl import URL
 
 from reverse_image_search_bot.settings import SAUCENAO_API
+
 from .generic import GenericRISEngine
 
 

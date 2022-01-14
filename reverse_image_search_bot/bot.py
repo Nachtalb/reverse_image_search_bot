@@ -1,18 +1,22 @@
 import logging
-
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 import os
 import sys
 from threading import Thread
 
 from telegram import Update
-from telegram.ext import CallbackQueryHandler, CommandHandler, Filters, MessageHandler, Updater, CallbackContext
+from telegram.ext import (
+    CallbackContext,
+    CallbackQueryHandler,
+    CommandHandler,
+    Filters,
+    MessageHandler,
+    Updater,
+)
 
 from . import settings
-from .commands import callback_best_match, start, image_search
+from .commands import callback_best_match, image_search, start
 
+logger = logging.getLogger(__name__)
 
 
 def error(update: Update, context: CallbackContext):
@@ -23,7 +27,7 @@ def error(update: Update, context: CallbackContext):
         context (:obj:`telegram.ext.CallbackContext`): Bot context
     """
     logger.exception(context.error)
-    logger.warning('Error caused by this update: %s' % (update))
+    logger.warning("Error caused by this update: %s" % (update))
 
 
 def main():
@@ -42,24 +46,26 @@ def main():
             update (:obj:`telegram.update.Update`): Telegram update
             context (:obj:`telegram.ext.CallbackContext`): Bot context
         """
-        update.message.reply_text('Bot is restarting...')
-        logger.info('Gracefully restarting...')
+        update.message.reply_text("Bot is restarting...")
+        logger.info("Gracefully restarting...")
         Thread(target=stop_and_restart).start()
 
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CommandHandler("help", start))
-    dispatcher.add_handler(CommandHandler('restart', restart, filters=Filters.user(username='@Nachtalb')))
+    dispatcher.add_handler(CommandHandler("restart", restart, filters=Filters.user(username="@Nachtalb")))
     dispatcher.add_handler(CallbackQueryHandler(callback_best_match))
 
-    dispatcher.add_handler(MessageHandler(Filters.sticker | Filters.photo | Filters.video | Filters.document, image_search))
+    dispatcher.add_handler(
+        MessageHandler(Filters.sticker | Filters.photo | Filters.video | Filters.document, image_search)
+    )
 
     # log all errors
     dispatcher.add_error_handler(error)
 
     updater.start_polling()
-    logger.info('Started bot. Waiting for requests...')
+    logger.info("Started bot. Waiting for requests...")
     updater.idle()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

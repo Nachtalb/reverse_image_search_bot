@@ -8,13 +8,13 @@ from yarl import URL
 
 class GenericRISEngine:
     _cache = TTLCache(maxsize=1e4, ttl=24 * 60 * 60)
-    name: str = 'GenericRISEngine'
-    url: str = ''
+    name: str = "GenericRISEngine"
+    url: str = ""
 
     def __init__(self, name: str = None, url: str = None):
         self.name = name or self.name
         self.url = url or self.url
-        self.logger = logging.getLogger('RISEngine [{self.name}]')
+        self.logger = logging.getLogger("RISEngine [{self.name}]")
 
     def __call__(self, url: str | URL, text: str = None) -> InlineKeyboardButton:
         """Create the :obj:`InlineKeyboardButton` button for the telegram but to use
@@ -25,8 +25,7 @@ class GenericRISEngine:
         Returns:
             :obj:`InlineKeyboardButton`: Telegram button with name and url target
         """
-        return InlineKeyboardButton(text=text or self.name,
-                                    url=str(self.get_search_link_by_url(url)))
+        return InlineKeyboardButton(text=text or self.name, url=str(self.get_search_link_by_url(url)))
 
     def get_search_link_by_url(self, url: str | URL) -> URL:
         """Get the reverse image search link for the given url

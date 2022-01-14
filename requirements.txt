@@ -17,6 +17,7 @@ imageio-ffmpeg==0.4.5
 importlib-metadata==4.10.0
 lxml==4.7.1
 moviepy==1.0.3
+multidict==5.2.0
 numpy==1.22.0
 paramiko==2.9.2
 parse==1.19.0
@@ -41,4 +42,5 @@ tzlocal==4.1
 urllib3==1.26.8
 w3lib==1.22.0
 websockets==10.1
+yarl==1.7.2
 zipp==3.7.0
