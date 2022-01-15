@@ -8,7 +8,8 @@ from yarl import URL
 from reverse_image_search_bot.settings import SAUCENAO_API
 from reverse_image_search_bot.utils import tagify, url_button
 
-from .generic import GenericRISEngine, InternalProviderData, MetaData, ProviderData
+from .generic import GenericRISEngine
+from .types import InternalProviderData, MetaData, ProviderData
 
 
 class SauceNaoEngine(GenericRISEngine):

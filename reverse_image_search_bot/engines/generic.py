@@ -1,40 +1,18 @@
 import logging
-import random
-from typing import TypedDict
 from urllib.parse import quote_plus
 
 from cachetools import TTLCache, cached
 from telegram import InlineKeyboardButton
 from yarl import URL
 
-from reverse_image_search_bot.utils import (
-    anilist_info,
-    danbooru_info,
-    tagify,
-    url_button,
-)
-
-InternalResultData = dict[str, str | int | URL | None | list[str]]
-ResultData = dict[str, str | int | URL]
+from .providers import ProviderCollection
+from .types import InternalResultData, ProviderData, ResultData
 
 
-class MetaData(TypedDict, total=False):
-    provider: str
-    provider_url: URL
-    provided_via: str
-    provided_via_url: URL
-    thumbnail: URL
-    similarity: int | float
-    buttons: list[InlineKeyboardButton]
-    identifier: str
-    thumbnail_identifier: str
+__all__ = ["GenericRISEngine"]
 
 
-InternalProviderData = tuple[InternalResultData, MetaData]
-ProviderData = tuple[ResultData, MetaData]
-
-
-class GenericRISEngine:
+class GenericRISEngine(ProviderCollection):
     _cache = TTLCache(maxsize=1e4, ttl=24 * 60 * 60)
     name: str = "GenericRISEngine"
     url: str = ""
@@ -60,65 +38,6 @@ class GenericRISEngine:
                 data[key] = ", ".join(map(str, value))
 
         return data  # type: ignore
-
-    def _anilist_provider(self, anilist_id: int, episode_at: int | str = None) -> InternalProviderData:
-        ani_data = anilist_info(anilist_id)
-        if not ani_data:
-            return {}, {}
-
-        episode_at = "?" if episode_at is None else episode_at
-
-        result = {
-            "Title": ani_data["title"]["english"],
-            "Title [romaji]": ani_data["title"]["romaji"],
-            "Episode": f'{episode_at}/{ani_data["episodes"]}',
-            "Status": ani_data["status"],
-            "Type": ani_data["type"],
-            "Year": f"{ani_data['startDate']['year']}-{ani_data['endDate']['year']}",
-            "Genres": tagify(ani_data["genres"]),
-        }
-
-        meta: MetaData = {
-            "provided_via": "AniList",
-            "provided_via_url": URL("https://anilist.co/"),
-            "thumbnail": URL(ani_data["coverImage"]["large"]),
-            "buttons": [url_button(ani_data["siteUrl"])],
-            "identifier": ani_data["siteUrl"],
-            "thumbnail_identifier": ani_data["coverImage"]["large"],
-        }
-
-        return result, meta
-
-    def _danbooru_provider(self, danbooru_id: int) -> InternalProviderData:
-        danbooru_data = danbooru_info(danbooru_id)
-        if not danbooru_data:
-            return {}, {}
-
-        buttons = []
-        if source := danbooru_data.get("source"):
-            buttons.append(url_button(source))
-
-        danbooru_url = URL(f"https://danbooru.donmai.us/posts/{danbooru_id}")
-        buttons.append(url_button(danbooru_url))
-
-        result = {
-            "Character": tagify(danbooru_data.get("tag_string_character", [])) or None,
-            "Size": f"{danbooru_data['image_width']}x{danbooru_data['image_height']}",
-            "Tags": tagify(random.choices(danbooru_data["tag_string_general"].split(" "), k=5)),
-            "By": tagify(danbooru_data.get("tag_string_artist", [])) or None,
-            "Material": danbooru_data.get("tag_string_copyright", None),
-        }
-
-        meta: MetaData = {
-            "provided_via": "Danbooru",
-            "provided_via_url": URL("https://danbooru.donmai.us/"),
-            "thumbnail": URL(danbooru_data["large_file_url"]),  # type: ignore
-            "buttons": buttons,
-            "identifier": str(danbooru_url),
-            "thumbnail_identifier": danbooru_data["large_file_url"],
-        }
-
-        return result, meta
 
     @cached(cache=_cache)
     def best_match(self, url: str | URL) -> ProviderData:

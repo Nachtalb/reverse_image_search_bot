@@ -13,11 +13,8 @@ from telegram.parsemode import ParseMode
 from yarl import URL
 
 from reverse_image_search_bot.engines import engines
-from reverse_image_search_bot.engines.generic import (
-    GenericRISEngine,
-    MetaData,
-    ResultData,
-)
+from reverse_image_search_bot.engines.generic import GenericRISEngine
+from reverse_image_search_bot.engines.types import MetaData, ResultData
 from reverse_image_search_bot.uploaders import uploader
 from reverse_image_search_bot.utils import chunks, upload_file
 
@@ -191,13 +188,13 @@ def best_match(update: Update, context: CallbackContext, url: str | URL):
 
 
 def build_reply(result: ResultData, meta: MetaData) -> str:
-    reply = f'Provided by: <b><a href="{meta["provider_url"]}">{meta["provider"]}</a></b>'  # type: ignore
+    reply = f'Found with: <b><a href="{meta["provider_url"]}">{meta["provider"]}</a></b>'  # type: ignore
 
     if via := meta.get("provided_via"):
         via = f"<b>{via}</b>"
         if via_url := meta.get("provided_via_url"):
             via = f'<a href="{via_url}">{via}</a>'
-        reply += f" via {via}"
+        reply += f" on {via}"
 
     if similarity := meta.get("similarity"):
         reply += f" with <b>{similarity}%</b> similarity"

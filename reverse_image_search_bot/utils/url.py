@@ -17,7 +17,7 @@ def fix_url(url: URL | str) -> URL:
     return url
 
 
-def url_icon(url: URL | str, with_icon: bool = True, with_text: bool = True) -> str:
+def url_icon(url: URL | str, with_icon: bool = True, with_text: bool = True, custom_text: str = None) -> str:
     url = URL(url)
 
     match url.host:
@@ -34,16 +34,18 @@ def url_icon(url: URL | str, with_icon: bool = True, with_text: bool = True) -> 
             text = url.host.split(".")[-2].title()  # type: ignore
             icon = "🌐"
 
+    if custom_text:
+        text = custom_text
     if not with_text:
         text = ""
     if not with_icon:
-        text = ""
+        icon = ""
     return f"{icon} {text}"
 
 
 def url_button(
-    url: URL | str, with_icon: bool = True, with_text: bool = True, fix_url_: bool = True
+    url: URL | str, with_icon: bool = True, with_text: bool = True, fix_url_: bool = True, text: str = None
 ) -> InlineKeyboardButton:
     if fix_url_:
         url = fix_url(url)
-    return InlineKeyboardButton(text=url_icon(url, with_icon, with_text), url=str(url))
+    return InlineKeyboardButton(text=url_icon(url, with_icon, with_text, text), url=str(url))

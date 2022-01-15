@@ -8,7 +8,8 @@ from yarl import URL
 
 from reverse_image_search_bot.utils import url_button
 
-from .generic import GenericRISEngine, MetaData, ProviderData
+from .generic import GenericRISEngine
+from .types import MetaData, ProviderData
 
 
 class TraceEngine(GenericRISEngine):
