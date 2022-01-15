@@ -13,7 +13,7 @@ __all__ = ["GenericRISEngine"]
 
 
 class GenericRISEngine(ProviderCollection):
-    _cache = TTLCache(maxsize=1e4, ttl=24 * 60 * 60)
+    _best_match_cache = TTLCache(maxsize=1e4, ttl=24 * 60 * 60)
     name: str = "GenericRISEngine"
     url: str = ""
 
@@ -22,11 +22,14 @@ class GenericRISEngine(ProviderCollection):
         self.url = url or self.url
         self.logger = logging.getLogger(f"RISEngine [{self.name}]")
 
-    def __call__(self, url: str | URL, text: str = None) -> InlineKeyboardButton:
+    def __call__(self, url: str | URL, text: str = None) -> InlineKeyboardButton | None:
         """Create the :obj:`InlineKeyboardButton` button for the telegram but to use"""
-        return InlineKeyboardButton(text=text or self.name, url=str(self.get_search_link_by_url(url)))
+        search_url = self.get_search_link_by_url(url)
+        if not search_url:
+            return
+        return InlineKeyboardButton(text=text or self.name, url=str(search_url))
 
-    def get_search_link_by_url(self, url: str | URL) -> URL:
+    def get_search_link_by_url(self, url: str | URL) -> URL | None:
         """Get the reverse image search link for the given url"""
         return URL(self.url.format(query_url=quote_plus(str(url))))
 
@@ -39,7 +42,7 @@ class GenericRISEngine(ProviderCollection):
 
         return data  # type: ignore
 
-    @cached(cache=_cache)
+    @cached(cache=_best_match_cache)
     def best_match(self, url: str | URL) -> ProviderData:
         """Get info about the best matching image found
 
@@ -64,4 +67,4 @@ class GenericRISEngine(ProviderCollection):
                 }
             )
         """
-        return {}, {}
+        raise NotImplementedError()

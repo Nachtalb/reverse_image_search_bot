@@ -20,7 +20,7 @@ class TraceEngine(GenericRISEngine):
         super().__init__(*args, **kwargs)
         self.session = Session()
 
-    @cached(GenericRISEngine._cache)
+    @cached(GenericRISEngine._best_match_cache)
     def best_match(self, url: str | URL) -> ProviderData:
         api_link = "https://api.trace.moe/search?url={}".format(quote_plus(str(url)))
         response = self.session.get(api_link)

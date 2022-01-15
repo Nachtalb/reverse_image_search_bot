@@ -123,7 +123,7 @@ class SauceNaoEngine(GenericRISEngine):
 
         return result, meta  # type: ignore
 
-    @cached(GenericRISEngine._cache)
+    @cached(GenericRISEngine._best_match_cache)
     def best_match(self, url: str | URL) -> ProviderData:
         meta: MetaData = {
             "provider": self.name,

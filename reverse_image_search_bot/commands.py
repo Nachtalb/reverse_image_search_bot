@@ -13,7 +13,6 @@ from telegram.parsemode import ParseMode
 from yarl import URL
 
 from reverse_image_search_bot.engines import engines
-from reverse_image_search_bot.engines.generic import GenericRISEngine
 from reverse_image_search_bot.engines.types import MetaData, ResultData
 from reverse_image_search_bot.settings import ADMIN_IDS
 from reverse_image_search_bot.uploaders import uploader
@@ -71,7 +70,7 @@ def error_to_admin(update: Update, context: CallbackContext, attachment, message
 def image_search(update: Update, context: CallbackContext):
     if not update.message:
         return
-    message = update.message.reply_text("...")
+    message = update.message.reply_text("⌛ Give me a sec...")
     context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
 
     attachment = update.message.effective_attachment
@@ -148,7 +147,8 @@ def general_image_search(update: Update, image_url: URL):
         [InlineKeyboardButton(text="Go To Image", url=str(image_url))],
     ]
 
-    button_list.extend(chunks([en(image_url) for en in engines], 2))
+    buttons = filter(None, map(lambda en: en(image_url), engines))
+    button_list.extend(chunks(list(buttons), 2))
 
     reply = f"Use **Best Match** to directly find the best match from here withing telegram.[​]({image_url})"
     reply_markup = InlineKeyboardMarkup(button_list)
@@ -169,7 +169,9 @@ def callback_best_match(update: Update, context: CallbackContext):
 def best_match(update: Update, context: CallbackContext, url: str | URL):
     """Find best matches for an image."""
     message: Message = update.effective_message  # type: ignore
-    search_message = context.bot.send_message(text="⏳", chat_id=message.chat_id, reply_to_message_id=message.message_id)
+    search_message = context.bot.send_message(
+        text="⏳ searching...", chat_id=message.chat_id, reply_to_message_id=message.message_id
+    )
 
     identifiers = []
     thumbnail_identifiers = []
@@ -177,17 +179,24 @@ def best_match(update: Update, context: CallbackContext, url: str | URL):
 
     match_found = False
     for engine in engines:
-        if type(engine) is GenericRISEngine:
-            continue
-
-        logger.debug("Searching %s for %s", engine.name, url)
-        search_message.edit_text(f"⏳ *{engine.name}*", parse_mode=ParseMode.MARKDOWN)
         try:
+            try:
+                logger.debug("%s Searching for %s", engine.name, url)
+                result, meta = engine.best_match(url)
+            except NotImplementedError:
+                logger.debug("%s Has no search implemented", engine.name)
+                continue
+
             engines_used.append(engine.name)
-            result, meta = engine.best_match(url)
+            search_message.edit_text(f"⏳ *{engine.name}*", parse_mode=ParseMode.MARKDOWN)
             if meta:
                 logger.debug("Found something UmU")
-                button_list = [engine(url=str(url), text="More")]
+
+                button_list = []
+                more_button = engine(str(url), "More")
+                if more_button := engine(str(url), "More"):
+                    button_list.append(more_button)
+
                 if buttons := meta.get("buttons"):
                     button_list.extend(buttons)
 
@@ -208,9 +217,9 @@ def best_match(update: Update, context: CallbackContext, url: str | URL):
                     text=build_reply(result, meta),
                     reply_markup=InlineKeyboardMarkup(button_list),
                     reply_to_message_id=message.message_id,
-                    disable_web_page_preview='errors' in meta
+                    disable_web_page_preview="errors" in meta,
                 )
-                if 'errors' not in meta and result:
+                if "errors" not in meta and result:
                     match_found = True
                 if identifier:
                     identifiers.append(identifier)
@@ -258,7 +267,7 @@ def build_reply(result: ResultData, meta: MetaData) -> str:
         else:
             reply += f"<b>{key}</b>: <code>{value}</code>\n"
 
-    if errors := meta.get('errors'):
+    if errors := meta.get("errors"):
         for error in errors:
             reply += error
 

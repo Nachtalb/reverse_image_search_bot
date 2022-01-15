@@ -19,7 +19,7 @@ class IQDBEngine(GenericRISEngine):
         super().__init__(*args, **kwargs)
         self.session = HTMLSession()
 
-    @cached(GenericRISEngine._cache)
+    @cached(GenericRISEngine._best_match_cache)
     def best_match(self, url: str | URL) -> ProviderData:
         response: HTMLResponse = self.session.get(str(self.get_search_link_by_url(url)))  # type: ignore
 

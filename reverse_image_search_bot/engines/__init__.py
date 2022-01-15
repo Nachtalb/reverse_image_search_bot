@@ -1,3 +1,4 @@
+from .baidu import BaiduEngine
 from .generic import GenericRISEngine
 from .iqdb import IQDBEngine
 from .saucenao import SauceNaoEngine
@@ -12,6 +13,7 @@ engines: list[GenericRISEngine] = [
     TraceEngine(),
     IQDBEngine(),
     GenericRISEngine("Yandex", "https://yandex.com/images/search?url={query_url}&rpt=imageview"),
+    BaiduEngine(),
     GenericRISEngine("Bing", "https://www.bing.com/images/search?q=imgurl:{query_url}&view=detailv2&iss=sbi"),
     GenericRISEngine("TinEye", "https://tineye.com/search?url={query_url}"),
 ]
