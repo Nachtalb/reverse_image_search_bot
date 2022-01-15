@@ -52,7 +52,9 @@ def error_to_admin(update: Update, context: CallbackContext, attachment, message
             message += f"\nUser: {user.mention_markdown_v2()}"
             buttons = None
             if image_url:
-                buttons = InlineKeyboardMarkup([[InlineKeyboardButton("Best Match", callback_data=f"best_match {image_url}")]])
+                buttons = InlineKeyboardMarkup(
+                    [[InlineKeyboardButton("Best Match", callback_data=f"best_match {image_url}")]]
+                )
 
             for admin in ADMIN_IDS:
                 if isinstance(attachment, Sticker):
@@ -171,6 +173,7 @@ def best_match(update: Update, context: CallbackContext, url: str | URL):
 
     identifiers = []
     thumbnail_identifiers = []
+    engines_used = []
 
     match_found = False
     for engine in engines:
@@ -180,6 +183,7 @@ def best_match(update: Update, context: CallbackContext, url: str | URL):
         logger.debug("Searching %s for %s", engine.name, url)
         search_message.edit_text(f"⏳ *{engine.name}*", parse_mode=ParseMode.MARKDOWN)
         try:
+            engines_used.append(engine.name)
             result, meta = engine.best_match(url)
             if meta:
                 logger.debug("Found something UmU")
@@ -204,8 +208,10 @@ def best_match(update: Update, context: CallbackContext, url: str | URL):
                     text=build_reply(result, meta),
                     reply_markup=InlineKeyboardMarkup(button_list),
                     reply_to_message_id=message.message_id,
+                    disable_web_page_preview='errors' in meta
                 )
-                match_found = True
+                if 'errors' not in meta and result:
+                    match_found = True
                 if identifier:
                     identifiers.append(identifier)
                 if thumbnail_identifier:
@@ -214,10 +220,19 @@ def best_match(update: Update, context: CallbackContext, url: str | URL):
             logger.error("Engine failure: %s", engine)
             logger.exception(error)
 
+    engines_used_html = ", ".join([f"<b>{name}</b>" for name in engines_used])
     if not match_found:
-        search_message.edit_text("❌ No results")
+        search_message.edit_text(
+            f"🔴 I searched for you on {engines_used_html} but didn't find anything. Please try another engine above.",
+            parse_mode=ParseMode.HTML,
+        )
     else:
         search_message.delete()
+        context.bot.send_message(
+            text=f"🔵 I searched for you on {engines_used_html}. You can try others above for more results",
+            parse_mode=ParseMode.HTML,
+            chat_id=message.chat_id,
+        )
 
 
 def build_reply(result: ResultData, meta: MetaData) -> str:
@@ -242,5 +257,9 @@ def build_reply(result: ResultData, meta: MetaData) -> str:
             reply += f"<b>{key}</b>: {value}\n"
         else:
             reply += f"<b>{key}</b>: <code>{value}</code>\n"
+
+    if errors := meta.get('errors'):
+        for error in errors:
+            reply += error
 
     return reply

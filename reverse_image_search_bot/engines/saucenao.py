@@ -129,10 +129,11 @@ class SauceNaoEngine(GenericRISEngine):
             "provider": self.name,
             "provider_url": URL("https://saucenao.com/"),
         }
-        limit_reached_result = {"Daily limit reached": 'Please click the "More" button below'}
+        limit_reached_result = "Daily limit reached. You can search SauceNAO via it's button above or <b>More</b> below."
 
         if self.limit_reached and time() - self.limit_reached < 3600:
-            return limit_reached_result, meta  # type: ignore
+            meta['errors'] = [limit_reached_result]
+            return {}, meta
 
         api_link = "https://saucenao.com/search.php?db=999&output_type=2&testmode=1&numres=8&url={}{}".format(
             quote_plus(str(url)), f"&api_key={SAUCENAO_API}" if SAUCENAO_API else ""
@@ -142,7 +143,8 @@ class SauceNaoEngine(GenericRISEngine):
 
         if response.status_code == 429:
             self.limit_reached = time()
-            return limit_reached_result, meta  # type: ignore
+            meta['errors'] = [limit_reached_result]
+            return {}, meta
 
         if response.status_code != 200:
             return {}, {}

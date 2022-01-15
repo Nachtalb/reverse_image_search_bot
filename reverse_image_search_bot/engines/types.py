@@ -12,6 +12,7 @@ ResultData = dict[str, str | int | URL]
 class MetaData(TypedDict, total=False):
     provider: str
     provider_url: URL
+    errors: list[str]
     provided_via: str
     provided_via_url: URL
     thumbnail: URL
