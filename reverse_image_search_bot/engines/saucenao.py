@@ -1,3 +1,4 @@
+from threading import Lock
 from urllib.parse import quote_plus
 
 from cachetools import cached
@@ -21,6 +22,7 @@ class SauceNaoEngine(GenericRISEngine):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.session = Session()
+        self.lock = Lock()
 
     def _21_provider(self, data: ResponseData) -> InternalProviderData:
         """Anime"""
@@ -124,7 +126,8 @@ class SauceNaoEngine(GenericRISEngine):
         api_link = "https://saucenao.com/search.php?db=999&output_type=2&testmode=1&numres=8&url={}{}".format(
             quote_plus(str(url)), f"&api_key={SAUCENAO_API}" if SAUCENAO_API else ""
         )
-        response = self.session.get(api_link)
+        with self.lock:
+            response = self.session.get(api_link)
         if response.status_code != 200:
             return {}, {}
 
