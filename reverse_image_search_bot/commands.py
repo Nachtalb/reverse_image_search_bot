@@ -15,6 +15,7 @@ from yarl import URL
 from reverse_image_search_bot.engines import engines
 from reverse_image_search_bot.engines.generic import GenericRISEngine
 from reverse_image_search_bot.engines.types import MetaData, ResultData
+from reverse_image_search_bot.settings import ADMIN_IDS
 from reverse_image_search_bot.uploaders import uploader
 from reverse_image_search_bot.utils import chunks, upload_file
 
@@ -40,6 +41,31 @@ def start(update: Update, context: CallbackContext):
         context.bot.send_animation(chat_id=update.message.chat_id, animation=ffile, caption="Example Usage")
 
 
+def error_to_admin(update: Update, context: CallbackContext, attachment, message: str, image_url: str | URL):
+    try:
+        user = update.effective_user
+        send_method = getattr(
+            context.bot,
+            "send_%s" % (attachment.__class__.__name__.lower() if not isinstance(attachment, PhotoSize) else "photo"),
+        )
+        if user and send_method and user.id != 713276361:
+            message += f"\nUser: {user.mention_markdown_v2()}"
+            buttons = None
+            if image_url:
+                buttons = InlineKeyboardMarkup([[InlineKeyboardButton("Best Match", callback_data=f"best_match {image_url}")]])
+
+            for admin in ADMIN_IDS:
+                if isinstance(attachment, Sticker):
+                    send_method(admin, attachment)
+                    context.bot.send_message(admin, message, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=buttons)
+                else:
+                    send_method(
+                        admin, attachment, caption=message, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=buttons
+                    )
+    except Exception as error:
+        logger.exception(error)
+
+
 def image_search(update: Update, context: CallbackContext):
     if not update.message:
         return
@@ -49,6 +75,7 @@ def image_search(update: Update, context: CallbackContext):
     attachment = update.message.effective_attachment
     if isinstance(attachment, list):
         attachment = attachment[-1]
+
     try:
         match attachment:
             case i if (isinstance(i, Document) and i.mime_type.startswith("video")) or isinstance(
@@ -62,8 +89,14 @@ def image_search(update: Update, context: CallbackContext):
                 return
 
         general_image_search(update, image_url)
-    except Exception:
+    except Exception as error:
         message.edit_text("An error occurred please contact the @Nachtalb for help.")
+        try:
+            image_url  # type: ignore
+        except NameError:
+            image_url = None
+
+        error_to_admin(update, context, attachment, f"Error: {error}", image_url)  # type: ignore
         raise
     message.delete()
     best_match(update, context, image_url)

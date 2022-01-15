@@ -16,4 +16,6 @@ UPLOADER = {
     },
 }
 
+ADMIN_IDS = []
+
 SAUCENAO_API = ""  # SauceNAO api key https://saucenao.com/user.php?page=search-api
