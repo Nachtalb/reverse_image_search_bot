@@ -39,7 +39,10 @@ class IQDBEngine(GenericRISEngine):
         link = URL(rows[0].find("a", first=True).attrs["href"]).with_scheme("https")  # type: ignore
         if link.host == "danbooru.donmai.us" and (danbooru_id := next(filter(None, reversed(link.parts)), None)):
             result, meta = self._danbooru_provider(int(danbooru_id))
-            buttons = meta.get("buttons", [])
+        elif link.host == "gelbooru.com" and (gelbooru_id := link.query.get("id")):
+            result, meta = self._gelbooru_provider(int(gelbooru_id))
+
+        buttons = meta.get("buttons", buttons)
 
         if not result:
             thumbnail = URL(self.url).with_path(rows[0].find("img", first=True).attrs["src"])  # type: ignore

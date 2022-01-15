@@ -45,3 +45,34 @@ class BooruProviders:
         }
 
         return result, meta
+
+    def _gelbooru_provider(self, gelbooru_id: int) -> InternalProviderData:
+        gelbooru_data = gelbooru_info(gelbooru_id)
+        if not gelbooru_data:
+            return {}, {}
+
+        buttons = []
+        if source := gelbooru_data.get("source"):
+            buttons.append(url_button(source, text="Source"))
+
+        gelbooru_url = URL(f"https://gelbooru.com/index.php?page=post&s=view&id={gelbooru_id}")
+        buttons.append(url_button(gelbooru_url))
+
+        result = {
+            "Title": gelbooru_data.get("title", None),
+            "Character": tagify(gelbooru_data.get("tag_string_character", [])) or None,
+            "Size": f"{gelbooru_data['width']}x{gelbooru_data['height']}",
+            "Tags": tagify(random.choices(gelbooru_data["tags"].split(" "), k=5)),
+            "Rating": gelbooru_data["rating"].title(),
+        }
+
+        meta: MetaData = {
+            "provided_via": "Gelbooru",
+            "provided_via_url": URL("https://gelbooru.com/"),
+            "thumbnail": URL(gelbooru_data["file_url"]),  # type: ignore
+            "buttons": buttons,
+            "identifier": str(gelbooru_url),
+            "thumbnail_identifier": gelbooru_data["file_url"],
+        }
+
+        return result, meta
