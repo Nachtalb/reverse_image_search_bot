@@ -120,7 +120,7 @@ class SauceNaoEngine(GenericRISEngine):
         if response.status_code != 200:
             return {}, {}
 
-        results = filter(lambda d: float(d["header"]["similarity"]) >= 70, response.json().get("results", []))
+        results = filter(lambda d: float(d["header"]["similarity"]) >= 60, response.json().get("results", []))
 
         priority = 21, 5, 9  # Anime, Pixiv, Danbooru
         data = next(
