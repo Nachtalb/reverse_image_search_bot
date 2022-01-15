@@ -221,13 +221,13 @@ def best_match(update: Update, context: CallbackContext, url: str | URL):
 
 
 def build_reply(result: ResultData, meta: MetaData) -> str:
-    reply = f'Found with: <b><a href="{meta["provider_url"]}">{meta["provider"]}</a></b>'  # type: ignore
+    reply = f'Provided by: <b><a href="{meta["provider_url"]}">{meta["provider"]}</a></b>'  # type: ignore
 
     if via := meta.get("provided_via"):
         via = f"<b>{via}</b>"
         if via_url := meta.get("provided_via_url"):
             via = f'<a href="{via_url}">{via}</a>'
-        reply += f" on {via}"
+        reply += f" with {via}"
 
     if similarity := meta.get("similarity"):
         reply += f" with <b>{similarity}%</b> similarity"

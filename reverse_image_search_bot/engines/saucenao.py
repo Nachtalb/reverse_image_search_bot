@@ -1,4 +1,5 @@
 from threading import Lock
+from time import time
 from urllib.parse import quote_plus
 
 from cachetools import cached
@@ -16,6 +17,7 @@ from .types import InternalProviderData, MetaData, ProviderData
 class SauceNaoEngine(GenericRISEngine):
     name = "SauceNAO"
     url = "https://saucenao.com/search.php?url={query_url}"
+    limit_reached = None
 
     ResponseData = dict[str, str | int | list[str]]
 
@@ -123,11 +125,25 @@ class SauceNaoEngine(GenericRISEngine):
 
     @cached(GenericRISEngine._cache)
     def best_match(self, url: str | URL) -> ProviderData:
+        meta: MetaData = {
+            "provider": self.name,
+            "provider_url": URL("https://saucenao.com/"),
+        }
+        limit_reached_result = {"Daily limit reached": 'Please click the "More" button below'}
+
+        if self.limit_reached and time() - self.limit_reached < 3600:
+            return limit_reached_result, meta  # type: ignore
+
         api_link = "https://saucenao.com/search.php?db=999&output_type=2&testmode=1&numres=8&url={}{}".format(
             quote_plus(str(url)), f"&api_key={SAUCENAO_API}" if SAUCENAO_API else ""
         )
         with self.lock:
             response = self.session.get(api_link)
+
+        if response.status_code == 429:
+            self.limit_reached = time()
+            return limit_reached_result, meta  # type: ignore
+
         if response.status_code != 200:
             return {}, {}
 
@@ -151,14 +167,12 @@ class SauceNaoEngine(GenericRISEngine):
             return {}, {}
 
         data_provider = getattr(self, f"_{data['header']['index_id']}_provider", self._default_provider)
-        result, meta = data_provider(data["data"])
-        meta: MetaData
+        result, new_meta = data_provider(data["data"])
+        meta.update(new_meta)
 
         meta.update(
             {
                 "thumbnail": URL(meta.get("thumbnail", data["header"]["thumbnail"])),
-                "provider": self.name,
-                "provider_url": URL("https://saucenao.com/"),
                 "similarity": float(data["header"]["similarity"]),
             }
         )
