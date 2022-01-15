@@ -13,6 +13,11 @@ from .types import MetaData, ProviderData
 
 class IQDBEngine(GenericRISEngine):
     name = "IQDB"
+    description = "IQDB is a reverse search engine that scrubs ImageBoards for anime/manga related artworks."
+    provider_url = URL("https://iqdb.org/")
+    types = ["Anime/Manga related Artworks"]
+    recommendation = ["Anime/Manga related Artworks"]
+
     url = "https://iqdb.org/?url={query_url}"
 
     def __init__(self, *args, **kwargs):
@@ -56,7 +61,7 @@ class IQDBEngine(GenericRISEngine):
         meta.update(
             {
                 "provider": self.name,
-                "provider_url": URL("https://iqdb.org/"),
+                "provider_url": self.provider_url,
                 "buttons": buttons,
                 "similarity": int(re.match(r"\d+", rows[3].text)[0]),  # type: ignore
             }

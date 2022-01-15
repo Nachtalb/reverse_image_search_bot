@@ -14,6 +14,11 @@ from .types import MetaData, ProviderData
 
 class TraceEngine(GenericRISEngine):
     name = "Trace"
+    description = "Search Anime by screenshots. Lookup the exact moment and the episode."
+    provider_url = URL("https://trace.moe/")
+    types = ["Anime"]
+    recommendation = ["Anime"]
+
     url = "https://trace.moe/?auto&url={query_url}"
 
     def __init__(self, *args, **kwargs):

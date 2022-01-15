@@ -29,6 +29,14 @@ def upload_file(file: Path | BinaryIO, file_name: str) -> URL:
     return URL(UPLOADER["url"]) / file_name
 
 
+def get_file(name: str) -> Path:
+    return Path(UPLOADER["configuration"]["path"]) / name
+
+
+def get_file_from_url(url: str | URL):
+    return get_file(str(url).replace(UPLOADER["url"].rstrip("/") + "/", ""))
+
+
 def tagify(tags: list[str] | str) -> list[str]:
     if not tags:
         return []

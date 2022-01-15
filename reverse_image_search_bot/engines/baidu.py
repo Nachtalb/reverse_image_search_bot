@@ -1,28 +1,23 @@
 from urllib.parse import quote_plus
 
-from cachetools import TTLCache, cached
-from requests import Session
 from yarl import URL
 
-from .generic import GenericRISEngine
+from .generic import PreWorkEngine
 
 
-class BaiduEngine(GenericRISEngine):
+class BaiduEngine(PreWorkEngine):
     name = "Baidu"
-    url = "https://graph.baidu.com/upload?image={query_url}&from=pc"
-    _cache = TTLCache(maxsize=1e4, ttl=24 * 60 * 60)
+    description = "Baidu, Inc. is a Chinese multinational technology company specializing in Internet-related services."
+    provider_url = URL("https://baidu.com/")
+    types = ["All-in-one"]
+    recommendation = ["Anything Chinese"]
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.session = Session()
+    pre_url = "https://graph.baidu.com/upload?image={query_url}&from=pc"
+    has_session = True
 
-    @cached(_cache)
-    def get_search_link_by_url(self, url: str | URL) -> URL | None:
-        pre_url = self.url.format(query_url=quote_plus(str(url)))
+    def get_search_link_by_url(self, url: URL) -> URL | None:
+        pre_url = self.pre_url.format(query_url=quote_plus(str(url)))
 
         response = self.session.get(pre_url)
-        if response.status_code != 200:
-            return
-
-        search_url = response.json().get("data", {}).get("url")
-        return URL(search_url) if search_url else None
+        if response.status_code == 200 and (search_url := response.json().get("data", {}).get("url")):
+            return URL(search_url)

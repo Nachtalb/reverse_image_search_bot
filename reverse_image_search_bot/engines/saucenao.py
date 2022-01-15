@@ -16,6 +16,14 @@ from .types import InternalProviderData, MetaData, ProviderData
 
 class SauceNaoEngine(GenericRISEngine):
     name = "SauceNAO"
+    description = (
+        "SauceNAO is a reverse image search website which is widely used to find the source of animes, mangas and"
+        " related fanart."
+    )
+    provider_url = URL("https://saucenao.com/")
+    types = ["Anime/Manga related Artworks", "Anime", "Manga"]
+    recommendation = ["Anime", "Manga", "Aniem/Manga related Artworks"]
+
     url = "https://saucenao.com/search.php?url={query_url}"
     limit_reached = None
 
@@ -127,12 +135,14 @@ class SauceNaoEngine(GenericRISEngine):
     def best_match(self, url: str | URL) -> ProviderData:
         meta: MetaData = {
             "provider": self.name,
-            "provider_url": URL("https://saucenao.com/"),
+            "provider_url": self.provider_url,
         }
-        limit_reached_result = "Daily limit reached. You can search SauceNAO via it's button above or <b>More</b> below."
+        limit_reached_result = (
+            "Daily limit reached. You can search SauceNAO via it's button above or <b>More</b> below."
+        )
 
         if self.limit_reached and time() - self.limit_reached < 3600:
-            meta['errors'] = [limit_reached_result]
+            meta["errors"] = [limit_reached_result]
             return {}, meta
 
         api_link = "https://saucenao.com/search.php?db=999&output_type=2&testmode=1&numres=8&url={}{}".format(
@@ -143,7 +153,7 @@ class SauceNaoEngine(GenericRISEngine):
 
         if response.status_code == 429:
             self.limit_reached = time()
-            meta['errors'] = [limit_reached_result]
+            meta["errors"] = [limit_reached_result]
             return {}, meta
 
         if response.status_code != 200:

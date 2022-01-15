@@ -40,6 +40,27 @@ def start(update: Update, context: CallbackContext):
         context.bot.send_animation(chat_id=update.message.chat_id, animation=ffile, caption="Example Usage")
 
 
+def engines_command(update: Update, context: CallbackContext):
+    reply = 'To get a desciption of the engines use "/engines more".\n\n'
+    engine_template = """<b>{engine.name}</b>: {engine.provider_url}
+<b>Recommended for:</b> {recommends}
+<b>Used for:</b> {used_for}
+{desciption}
+"""
+    for engine in engines:
+        recommends = ", ".join(engine.recommendation) if engine.recommendation else "-"
+        used_for = ", ".join(engine.types)
+        desciption = f"\n{engine.description}\n" if context.args else ""
+        reply += engine_template.format(
+            engine=engine,
+            recommends=recommends,
+            used_for=used_for,
+            desciption=desciption,
+        )
+
+    update.message.reply_html(reply, reply_to_message_id=update.message.message_id, disable_web_page_preview=True)
+
+
 def error_to_admin(update: Update, context: CallbackContext, attachment, message: str, image_url: str | URL):
     try:
         user = update.effective_user
@@ -150,12 +171,13 @@ def general_image_search(update: Update, image_url: URL):
     buttons = filter(None, map(lambda en: en(image_url), engines))
     button_list.extend(chunks(list(buttons), 2))
 
-    reply = f"Use **Best Match** to directly find the best match from here withing telegram.[​]({image_url})"
+    reply = "Use /engines to get a overview of supprted engines and what they are good at."
     reply_markup = InlineKeyboardMarkup(button_list)
     update.message.reply_text(
         text=reply,
         reply_markup=reply_markup,
         parse_mode=ParseMode.MARKDOWN,
+        reply_to_message_id=update.message.message_id,
     )
 
 
