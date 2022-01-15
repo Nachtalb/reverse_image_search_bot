@@ -139,6 +139,9 @@ def best_match(update: Update, context: CallbackContext, url: str | URL):
     message: Message = update.effective_message  # type: ignore
     search_message = context.bot.send_message(text="⏳", chat_id=message.chat_id, reply_to_message_id=message.message_id)
 
+    identifiers = []
+    thumbnail_identifiers = []
+
     match_found = False
     for engine in engines:
         if type(engine) is GenericRISEngine:
@@ -156,12 +159,27 @@ def best_match(update: Update, context: CallbackContext, url: str | URL):
 
                 button_list = list(chunks(button_list, 3))
 
+                identifier = meta.get("identifier")
+                thumbnail_identifier = meta.get("thumbnail_identifier")
+                if identifier in identifiers and thumbnail_identifier not in thumbnail_identifiers:
+                    result = {}
+                    result["Duplicate search result omitted"] = ""
+                elif identifier not in identifiers and thumbnail_identifier in thumbnail_identifiers:
+                    result["Dplicate thumbnail omitted"] = ""
+                    del meta["thumbnail"]
+                elif identifier in identifiers and thumbnail_identifier in thumbnail_identifiers:
+                    continue
+
                 message.reply_html(
                     text=build_reply(result, meta),
                     reply_markup=InlineKeyboardMarkup(button_list),
-                    reply_to_message_id=message.message_id
+                    reply_to_message_id=message.message_id,
                 )
                 match_found = True
+                if identifier:
+                    identifiers.append(identifier)
+                if thumbnail_identifier:
+                    thumbnail_identifiers.append(thumbnail_identifier)
         except Exception as error:
             logger.error("Engine failure: %s", engine)
             logger.exception(error)
@@ -190,8 +208,8 @@ def build_reply(result: ResultData, meta: MetaData) -> str:
     reply += "\n\n"
 
     for key, value in result.items():
-        if isinstance(value, str) and value.startswith('#'):  # Tags
-            reply += f'<b>{key}</b>: {value}\n'
+        if isinstance(value, str) and value.startswith("#"):  # Tags
+            reply += f"<b>{key}</b>: {value}\n"
         else:
             reply += f"<b>{key}</b>: <code>{value}</code>\n"
 

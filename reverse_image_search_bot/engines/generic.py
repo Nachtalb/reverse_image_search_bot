@@ -26,6 +26,8 @@ class MetaData(TypedDict, total=False):
     thumbnail: URL
     similarity: int | float
     buttons: list[InlineKeyboardButton]
+    identifier: str
+    thumbnail_identifier: str
 
 
 InternalProviderData = tuple[InternalResultData, MetaData]
@@ -81,6 +83,8 @@ class GenericRISEngine:
             "provided_via_url": URL("https://anilist.co/"),
             "thumbnail": URL(ani_data["coverImage"]["large"]),
             "buttons": [url_button(ani_data["siteUrl"])],
+            "identifier": ani_data["siteUrl"],
+            "thumbnail_identifier": ani_data["coverImage"]["large"],
         }
 
         return result, meta
@@ -93,6 +97,9 @@ class GenericRISEngine:
         buttons = []
         if source := danbooru_data.get("source"):
             buttons.append(url_button(source))
+
+        danbooru_url = URL(f"https://danbooru.donmai.us/posts/{danbooru_id}")
+        buttons.append(url_button(danbooru_url))
 
         result = {
             "Character": tagify(danbooru_data.get("tag_string_character", [])) or None,
@@ -107,6 +114,8 @@ class GenericRISEngine:
             "provided_via_url": URL("https://danbooru.donmai.us/"),
             "thumbnail": URL(danbooru_data["large_file_url"]),  # type: ignore
             "buttons": buttons,
+            "identifier": str(danbooru_url),
+            "thumbnail_identifier": danbooru_data["large_file_url"],
         }
 
         return result, meta
@@ -131,6 +140,8 @@ class GenericRISEngine:
                     "provided_via": "Danbooru",                         # optional: Data provider (not search engine)
                                                                         # when additional API is used
                     "provided_via_url": "https://danbooru.donmai.us/"   # optional: URL to additional provider
+                    "identifier": "something"                           # optional: identifier to prevent search results from other engines (text only)
+                    "thumbnail_identifier": "something"                 # optional: identifier to prevent search results from other engines (thumbnail only)
                 }
             )
         """

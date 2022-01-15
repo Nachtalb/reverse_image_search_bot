@@ -78,6 +78,7 @@ class TraceEngine(GenericRISEngine):
                 "provider_url": URL("https://trace.moe/"),
                 "similarity": round(data["similarity"] * 100, 2),
                 "buttons": buttons,
+                "thumbnail_identifier": data["video"],
             }
         )
 
