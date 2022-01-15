@@ -63,7 +63,10 @@ def main():
     # log all errors
     dispatcher.add_error_handler(error)
 
-    updater.start_polling()
+    if settings.MODE["active"] == "webhook":
+        updater.start_webhook(**settings.MODE["configuration"])
+    else:
+        updater.start_polling()
     logger.info("Started bot. Waiting for requests...")
     updater.idle()
 

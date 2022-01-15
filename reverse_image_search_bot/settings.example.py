@@ -19,3 +19,13 @@ UPLOADER = {
 ADMIN_IDS = []
 
 SAUCENAO_API = ""  # SauceNAO api key https://saucenao.com/user.php?page=search-api
+
+MODE = {
+    "active": "webhook",  # or polling
+    "configuration": {
+        "listen": "127.0.0.1",
+        "port": 5020,
+        "url_path": "reverse_image_search",
+        "webhook_url": "https://EXAMPLE.COM/reverse_image_search",
+    },
+}
