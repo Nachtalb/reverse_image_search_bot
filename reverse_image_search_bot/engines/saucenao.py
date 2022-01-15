@@ -63,8 +63,8 @@ class SauceNaoEngine(GenericRISEngine):
             {"Title": data["title"], "Creator": data["member_name"]},
             {
                 "buttons": [
-                    url_button(f"https://www.pixiv.net/en/artworks/{data['pixiv_id']}"),
-                    InlineKeyboardButton(text="🅿 Artist", url="https://www.pixiv.net/en/users/{data['member_id']}"),
+                    url_button(f"https://www.pixiv.net/en/artworks/{data['pixiv_id']}", text="Source"),
+                    url_button(f"https://www.pixiv.net/en/users/{data['member_id']}", text="Artist"),
                 ]
             },
         )
@@ -82,7 +82,7 @@ class SauceNaoEngine(GenericRISEngine):
 
         if not result:
             if source := data.get("source"):
-                buttons.append(("Source", source))  # type: ignore
+                buttons.append(url_button(source, text="Source"))  # type: ignore
 
             for item in data.get("ext_urls", []):  # type: ignore
                 buttons.append(url_button(item))
@@ -101,14 +101,21 @@ class SauceNaoEngine(GenericRISEngine):
     def _default_provider(self, data: ResponseData) -> InternalProviderData:
         """Generic"""
         buttons: list[InlineKeyboardButton] = []
-        for item in data.get("ext_urls", []):  # type: ignore
+        for item in data.pop("ext_urls", []):  # type: ignore
             buttons.append(url_button(item))
 
         result = {}
         meta = {"buttons": buttons}
 
         for key, value in list(data.items()):
-            result[key.replace("_", " ").title()] = value
+            match key:
+                case k if k.endswith(("_id", "_aid")):
+                    continue
+                case "twitter_user_handle":
+                    result["Poster"] = value.title()  # type: ignore
+                    buttons.append(url_button(f"https://twitter.com/{value}", text=value.title()))  # type: ignore
+                case _:
+                    result[key.replace("_", " ").title()] = value
 
         return result, meta  # type: ignore
 
