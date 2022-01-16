@@ -70,6 +70,11 @@ class GenericRISEngine(ProviderCollection):
 
         return data  # type: ignore
 
+    @classmethod
+    @property
+    def best_match_implemented(cls):
+        return "best_match" in cls.__dict__ and cls is not GenericRISEngine
+
     @cached(cache=_best_match_cache)
     def best_match(self, url: str | URL) -> ProviderData:
         """Get info about the best matching image found

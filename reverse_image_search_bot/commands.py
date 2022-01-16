@@ -17,6 +17,7 @@ from reverse_image_search_bot.engines.types import MetaData, ResultData
 from reverse_image_search_bot.settings import ADMIN_IDS
 from reverse_image_search_bot.uploaders import uploader
 from reverse_image_search_bot.utils import chunks, upload_file
+from reverse_image_search_bot.utils.tags import title
 
 
 logger = getLogger("BEST MATCH")
@@ -46,24 +47,22 @@ def engines_command_more(update: Update, context: CallbackContext):
 
 
 def engines_command(update: Update, context: CallbackContext):
-    reply = 'To get a desciption of the engines use "/engines more".\n\n'
-    recommended_for_template = "<b>Recommended for:</b>{}\n"
-    engine_template = """<b>{engine.name}</b>: {engine.provider_url}
-{recommended_for}<b>Used for:</b> {used_for}
-{desciption}
-"""
+    reply = ""
+    if not context.args:
+        reply = "To get even more info use /more.\n\n"
+
     for engine in engines:
-        recommends = ""
+        parts = [title(engine.name) + str(engine.provider_url)]
+        if context.args:
+            parts.append(title("Description") + engine.description)
         if engine.recommendation:
-            recommends = recommended_for_template.format("\n- " + "\n- ".join(engine.recommendation))
-        used_for = ", ".join(engine.types)
-        desciption = f"\n{engine.description}\n" if context.args else ""
-        reply += engine_template.format(
-            engine=engine,
-            recommended_for=recommends,
-            used_for=used_for,
-            desciption=desciption,
-        )
+            parts.append(title("Recommended for") + "\n- " + "\n- ".join(engine.recommendation))
+        if engine.types:
+            parts.append(title("Used for") + ", ".join(engine.types))
+
+        parts.append(title("Supports inline search") + ("✅" if engine.best_match_implemented else "❌"))
+
+        reply += "\n".join(parts) + "\n\n"
 
     update.message.reply_html(reply, reply_to_message_id=update.message.message_id, disable_web_page_preview=True)
 
