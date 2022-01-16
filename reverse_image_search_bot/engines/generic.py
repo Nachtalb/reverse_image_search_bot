@@ -11,7 +11,7 @@ from .providers import ProviderCollection
 from .types import InternalResultData, ProviderData, ResultData
 
 
-__all__ = ["GenericRISEngine"]
+__all__ = ["GenericRISEngine", "PreWorkEngine"]
 
 
 class GenericRISEngine(ProviderCollection):
@@ -120,3 +120,6 @@ class PreWorkEngine(GenericRISEngine):
 
     def get_search_link_by_url(self, url: str | URL) -> URL | None:
         raise NotImplementedError()
+
+    def empty_button(self):
+        return InlineKeyboardButton(text="⌛ " + self.name, url=str(self.provider_url))

@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import io
 import json
 from logging import getLogger
@@ -13,6 +14,7 @@ from telegram.parsemode import ParseMode
 from yarl import URL
 
 from reverse_image_search_bot.engines import engines
+from reverse_image_search_bot.engines.generic import PreWorkEngine
 from reverse_image_search_bot.engines.types import MetaData, ResultData
 from reverse_image_search_bot.settings import ADMIN_IDS
 from reverse_image_search_bot.uploaders import uploader
@@ -25,9 +27,7 @@ logger = getLogger("BEST MATCH")
 
 def show_id(update: Update, context: CallbackContext):
     if update.effective_chat:
-        update.message.reply_html(
-            pre(json.dumps(update.effective_chat.to_dict(), sort_keys=True, indent=4))
-        )
+        update.message.reply_html(pre(json.dumps(update.effective_chat.to_dict(), sort_keys=True, indent=4)))
 
 
 def start(update: Update, context: CallbackContext):
@@ -176,22 +176,43 @@ def image_to_url(attachment: PhotoSize | Sticker) -> URL:
 
 def general_image_search(update: Update, image_url: URL):
     """Send a reverse image search link for the image sent to us"""
-    button_list = [
-        [InlineKeyboardButton(text="Best Match", callback_data="best_match " + str(image_url))],
-        [InlineKeyboardButton(text="Go To Image", url=str(image_url))],
+    buttons = [
+        InlineKeyboardButton(text="Best Match", callback_data="best_match " + str(image_url)),
+        InlineKeyboardButton(text="Go To Image", url=str(image_url)),
     ]
 
-    buttons = filter(None, map(lambda en: en(image_url), engines))
-    button_list.extend(chunks(list(buttons), 2))
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        wait_for = {}
 
-    reply = "Use /engines to get a overview of supprted engines and what they are good at."
-    reply_markup = InlineKeyboardMarkup(button_list)
-    update.message.reply_text(
-        text=reply,
-        reply_markup=reply_markup,
-        parse_mode=ParseMode.MARKDOWN,
-        reply_to_message_id=update.message.message_id,
-    )
+        for engine in engines:
+            if isinstance(engine, PreWorkEngine) and (button := engine.empty_button()):
+                wait_for[executor.submit(engine, image_url)] = engine
+                buttons.append(button)
+            elif button := engine(image_url):
+                buttons.append(button)
+
+        button_list = list(chunks(buttons, 2))
+
+        reply = "Use /engines to get a overview of supprted engines and what they are good at."
+        reply_markup = InlineKeyboardMarkup(button_list)
+        message: Message = update.message.reply_text(
+            text=reply,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_to_message_id=update.message.message_id,
+        )
+        logger.info("Sent buttons")
+
+        for future in as_completed(wait_for):
+            engine = wait_for[future]
+            new_button = future.result()
+            for button in buttons[:]:
+                if button.text.endswith(engine.name):
+                    if not new_button:
+                        buttons.remove(button)
+                    else:
+                        buttons[buttons.index(button)] = new_button
+            message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(list(chunks(buttons, 2))))
 
 
 def callback_best_match(update: Update, context: CallbackContext):
