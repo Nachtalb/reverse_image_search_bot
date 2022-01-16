@@ -22,7 +22,7 @@ class SauceNaoEngine(GenericRISEngine):
     )
     provider_url = URL("https://saucenao.com/")
     types = ["Anime/Manga related Artworks", "Anime", "Manga"]
-    recommendation = ["Anime", "Manga", "Aniem/Manga related Artworks"]
+    recommendation = ["Anime", "Manga", "Anime/Manga related Artworks"]
 
     url = "https://saucenao.com/search.php?url={query_url}"
     limit_reached = None

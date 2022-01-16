@@ -42,18 +42,20 @@ def start(update: Update, context: CallbackContext):
 
 def engines_command(update: Update, context: CallbackContext):
     reply = 'To get a desciption of the engines use "/engines more".\n\n'
+    recommended_for_template = "<b>Recommended for:</b>{}\n"
     engine_template = """<b>{engine.name}</b>: {engine.provider_url}
-<b>Recommended for:</b> {recommends}
-<b>Used for:</b> {used_for}
+{recommended_for}<b>Used for:</b> {used_for}
 {desciption}
 """
     for engine in engines:
-        recommends = ", ".join(engine.recommendation) if engine.recommendation else "-"
+        recommends = ""
+        if engine.recommendation:
+            recommends = recommended_for_template.format("\n- " + "\n- ".join(engine.recommendation))
         used_for = ", ".join(engine.types)
         desciption = f"\n{engine.description}\n" if context.args else ""
         reply += engine_template.format(
             engine=engine,
-            recommends=recommends,
+            recommended_for=recommends,
             used_for=used_for,
             desciption=desciption,
         )
