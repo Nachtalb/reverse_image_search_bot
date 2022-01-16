@@ -109,6 +109,9 @@ def image_search(update: Update, context: CallbackContext):
             ):
                 image_url = video_to_url(attachment)
             case PhotoSize() | Sticker():
+                if isinstance(attachment, Sticker) and attachment.is_animated:
+                    message.edit_text('Animated stickers are not supported.')
+                    return
                 image_url = image_to_url(attachment)
             case _:
                 message.edit_text("Format is not supported")
