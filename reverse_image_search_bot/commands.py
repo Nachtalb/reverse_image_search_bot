@@ -61,29 +61,33 @@ def engines_command(update: Update, context: CallbackContext):
     update.message.reply_html(reply, reply_to_message_id=update.message.message_id, disable_web_page_preview=True)
 
 
-def error_to_admin(update: Update, context: CallbackContext, attachment, message: str, image_url: str | URL):
+def error_to_admin(update: Update, context: CallbackContext, message: str, image_url: str | URL, attachment=None):
     try:
         user = update.effective_user
+        message += f"\nUser: {user.mention_html()}"  # type: ignore
+        buttons = None
+        if image_url:
+            buttons = InlineKeyboardMarkup(
+                [[InlineKeyboardButton("Best Match", callback_data=f"best_match {image_url}")]]
+            )
+
+        if not attachment:
+            message += "\nImage: {image_url}"
+            for admin in ADMIN_IDS:
+                context.bot.send_message(admin, message, ParseMode.HTML, reply_markup=buttons)
+            return
+
         send_method = getattr(
             context.bot,
             "send_%s" % (attachment.__class__.__name__.lower() if not isinstance(attachment, PhotoSize) else "photo"),
         )
         if user and send_method and user.id != 713276361:
-            message += f"\nUser: {user.mention_markdown_v2()}"
-            buttons = None
-            if image_url:
-                buttons = InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("Best Match", callback_data=f"best_match {image_url}")]]
-                )
-
             for admin in ADMIN_IDS:
                 if isinstance(attachment, Sticker):
                     send_method(admin, attachment)
-                    context.bot.send_message(admin, message, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=buttons)
+                    context.bot.send_message(admin, message, parse_mode=ParseMode.HTML, reply_markup=buttons)
                 else:
-                    send_method(
-                        admin, attachment, caption=message, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=buttons
-                    )
+                    send_method(admin, attachment, caption=message, parse_mode=ParseMode.HTML, reply_markup=buttons)
     except Exception as error:
         logger.exception(error)
 
@@ -118,7 +122,7 @@ def image_search(update: Update, context: CallbackContext):
         except NameError:
             image_url = None
 
-        error_to_admin(update, context, attachment, f"Error: {error}", image_url)  # type: ignore
+        error_to_admin(update, context, f"Error: {error}", image_url, attachment)  # type: ignore
         raise
     message.delete()
     best_match(update, context, image_url)
@@ -248,6 +252,7 @@ def best_match(update: Update, context: CallbackContext, url: str | URL):
                 if thumbnail_identifier:
                     thumbnail_identifiers.append(thumbnail_identifier)
         except Exception as error:
+            error_to_admin(update, context, message=f"Best match error: {error}", image_url=url)
             logger.error("Engine failure: %s", engine)
             logger.exception(error)
 
