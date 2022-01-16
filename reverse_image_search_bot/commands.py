@@ -17,7 +17,7 @@ from reverse_image_search_bot.engines.types import MetaData, ResultData
 from reverse_image_search_bot.settings import ADMIN_IDS
 from reverse_image_search_bot.uploaders import uploader
 from reverse_image_search_bot.utils import chunks, upload_file
-from reverse_image_search_bot.utils.tags import title
+from reverse_image_search_bot.utils.tags import a, b, code, hidden_a, pre, title
 
 
 logger = getLogger("BEST MATCH")
@@ -26,7 +26,7 @@ logger = getLogger("BEST MATCH")
 def show_id(update: Update, context: CallbackContext):
     if update.effective_chat:
         update.message.reply_html(
-            "<pre>%s</pre>" % json.dumps(update.effective_chat.to_dict(), sort_keys=True, indent=4)
+            pre(json.dumps(update.effective_chat.to_dict(), sort_keys=True, indent=4))
         )
 
 
@@ -213,17 +213,13 @@ def best_match(update: Update, context: CallbackContext, url: str | URL):
     engines_used = []
 
     match_found = False
-    for engine in engines:
+    for engine in filter(lambda en: en.best_match_implemented, engines):
         try:
-            try:
-                logger.debug("%s Searching for %s", engine.name, url)
-                result, meta = engine.best_match(url)
-            except NotImplementedError:
-                logger.debug("%s Has no search implemented", engine.name)
-                continue
+            logger.debug("%s Searching for %s", engine.name, url)
+            result, meta = engine.best_match(url)
 
             engines_used.append(engine.name)
-            search_message.edit_text(f"⏳ *{engine.name}*", parse_mode=ParseMode.MARKDOWN)
+            search_message.edit_text("⏳ " + b(engine.name), parse_mode=ParseMode.HTML)
             if meta:
                 logger.debug("Found something UmU")
 
@@ -265,43 +261,41 @@ def best_match(update: Update, context: CallbackContext, url: str | URL):
             logger.error("Engine failure: %s", engine)
             logger.exception(error)
 
-    engines_used_html = ", ".join([f"<b>{name}</b>" for name in engines_used])
+    engines_used_html = ", ".join([b(name) for name in engines_used])
     if not match_found:
         search_message.edit_text(
             f"🔴 I searched for you on {engines_used_html} but didn't find anything. Please try another engine above.",
-            parse_mode=ParseMode.HTML,
+            ParseMode.HTML,
         )
     else:
-        search_message.delete()
-        context.bot.send_message(
-            text=f"🔵 I searched for you on {engines_used_html}. You can try others above for more results",
-            parse_mode=ParseMode.HTML,
-            chat_id=message.chat_id,
+        search_message.edit_text(
+            f"🔵 I searched for you on {engines_used_html}. You can try others above for more results",
+            ParseMode.HTML,
         )
 
 
 def build_reply(result: ResultData, meta: MetaData) -> str:
-    reply = f'Provided by: <b><a href="{meta["provider_url"]}">{meta["provider"]}</a></b>'  # type: ignore
+    reply = f"Provided by: {a(b(meta['provider']), meta['provider_url'])}"  # type: ignore
 
     if via := meta.get("provided_via"):
-        via = f"<b>{via}</b>"
+        via = b(via)
         if via_url := meta.get("provided_via_url"):
-            via = f'<a href="{via_url}">{via}</a>'
+            via = a(b(via), via_url)
         reply += f" with {via}"
 
     if similarity := meta.get("similarity"):
-        reply += f" with <b>{similarity}%</b> similarity"
+        reply += f" with {b(str(similarity) + '%')} similarity"
 
     if thumbnail := meta.get("thumbnail"):
-        reply = f'<a href="{thumbnail}">​</a>' + reply
+        reply = hidden_a(thumbnail) + reply
 
     reply += "\n\n"
 
     for key, value in result.items():
         if isinstance(value, str) and value.startswith("#"):  # Tags
-            reply += f"<b>{key}</b>: {value}\n"
+            reply += title(key) + value + "\n"
         else:
-            reply += f"<b>{key}</b>: <code>{value}</code>\n"
+            reply += title(key) + code(value) + "\n"
 
     if errors := meta.get("errors"):
         for error in errors:

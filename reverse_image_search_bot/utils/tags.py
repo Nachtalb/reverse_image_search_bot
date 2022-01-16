@@ -8,5 +8,5 @@ i = lambda text: tag("i", text)
 pre = lambda text: tag("pre", text)
 code = lambda text: tag("code", text)
 a = lambda text, href: tag("a", text, {"href": href})
-img = lambda text, src: tag("img", text, {"src": src})
+hidden_a = lambda src: a("​", src)
 title = lambda text: b(text + ":") + " "
