@@ -176,10 +176,11 @@ def image_to_url(attachment: PhotoSize | Sticker) -> URL:
 
 def general_image_search(update: Update, image_url: URL):
     """Send a reverse image search link for the image sent to us"""
-    buttons = [
-        InlineKeyboardButton(text="Best Match", callback_data="best_match " + str(image_url)),
-        InlineKeyboardButton(text="Go To Image", url=str(image_url)),
+    default_buttons = [
+        [InlineKeyboardButton(text="Best Match", callback_data="best_match " + str(image_url))],
+        [InlineKeyboardButton(text="Go To Image", url=str(image_url))],
     ]
+    buttons = []
 
     with ThreadPoolExecutor(max_workers=5) as executor:
         wait_for = {}
@@ -194,14 +195,13 @@ def general_image_search(update: Update, image_url: URL):
         button_list = list(chunks(buttons, 2))
 
         reply = "Use /engines to get a overview of supprted engines and what they are good at."
-        reply_markup = InlineKeyboardMarkup(button_list)
+        reply_markup = InlineKeyboardMarkup(default_buttons + button_list)
         message: Message = update.message.reply_text(
             text=reply,
             reply_markup=reply_markup,
             parse_mode=ParseMode.MARKDOWN,
             reply_to_message_id=update.message.message_id,
         )
-        logger.info("Sent buttons")
 
         for future in as_completed(wait_for):
             engine = wait_for[future]
@@ -212,18 +212,34 @@ def general_image_search(update: Update, image_url: URL):
                         buttons.remove(button)
                     else:
                         buttons[buttons.index(button)] = new_button
-            message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(list(chunks(buttons, 2))))
+            message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(default_buttons + list(chunks(buttons, 2))))
 
 
-def callback_best_match(update: Update, context: CallbackContext):
-    """Find best matches for an image for a :class:`telegram.callbackquery.CallbackQuery`."""
-    context.bot.answer_callback_query(update.callback_query.id, show_alert=False)
-    url = update.callback_query.data.split(" ")[1]
-    best_match(update, context, url)
+def callback_query_handler(update: Update, context: CallbackContext):
+    data = update.callback_query.data.split(" ")
+
+    if len(data) == 1:
+        command, values = data, []
+    else:
+        command, values = data[0], data[1:]
+
+    match command:
+        case "best_match":
+            best_match(update, context, values[0])
+        case "wait_for":
+            send_wait_for(update, context, values[0])
+        case _:
+            update.callback_query.answer("Something went wrong")
+
+
+def send_wait_for(update: Update, context: CallbackContext, engine_name: str):
+    update.callback_query.answer(f"Creating {engine_name} search url...")
 
 
 def best_match(update: Update, context: CallbackContext, url: str | URL):
     """Find best matches for an image."""
+    if update.callback_query:
+        update.callback_query.answer(show_alert=False)
     message: Message = update.effective_message  # type: ignore
     search_message = context.bot.send_message(
         text="⏳ searching...", chat_id=message.chat_id, reply_to_message_id=message.message_id

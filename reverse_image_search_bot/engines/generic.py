@@ -122,4 +122,4 @@ class PreWorkEngine(GenericRISEngine):
         raise NotImplementedError()
 
     def empty_button(self):
-        return InlineKeyboardButton(text="⌛ " + self.name, url=str(self.provider_url))
+        return InlineKeyboardButton(text="⌛ " + self.name, callback_data=f"wait_for {self.name}")

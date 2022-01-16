@@ -15,7 +15,7 @@ from telegram.ext import (
 
 from . import settings
 from .commands import (
-    callback_best_match,
+    callback_query_handler,
     engines_command,
     engines_command_more,
     image_search,
@@ -62,7 +62,7 @@ def main():
     dispatcher.add_handler(CommandHandler("restart", restart, filters=Filters.user(user_id=settings.ADMIN_IDS)))
     dispatcher.add_handler(CommandHandler("engines", engines_command, run_async=True))
     dispatcher.add_handler(CommandHandler("more", engines_command_more, run_async=True))
-    dispatcher.add_handler(CallbackQueryHandler(callback_best_match, run_async=True))
+    dispatcher.add_handler(CallbackQueryHandler(callback_query_handler, run_async=True))
 
     dispatcher.add_handler(
         MessageHandler(Filters.sticker | Filters.photo | Filters.video | Filters.document, image_search, run_async=True)
