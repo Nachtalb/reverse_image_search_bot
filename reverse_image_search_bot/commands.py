@@ -40,6 +40,11 @@ def start(update: Update, context: CallbackContext):
         context.bot.send_animation(chat_id=update.message.chat_id, animation=ffile, caption="Example Usage")
 
 
+def engines_command_more(update: Update, context: CallbackContext):
+    context.args = ["more"]
+    engines_command(update, context)
+
+
 def engines_command(update: Update, context: CallbackContext):
     reply = 'To get a desciption of the engines use "/engines more".\n\n'
     recommended_for_template = "<b>Recommended for:</b>{}\n"
@@ -112,7 +117,7 @@ def image_search(update: Update, context: CallbackContext):
                 image_url = video_to_url(attachment)
             case PhotoSize() | Sticker():
                 if isinstance(attachment, Sticker) and attachment.is_animated:
-                    message.edit_text('Animated stickers are not supported.')
+                    message.edit_text("Animated stickers are not supported.")
                     return
                 image_url = image_to_url(attachment)
             case _:
