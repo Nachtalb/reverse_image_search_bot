@@ -133,6 +133,7 @@ class SauceNaoEngine(GenericRISEngine):
 
     @cached(GenericRISEngine._best_match_cache)
     def best_match(self, url: str | URL) -> ProviderData:
+        self.logger.debug('Started looking for %s', url)
         meta: MetaData = {
             "provider": self.name,
             "provider_url": self.provider_url,
@@ -143,6 +144,7 @@ class SauceNaoEngine(GenericRISEngine):
 
         if self.limit_reached and time() - self.limit_reached < 3600:
             meta["errors"] = [limit_reached_result]
+            self.logger.debug("Done with search: found nothing")
             return {}, meta
 
         api_link = "https://saucenao.com/search.php?db=999&output_type=2&testmode=1&numres=8&url={}{}".format(
@@ -154,9 +156,11 @@ class SauceNaoEngine(GenericRISEngine):
         if response.status_code == 429:
             self.limit_reached = time()
             meta["errors"] = [limit_reached_result]
+            self.logger.debug("Done with search: found nothing")
             return {}, meta
 
         if response.status_code != 200:
+            self.logger.debug("Done with search: found nothing")
             return {}, {}
 
         results = filter(lambda d: float(d["header"]["similarity"]) >= 60, response.json().get("results", []))
@@ -176,6 +180,7 @@ class SauceNaoEngine(GenericRISEngine):
         )
 
         if not data:
+            self.logger.debug("Done with search: found nothing")
             return {}, {}
 
         data_provider = getattr(self, f"_{data['header']['index_id']}_provider", self._default_provider)
@@ -189,4 +194,5 @@ class SauceNaoEngine(GenericRISEngine):
             }
         )
 
+        self.logger.debug("Done with search: found something")
         return self._clean_privider_data(result), meta

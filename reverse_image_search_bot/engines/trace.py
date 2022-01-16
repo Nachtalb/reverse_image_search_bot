@@ -27,14 +27,17 @@ class TraceEngine(GenericRISEngine):
 
     @cached(GenericRISEngine._best_match_cache)
     def best_match(self, url: str | URL) -> ProviderData:
+        self.logger.debug("Started looking for %s", url)
         api_link = "https://api.trace.moe/search?url={}".format(quote_plus(str(url)))
         response = self.session.get(api_link)
 
         if response.status_code != 200:
+            self.logger.debug("Done with search: found nothing")
             return {}, {}
 
         data = next(iter(response.json()["result"]), None)
         if not data or data["similarity"] < 0.9:
+            self.logger.debug("Done with search: found nothing")
             return {}, {}
 
         buttons: list[InlineKeyboardButton] = []
@@ -89,5 +92,5 @@ class TraceEngine(GenericRISEngine):
         )
 
         result = self._clean_privider_data(result)
-
+        self.logger.debug("Done with search: found something")
         return result, meta
