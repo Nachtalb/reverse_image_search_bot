@@ -35,7 +35,7 @@ def start(update: Update, context: CallbackContext):
     reply = Path(__file__).with_name("start.md").read_text()
     update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)
 
-    file = Path(__file__).parent / "images/example.mp4"
+    file = Path(__file__).parent / "images/example.jpg"
 
     with file.open("br") as ffile:
         context.bot.send_animation(chat_id=update.message.chat_id, animation=ffile, caption="Example Usage")

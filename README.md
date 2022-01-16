@@ -15,7 +15,7 @@ Inline results support:
 
 SauceNAO, IQDB, Trace
 
-![example](https://raw.githubusercontent.com/Nachtalb/reverse_image_search_bot/master/reverse_image_search_bot/images/example.gif)
+![example](https://raw.githubusercontent.com/Nachtalb/reverse_image_search_bot/master/reverse_image_search_bot/images/example.jpg)
 
 ## Commands
 
