@@ -265,53 +265,58 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, lock: L
     engines_used = []
 
     match_found = False
-    for engine in filter(lambda en: en.best_match_implemented, engines):
-        try:
-            logger.debug("%s Searching for %s", engine.name, url)
-            result, meta = engine.best_match(url)
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {
+            executor.submit(engine.best_match, url): engine
+            for engine in filter(lambda en: en.best_match_implemented, engines)
+        }
+        for future in as_completed(futures):
+            engine = futures[future]
+            try:
+                logger.debug("%s Searching for %s", engine.name, url)
+                result, meta = future.result()
 
-            engines_used.append(engine.name)
-            search_message.edit_text("⏳ " + b(engine.name), parse_mode=ParseMode.HTML)
-            if meta:
-                logger.debug("Found something UmU")
+                engines_used.append(engine.name)
+                if meta:
+                    logger.debug("Found something UmU")
 
-                button_list = []
-                more_button = engine(str(url), "More")
-                if more_button := engine(str(url), "More"):
-                    button_list.append(more_button)
+                    button_list = []
+                    more_button = engine(str(url), "More")
+                    if more_button := engine(str(url), "More"):
+                        button_list.append(more_button)
 
-                if buttons := meta.get("buttons"):
-                    button_list.extend(buttons)
+                    if buttons := meta.get("buttons"):
+                        button_list.extend(buttons)
 
-                button_list = list(chunks(button_list, 3))
+                    button_list = list(chunks(button_list, 3))
 
-                identifier = meta.get("identifier")
-                thumbnail_identifier = meta.get("thumbnail_identifier")
-                if identifier in identifiers and thumbnail_identifier not in thumbnail_identifiers:
-                    result = {}
-                    result["Duplicate search result omitted"] = ""
-                elif identifier not in identifiers and thumbnail_identifier in thumbnail_identifiers:
-                    result["Dplicate thumbnail omitted"] = ""
-                    del meta["thumbnail"]
-                elif identifier in identifiers and thumbnail_identifier in thumbnail_identifiers:
-                    continue
+                    identifier = meta.get("identifier")
+                    thumbnail_identifier = meta.get("thumbnail_identifier")
+                    if identifier in identifiers and thumbnail_identifier not in thumbnail_identifiers:
+                        result = {}
+                        result["Duplicate search result omitted"] = ""
+                    elif identifier not in identifiers and thumbnail_identifier in thumbnail_identifiers:
+                        result["Dplicate thumbnail omitted"] = ""
+                        del meta["thumbnail"]
+                    elif identifier in identifiers and thumbnail_identifier in thumbnail_identifiers:
+                        continue
 
-                message.reply_html(
-                    text=build_reply(result, meta),
-                    reply_markup=InlineKeyboardMarkup(button_list),
-                    reply_to_message_id=message.message_id,
-                    disable_web_page_preview="errors" in meta,
-                )
-                if "errors" not in meta and result:
-                    match_found = True
-                if identifier:
-                    identifiers.append(identifier)
-                if thumbnail_identifier:
-                    thumbnail_identifiers.append(thumbnail_identifier)
-        except Exception as error:
-            error_to_admin(update, context, message=f"Best match error: {error}", image_url=url)
-            logger.error("Engine failure: %s", engine)
-            logger.exception(error)
+                    message.reply_html(
+                        text=build_reply(result, meta),
+                        reply_markup=InlineKeyboardMarkup(button_list),
+                        reply_to_message_id=message.message_id,
+                        disable_web_page_preview="errors" in meta,
+                    )
+                    if "errors" not in meta and result:
+                        match_found = True
+                    if identifier:
+                        identifiers.append(identifier)
+                    if thumbnail_identifier:
+                        thumbnail_identifiers.append(thumbnail_identifier)
+            except Exception as error:
+                error_to_admin(update, context, message=f"Best match error: {error}", image_url=url)
+                logger.error("Engine failure: %s", engine)
+                logger.exception(error)
 
     engines_used_html = ", ".join([b(name) for name in engines_used])
     if not match_found:
