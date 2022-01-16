@@ -4,6 +4,7 @@ import json
 from logging import getLogger
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from threading import Lock, Thread
 
 from PIL import Image
 from moviepy.video.io.VideoFileClip import VideoFileClip
@@ -123,7 +124,10 @@ def image_search(update: Update, context: CallbackContext):
                 message.edit_text("Format is not supported")
                 return
 
-        general_image_search(update, image_url)
+        lock = Lock()
+        lock.acquire()
+        Thread(target=general_image_search, args=(update, image_url, lock)).start()
+        best_match(update, context, image_url, lock)
     except Exception as error:
         message.edit_text("An error occurred please contact the @Nachtalb for help.")
         try:
@@ -134,7 +138,6 @@ def image_search(update: Update, context: CallbackContext):
         error_to_admin(update, context, f"Error: {error}", image_url, attachment)  # type: ignore
         raise
     message.delete()
-    best_match(update, context, image_url)
 
 
 def video_to_url(attachment: Document | Video) -> URL:
@@ -174,45 +177,52 @@ def image_to_url(attachment: PhotoSize | Sticker) -> URL:
         return upload_file(file, filename)
 
 
-def general_image_search(update: Update, image_url: URL):
+def general_image_search(update: Update, image_url: URL, lock: Lock):
     """Send a reverse image search link for the image sent to us"""
-    default_buttons = [
-        [InlineKeyboardButton(text="Best Match", callback_data="best_match " + str(image_url))],
-        [InlineKeyboardButton(text="Go To Image", url=str(image_url))],
-    ]
-    buttons = []
+    try:
+        default_buttons = [
+            [InlineKeyboardButton(text="Best Match", callback_data="best_match " + str(image_url))],
+            [InlineKeyboardButton(text="Go To Image", url=str(image_url))],
+        ]
+        buttons = []
 
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        wait_for = {}
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            wait_for = {}
 
-        for engine in engines:
-            if isinstance(engine, PreWorkEngine) and (button := engine.empty_button()):
-                wait_for[executor.submit(engine, image_url)] = engine
-                buttons.append(button)
-            elif button := engine(image_url):
-                buttons.append(button)
+            for engine in engines:
+                if isinstance(engine, PreWorkEngine) and (button := engine.empty_button()):
+                    wait_for[executor.submit(engine, image_url)] = engine
+                    buttons.append(button)
+                elif button := engine(image_url):
+                    buttons.append(button)
 
-        button_list = list(chunks(buttons, 2))
+            button_list = list(chunks(buttons, 2))
 
-        reply = "Use /engines to get a overview of supprted engines and what they are good at."
-        reply_markup = InlineKeyboardMarkup(default_buttons + button_list)
-        message: Message = update.message.reply_text(
-            text=reply,
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.MARKDOWN,
-            reply_to_message_id=update.message.message_id,
-        )
+            reply = "Use /engines to get a overview of supprted engines and what they are good at."
+            reply_markup = InlineKeyboardMarkup(default_buttons + button_list)
+            message: Message = update.message.reply_text(
+                text=reply,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_to_message_id=update.message.message_id,
+            )
 
-        for future in as_completed(wait_for):
-            engine = wait_for[future]
-            new_button = future.result()
-            for button in buttons[:]:
-                if button.text.endswith(engine.name):
-                    if not new_button:
-                        buttons.remove(button)
-                    else:
-                        buttons[buttons.index(button)] = new_button
-            message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(default_buttons + list(chunks(buttons, 2))))
+            lock.release()
+
+            for future in as_completed(wait_for):
+                engine = wait_for[future]
+                new_button = future.result()
+                for button in buttons[:]:
+                    if button.text.endswith(engine.name):
+                        if not new_button:
+                            buttons.remove(button)
+                        else:
+                            buttons[buttons.index(button)] = new_button
+                message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(default_buttons + list(chunks(buttons, 2))))
+    finally:
+        logger.info("Release lock")
+        if lock.locked:
+            lock.release()
 
 
 def callback_query_handler(update: Update, context: CallbackContext):
@@ -236,8 +246,13 @@ def send_wait_for(update: Update, context: CallbackContext, engine_name: str):
     update.callback_query.answer(f"Creating {engine_name} search url...")
 
 
-def best_match(update: Update, context: CallbackContext, url: str | URL):
+def best_match(update: Update, context: CallbackContext, url: str | URL, lock: Lock = None):
     """Find best matches for an image."""
+    if lock:
+        lock.acquire()
+        lock.release
+        # We only have to wait for the other thread to release the lock, we don't need it any further than that
+
     if update.callback_query:
         update.callback_query.answer(show_alert=False)
     message: Message = update.effective_message  # type: ignore
