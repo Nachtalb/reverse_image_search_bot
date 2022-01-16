@@ -8,20 +8,20 @@ I recommend SauceNao, for other images I recommend to use Google, Yandex.
 
 Supported engines:
 
-- General: Goolge, Yandex, Bing & TinEye
-- Artworks & Anime: SauceNAO, IQDB, Trace & ascii2d
+- All-in-one: Google, Yandex, Baidu, Shutterstock, Bing, TinEye
+- Artworks & Anime: SauceNAO, IQDB, Trace
 
-Inline search results:
+Inline results support:
 
-- IQDB unlimited
-- Trace 1000/month
-- SauceNAO 6/30s 200/24h
+SauceNAO, IQDB, Trace
 
 ![example](https://raw.githubusercontent.com/Nachtalb/reverse_image_search_bot/master/reverse_image_search_bot/images/example.gif)
 
 ## Commands
 
-- /help, /start: show this help message
+- /help, /start: Show this help message
+- /engines: Show engine overview with use case recommendation and more
+- /more: Even more info about said engines
 
 ## Author
 

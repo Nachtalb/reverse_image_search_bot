@@ -4,17 +4,10 @@
 Send me an image, sticker, video/gif or url and I will send you direct reverse image search links for SauceNao, Google, Yandex and the like.
 For anime images I recommend SauceNao, for other images I recommend to use Google, Yandex.
 
-Supported engines:
-- General: Goolge, Yandex, Bing & TinEye
-- Artworks & Anime: SauceNAO, IQDB, Trace & ascii2d
-
-Inline search results:
-- IQDB unlimited
-- Trace 1000/month
-- SauceNAO 6/30s 200/24h
-
 *Commands*
-- /help, /start: show this help message
+- /help, /start: Show this help message
+- /engines: Show engine overview with use case recommendation and more
+- /more: Even more info about said engines
 
 *Author*
 Nachtalb: [GitHub](https://github.com/Nachtalb) | [Telegram](https://t.me/Nachtalb)
