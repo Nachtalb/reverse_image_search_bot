@@ -15,11 +15,11 @@ from telegram.parsemode import ParseMode
 from yarl import URL
 
 from reverse_image_search_bot.engines import engines
-from reverse_image_search_bot.engines.generic import PreWorkEngine
+from reverse_image_search_bot.engines.generic import GenericRISEngine, PreWorkEngine
 from reverse_image_search_bot.engines.types import MetaData, ResultData
 from reverse_image_search_bot.settings import ADMIN_IDS
 from reverse_image_search_bot.uploaders import uploader
-from reverse_image_search_bot.utils import chunks, upload_file
+from reverse_image_search_bot.utils import ReturnableThread, chunks, upload_file
 from reverse_image_search_bot.utils.tags import a, b, code, hidden_a, pre, title
 
 
@@ -187,11 +187,11 @@ def general_image_search(update: Update, image_url: URL, lock: Lock):
         buttons = []
 
         with ThreadPoolExecutor(max_workers=5) as executor:
-            wait_for = {}
+            futures = {}
 
             for engine in engines:
                 if isinstance(engine, PreWorkEngine) and (button := engine.empty_button()):
-                    wait_for[executor.submit(engine, image_url)] = engine
+                    futures[executor.submit(engine, image_url)] = engine
                     buttons.append(button)
                 elif button := engine(image_url):
                     buttons.append(button)
@@ -206,11 +206,10 @@ def general_image_search(update: Update, image_url: URL, lock: Lock):
                 parse_mode=ParseMode.MARKDOWN,
                 reply_to_message_id=update.message.message_id,
             )
-
             lock.release()
 
-            for future in as_completed(wait_for):
-                engine = wait_for[future]
+            for future in as_completed(futures):
+                engine = futures[future]
                 new_button = future.result()
                 for button in buttons[:]:
                     if button.text.endswith(engine.name):
@@ -220,9 +219,11 @@ def general_image_search(update: Update, image_url: URL, lock: Lock):
                             buttons[buttons.index(button)] = new_button
                 message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(default_buttons + list(chunks(buttons, 2))))
     finally:
-        logger.info("Release lock")
         if lock.locked:
-            lock.release()
+            try:
+                lock.release()
+            except RuntimeError:
+                pass
 
 
 def callback_query_handler(update: Update, context: CallbackContext):
@@ -246,37 +247,65 @@ def send_wait_for(update: Update, context: CallbackContext, engine_name: str):
     update.callback_query.answer(f"Creating {engine_name} search url...")
 
 
+def wait_for(lock: Lock):
+    if lock and lock.locked:
+        lock.acquire()
+        lock.release()
+
+
 def best_match(update: Update, context: CallbackContext, url: str | URL, lock: Lock = None):
     """Find best matches for an image."""
-    if lock:
-        lock.acquire()
-        lock.release
-        # We only have to wait for the other thread to release the lock, we don't need it any further than that
-
     if update.callback_query:
         update.callback_query.answer(show_alert=False)
-    message: Message = update.effective_message  # type: ignore
-    search_message = context.bot.send_message(
-        text="⏳ searching...", chat_id=message.chat_id, reply_to_message_id=message.message_id
-    )
 
+    searchable_engines = [engine for engine in engines if engine.best_match_implemented]
+
+    best_match_lock = Lock()
+    best_match_lock.acquire()
+    try:
+        thread = ReturnableThread(_best_match_search, args=(update, context, searchable_engines, url, best_match_lock))
+        thread.start()
+
+        if lock:
+            wait_for(lock)
+            # We only have to wait for the other thread to release the lock, we don't need it any further than that
+
+        message: Message = update.effective_message  # type: ignore
+        search_message = context.bot.send_message(
+            text="⏳ searching...", chat_id=message.chat_id, reply_to_message_id=message.message_id
+        )
+    finally:
+        best_match_lock.release()
+
+    match_found = thread.join()
+
+    engines_used_html = ", ".join([b(en.name) for en in searchable_engines])
+    if not match_found:
+        search_message.edit_text(
+            f"🔴 I searched for you on {engines_used_html} but didn't find anything. Please try another engine above.",
+            ParseMode.HTML,
+        )
+    else:
+        search_message.edit_text(
+            f"🔵 I searched for you on {engines_used_html}. You can try others above for more results",
+            ParseMode.HTML,
+        )
+
+
+def _best_match_search(update: Update, context: CallbackContext, engines: list[GenericRISEngine], url: URL, lock: Lock):
+    message: Message = update.effective_message  # type: ignore
     identifiers = []
     thumbnail_identifiers = []
-    engines_used = []
-
     match_found = False
+
     with ThreadPoolExecutor(max_workers=5) as executor:
-        futures = {
-            executor.submit(engine.best_match, url): engine
-            for engine in filter(lambda en: en.best_match_implemented, engines)
-        }
+        futures = {executor.submit(en.best_match, url): en for en in engines}
         for future in as_completed(futures):
             engine = futures[future]
             try:
                 logger.debug("%s Searching for %s", engine.name, url)
                 result, meta = future.result()
 
-                engines_used.append(engine.name)
                 if meta:
                     logger.debug("Found something UmU")
 
@@ -301,6 +330,8 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, lock: L
                     elif identifier in identifiers and thumbnail_identifier in thumbnail_identifiers:
                         continue
 
+                    wait_for(lock)
+
                     message.reply_html(
                         text=build_reply(result, meta),
                         reply_markup=InlineKeyboardMarkup(button_list),
@@ -318,17 +349,7 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, lock: L
                 logger.error("Engine failure: %s", engine)
                 logger.exception(error)
 
-    engines_used_html = ", ".join([b(name) for name in engines_used])
-    if not match_found:
-        search_message.edit_text(
-            f"🔴 I searched for you on {engines_used_html} but didn't find anything. Please try another engine above.",
-            ParseMode.HTML,
-        )
-    else:
-        search_message.edit_text(
-            f"🔵 I searched for you on {engines_used_html}. You can try others above for more results",
-            ParseMode.HTML,
-        )
+    return match_found
 
 
 def build_reply(result: ResultData, meta: MetaData) -> str:
