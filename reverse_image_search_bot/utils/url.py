@@ -20,6 +20,7 @@ def fix_url(url: URL | str) -> URL:
 def url_icon(url: URL | str, with_icon: bool = True, with_text: bool = True, custom_text: str = None) -> str:
     url = URL(url)
 
+    icon = "🌐"
     match url.host:
         case "twitter.com":
             text = "Twitter"
@@ -30,9 +31,10 @@ def url_icon(url: URL | str, with_icon: bool = True, with_text: bool = True, cus
         case "danbooru.donmai.us":
             text = "Danbooru"
             icon = "📦"
+        case "yande.re":
+            text = "Yandere"
         case _:
             text = url.host.split(".")[-2].title()  # type: ignore
-            icon = "🌐"
 
     if custom_text:
         text = custom_text

@@ -60,6 +60,16 @@ def danbooru_info(danbooru_id: int) -> dict | None:
 
 
 @cached(DataAPICache)
+def yandere_info(yandere_id: int) -> dict | None:
+    response = SESSION.get(
+        f"https://yande.re/post.json?tags=id:{yandere_id}", headers={"Content-Type": "application/json"}
+    )
+
+    if response.status_code == 200 and (post := next(iter(response.json()), None)):
+        return post
+
+
+@cached(DataAPICache)
 def gelbooru_info(gelbooru_id: int) -> dict | None:
     response = SESSION.get(
         f"https://gelbooru.com/index.php?page=dapi&s=post&q=index&json=1&id={gelbooru_id}",

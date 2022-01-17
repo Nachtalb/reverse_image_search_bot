@@ -8,6 +8,7 @@ from reverse_image_search_bot.utils import (
     gelbooru_info,
     tagify,
     url_button,
+    yandere_info,
 )
 
 
@@ -73,6 +74,37 @@ class BooruProviders:
             "buttons": buttons,
             "identifier": str(gelbooru_url),
             "thumbnail_identifier": gelbooru_data["file_url"],
+        }
+
+        return result, meta
+
+    def _yandere_provider(self, yandere_id: int) -> InternalProviderData:
+        yandere_data = yandere_info(yandere_id)
+        if not yandere_data:
+            return {}, {}
+
+        buttons = []
+        if source := yandere_data.get("source"):
+            buttons.append(url_button(source, text="Source"))
+
+        yandere_url = URL(f"https://yandere.com/index.php?page=post&s=view&id={yandere_id}")
+        buttons.append(url_button(yandere_url))
+
+        rating = {"s": "Safe", "q": "Questionable", "e": "Explicit"}.get(yandere_data["rating"])
+
+        result = {
+            "Size": f"{yandere_data['width']}x{yandere_data['height']}",
+            "Tags": tagify(random.choices(yandere_data["tags"].split(" "), k=5)),
+            "Rating": rating,
+        }
+
+        meta: MetaData = {
+            "provided_via": "Yandere",
+            "provided_via_url": URL("https://yande.re/"),
+            "thumbnail": URL(yandere_data["file_url"]),  # type: ignore
+            "buttons": buttons,
+            "identifier": str(yandere_url),
+            "thumbnail_identifier": yandere_data["file_url"],
         }
 
         return result, meta

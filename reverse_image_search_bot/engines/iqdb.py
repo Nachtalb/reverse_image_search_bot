@@ -47,6 +47,8 @@ class IQDBEngine(GenericRISEngine):
         link = URL(rows[0].find("a", first=True).attrs["href"]).with_scheme("https")  # type: ignore
         if link.host == "danbooru.donmai.us" and (danbooru_id := next(filter(None, reversed(link.parts)), None)):
             result, meta = self._danbooru_provider(int(danbooru_id))
+        elif link.host == "yande.re" and (yandere_id := next(filter(None, reversed(link.parts)), None)):
+            result, meta = self._yandere_provider(int(yandere_id))
         elif link.host == "gelbooru.com" and (gelbooru_id := link.query.get("id")):
             result, meta = self._gelbooru_provider(int(gelbooru_id))
 

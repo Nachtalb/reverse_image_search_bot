@@ -81,14 +81,14 @@ class SauceNaoEngine(GenericRISEngine):
             },
         )
 
-    def _9_provider(self, data: ResponseData) -> InternalProviderData:
-        """Danbooru"""
+    def _booru_provider(self, data: ResponseData, provider_name: str) -> InternalProviderData:
+        """Generic Booru SauceNAO Provider"""
         buttons: list[InlineKeyboardButton] = []
         result = {}
         meta: MetaData = {}
 
-        if "danbooru_id" in data:
-            result, meta = self._danbooru_provider(data["danbooru_id"])  # type: ignore
+        if provider_name + "_id" in data:
+            result, meta = getattr(self, f"_{provider_name}_provider")(data["danbooru_id"])  # type: ignore
             if meta:
                 buttons = meta.get("buttons", [])
 
@@ -110,6 +110,18 @@ class SauceNaoEngine(GenericRISEngine):
         meta["buttons"] = buttons
         return result, meta
 
+    def _9_provider(self, data: ResponseData) -> InternalProviderData:
+        """Danbooru"""
+        return self._booru_provider(data, "danbooru")
+
+    def _12_provider(self, data: ResponseData) -> InternalProviderData:
+        """Yandere"""
+        return self._booru_provider(data, "yandere")
+
+    def _25_provider(self, data: ResponseData) -> InternalProviderData:
+        """Gelbooru"""
+        return self._booru_provider(data, "gelbooru")
+
     def _default_provider(self, data: ResponseData) -> InternalProviderData:
         """Generic"""
         buttons: list[InlineKeyboardButton] = []
@@ -119,10 +131,21 @@ class SauceNaoEngine(GenericRISEngine):
         result = {}
         meta = {"buttons": buttons}
 
+        skip = []
         for key, value in list(data.items()):
+            if key in skip:
+                continue
             match key:
                 case k if k.endswith(("_id", "_aid")):
                     continue
+                case k if k.endswith("_url"):  # author_name + author_url fields
+                    clean_key = key.replace("_url", "")
+                    name = ""
+                    if (alt_key := clean_key + "_name") in data:
+                        name = clean_key.title()
+                        skip.append(alt_key)
+                        result.pop(alt_key.replace("_", " ").title(), None)
+                    buttons.append(url_button(str(value), text=name))
                 case "twitter_user_handle":
                     result["Poster"] = value.title()  # type: ignore
                     buttons.append(url_button(f"https://twitter.com/{value}", text=value.title()))  # type: ignore
@@ -133,7 +156,7 @@ class SauceNaoEngine(GenericRISEngine):
 
     @cached(GenericRISEngine._best_match_cache)
     def best_match(self, url: str | URL) -> ProviderData:
-        self.logger.debug('Started looking for %s', url)
+        self.logger.debug("Started looking for %s", url)
         meta: MetaData = {
             "provider": self.name,
             "provider_url": self.provider_url,
@@ -165,7 +188,7 @@ class SauceNaoEngine(GenericRISEngine):
 
         results = filter(lambda d: float(d["header"]["similarity"]) >= 60, response.json().get("results", []))
 
-        priority = 21, 5, 9  # Anime, Pixiv, Danbooru
+        priority = 21, 5, 9, 12, 25  # Anime, Pixiv, Danbooru, Yandere, Gelbooru
         data = next(
             iter(
                 sorted(

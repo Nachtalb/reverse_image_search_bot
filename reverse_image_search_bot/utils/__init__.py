@@ -1,4 +1,4 @@
-from .api import anilist_info, danbooru_info, gelbooru_info
+from .api import anilist_info, danbooru_info, gelbooru_info, yandere_info
 from .helpers import (
     ReturnableThread,
     chunks,
@@ -13,6 +13,7 @@ __all__ = [
     "anilist_info",
     "danbooru_info",
     "gelbooru_info",
+    "yandere_info",
     "chunks",
     "tagify",
     "upload_file",
