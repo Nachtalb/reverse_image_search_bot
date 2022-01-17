@@ -87,7 +87,7 @@ def error_to_admin(update: Update, context: CallbackContext, message: str, image
             )
 
         if not attachment:
-            message += "\nImage: {image_url}"
+            message += f"\nImage: {image_url}"
             for admin in ADMIN_IDS:
                 context.bot.send_message(admin, message, ParseMode.HTML, reply_markup=buttons)
             return

@@ -88,7 +88,7 @@ class SauceNaoEngine(GenericRISEngine):
         meta: MetaData = {}
 
         if provider_name + "_id" in data:
-            result, meta = getattr(self, f"_{provider_name}_provider")(data["danbooru_id"])  # type: ignore
+            result, meta = getattr(self, f"_{provider_name}_provider")(data[provider_name + "_id"])  # type: ignore
             if meta:
                 buttons = meta.get("buttons", [])
 
