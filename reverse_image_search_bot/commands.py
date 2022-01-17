@@ -5,10 +5,17 @@ from logging import getLogger
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from threading import Lock, Thread
+from time import time
 
 from PIL import Image
 from moviepy.video.io.VideoFileClip import VideoFileClip
-from telegram import ChatAction, InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import (
+    ChatAction,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Update,
+    User,
+)
 from telegram import Animation, Document, Message, PhotoSize, Sticker, Video
 from telegram.ext import CallbackContext
 from telegram.parsemode import ParseMode
@@ -24,6 +31,7 @@ from reverse_image_search_bot.utils.tags import a, b, code, hidden_a, pre, title
 
 
 logger = getLogger("BEST MATCH")
+last_used: dict[int, float] = {}
 
 
 def show_id(update: Update, context: CallbackContext):
@@ -258,6 +266,19 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, lock: L
     if update.callback_query:
         update.callback_query.answer(show_alert=False)
 
+    user: User = update.effective_user  # type: ignore
+    message: Message = update.effective_message  # type: ignore
+
+    if (last_time := last_used.get(user.id)) and time() - last_time < 10:
+        if lock:
+            wait_for(lock)
+        context.bot.send_message(
+            text="Slow down a bit please....", chat_id=message.chat_id, reply_to_message_id=message.message_id
+        )
+        return
+    else:
+        last_used[user.id] = time()
+
     searchable_engines = [engine for engine in engines if engine.best_match_implemented]
 
     best_match_lock = Lock()
@@ -270,7 +291,6 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, lock: L
             wait_for(lock)
             # We only have to wait for the other thread to release the lock, we don't need it any further than that
 
-        message: Message = update.effective_message  # type: ignore
         search_message = context.bot.send_message(
             text="⏳ searching...", chat_id=message.chat_id, reply_to_message_id=message.message_id
         )
