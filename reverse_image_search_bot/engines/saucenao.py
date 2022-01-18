@@ -27,6 +27,8 @@ class SauceNaoEngine(GenericRISEngine):
     url = "https://saucenao.com/search.php?url={query_url}"
     limit_reached = None
 
+    min_similarity = 60
+
     ResponseData = dict[str, str | int | list[str]]
 
     def __init__(self, *args, **kwargs):
@@ -186,7 +188,7 @@ class SauceNaoEngine(GenericRISEngine):
             self.logger.debug("Done with search: found nothing")
             return {}, {}
 
-        results = filter(lambda d: float(d["header"]["similarity"]) >= 60, response.json().get("results", []))
+        results = filter(lambda d: float(d["header"]["similarity"]) >= self.min_similarity, response.json().get("results", []))
 
         priority = 21, 5, 9, 12, 25  # Anime, Pixiv, Danbooru, Yandere, Gelbooru
         data = next(

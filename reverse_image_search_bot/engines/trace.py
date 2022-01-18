@@ -21,6 +21,8 @@ class TraceEngine(GenericRISEngine):
 
     url = "https://trace.moe/?auto&url={query_url}"
 
+    min_similarity = 91
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.session = Session()
@@ -36,7 +38,7 @@ class TraceEngine(GenericRISEngine):
             return {}, {}
 
         data = next(iter(response.json()["result"]), None)
-        if not data or data["similarity"] < 0.9:
+        if not data or data["similarity"] < (self.min_similarity / 100):
             self.logger.debug("Done with search: found nothing")
             return {}, {}
 
