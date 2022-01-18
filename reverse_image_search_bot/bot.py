@@ -1,10 +1,12 @@
+import html
 import logging
 import os
 import re
 import sys
 from threading import Thread
 
-from telegram import Update
+from emoji import emojize
+from telegram import Bot, Update
 from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler,
@@ -13,6 +15,7 @@ from telegram.ext import (
     MessageHandler,
     Updater,
 )
+from telegram.parsemode import ParseMode
 
 from . import settings
 from .commands import (
@@ -24,18 +27,42 @@ from .commands import (
     more_command,
 )
 
+
+class TelegramLogHandler(logging.Handler):
+    prefixes = {
+        logging.INFO: emojize(":blue_circle:"),
+        logging.WARNING: emojize(":orange_circle:"),
+        logging.ERROR: emojize(":red_circle:"),
+        logging.FATAL: emojize(":cross_mark:"),
+    }
+
+    def __init__(self, *args, bot: Bot, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.bot = bot
+
+    def emit(self, record: logging.LogRecord):
+        msg = self.prefixes.get(record.levelno, "") + " " + self.format(record)
+
+        print("Sending this to Telegram: ", msg)
+
+        for admin in settings.ADMIN_IDS:
+            self.bot.send_message(admin, msg, parse_mode=ParseMode.HTML)
+
+    def format(self, record: logging.LogRecord):
+        result = html.escape(super().format(record))
+        if record.exc_info:
+            parts = result.split("\n", 1)
+            return f"{parts[0]}\n<pre>{parts[1]}</pre>"
+        return result
+
+
 logger = logging.getLogger(__name__)
 
 ADMIN_FILTER = Filters.user(user_id=settings.ADMIN_IDS)
 
 
 def error(update: Update, context: CallbackContext):
-    """Log all errors from the telegram bot api
-
-    Args:
-        update (:obj:`telegram.update.Update`): Telegram update
-        context (:obj:`telegram.ext.CallbackContext`): Bot context
-    """
+    """Log all errors from the telegram bot api"""
     logger.exception(context.error)
     logger.warning("Error caused by this update: %s" % (update))
 
@@ -52,12 +79,7 @@ def main():
         os.execl(sys.executable, sys.executable, *sys.argv, "restart=%d" % chat_id)
 
     def restart_command(update: Update, context: CallbackContext):
-        """Start the restarting process
-
-        Args:
-            update (:obj:`telegram.update.Update`): Telegram update
-            context (:obj:`telegram.ext.CallbackContext`): Bot context
-        """
+        """Start the restarting process"""
         update.message.reply_text("Bot is restarting...")
         logger.info("User requested restart")
         Thread(target=stop_and_restart, args=(update.effective_chat.id,)).start()  # type: ignore
@@ -68,6 +90,8 @@ def main():
     dispatcher.add_handler(CommandHandler("engines", engines_command, run_async=True))
     dispatcher.add_handler(CommandHandler("more", more_command, run_async=True))
     dispatcher.add_handler(CallbackQueryHandler(callback_query_handler, run_async=True))
+
+    logging.getLogger("").addHandler(TelegramLogHandler(bot=updater.bot, level=logging.WARNING))
 
     dispatcher.add_handler(
         MessageHandler(Filters.sticker | Filters.photo | Filters.video | Filters.document, file_handler, run_async=True)
