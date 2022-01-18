@@ -1,5 +1,6 @@
 import re
 
+from emoji import emojize
 from telegram import InlineKeyboardButton
 from yarl import URL
 
@@ -20,17 +21,17 @@ def fix_url(url: URL | str) -> URL:
 def url_icon(url: URL | str, with_icon: bool = True, with_text: bool = True, custom_text: str = None) -> str:
     url = URL(url)
 
-    icon = "🌐"
+    icon = ":globe_with_meridians:"
     match url.host:
         case "twitter.com":
             text = "Twitter"
-            icon = "🐦"
+            icon = ":bird:"
         case "www.pixiv.net" | "pixiv.net" | "i.pximg.net":
             text = "Pixiv"
-            icon = "🅿"
+            icon = ":P_button:"
         case "danbooru.donmai.us":
             text = "Danbooru"
-            icon = "📦"
+            icon = ":package:"
         case "yande.re":
             text = "Yandere"
         case _:
@@ -42,7 +43,7 @@ def url_icon(url: URL | str, with_icon: bool = True, with_text: bool = True, cus
         text = ""
     if not with_icon:
         icon = ""
-    return f"{icon} {text}"
+    return emojize(f"{icon} {text}", use_aliases=True)
 
 
 def url_button(

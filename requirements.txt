@@ -10,6 +10,7 @@ charset-normalizer==2.0.10
 cryptography==36.0.1
 cssselect==1.1.0
 decorator==4.4.2
+emoji==1.6.3
 fake-useragent==0.1.11
 idna==3.3
 imageio==2.13.5
