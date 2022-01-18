@@ -34,12 +34,17 @@ logger = getLogger("BEST MATCH")
 last_used: dict[int, float] = {}
 
 
-def show_id(update: Update, context: CallbackContext):
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# Commands
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+
+def id_command(update: Update, context: CallbackContext):
     if update.effective_chat:
         update.message.reply_html(pre(json.dumps(update.effective_chat.to_dict(), sort_keys=True, indent=4)))
 
 
-def start(update: Update, context: CallbackContext):
+def help_command(update: Update, context: CallbackContext):
     """Send Start / Help message to client."""
     reply = Path(__file__).with_name("start.md").read_text()
     update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)
@@ -50,7 +55,7 @@ def start(update: Update, context: CallbackContext):
         context.bot.send_animation(chat_id=update.message.chat_id, animation=ffile, caption="Example Usage")
 
 
-def engines_command_more(update: Update, context: CallbackContext):
+def more_command(update: Update, context: CallbackContext):
     context.args = ["more"]
     engines_command(update, context)
 
@@ -76,38 +81,7 @@ def engines_command(update: Update, context: CallbackContext):
     update.message.reply_html(reply, reply_to_message_id=update.message.message_id, disable_web_page_preview=True)
 
 
-def error_to_admin(update: Update, context: CallbackContext, message: str, image_url: str | URL, attachment=None):
-    try:
-        user = update.effective_user
-        message += f"\nUser: {user.mention_html()}"  # type: ignore
-        buttons = None
-        if image_url:
-            buttons = InlineKeyboardMarkup(
-                [[InlineKeyboardButton("Best Match", callback_data=f"best_match {image_url}")]]
-            )
-
-        if not attachment:
-            message += f"\nImage: {image_url}"
-            for admin in ADMIN_IDS:
-                context.bot.send_message(admin, message, ParseMode.HTML, reply_markup=buttons)
-            return
-
-        send_method = getattr(
-            context.bot,
-            "send_%s" % (attachment.__class__.__name__.lower() if not isinstance(attachment, PhotoSize) else "photo"),
-        )
-        if user and send_method and user.id != 713276361:
-            for admin in ADMIN_IDS:
-                if isinstance(attachment, Sticker):
-                    send_method(admin, attachment)
-                    context.bot.send_message(admin, message, parse_mode=ParseMode.HTML, reply_markup=buttons)
-                else:
-                    send_method(admin, attachment, caption=message, parse_mode=ParseMode.HTML, reply_markup=buttons)
-    except Exception as error:
-        logger.exception(error)
-
-
-def image_search(update: Update, context: CallbackContext):
+def file_handler(update: Update, context: CallbackContext):
     if not update.message:
         return
     message = update.message.reply_text("⌛ Give me a sec...")
@@ -148,41 +122,30 @@ def image_search(update: Update, context: CallbackContext):
     message.delete()
 
 
-def video_to_url(attachment: Document | Video) -> URL:
-    filename = f"{attachment.file_unique_id}.jpg"
-    if uploader.file_exists(filename):
-        return uploader.get_url(filename)
+def callback_query_handler(update: Update, context: CallbackContext):
+    data = update.callback_query.data.split(" ")
 
-    if attachment.file_size > 2e7:  # Bots are only allowed to download up to 20MB
-        return image_to_url(attachment.thumb)
+    if len(data) == 1:
+        command, values = data, []
+    else:
+        command, values = data[0], data[1:]
 
-    video = attachment.get_file()
-    with NamedTemporaryFile() as video_file:
-        video.download(out=video_file)
-        with VideoFileClip(video_file.name, audio=False) as video_clip:
-            frame = video_clip.get_frame(0)
-
-    with io.BytesIO() as file:
-        Image.fromarray(frame, "RGB").save(file, "jpeg")
-        file.seek(0)
-        return upload_file(file, filename)
+    match command:
+        case "best_match":
+            best_match(update, context, values[0])
+        case "wait_for":
+            send_wait_for(update, context, values[0])
+        case _:
+            update.callback_query.answer("Something went wrong")
 
 
-def image_to_url(attachment: PhotoSize | Sticker) -> URL:
-    extension = "jpg" if isinstance(attachment, PhotoSize) else "png"
-    filename = f"{attachment.file_unique_id}.{extension}"
-    if uploader.file_exists(filename):
-        return uploader.get_url(filename)
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# Communication
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-    photo = attachment.get_file()
-    with io.BytesIO() as file:
-        photo.download(out=file)
-        if extension != "jpg":
-            file.seek(0)
-            with Image.open(file) as image:
-                file.seek(0)
-                image.save(file, extension)
-        return upload_file(file, filename)
+
+def send_wait_for(update: Update, context: CallbackContext, engine_name: str):
+    update.callback_query.answer(f"Creating {engine_name} search url...")
 
 
 def general_image_search(update: Update, image_url: URL, lock: Lock):
@@ -232,33 +195,6 @@ def general_image_search(update: Update, image_url: URL, lock: Lock):
                 lock.release()
             except RuntimeError:
                 pass
-
-
-def callback_query_handler(update: Update, context: CallbackContext):
-    data = update.callback_query.data.split(" ")
-
-    if len(data) == 1:
-        command, values = data, []
-    else:
-        command, values = data[0], data[1:]
-
-    match command:
-        case "best_match":
-            best_match(update, context, values[0])
-        case "wait_for":
-            send_wait_for(update, context, values[0])
-        case _:
-            update.callback_query.answer("Something went wrong")
-
-
-def send_wait_for(update: Update, context: CallbackContext, engine_name: str):
-    update.callback_query.answer(f"Creating {engine_name} search url...")
-
-
-def wait_for(lock: Lock):
-    if lock and lock.locked:
-        lock.acquire()
-        lock.release()
 
 
 def best_match(update: Update, context: CallbackContext, url: str | URL, lock: Lock = None):
@@ -372,6 +308,11 @@ def _best_match_search(update: Update, context: CallbackContext, engines: list[G
     return match_found
 
 
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# Misc
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+
 def build_reply(result: ResultData, meta: MetaData) -> str:
     reply = f"Provided by: {a(b(meta['provider']), meta['provider_url'])}"  # type: ignore
 
@@ -400,3 +341,77 @@ def build_reply(result: ResultData, meta: MetaData) -> str:
             reply += error
 
     return reply
+
+
+def video_to_url(attachment: Document | Video) -> URL:
+    filename = f"{attachment.file_unique_id}.jpg"
+    if uploader.file_exists(filename):
+        return uploader.get_url(filename)
+
+    if attachment.file_size > 2e7:  # Bots are only allowed to download up to 20MB
+        return image_to_url(attachment.thumb)
+
+    video = attachment.get_file()
+    with NamedTemporaryFile() as video_file:
+        video.download(out=video_file)
+        with VideoFileClip(video_file.name, audio=False) as video_clip:
+            frame = video_clip.get_frame(0)
+
+    with io.BytesIO() as file:
+        Image.fromarray(frame, "RGB").save(file, "jpeg")
+        file.seek(0)
+        return upload_file(file, filename)
+
+
+def image_to_url(attachment: PhotoSize | Sticker) -> URL:
+    extension = "jpg" if isinstance(attachment, PhotoSize) else "png"
+    filename = f"{attachment.file_unique_id}.{extension}"
+    if uploader.file_exists(filename):
+        return uploader.get_url(filename)
+
+    photo = attachment.get_file()
+    with io.BytesIO() as file:
+        photo.download(out=file)
+        if extension != "jpg":
+            file.seek(0)
+            with Image.open(file) as image:
+                file.seek(0)
+                image.save(file, extension)
+        return upload_file(file, filename)
+
+
+def wait_for(lock: Lock):
+    if lock and lock.locked:
+        lock.acquire()
+        lock.release()
+
+
+def error_to_admin(update: Update, context: CallbackContext, message: str, image_url: str | URL, attachment=None):
+    try:
+        user = update.effective_user
+        message += f"\nUser: {user.mention_html()}"  # type: ignore
+        buttons = None
+        if image_url:
+            buttons = InlineKeyboardMarkup(
+                [[InlineKeyboardButton("Best Match", callback_data=f"best_match {image_url}")]]
+            )
+
+        if not attachment:
+            message += f"\nImage: {image_url}"
+            for admin in ADMIN_IDS:
+                context.bot.send_message(admin, message, ParseMode.HTML, reply_markup=buttons)
+            return
+
+        send_method = getattr(
+            context.bot,
+            "send_%s" % (attachment.__class__.__name__.lower() if not isinstance(attachment, PhotoSize) else "photo"),
+        )
+        if user and send_method and user.id != 713276361:
+            for admin in ADMIN_IDS:
+                if isinstance(attachment, Sticker):
+                    send_method(admin, attachment)
+                    context.bot.send_message(admin, message, parse_mode=ParseMode.HTML, reply_markup=buttons)
+                else:
+                    send_method(admin, attachment, caption=message, parse_mode=ParseMode.HTML, reply_markup=buttons)
+    except Exception as error:
+        logger.exception(error)
