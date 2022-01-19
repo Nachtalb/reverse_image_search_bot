@@ -43,8 +43,6 @@ class TelegramLogHandler(logging.Handler):
     def emit(self, record: logging.LogRecord):
         msg = self.prefixes.get(record.levelno, "") + " " + self.format(record)
 
-        print("Sending this to Telegram: ", msg)
-
         for admin in settings.ADMIN_IDS:
             self.bot.send_message(admin, msg, parse_mode=ParseMode.HTML)
 
