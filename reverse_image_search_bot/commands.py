@@ -205,7 +205,7 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, lock: L
     user: User = update.effective_user  # type: ignore
     message: Message = update.effective_message  # type: ignore
 
-    if (last_time := last_used.get(user.id)) and time() - last_time < 10:
+    if user.id not in ADMIN_IDS and (last_time := last_used.get(user.id)) and time() - last_time < 10:
         if lock:
             wait_for(lock)
         context.bot.send_message(
