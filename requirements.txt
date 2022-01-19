@@ -41,6 +41,7 @@ tqdm==4.62.3
 tzdata==2021.5
 tzlocal==4.1
 urllib3==1.26.8
+validators==0.18.2
 w3lib==1.22.0
 websockets==10.1
 yarl==1.7.2

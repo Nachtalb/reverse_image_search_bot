@@ -1,5 +1,7 @@
 import random
 
+from telegram import InlineKeyboardButton
+import validators
 from yarl import URL
 
 from reverse_image_search_bot.engines.types import InternalProviderData, MetaData
@@ -13,14 +15,18 @@ from reverse_image_search_bot.utils import (
 
 
 class BooruProviders:
+    def __source_button(self, data: dict) -> InlineKeyboardButton | None:
+        if (source := data.get("source")) and validators.url(source):
+            return url_button(source, text="Source")
+
     def _danbooru_provider(self, danbooru_id: int) -> InternalProviderData:
         danbooru_data = danbooru_info(danbooru_id)
         if not danbooru_data:
             return {}, {}
 
         buttons = []
-        if source := danbooru_data.get("source"):
-            buttons.append(url_button(source, text="Source"))
+        if source := self.__source_button(danbooru_data):
+            buttons.append(source)
 
         danbooru_url = URL(f"https://danbooru.donmai.us/posts/{danbooru_id}")
         buttons.append(url_button(danbooru_url))
@@ -53,8 +59,8 @@ class BooruProviders:
             return {}, {}
 
         buttons = []
-        if source := gelbooru_data.get("source"):
-            buttons.append(url_button(source, text="Source"))
+        if source := self.__source_button(gelbooru_data):
+            buttons.append(source)
 
         gelbooru_url = URL(f"https://gelbooru.com/index.php?page=post&s=view&id={gelbooru_id}")
         buttons.append(url_button(gelbooru_url))
@@ -84,8 +90,8 @@ class BooruProviders:
             return {}, {}
 
         buttons = []
-        if source := yandere_data.get("source"):
-            buttons.append(url_button(source, text="Source"))
+        if source := self.__source_button(yandere_data):
+            buttons.append(source)
 
         yandere_url = URL(f"https://yandere.com/index.php?page=post&s=view&id={yandere_id}")
         buttons.append(url_button(yandere_url))
