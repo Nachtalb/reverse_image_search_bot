@@ -72,7 +72,5 @@ class IQDBEngine(GenericRISEngine):
             }
         )
 
-        result = self._clean_privider_data(result)
-
         self.logger.debug("Done with search: found something")
-        return result, meta
+        return self._clean_best_match(result, meta)

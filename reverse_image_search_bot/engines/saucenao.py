@@ -188,7 +188,9 @@ class SauceNaoEngine(GenericRISEngine):
             self.logger.debug("Done with search: found nothing")
             return {}, {}
 
-        results = filter(lambda d: float(d["header"]["similarity"]) >= self.min_similarity, response.json().get("results", []))
+        results = filter(
+            lambda d: float(d["header"]["similarity"]) >= self.min_similarity, response.json().get("results", [])
+        )
 
         priority = 21, 5, 9, 12, 25  # Anime, Pixiv, Danbooru, Yandere, Gelbooru
         data = next(
@@ -212,6 +214,8 @@ class SauceNaoEngine(GenericRISEngine):
         result, new_meta = data_provider(data["data"])
         meta.update(new_meta)
 
+        meta["buttons"].append(InlineKeyboardButton(" UwU ", " UMU "))
+
         meta.update(
             {
                 "thumbnail": URL(meta.get("thumbnail", data["header"]["thumbnail"])),
@@ -220,4 +224,4 @@ class SauceNaoEngine(GenericRISEngine):
         )
 
         self.logger.debug("Done with search: found something")
-        return self._clean_privider_data(result), meta
+        return self._clean_best_match(result, meta)

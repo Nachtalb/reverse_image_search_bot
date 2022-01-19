@@ -5,10 +5,11 @@ from cachetools import TTLCache, cached
 from requests import Session
 from requests_html import HTMLSession
 from telegram import InlineKeyboardButton
+import validators
 from yarl import URL
 
 from .providers import ProviderCollection
-from .types import InternalResultData, ProviderData, ResultData
+from .types import InternalResultData, MetaData, ProviderData, ResultData
 
 
 __all__ = ["GenericRISEngine", "PreWorkEngine"]
@@ -69,6 +70,15 @@ class GenericRISEngine(ProviderCollection):
                 data[key] = ", ".join(map(str, value))
 
         return data  # type: ignore
+
+    def _clean_meta_data(self, data: MetaData) -> MetaData:
+        for button in data.get("buttons", [])[:]:
+            if button.url and not validators.url(button.url):
+                data["buttons"].remove(button)  # type: ignore
+        return data
+
+    def _clean_best_match(self, result: InternalResultData, meta: MetaData) -> tuple[ResultData, MetaData]:
+        return self._clean_privider_data(result), self._clean_meta_data(meta)
 
     @classmethod
     @property
