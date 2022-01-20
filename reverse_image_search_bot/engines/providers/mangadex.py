@@ -72,6 +72,8 @@ class MangadexProvider:
         buttons = [
             url_button("https://mangadex.org/title/" + manga_id, text="Mangadex"),
         ]
+        if chapter_id:
+            buttons.append(url_button(f'https://mangadex.org/chapter/{chapter_id}', text="Chapter"))
 
         for key, url in safe_get(manga_data, "attributes.links", {}).items():
             if not validators.url(url):  # type: ignore
