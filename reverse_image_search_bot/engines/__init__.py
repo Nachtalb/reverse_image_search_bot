@@ -16,7 +16,7 @@ engines: list[GenericRISEngine] = [
         "Google LLC is an American multinational technology company that specializes in Internet-related services and"
         " products.",
         "https://google.com/",
-        ["All-in-one"],
+        ["General"],
         ["Anything SFW", "People and Characters"],
     ),
     TraceEngine(),
@@ -27,7 +27,7 @@ engines: list[GenericRISEngine] = [
         "Yandex N.V. is a multinational corporation primarily for Russian and Russian-language users, providing 70"
         " Internet-related products and services",
         "https://yandex.ru/",
-        ["All-in-one"],
+        ["General"],
         ["Anything SFW and NSFW", "Image to Text (ORC)", "Anything Russian"],
     ),
     BaiduEngine(),
@@ -37,7 +37,7 @@ engines: list[GenericRISEngine] = [
         "https://www.bing.com/images/search?q=imgurl:{query_url}&view=detailv2&iss=sbi",
         "Microsoft Bing is a web search engine owned and operated by Microsoft.",
         "https://bing.com/",
-        ["All-in-one"],
+        ["General"],
     ),
     GenericRISEngine(
         "TinEye",
@@ -45,6 +45,21 @@ engines: list[GenericRISEngine] = [
         "TinEye is a reverse image search engine developed and offered by Idée, Inc.. It is the first image search"
         " engine on the web to use image identification technology rather than keywords, metadata or watermarks.",
         "https://tineye.com/",
-        ["All-in-one"],
+        ["General"],
+    ),
+    GenericRISEngine(
+        "Sogou",
+        "https://pic.sogou.com/ris?flag=1&drag=0&query={query_url}",
+        "Sogou, Inc. is a Chinese technology company that offers a search engine. It is a subsidiary of Tencent.",
+        "https://www.sogou.com/",
+        ["Asian people I guess"],
+    ),
+    GenericRISEngine(
+        "ascii2d",
+        "https://ascii2d.net/search/url/{query_url}",
+        "ascii2d allows you to search for images by image and examine its details. You can search for images with"
+        "matching partial features (mainly for cropped images if about 2/3 of the original image remains)",
+        "https://ascii2d.net/",
+        ["General"],
     ),
 ]

@@ -1,5 +1,5 @@
 import logging
-from urllib.parse import quote_plus
+from urllib.parse import quote, quote_plus
 
 from cachetools import TTLCache, cached
 from requests import Session
@@ -56,11 +56,11 @@ class GenericRISEngine(ProviderCollection):
 
     def __call__(self, url: str | URL, text: str = None) -> InlineKeyboardButton:
         """Create the :obj:`InlineKeyboardButton` button for the telegram but to use"""
-        return InlineKeyboardButton(text=text or self.name, url=str(self.get_search_link_by_url(url)))
+        return InlineKeyboardButton(text=text or self.name, url=self.get_search_link_by_url(url))
 
-    def get_search_link_by_url(self, url: str | URL) -> URL:
+    def get_search_link_by_url(self, url: str | URL) -> str:
         """Get the reverse image search link for the given url"""
-        return URL(self.url.format(query_url=quote_plus(str(url))))
+        return self.url.format(query_url=quote_plus(str(url)))
 
     def _clean_privider_data(self, data: InternalResultData) -> ResultData:
         for key, value in list(data.items()):
@@ -126,9 +126,9 @@ class PreWorkEngine(GenericRISEngine):
         search_url = self.get_search_link_by_url(url)
         if not search_url:
             return
-        return InlineKeyboardButton(text=text or self.name, url=str(search_url))
+        return InlineKeyboardButton(text=text or self.name, url=search_url)
 
-    def get_search_link_by_url(self, url: str | URL) -> URL | None:
+    def get_search_link_by_url(self, url: str | URL) -> str | None:
         raise NotImplementedError()
 
     def empty_button(self):
