@@ -12,7 +12,7 @@ logger = getLogger("API")
 SESSION = Session()
 
 
-@cached(DataAPICache)
+@cached(DataAPICache, key=partial(hashkey, "anilist"))
 def anilist_info(anilist_id: int) -> dict | None:
     query = """
 query ($id: Int) {
@@ -51,7 +51,7 @@ query ($id: Int) {
     return next(iter(response.json()["data"]["Page"]["media"]), None)
 
 
-@cached(DataAPICache)
+@cached(DataAPICache, key=partial(hashkey, "danbooru"))
 def danbooru_info(danbooru_id: int) -> dict | None:
     response = SESSION.get(
         f"https://danbooru.donmai.us/posts/{danbooru_id}.json", headers={"Content-Type": "application/json"}
@@ -63,7 +63,7 @@ def danbooru_info(danbooru_id: int) -> dict | None:
     return response.json()
 
 
-@cached(DataAPICache)
+@cached(DataAPICache, key=partial(hashkey, "yandere"))
 def yandere_info(yandere_id: int) -> dict | None:
     response = SESSION.get(
         f"https://yande.re/post.json?tags=id:{yandere_id}", headers={"Content-Type": "application/json"}
@@ -73,7 +73,7 @@ def yandere_info(yandere_id: int) -> dict | None:
         return post
 
 
-@cached(DataAPICache)
+@cached(DataAPICache, key=partial(hashkey, "gelbooru"))
 def gelbooru_info(gelbooru_id: int) -> dict | None:
     response = SESSION.get(
         f"https://gelbooru.com/index.php?page=dapi&s=post&q=index&json=1&id={gelbooru_id}",
