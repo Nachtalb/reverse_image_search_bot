@@ -25,6 +25,7 @@ from .commands import (
     help_command,
     id_command,
     more_command,
+    tips_command,
 )
 
 
@@ -84,6 +85,7 @@ def main():
 
     dispatcher.add_handler(CommandHandler(("start", "help"), help_command))
     dispatcher.add_handler(CommandHandler("id", id_command))
+    dispatcher.add_handler(CommandHandler("tips", tips_command))
     dispatcher.add_handler(CommandHandler("restart", restart_command, filters=ADMIN_FILTER))
     dispatcher.add_handler(CommandHandler("engines", engines_command, run_async=True))
     dispatcher.add_handler(CommandHandler("more", more_command, run_async=True))

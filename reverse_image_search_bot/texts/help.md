@@ -4,6 +4,8 @@
 Send me an image, sticker, video/gif or url and I will send you direct reverse image search links for SauceNao, Google, Yandex and the like.
 For anime images I recommend SauceNao, for other images I recommend to use Google, Yandex.
 
+❕ Check out /tips to see a few tricks on how to use this bot and search engines in general.
+
 *Commands*
 - /help, /start: Show this help message
 - /engines: Show engine overview with use case recommendation and more

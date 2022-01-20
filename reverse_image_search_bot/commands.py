@@ -6,6 +6,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from threading import Lock, Thread
 from time import time
+from typing import Callable
 
 from PIL import Image
 from moviepy.video.io.VideoFileClip import VideoFileClip
@@ -44,15 +45,30 @@ def id_command(update: Update, context: CallbackContext):
         update.message.reply_html(pre(json.dumps(update.effective_chat.to_dict(), sort_keys=True, indent=4)))
 
 
-def help_command(update: Update, context: CallbackContext):
-    """Send Start / Help message to client."""
-    reply = Path(__file__).with_name("start.md").read_text()
-    update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)
+def send_template_command(name: str) -> Callable:
+    local = Path(__file__).parent
+    reply_file = local / f"texts/{name}.md"
+    image_file = local / f"images/{name}.jpg"
 
-    file = Path(__file__).parent / "images/example.jpg"
+    def wrapper(update, context):
+        return _send_template_command(update, context, reply_file, image_file)
 
-    with file.open("br") as ffile:
-        context.bot.send_animation(chat_id=update.message.chat_id, animation=ffile, caption="Example Usage")
+    return wrapper
+
+
+def _send_template_command(update: Update, context: CallbackContext, reply_file: Path, image_file: Path):
+    reply = reply_file.read_text()
+    if len(reply) > 1000:
+        update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)
+        reply = None
+
+    if image_file.is_file():
+        with image_file.open("br") as image_obj:
+            update.message.reply_photo(image_obj, caption=reply, parse_mode=ParseMode.MARKDOWN)
+
+
+tips_command = send_template_command("tips")
+help_command = send_template_command("help")
 
 
 def more_command(update: Update, context: CallbackContext):
@@ -238,7 +254,7 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, lock: L
     engines_used_html = ", ".join([b(en.name) for en in searchable_engines])
     if not match_found:
         search_message.edit_text(
-            f"🔴 I searched for you on {engines_used_html} but didn't find anything. Please try another engine above.",
+            f"🔴 I searched for you on {engines_used_html} but didn't find anything. Please try another engine above and take a look at /tips.",
             ParseMode.HTML,
         )
     else:
