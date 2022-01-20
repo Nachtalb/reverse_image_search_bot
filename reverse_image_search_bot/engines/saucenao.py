@@ -124,6 +124,18 @@ class SauceNaoEngine(GenericRISEngine):
         """Gelbooru"""
         return self._booru_provider(data, "gelbooru")
 
+    def _37_provider(self, data: ResponseData) -> InternalProviderData:
+        """Mangadex"""
+        kwargs = {}
+        if chapter_id := data.get('md_id'):
+            kwargs['chapter_id'] = chapter_id
+        if mangadex_url := next(iter([url for url in data.get('ext_urls', []) if URL(url).host == 'mangadex.org']), None):  # type: ignore
+            kwargs['url'] = URL(mangadex_url.strip('/'))
+
+        return self._mangadex_provider(**kwargs)
+
+    _371_provider = _37_provider  # Mangadex V2
+
     def _default_provider(self, data: ResponseData) -> InternalProviderData:
         """Generic"""
         buttons: list[InlineKeyboardButton] = []
@@ -192,7 +204,7 @@ class SauceNaoEngine(GenericRISEngine):
             lambda d: float(d["header"]["similarity"]) >= self.min_similarity, response.json().get("results", [])
         )
 
-        priority = 21, 5, 9, 12, 25  # Anime, Pixiv, Danbooru, Yandere, Gelbooru
+        priority = 21, 371, 37, 5, 9, 12, 25  # Anime, Mangadex V2, Mangadex, Pixiv, Danbooru, Yandere, Gelbooru
         data = next(
             iter(
                 sorted(
@@ -213,8 +225,6 @@ class SauceNaoEngine(GenericRISEngine):
         data_provider = getattr(self, f"_{data['header']['index_id']}_provider", self._default_provider)
         result, new_meta = data_provider(data["data"])
         meta.update(new_meta)
-
-        meta["buttons"].append(InlineKeyboardButton(" UwU ", " UMU "))
 
         meta.update(
             {

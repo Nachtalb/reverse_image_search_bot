@@ -1,10 +1,14 @@
+from functools import partial
 import json
+from logging import getLogger
 
 from cachetools import TTLCache, cached
+from cachetools.keys import hashkey
 from requests import Session
 
 DataAPICache = TTLCache(maxsize=1e4, ttl=12 * 60 * 60)
 
+logger = getLogger("API")
 SESSION = Session()
 
 
@@ -80,3 +84,26 @@ def gelbooru_info(gelbooru_id: int) -> dict | None:
         return
 
     return response.json()["post"][0]
+
+
+def _mangadex_api(endpoint: str, request_data: dict = {}) -> dict | None:
+    response = SESSION.get(endpoint, params=request_data)
+    if response.status_code != 200:
+        logger.error('Mangadex API error: "%s" -- %s', response.url, response.text)
+        return
+    data = response.json()
+    if data.get("result") == "error":
+        return
+    return data["data"]
+
+
+@cached(DataAPICache, key=partial(hashkey, "mangadex_chapter"))
+def mangadex_chapter(chapter_id: str) -> dict | None:
+    return _mangadex_api(f"https://api.mangadex.org/chapter/{chapter_id}")
+
+
+@cached(DataAPICache, key=partial(hashkey, "mangadex_manga"))
+def mangadex_manga(manga_id: str) -> dict | None:
+    return _mangadex_api(
+        f"https://api.mangadex.org/manga/{manga_id}", {"includes[]": ["artist", "cover_art", "author"]}
+    )

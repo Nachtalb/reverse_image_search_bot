@@ -2,10 +2,36 @@ import re
 
 from emoji import emojize
 from telegram import InlineKeyboardButton
+import validators
 from yarl import URL
 
 
 def fix_url(url: URL | str) -> URL:
+    if not validators.url(str(url)) and (match := re.match("((?!:).+):((?!:).*):(.*)", str(url))):  # type: ignore
+        short, category, id = match.groups()
+        match short:
+            case "al" | "anilist":
+                category = category or "anime"
+                return URL(f"https://anilist.co/{category}/{id}")
+            case "ap" | "animeplanet":
+                category = "anime"
+                return URL(f"https://www.anime-planet.com/{category}/{id}")
+            case "bw" | "bookwalker.jp":
+                return URL(f"https://bookwalker.jp/{id}")
+            case "mu" | "mangaupdates":
+                return URL(f"https://www.mangaupdates.com/series.html?id={id}")
+            case "nu" | "novelupdates":
+                return URL(f"https://www.novelupdates.com/series/{id}")
+            case "kt" | "kitsu":
+                if id.isdigit():
+                    return URL(f"https://kitsu.io/api/edge/manga/{id}")
+                return URL(f"https://kitsu.io/api/edge/manga?filter[slug]={id}")
+            case "mal" | "myanimelist":
+                category = category or "anime"
+                return URL(f"https://myanimelist.net/{category}/{id}")
+            case _:
+                raise KeyError()
+
     url = URL(url)
 
     match url.host:

@@ -63,3 +63,68 @@ class ReturnableThread(Thread):
     def join(self, timeout=None):
         super().join(timeout)
         return self._return
+
+
+def safe_get(dct: dict, key_str: str, default=None) -> Any:
+    """Safely get data from a multidimensional dict
+
+    Examples:
+        >>> data = {
+        ...     "foo": "bar",
+        ...     "hello": {
+        ...         "world": "jeff",
+        ...         "animal": [
+        ...             {
+        ...                 "type": "cat",
+        ...                 "sound": "meow",
+        ...                 "ja": "neko"
+        ...             },
+        ...             {
+        ...                 "type": "shark",
+        ...                 "sound": "a",
+        ...                 "de": "hai"
+        ...             }
+        ...         ]
+        ...     }
+        ... }
+        >>> safe_get(data, "foo")
+        "bar"
+        >>> safe_get(data, "hello.world")
+        "jeff"
+        >>> safe_get(data, "hello.animal[0]")
+        {"type": "cat", "ja": "neko"}
+        >>> safe_get(data, "hello.animal[type=cat]")
+        {"type": "cat", "ja": "neko"}
+        >>> safe_get(data, "hello.animal[type=shark].sound")
+        "a"
+        >>> safe_get(data, "hello.animal[de].type")
+        "shark"
+    """
+    for key in key_str.split("."):
+        try:
+            if match := re.match(r"\[(\d+)\]", key):
+                key = int(match.groups()[0])
+            elif match := re.match(r"\[((?!=).+)=(.*)\]", key):
+                if not isinstance(dct, list):
+                    return default
+                key, value = match.groups()
+                if value.isdigit():
+                    value = int(value)
+                for dct in dct:
+                    if dct[key] == value:
+                        break
+                else:
+                    return default
+                continue
+            if match := re.match(r'\[(.*)\]', key):
+                key = match.groups()[0]
+                for dct in dct:
+                    if key in dct:
+                        break
+                else:
+                    return default
+                continue
+            dct = dct[key]
+        except (KeyError, IndexError):
+            return default
+    return dct

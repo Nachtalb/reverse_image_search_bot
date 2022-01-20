@@ -4,6 +4,7 @@ from .helpers import (
     chunks,
     get_file,
     get_file_from_url,
+    safe_get,
     tagify,
     upload_file,
 )
@@ -20,6 +21,7 @@ __all__ = [
     "get_file",
     "get_file_from_url",
     "ReturnableThread",
+    "safe_get",
     "fix_url",
     "url_button",
     "url_icon",
