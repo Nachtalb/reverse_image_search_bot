@@ -49,7 +49,7 @@ def id_command(update: Update, context: CallbackContext):
 
 def send_template_command(name: str) -> Callable:
     local = Path(__file__).parent
-    reply_file = local / f"texts/{name}.md"
+    reply_file = local / f"texts/{name}.html"
     image_file = local / f"images/{name}.jpg"
 
     def wrapper(update, context):
@@ -61,12 +61,12 @@ def send_template_command(name: str) -> Callable:
 def _send_template_command(update: Update, context: CallbackContext, reply_file: Path, image_file: Path):
     reply = reply_file.read_text()
     if len(reply) > 1000:
-        update.message.reply_text(reply, parse_mode=ParseMode.MARKDOWN)
+        update.message.reply_text(reply, parse_mode=ParseMode.HTML)
         reply = None
 
     if image_file.is_file():
         with image_file.open("br") as image_obj:
-            update.message.reply_photo(image_obj, caption=reply, parse_mode=ParseMode.MARKDOWN)
+            update.message.reply_photo(image_obj, caption=reply, parse_mode=ParseMode.HTML)
 
 
 tips_command = send_template_command("tips")
