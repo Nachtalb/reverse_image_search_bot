@@ -62,6 +62,16 @@ def url_icon(url: URL | str, with_icon: bool = True, with_text: bool = True, cus
             text = "Yandere"
         case "myanimelist.net":
             text = "MyAnimeList"
+        case "www.mangaupdates.com" | "mangaupdates.com":
+            text = "MangaUpdates"
+        case "www.novelupdates.com" | "novelupdates.com":
+            text = "NovelUpdates"
+        case "www.nicovideo.jp" | "nicovideo.jp":
+            text = "Nico Nico"
+        case "seiga.nicovideo.jp":
+            text = "Nico Nico Seiga"
+        case "www.bookwalker.jp" | "bookwalker.jp":
+            text = "Book Walker"
         case _:
             text = url.host.split(".")[-2].replace('_', ' ').replace('-', ' ').title()  # type: ignore
 
