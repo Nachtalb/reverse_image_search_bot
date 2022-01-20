@@ -60,8 +60,10 @@ def url_icon(url: URL | str, with_icon: bool = True, with_text: bool = True, cus
             icon = ":package:"
         case "yande.re":
             text = "Yandere"
+        case "myanimelist.net":
+            text = "MyAnimeList"
         case _:
-            text = url.host.split(".")[-2].title()  # type: ignore
+            text = url.host.split(".")[-2].replace('_', ' ').replace('-', ' ').title()  # type: ignore
 
     if custom_text:
         text = custom_text
