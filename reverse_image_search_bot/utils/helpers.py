@@ -1,7 +1,7 @@
 from pathlib import Path
 import re
 from threading import Thread
-from typing import BinaryIO
+from typing import Any, BinaryIO
 
 from yarl import URL
 
@@ -38,12 +38,12 @@ def get_file_from_url(url: str | URL):
     return get_file(str(url).replace(UPLOADER["url"].rstrip("/") + "/", ""))
 
 
-def tagify(tags: list[str] | str) -> list[str]:
+def tagify(tags: list[str] | str) -> set[str]:
     if not tags:
-        return []
+        return set()
     tags = " ".join(map(lambda s: s.replace(" ", "_"), tags)) if isinstance(tags, list) else tags
     tags = re.sub(r"(?![_a-zA-Z0-9\s]).", "_", tags).split(" ")
-    return [f"#{tag}" for tag in filter(None, tags)]
+    return {f"#{tag}".lower() for tag in filter(None, tags)}
 
 
 class ReturnableThread(Thread):
