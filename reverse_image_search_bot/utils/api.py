@@ -86,6 +86,12 @@ def gelbooru_info(gelbooru_id: int) -> dict | None:
     return response.json()["post"][0]
 
 
+@cached(DataAPICache, key=partial(hashkey, 'redirect'))
+def get_redirect(url: str) -> str:
+    response = SESSION.head(str(url))
+    return response.headers.get('Location', '')
+
+
 def _mangadex_api(endpoint: str, request_data: dict = {}) -> dict | None:
     response = SESSION.get(endpoint, params=request_data)
     if response.status_code != 200:
@@ -99,6 +105,13 @@ def _mangadex_api(endpoint: str, request_data: dict = {}) -> dict | None:
 
 @cached(DataAPICache, key=partial(hashkey, "mangadex_chapter"))
 def mangadex_chapter(chapter_id: str) -> dict | None:
+    if chapter_id.isdigit():
+        parts = get_redirect(f'https://mangadex.org/chapter/{chapter_id}').split('/')
+        if len(parts) == 3 and parts[1] == 'chapter':
+            chapter_id = parts[-1]
+        else:
+            return
+
     return _mangadex_api(f"https://api.mangadex.org/chapter/{chapter_id}")
 
 

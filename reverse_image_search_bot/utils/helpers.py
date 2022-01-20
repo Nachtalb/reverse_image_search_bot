@@ -65,7 +65,7 @@ class ReturnableThread(Thread):
         return self._return
 
 
-def safe_get(dct: dict, key_str: str, default=None) -> Any:
+def safe_get(dct: dict, key_str: str, default: Any = None, none_to_default: bool = True) -> Any:
     """Safely get data from a multidimensional dict
 
     Examples:
@@ -116,7 +116,7 @@ def safe_get(dct: dict, key_str: str, default=None) -> Any:
                 else:
                     return default
                 continue
-            if match := re.match(r'\[(.*)\]', key):
+            if match := re.match(r"\[(.*)\]", key):
                 key = match.groups()[0]
                 for dct in dct:
                     if key in dct:
@@ -127,4 +127,4 @@ def safe_get(dct: dict, key_str: str, default=None) -> Any:
             dct = dct[key]
         except (KeyError, IndexError):
             return default
-    return dct
+    return default if dct is None and none_to_default else dct

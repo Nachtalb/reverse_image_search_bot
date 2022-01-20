@@ -14,6 +14,8 @@ class MangadexProvider:
     def _mangadex_provider(
         self, url: str | URL = None, chapter_id: str = None, manga_id: str = None
     ) -> InternalProviderData:
+        chapter_id = str(chapter_id)
+        manga_id = str(manga_id)
         if not url and not chapter_id and not manga_id:
             return {}, {}
         elif url and (url := URL(url)):
@@ -28,6 +30,7 @@ class MangadexProvider:
 
         chapter_data = mangadex_chapter(chapter_id) if chapter_id else {}
         chapter_data = chapter_data or {}
+        chapter_id = chapter_data.get('id', '')
 
         manga_data = {}
         if chapter_data:

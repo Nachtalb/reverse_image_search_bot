@@ -224,6 +224,8 @@ class SauceNaoEngine(GenericRISEngine):
 
         data_provider = getattr(self, f"_{data['header']['index_id']}_provider", self._default_provider)
         result, new_meta = data_provider(data["data"])
+        if not result:
+            result, new_meta = self._default_provider(data["data"])
         meta.update(new_meta)
 
         meta.update(
