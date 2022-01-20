@@ -5,6 +5,10 @@ from reverse_image_search_bot.utils import anilist_info, tagify, url_button
 
 
 class AnilistProvider:
+    provider_name = "AniList"
+    provider_url = URL("https://anilist.co/")
+    provides = ["Anime"]
+
     def _anilist_provider(self, anilist_id: int, episode_at: int | str = None) -> InternalProviderData:
         ani_data = anilist_info(anilist_id)
         if not ani_data:

@@ -7,6 +7,10 @@ from reverse_image_search_bot.utils.api import mangadex_chapter, mangadex_manga
 
 
 class MangadexProvider:
+    provider_name = "Mangadex"
+    provider_url = URL("https://mangadex.org/")
+    provides = ["Manga"]
+
     def _mangadex_provider(
         self, url: str | URL = None, chapter_id: str = None, manga_id: str = None
     ) -> InternalProviderData:

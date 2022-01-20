@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import partial
 import io
 import json
 from logging import getLogger
@@ -72,28 +73,41 @@ tips_command = send_template_command("tips")
 help_command = send_template_command("help")
 
 
-def more_command(update: Update, context: CallbackContext):
-    context.args = ["more"]
-    engines_command(update, context)
+def credits_command(
+    update: Update,
+    context: CallbackContext,
+):
+    data_providers = []
+    for provider in GenericRISEngine.data_provider_info():
+        data_providers.append(
+            title(provider["name"]) + str(provider["url"]) + "\n" + title("Provides") + ", ".join(provider["provides"])
+        )
 
-
-def engines_command(update: Update, context: CallbackContext):
-    reply = ""
-    if not context.args:
-        reply = "To get even more info use /more.\n\n"
-
+    search_engines = ""
     for engine in engines:
         parts = [title(engine.name) + str(engine.provider_url)]
-        if context.args:
-            parts.append(title("Description") + engine.description)
+        parts.append(title("Description") + engine.description)
         if engine.recommendation:
-            parts.append(title("Recommended for") + "\n- " + "\n- ".join(engine.recommendation))
+            parts.append(
+                title("Recommended for")
+                + "\n- "
+                + "\n- ".join([code(recommend) for recommend in engine.recommendation])
+            )
         if engine.types:
-            parts.append(title("Used for") + ", ".join(engine.types))
+            parts.append(title("Used for") + ", ".join([code(type) for type in engine.types]))
 
-        parts.append(title("Supports inline search") + ("✅" if engine.best_match_implemented else "❌"))
+        parts.append(
+            title("Supports inline search")
+            + emojize(":green_circle:" if engine.best_match_implemented else ":red_circle:")
+        )
 
-        reply += "\n".join(parts) + "\n\n"
+        search_engines += "\n".join(parts) + "\n\n"
+
+    reply = (
+        (Path(__file__).parent / "texts/credits.html")
+        .read_text()
+        .format(data_providers="\n\n".join(data_providers), search_engines=search_engines)
+    )
 
     update.message.reply_html(reply, reply_to_message_id=update.message.message_id, disable_web_page_preview=True)
 
@@ -186,7 +200,7 @@ def general_image_search(update: Update, image_url: URL, lock: Lock):
 
             button_list = list(chunks(buttons, 2))
 
-            reply = "Use /engines to get a overview of supprted engines and what they are good at."
+            reply = "Use /credits to get a overview of supprted engines and what they are good at."
             reply_markup = InlineKeyboardMarkup(default_buttons + button_list)
             message: Message = update.message.reply_text(
                 text=reply,

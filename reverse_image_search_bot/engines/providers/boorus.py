@@ -15,6 +15,10 @@ from reverse_image_search_bot.utils import (
 
 
 class BooruProviders:
+    provider_name = ["Danbooru", "Gelbooru", "Yander.re"]
+    provider_url = [URL("https://danbooru.donmai.us/"), URL("https://gelbooru.com/"), URL("https://yande.re/")]
+    provides = ["Anime/Manga related Artworks"]
+
     def __source_button(self, data: dict) -> InlineKeyboardButton | None:
         if (source := data.get("source")) and validators.url(source):
             return url_button(source, text="Source")

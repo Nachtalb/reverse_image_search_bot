@@ -8,8 +8,8 @@ For anime images I recommend SauceNao, for other images I recommend to use Googl
 
 *Commands*
 - /help, /start: Show this help message
-- /engines: Show engine overview with use case recommendation and more
-- /more: Even more info about said engines
+- /credits: Show all available engines (and what they are best for), data providers and other credits.
+- /tips: Various tips and tricks for better search results
 
 *Author*
 Nachtalb: [GitHub](https://github.com/Nachtalb) | [Telegram](https://t.me/Nachtalb)
