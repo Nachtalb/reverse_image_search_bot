@@ -31,7 +31,7 @@ engines: list[GenericRISEngine] = [
         ["Anything SFW and NSFW", "Image to Text (ORC)", "Anything Russian"],
     ),
     BaiduEngine(),
-    ShutterStockEngine(),
+    # ShutterStockEngine(),
     GenericRISEngine(
         "Bing",
         "https://www.bing.com/images/search?q=imgurl:{query_url}&view=detailv2&iss=sbi",
@@ -60,6 +60,6 @@ engines: list[GenericRISEngine] = [
         "ascii2d allows you to search for images by image and examine its details. You can search for images with"
         "matching partial features (mainly for cropped images if about 2/3 of the original image remains)",
         "https://ascii2d.net/",
-        ["General"],
+        ["Anime/Manga related Artworks"],
     ),
 ]
