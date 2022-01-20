@@ -9,6 +9,7 @@ from time import time
 from typing import Callable
 
 from PIL import Image
+from emoji import emojize
 from moviepy.video.io.VideoFileClip import VideoFileClip
 from telegram import (
     ChatAction,
@@ -254,12 +255,17 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, lock: L
     engines_used_html = ", ".join([b(en.name) for en in searchable_engines])
     if not match_found:
         search_message.edit_text(
-            f"🔴 I searched for you on {engines_used_html} but didn't find anything. Please try another engine above and take a look at /tips.",
+            emojize(
+                f":red_circle: I searched for you on {engines_used_html} but didn't find anything. Please try another"
+                " engine above and take a look at /tips."
+            ),
             ParseMode.HTML,
         )
     else:
         search_message.edit_text(
-            f"🔵 I searched for you on {engines_used_html}. You can try others above for more results",
+            emojize(
+                f":blue_circle: I searched for you on {engines_used_html}. You can try others above for more results"
+            ),
             ParseMode.HTML,
         )
 
