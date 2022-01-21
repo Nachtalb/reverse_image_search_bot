@@ -8,20 +8,21 @@ I recommend SauceNao, for other images I recommend to use Google, Yandex.
 
 Supported engines:
 
-- All-in-one: Google, Yandex, Baidu, Shutterstock, Bing, TinEye
-- Artworks & Anime: SauceNAO, IQDB, Trace
+- All-in-one: Google, Yandex, Baidu, Shutterstock, Bing, TinEye, Sogou
+- Artworks & Anime: SauceNAO, IQDB, Trace, ascii2d
 
 Inline results support:
 
 SauceNAO, IQDB, Trace
 
-![example](https://raw.githubusercontent.com/Nachtalb/reverse_image_search_bot/master/reverse_image_search_bot/images/example.jpg)
-
 ## Commands
 
-- /help, /start: Show this help message
-- /engines: Show engine overview with use case recommendation and more
-- /more: Even more info about said engines
+- `/help`, `/start`: Show this help message
+- `/credits`: Show all available engines (and what they are best for), data
+  providers and other credits.
+- `/tips`: Various tips and tricks for better search results
+
+![example](https://raw.githubusercontent.com/Nachtalb/reverse_image_search_bot/master/reverse_image_search_bot/images/help.jpg)
 
 ## Author
 
@@ -65,7 +66,7 @@ After this is complete, you have to get an API Token from Telegram. You can
 easily get one via [@BotFather](https://t.me/BotFather).
 
 Now that you have your API Token copy the `settings.example.py` to `settings.py`
-and paste in your API Token.
+and paste in your API Token and so on.
 
 Finally you can use this to start your bot.
 
