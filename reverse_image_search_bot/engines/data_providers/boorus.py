@@ -66,6 +66,8 @@ class BooruProvider(BaseProvider):
                 if safe_get(data, "@attributes.count"):
                     return data["post"][0]
             case _:
+                if isinstance(data, list):
+                    return next(iter(data), None)
                 return data
 
     def source_button(self, data: dict) -> list[InlineKeyboardButton]:
