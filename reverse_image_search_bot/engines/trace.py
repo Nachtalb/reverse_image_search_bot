@@ -8,6 +8,7 @@ from yarl import URL
 
 from reverse_image_search_bot.utils import url_button
 
+from .data_providers import anilist
 from .generic import GenericRISEngine
 from .types import MetaData, ProviderData
 
@@ -50,7 +51,7 @@ class TraceEngine(GenericRISEngine):
         if isinstance(data["anilist"], dict):
             anilist_id = data["anilist"]["id"]
 
-        result, meta = self._anilist_provider(int(anilist_id), data["episode"])
+        result, meta = anilist.provide(int(anilist_id), data["episode"])
 
         if meta:
             buttons = meta.get("buttons", [])
@@ -60,10 +61,10 @@ class TraceEngine(GenericRISEngine):
             if isinstance(data["anilist"], int):
                 buttons.append(url_button("https://anilist.co/anime/%d" % data["anilist"]))
             else:
-                anilist = data["anilist"]
-                titles = anilist["titles"]
-                buttons.append(url_button("https://anilist.co/anime/%d" % anilist["id"]))
-                buttons.append(url_button("https://myanimelist.net/anime/%d" % anilist["idMal"]))
+                anilist_data = data["anilist"]
+                titles = anilist_data["titles"]
+                buttons.append(url_button("https://anilist.co/anime/%d" % anilist_data["id"]))
+                buttons.append(url_button("https://myanimelist.net/anime/%d" % anilist_data["idMal"]))
 
             result.update(
                 {

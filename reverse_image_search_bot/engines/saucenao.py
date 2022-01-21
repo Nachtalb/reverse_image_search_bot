@@ -1,3 +1,4 @@
+from functools import partial
 from threading import Lock
 from time import time
 from urllib.parse import quote_plus
@@ -5,11 +6,13 @@ from urllib.parse import quote_plus
 from cachetools import cached
 from requests import Session
 from telegram import InlineKeyboardButton
+import validators
 from yarl import URL
 
 from reverse_image_search_bot.settings import SAUCENAO_API
 from reverse_image_search_bot.utils import tagify, url_button
 
+from .data_providers import anilist, booru, mangadex
 from .generic import GenericRISEngine
 from .types import InternalProviderData, MetaData, ProviderData
 
@@ -27,7 +30,7 @@ class SauceNaoEngine(GenericRISEngine):
     url = "https://saucenao.com/search.php?url={query_url}"
     limit_reached = None
 
-    min_similarity = 60
+    min_similarity = 65
 
     ResponseData = dict[str, str | int | list[str]]
 
@@ -38,38 +41,14 @@ class SauceNaoEngine(GenericRISEngine):
 
     def _21_provider(self, data: ResponseData) -> InternalProviderData:
         """Anime"""
-        buttons: list[InlineKeyboardButton] = []
+        return anilist.provide(data["anilist_id"], data.get("part"))  # type: ignore
 
-        meta: MetaData = {}
-        result = {}
-        if "anilist_id" in data:
-            result, meta = self._anilist_provider(data["anilist_id"], data.get("part"))  # type: ignore
-            if result:
-                buttons = meta.get("buttons", [])
-                for item in data.get("ext_urls", []):  # type: ignore
-                    if "anilist.co" not in item:
-                        buttons.append(url_button(item))
+    def _booru_provider(self, data: ResponseData, api: str) -> InternalProviderData:
+        return booru.provide(api, data[api + "_id"])  # type: ignore
 
-        if not result:
-            for item in data.get("ext_urls", []):  # type: ignore
-                buttons.append(url_button(item))
-
-            result.update(
-                {
-                    "Source": data["source"],
-                    "Episode": data["part"],
-                }
-            )
-
-        result.update(
-            {
-                "Year": data["year"],
-                "Est. Time": data["est_time"],
-            }
-        )
-
-        meta["buttons"] = buttons
-        return result, meta
+    _9_provider = lambda self, data: self._booru_provider(data, "danbooru")
+    _12_provider = lambda self, data: self._booru_provider(data, "yandere")
+    _25_provider = lambda self, data: self._booru_provider(data, "gelbooru")
 
     def _5_provider(self, data: ResponseData) -> InternalProviderData:
         """Pixiv"""
@@ -83,62 +62,32 @@ class SauceNaoEngine(GenericRISEngine):
             },
         )
 
-    def _booru_provider(self, data: ResponseData, provider_name: str) -> InternalProviderData:
-        """Generic Booru SauceNAO Provider"""
-        buttons: list[InlineKeyboardButton] = []
-        result = {}
-        meta: MetaData = {}
-
-        if provider_name + "_id" in data:
-            result, meta = getattr(self, f"_{provider_name}_provider")(data[provider_name + "_id"])  # type: ignore
-            if meta:
-                buttons = meta.get("buttons", [])
-
-        if not result:
-            if source := data.get("source"):
-                buttons.append(url_button(source, text="Source"))  # type: ignore
-
-            for item in data.get("ext_urls", []):  # type: ignore
-                buttons.append(url_button(item))
-
-            result.update(
-                {
-                    "Character": tagify(data.get("characters")),  # type: ignore
-                    "Material": data.get("material"),
-                    "By": tagify(data.get("creator")),  # type: ignore
-                }
-            )
-
-        meta["buttons"] = buttons
-        return result, meta
-
-    def _9_provider(self, data: ResponseData) -> InternalProviderData:
-        """Danbooru"""
-        return self._booru_provider(data, "danbooru")
-
-    def _12_provider(self, data: ResponseData) -> InternalProviderData:
-        """Yandere"""
-        return self._booru_provider(data, "yandere")
-
-    def _25_provider(self, data: ResponseData) -> InternalProviderData:
-        """Gelbooru"""
-        return self._booru_provider(data, "gelbooru")
-
     def _37_provider(self, data: ResponseData) -> InternalProviderData:
         """Mangadex"""
         kwargs = {}
-        if chapter_id := data.get('md_id'):
-            kwargs['chapter_id'] = chapter_id
-        if mangadex_url := next(iter([url for url in data.get('ext_urls', []) if URL(url).host == 'mangadex.org']), None):  # type: ignore
-            kwargs['url'] = URL(mangadex_url.strip('/'))
+        if chapter_id := data.get("md_id"):
+            kwargs["chapter_id"] = chapter_id
+        if mangadex_url := next(iter([url for url in data.get("ext_urls", []) if URL(url).host == "mangadex.org"]), None):  # type: ignore
+            kwargs["url"] = URL(mangadex_url.strip("/"))
 
-        return self._mangadex_provider(**kwargs)
+        return mangadex.provide(**kwargs)
 
     _371_provider = _37_provider  # Mangadex V2
 
     def _default_provider(self, data: ResponseData) -> InternalProviderData:
         """Generic"""
+        known = {
+            "characters": ("Character", tagify),
+            "material": ("Material", str),
+            "creator": ("By", tagify),
+        }
+        known_buttons = {"source": "Source"}
         buttons: list[InlineKeyboardButton] = []
+        for key, text in known_buttons.items():
+            value = data.pop(key, None)
+            if isinstance(value, str) and validators.url(value):  # type: ignore
+                buttons.append(url_button(value, text=text))
+
         for item in data.pop("ext_urls", []):  # type: ignore
             buttons.append(url_button(item))
 
@@ -150,6 +99,8 @@ class SauceNaoEngine(GenericRISEngine):
             if key in skip:
                 continue
             match key:
+                case k if k in known:
+                    result[known[key][0]] = known[key][1](value)
                 case k if k.endswith(("_id", "_aid")):
                     continue
                 case k if k.endswith("_url"):  # author_name + author_url fields
@@ -226,8 +177,8 @@ class SauceNaoEngine(GenericRISEngine):
         result, new_meta = data_provider(data["data"])
         if not result:
             result, new_meta = self._default_provider(data["data"])
-        meta.update(new_meta)
 
+        meta.update(new_meta)
         meta.update(
             {
                 "thumbnail": URL(meta.get("thumbnail", data["header"]["thumbnail"])),

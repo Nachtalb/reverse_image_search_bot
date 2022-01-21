@@ -3,19 +3,54 @@ from yarl import URL
 
 from reverse_image_search_bot.engines.types import InternalProviderData, MetaData
 from reverse_image_search_bot.utils import fix_url, safe_get, tagify, url_button
-from reverse_image_search_bot.utils.api import mangadex_chapter, mangadex_manga
+
+from .base import BaseProvider, provider_cache
 
 
-class MangadexProvider:
-    provider_name = "Mangadex"
-    provider_url = URL("https://mangadex.org/")
-    provides = ["Manga"]
+class MangadexProvider(BaseProvider):
+    info = {"name": "Mangadex", "url": "https://mangadex.org/", "types": ["Manga"], "site_type": "Manga DB & Reader"}
+    api_base = URL("https://api.mangadex.org/")
 
-    def _mangadex_provider(
-        self, url: str | URL = None, chapter_id: str = None, manga_id: str = None
-    ) -> InternalProviderData:
-        chapter_id = str(chapter_id)
-        manga_id = str(manga_id)
+    def _request(
+        self, endpoint: str, params: dict = {}, json: dict = {}, method: str = "get", **kwargs
+    ) -> dict | list | None:
+        request_method = getattr(self.session, method.lower())
+        if not request_method:
+            return
+
+        url = self.api_base / endpoint
+        response = request_method(str(url), params=params, json=json, **kwargs)
+
+        if response.status_code != 200:
+            self.logger.error('Mangadex API error: "%s" -- %s', response.url, response.text)
+            return
+
+        data = response.json()
+        if data["result"] == "error":
+            return
+        return data["data"]
+
+    def legacy_mapping(self, id: int, kind: str) -> str | None:
+        data = self._request("legacy/mapping", json={"type": kind, "ids": [id]}, method="POST")
+        if not isinstance(data, list) or not data:
+            return
+        return safe_get(data, "[0].attributes.newId")
+
+    @provider_cache
+    def chapter(self, chapter_id: str) -> dict | None:
+        if chapter_id.isdigit():
+            chapter_id = self.legacy_mapping(int(chapter_id), "chapter")  # type: ignore
+            if not chapter_id:
+                return
+        return self._request(f"chapter/{chapter_id}")  # type: ignore
+
+    @provider_cache
+    def manga(self, manga_id: str) -> dict | None:
+        return self._request(f"manga/{manga_id}", {"includes[]": ["artist", "cover_art", "author"]})  # type: ignore
+
+    def provide(self, url: str | URL = None, chapter_id: str = None, manga_id: str = None) -> InternalProviderData:
+        chapter_id = str(chapter_id) if chapter_id else None
+        manga_id = str(manga_id) if manga_id else None
         if not url and not chapter_id and not manga_id:
             return {}, {}
         elif url and (url := URL(url)):
@@ -28,9 +63,9 @@ class MangadexProvider:
         if not chapter_id and not manga_id:
             return {}, {}
 
-        chapter_data = mangadex_chapter(chapter_id) if chapter_id else {}
+        chapter_data = self.chapter(chapter_id) if chapter_id else {}
         chapter_data = chapter_data or {}
-        chapter_id = chapter_data.get('id', '')
+        chapter_id = chapter_data.get("id", "")
 
         manga_data = {}
         if chapter_data:
@@ -40,7 +75,7 @@ class MangadexProvider:
         if not manga_id:
             return {}, {}
 
-        manga_data = mangadex_manga(manga_id) or {}
+        manga_data = self.manga(manga_id) or {}
 
         if not manga_data:
             return {}, {}
@@ -73,7 +108,7 @@ class MangadexProvider:
             url_button("https://mangadex.org/title/" + manga_id, text="Mangadex"),
         ]
         if chapter_id:
-            buttons.append(url_button(f'https://mangadex.org/chapter/{chapter_id}', text="Chapter"))
+            buttons.append(url_button(f"https://mangadex.org/chapter/{chapter_id}", text="Chapter"))
 
         for key, url in safe_get(manga_data, "attributes.links", {}).items():
             if not validators.url(url):  # type: ignore
@@ -83,8 +118,8 @@ class MangadexProvider:
             buttons.append(url_button(url))
 
         meta: MetaData = {
-            "provided_via": "Mangadex",
-            "provided_via_url": URL("https://mangadex.org/"),
+            "provided_via": self.info["name"],
+            "provided_via_url": URL(self.info["url"]),
             "buttons": buttons,
             "identifier": manga_id,
         }

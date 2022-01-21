@@ -7,6 +7,7 @@ from yarl import URL
 
 from reverse_image_search_bot.utils import url_button
 
+from .data_providers import booru
 from .generic import GenericRISEngine
 from .types import MetaData, ProviderData
 
@@ -44,13 +45,8 @@ class IQDBEngine(GenericRISEngine):
         buttons: list[InlineKeyboardButton] = []
 
         rows = best_match.find("td")  # type: ignore
-        link = URL(rows[0].find("a", first=True).attrs["href"]).with_scheme("https")  # type: ignore
-        if link.host == "danbooru.donmai.us" and (danbooru_id := next(filter(None, reversed(link.parts)), None)):
-            result, meta = self._danbooru_provider(int(danbooru_id))
-        elif link.host == "yande.re" and (yandere_id := next(filter(None, reversed(link.parts)), None)):
-            result, meta = self._yandere_provider(int(yandere_id))
-        elif link.host == "gelbooru.com" and (gelbooru_id := link.query.get("id")):
-            result, meta = self._gelbooru_provider(int(gelbooru_id))
+        link = URL(rows[0].find("a", first=True).attrs["href"].rstrip("/")).with_scheme("https")  # type: ignore
+        result, meta = booru.provide(link)
 
         buttons = meta.get("buttons", buttons)
 

@@ -1,5 +1,4 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from functools import partial
 import io
 import json
 from logging import getLogger
@@ -25,6 +24,7 @@ from telegram.parsemode import ParseMode
 from yarl import URL
 
 from reverse_image_search_bot.engines import engines
+from reverse_image_search_bot.engines.data_providers import provides
 from reverse_image_search_bot.engines.generic import GenericRISEngine, PreWorkEngine
 from reverse_image_search_bot.engines.types import MetaData, ResultData
 from reverse_image_search_bot.settings import ADMIN_IDS
@@ -78,10 +78,19 @@ def credits_command(
     context: CallbackContext,
 ):
     data_providers = []
-    for provider in GenericRISEngine.data_provider_info():
-        data_providers.append(
-            title(provider["name"]) + str(provider["url"]) + "\n" + title("Provides") + ", ".join(provider["provides"])
-        )
+    for provider in provides:
+        infos = provider.infos.values() if provider.infos else [provider.info]
+
+        for info in infos:
+            data_providers.append(
+                "{name_title}{info[url]}\n{provides_title}{provides}\n{site_type_title}{info[site_type]}".format(
+                    name_title=title(info["name"]),
+                    provides_title=title("Provides"),
+                    site_type_title=title("Site Type"),
+                    provides=", ".join(map(code, info["types"])),
+                    info=info,
+                )
+            )
 
     search_engines = ""
     for engine in engines:

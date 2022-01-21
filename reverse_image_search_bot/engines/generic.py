@@ -1,5 +1,5 @@
 import logging
-from urllib.parse import quote, quote_plus
+from urllib.parse import quote_plus
 
 from cachetools import TTLCache, cached
 from requests import Session
@@ -8,14 +8,13 @@ from telegram import InlineKeyboardButton
 import validators
 from yarl import URL
 
-from .providers import ProviderCollection
 from .types import InternalResultData, MetaData, ProviderData, ResultData
 
 
 __all__ = ["GenericRISEngine", "PreWorkEngine"]
 
 
-class GenericRISEngine(ProviderCollection):
+class GenericRISEngine:
     _best_match_cache = TTLCache(maxsize=1e4, ttl=24 * 60 * 60)
     name: str = "GenericRISEngine"
     description: str = ""
