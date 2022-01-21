@@ -60,7 +60,7 @@ class BooruProvider(BaseProvider):
             return
         match api:
             case "danbooru":
-                if data.get("success"):
+                if data.get("success") is not False:
                     return data
             case "gelbooru":
                 if safe_get(data, "@attributes.count"):
@@ -112,7 +112,7 @@ class BooruProvider(BaseProvider):
             ),
             "Tags": tagify(random.choices(data["tag_string_general" if api == "danbooru" else "tags"].split(" "), k=5)),
             "By": tagify(data.get("tag_string_artist", [])) or None,
-            "Copyright": data.get("tag_string_copyright", None),
+            "Copyright": data.get("tag_string_copyright", "").split(" "),
             "Rating": rating,
         }
 

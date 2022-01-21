@@ -5,8 +5,8 @@ from yarl import URL
 
 __all__ = ["InternalResultData", "ResultData", "MetaData", "InternalProviderData", "ProviderData"]
 
-InternalResultData = dict[str, str | int | URL | None | list[str]]
-ResultData = dict[str, str | int | URL]
+InternalResultData = dict[str, str | int | URL | None | list[str] | set[str]]
+ResultData = dict[str, str | int | URL | list[str] | set[str]]
 
 
 class MetaData(TypedDict, total=False):

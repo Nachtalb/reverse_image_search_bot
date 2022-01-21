@@ -65,8 +65,6 @@ class GenericRISEngine:
         for key, value in list(data.items()):
             if value is None or value == "":
                 del data[key]
-            elif isinstance(value, (list, set, tuple)):
-                data[key] = ", ".join(map(str, value))
 
         return data  # type: ignore
 

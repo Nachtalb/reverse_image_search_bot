@@ -376,10 +376,14 @@ def build_reply(result: ResultData, meta: MetaData) -> str:
     reply += "\n\n"
 
     for key, value in result.items():
-        if isinstance(value, str) and value.startswith("#"):  # Tags
-            reply += title(key) + value + "\n"
+        reply += title(key)
+        if isinstance(value, set):  # Tags
+            reply += ', '.join(value)
+        elif isinstance(value, list):
+            reply += ', '.join(map(code, value))
         else:
-            reply += title(key) + code(value) + "\n"
+            reply += code(value)
+        reply += '\n'
 
     if errors := meta.get("errors"):
         for error in errors:

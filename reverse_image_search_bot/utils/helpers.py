@@ -43,7 +43,7 @@ def tagify(tags: list[str] | str) -> set[str]:
         return set()
     tags = " ".join(map(lambda s: s.replace(" ", "_"), tags)) if isinstance(tags, list) else tags
     tags = re.sub(r"(?![_a-zA-Z0-9\s]).", "_", tags).split(" ")
-    return {f"#{tag}".lower() for tag in filter(None, tags)}
+    return {f"#{tag}".lower() for tag in filter(lambda t: t and not t[0].isdigit(), tags)}
 
 
 class ReturnableThread(Thread):
