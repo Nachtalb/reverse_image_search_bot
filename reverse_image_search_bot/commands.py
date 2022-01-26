@@ -121,13 +121,24 @@ def credits_command(
     update.message.reply_html(reply, reply_to_message_id=update.message.message_id, disable_web_page_preview=True)
 
 
-def file_handler(update: Update, context: CallbackContext):
-    if not update.message:
+def search_command(update: Update, context: CallbackContext):
+    orig_message: Message | None = update.message.reply_to_message  # type: ignore
+    if not orig_message:
+        update.message.reply_text('When using /search you have to reply to a message with an image or video')
         return
-    message = update.message.reply_text("⌛ Give me a sec...")
+
+    file_handler(update, context, orig_message)
+
+
+def file_handler(update: Update, context: CallbackContext, message: Message = None):
+    message = message or update.effective_message
+    if not message:
+        return
+
+    wait_message = update.message.reply_text("⌛ Give me a sec...")
     context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
 
-    attachment = update.message.effective_attachment
+    attachment = message.effective_attachment
     if isinstance(attachment, list):
         attachment = attachment[-1]
 
@@ -136,14 +147,14 @@ def file_handler(update: Update, context: CallbackContext):
             case i if (isinstance(i, Document) and i.mime_type.startswith("video")) or isinstance(
                 i, (Video, Animation)
             ):
-                image_url = video_to_url(attachment)
+                image_url = video_to_url(attachment)  # type: ignore
             case PhotoSize() | Sticker():
                 if isinstance(attachment, Sticker) and attachment.is_animated:
-                    message.edit_text("Animated stickers are not supported.")
+                    wait_message.edit_text("Animated stickers are not supported.")
                     return
                 image_url = image_to_url(attachment)
             case _:
-                message.edit_text("Format is not supported")
+                wait_message.edit_text("Format is not supported")
                 return
 
         lock = Lock()
@@ -151,7 +162,7 @@ def file_handler(update: Update, context: CallbackContext):
         Thread(target=general_image_search, args=(update, image_url, lock)).start()
         best_match(update, context, image_url, lock)
     except Exception as error:
-        message.edit_text("An error occurred please contact the @Nachtalb for help.")
+        wait_message.edit_text("An error occurred please contact the @Nachtalb for help.")
         try:
             image_url  # type: ignore
         except NameError:
@@ -159,7 +170,7 @@ def file_handler(update: Update, context: CallbackContext):
 
         error_to_admin(update, context, f"Error: {error}", image_url, attachment)  # type: ignore
         raise
-    message.delete()
+    wait_message.delete()
 
 
 def callback_query_handler(update: Update, context: CallbackContext):

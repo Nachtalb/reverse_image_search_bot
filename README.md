@@ -21,6 +21,7 @@ SauceNAO, IQDB, Trace
 - `/credits`: Show all available engines (and what they are best for), data
   providers and other credits.
 - `/tips`: Various tips and tricks for better search results
+- `/search`: Reply to a message with an image or video to start a search
 
 ![example](https://raw.githubusercontent.com/Nachtalb/reverse_image_search_bot/master/reverse_image_search_bot/images/help.jpg)
 

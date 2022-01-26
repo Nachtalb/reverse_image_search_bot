@@ -24,6 +24,7 @@ from .commands import (
     file_handler,
     help_command,
     id_command,
+    search_command,
     tips_command,
 )
 
@@ -86,14 +87,18 @@ def main():
     dispatcher.add_handler(CommandHandler("id", id_command))
     dispatcher.add_handler(CommandHandler("tips", tips_command))
     dispatcher.add_handler(CommandHandler("restart", restart_command, filters=ADMIN_FILTER))
-    dispatcher.add_handler(CommandHandler("credits", credits_command, run_async=True))
-    dispatcher.add_handler(CommandHandler("credit", credits_command, run_async=True))
+    dispatcher.add_handler(CommandHandler(("credits", "credit"), credits_command, run_async=True))
+    dispatcher.add_handler(CommandHandler("search", search_command, run_async=True))
     dispatcher.add_handler(CallbackQueryHandler(callback_query_handler, run_async=True))
 
     logging.getLogger("").addHandler(TelegramLogHandler(bot=updater.bot, level=logging.WARNING))
 
     dispatcher.add_handler(
-        MessageHandler(Filters.sticker | Filters.photo | Filters.video | Filters.document, file_handler, run_async=True)
+        MessageHandler(
+            (Filters.sticker | Filters.photo | Filters.video | Filters.document) & Filters.private,
+            file_handler,
+            run_async=True,
+        )
     )
 
     # log all errors
