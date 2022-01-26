@@ -110,12 +110,16 @@ class MangadexProvider(BaseProvider):
         if chapter_id:
             buttons.append(url_button(f"https://mangadex.org/chapter/{chapter_id}", text="Chapter"))
 
-        for key, url in safe_get(manga_data, "attributes.links", {}).items():
-            if not validators.url(url):  # type: ignore
-                url = fix_url(f"{key}:manga:{url}")
-            else:
-                url = URL(url)  # type: ignore
-            buttons.append(url_button(url))
+        links = safe_get(manga_data, "attributes.links", {})
+        if isinstance(links, list) and links:
+            self.logger.warning("Found a manga with link list", manga_id)
+        if isinstance(links, dict):
+            for key, url in safe_get(manga_data, "attributes.links", {}).items():
+                if not validators.url(url):  # type: ignore
+                    url = fix_url(f"{key}:manga:{url}")
+                else:
+                    url = URL(url)  # type: ignore
+                buttons.append(url_button(url))
 
         meta: MetaData = {
             "provided_via": self.info["name"],
