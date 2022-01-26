@@ -34,6 +34,16 @@ class TraceEngine(GenericRISEngine):
         api_link = "https://api.trace.moe/search?url={}".format(quote_plus(str(url)))
         response = self.session.get(api_link)
 
+        meta: MetaData = {
+            "provider": self.name,
+            "provider_url": self.provider_url,
+        }
+        limit_reached_result = "Monthly limit reached. You can search Trace via it's button above or <b>More</b> below."
+
+        if response.status_code == 402:
+            meta["errors"] = [limit_reached_result]
+            return {}, meta
+
         if response.status_code != 200:
             self.logger.debug("Done with search: found nothing")
             return {}, {}
@@ -45,7 +55,6 @@ class TraceEngine(GenericRISEngine):
 
         buttons: list[InlineKeyboardButton] = []
         result = {}
-        meta: MetaData = {}
 
         anilist_id = data["anilist"]
         if isinstance(data["anilist"], dict):
