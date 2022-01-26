@@ -95,7 +95,7 @@ def main():
 
     dispatcher.add_handler(
         MessageHandler(
-            (Filters.sticker | Filters.photo | Filters.video | Filters.document) & Filters.private,
+            (Filters.sticker | Filters.photo | Filters.video | Filters.document) & Filters.chat_type.private,
             file_handler,
             run_async=True,
         )
