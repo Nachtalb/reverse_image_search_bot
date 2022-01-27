@@ -307,7 +307,7 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, lock: L
             config.auto_search_enabled = False
             update.message.reply_text(
                 emojize(
-                    ":yellow_circle: You had 4 searches in a row returning no results thus I disabled auto search for"
+                    ":yellow_circle: You had 5 searches in a row returning no results thus I disabled auto search for"
                     " you. This helps to prevent hitting rate limits of the search engines making the bot more useful"
                     " for everyone. At the moment the auto search compatible engines are for anime & manga related"
                     " content. If you mainly search for other material please keep auto search disabled. You can use"
