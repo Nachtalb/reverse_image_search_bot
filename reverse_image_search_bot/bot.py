@@ -95,6 +95,7 @@ def main():
     dispatcher.add_handler(CommandHandler("restart", restart_command, filters=ADMIN_FILTER))
     dispatcher.add_handler(CommandHandler(("credits", "credit"), credits_command, run_async=True))
     dispatcher.add_handler(CommandHandler("search", search_command, run_async=True))
+    dispatcher.add_handler(CommandHandler("auto_search", auto_search_command, filters=Filters.chat_type.private, run_async=True))
     dispatcher.add_handler(CallbackQueryHandler(callback_query_handler, run_async=True))
 
     logging.getLogger("").addHandler(TelegramLogHandler(bot=updater.bot, level=logging.WARNING))
