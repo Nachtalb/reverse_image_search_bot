@@ -158,19 +158,16 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
         attachment = attachment[-1]
 
     try:
-        match attachment:
-            case i if (isinstance(i, Document) and i.mime_type.startswith("video")) or isinstance(
-                i, (Video, Animation)
-            ):
-                image_url = video_to_url(attachment)  # type: ignore
-            case PhotoSize() | Sticker():
-                if isinstance(attachment, Sticker) and attachment.is_animated:
-                    wait_message.edit_text("Animated stickers are not supported.")
-                    return
-                image_url = image_to_url(attachment)
-            case _:
-                wait_message.edit_text("Format is not supported")
+        if (isinstance(attachment, Document) and attachment.mime_type.startswith('video')) or isinstance(attachment, (Video, Animation)):
+            image_url = video_to_url(attachment)  # type: ignore
+        elif (isinstance(attachment, Document) and attachment.mime_type.endswith(('jpeg', 'png', 'webp'))) or isinstance(attachment, (PhotoSize, Sticker)):
+            if isinstance(attachment, Sticker) and attachment.is_animated:
+                wait_message.edit_text("Animated stickers are not supported.")
                 return
+            image_url = image_to_url(attachment)
+        else:
+            wait_message.edit_text("Format is not supported")
+            return
 
         lock = Lock()
         lock.acquire()
@@ -454,8 +451,12 @@ def video_to_url(attachment: Document | Video) -> URL:
         return upload_file(file, filename)
 
 
-def image_to_url(attachment: PhotoSize | Sticker) -> URL:
-    extension = "jpg" if isinstance(attachment, PhotoSize) else "png"
+def image_to_url(attachment: PhotoSize | Sticker | Document) -> URL:
+    if isinstance(attachment, Document):
+        extension = attachment.file_name.lower().rsplit('.', 1)[1].strip('.')
+    else:
+        extension = "jpg" if isinstance(attachment, PhotoSize) else "png"
+
     filename = f"{attachment.file_unique_id}.{extension}"
     if uploader.file_exists(filename):
         return uploader.get_url(filename)
