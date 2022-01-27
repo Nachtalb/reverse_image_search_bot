@@ -4,8 +4,10 @@ from urllib.parse import quote_plus
 from cachetools import cached
 from requests import Session
 from telegram import InlineKeyboardButton
+from telegram.ext import CallbackContext
 from yarl import URL
 
+from reverse_image_search_bot import settings
 from reverse_image_search_bot.utils import url_button
 
 from .data_providers import anilist
@@ -21,6 +23,7 @@ class TraceEngine(GenericRISEngine):
     recommendation = ["Anime"]
 
     url = "https://trace.moe/?auto&url={query_url}"
+    _use_api_key = False
 
     min_similarity = 91
 
@@ -28,11 +31,44 @@ class TraceEngine(GenericRISEngine):
         super().__init__(*args, **kwargs)
         self.session = Session()
 
+    @property
+    def use_api_key(self):
+        return self._use_api_key
+
+    @use_api_key.setter
+    def use_api_key(self, value):
+        from reverse_image_search_bot.bot import job_queue  # import it now to not get import recursion during boot
+
+        self._use_api_key = value
+
+        job_name = "trace_api"
+        if value and not job_queue.get_jobs_by_name(job_name):
+            job_queue.run_monthly(self._stop_using_api_key, when=datetime.min.time(), day=1, name=job_name)
+
+    def _stop_using_api_key(self, _: CallbackContext):
+        self._use_api_key = False
+
+    def _fetch_data(self, url: URL | str) -> int | dict:
+        api_link = "https://api.trace.moe/search"
+        params = {"url": str(url)}
+
+        result = None
+        if not self.use_api_key:
+            result = self.session.get(api_link, params=params)
+
+        if self.use_api_key or (result is not None and result.status_code == 402):
+            self.use_api_key = True
+            headers = {"x-trace-key": settings.TRACE_API}
+            result = self.session.get(api_link, params=params, headers=headers)
+
+        if result and result.status_code != 200:
+            return result.status_code
+        else:
+            return result.json() if result else {}
+
     @cached(GenericRISEngine._best_match_cache)
     def best_match(self, url: str | URL) -> ProviderData:
         self.logger.debug("Started looking for %s", url)
-        api_link = "https://api.trace.moe/search?url={}".format(quote_plus(str(url)))
-        response = self.session.get(api_link)
 
         meta: MetaData = {
             "provider": self.name,
@@ -40,15 +76,16 @@ class TraceEngine(GenericRISEngine):
         }
         limit_reached_result = "Monthly limit reached. You can search Trace via it's button above or <b>More</b> below."
 
-        if response.status_code == 402:
+        data = self._fetch_data(url)
+
+        if data == 402:
             meta["errors"] = [limit_reached_result]
             return {}, meta
-
-        if response.status_code != 200:
+        elif isinstance(data, int) or not data:
             self.logger.debug("Done with search: found nothing")
             return {}, {}
 
-        data = next(iter(response.json()["result"]), None)
+        data = next(iter(data["result"]), None)
         if not data or data["similarity"] < (self.min_similarity / 100):
             self.logger.debug("Done with search: found nothing")
             return {}, {}

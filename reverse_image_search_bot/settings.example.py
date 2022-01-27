@@ -19,6 +19,7 @@ UPLOADER = {
 ADMIN_IDS = []
 
 SAUCENAO_API = ""  # SauceNAO api key https://saucenao.com/user.php?page=search-api
+TRACE_API = ""  # Trace.moe api key https://soruly.github.io/trace.moe-api/#/limits?id=http-rate-limits
 
 MODE = {
     "active": "webhook",  # or polling

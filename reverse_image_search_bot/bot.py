@@ -12,6 +12,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     CommandHandler,
     Filters,
+    JobQueue,
     MessageHandler,
     Updater,
 )
@@ -27,6 +28,9 @@ from .commands import (
     search_command,
     tips_command,
 )
+
+
+job_queue: JobQueue = None  # type: ignore
 
 
 class TelegramLogHandler(logging.Handler):
@@ -67,8 +71,10 @@ def error(update: Update, context: CallbackContext):
 
 
 def main():
+    global job_queue
     updater = Updater(settings.TELEGRAM_API_TOKEN)
     dispatcher = updater.dispatcher
+    job_queue = dispatcher.job_queue
 
     def stop_and_restart(chat_id: int):
         """Gracefully stop the Updater and replace the current process with a new one."""
