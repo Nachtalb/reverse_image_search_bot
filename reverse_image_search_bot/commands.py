@@ -9,6 +9,7 @@ from time import time
 from typing import Callable
 
 from PIL import Image
+from cleverdict import CleverDict, get_app_dir
 from emoji import emojize
 from moviepy.video.io.VideoFileClip import VideoFileClip
 from telegram import (
@@ -19,10 +20,12 @@ from telegram import (
     User,
 )
 from telegram import Animation, Document, Message, PhotoSize, Sticker, Video
+from telegram.error import BadRequest
 from telegram.ext import CallbackContext
 from telegram.parsemode import ParseMode
 from yarl import URL
 
+from reverse_image_search_bot.config import UserConfig
 from reverse_image_search_bot.engines import engines
 from reverse_image_search_bot.engines.data_providers import provides
 from reverse_image_search_bot.engines.generic import GenericRISEngine, PreWorkEngine
@@ -31,7 +34,6 @@ from reverse_image_search_bot.settings import ADMIN_IDS
 from reverse_image_search_bot.uploaders import uploader
 from reverse_image_search_bot.utils import ReturnableThread, chunks, upload_file
 from reverse_image_search_bot.utils.tags import a, b, code, hidden_a, pre, title
-
 
 logger = getLogger("BEST MATCH")
 last_used: dict[int, float] = {}
@@ -45,6 +47,19 @@ last_used: dict[int, float] = {}
 def id_command(update: Update, context: CallbackContext):
     if update.effective_chat:
         update.message.reply_html(pre(json.dumps(update.effective_chat.to_dict(), sort_keys=True, indent=4)))
+
+
+def auto_search_command(update: Update, _: CallbackContext):
+    user = update.effective_user
+    if not user:
+        return
+    config = UserConfig(user)
+    if config.auto_search_enabled:
+        config.auto_search_enabled = False
+        update.message.reply_html("You have disabled auto search")
+    else:
+        config.auto_search_enabled = True
+        update.message.reply_text("You have enabled auto search")
 
 
 def send_template_command(name: str) -> Callable:
@@ -124,7 +139,7 @@ def credits_command(
 def search_command(update: Update, context: CallbackContext):
     orig_message: Message | None = update.message.reply_to_message  # type: ignore
     if not orig_message:
-        update.message.reply_text('When using /search you have to reply to a message with an image or video')
+        update.message.reply_text("When using /search you have to reply to a message with an image or video")
         return
 
     file_handler(update, context, orig_message)
@@ -160,7 +175,9 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
         lock = Lock()
         lock.acquire()
         Thread(target=general_image_search, args=(update, image_url, lock)).start()
-        best_match(update, context, image_url, lock)
+        config = UserConfig(update.effective_user)  # type: ignore
+        if config.auto_search_enabled:
+            best_match(update, context, image_url, lock)
     except Exception as error:
         wait_message.edit_text("An error occurred please contact the @Nachtalb for help.")
         try:
@@ -255,16 +272,16 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, lock: L
 
     user: User = update.effective_user  # type: ignore
     message: Message = update.effective_message  # type: ignore
+    config = UserConfig(user)
 
-    if user.id not in ADMIN_IDS and (last_time := last_used.get(user.id)) and time() - last_time < 10:
+    if user.id not in ADMIN_IDS and (last_time := config.last_auto_search) and time() - last_time < 10:
         if lock:
             wait_for(lock)
         context.bot.send_message(
             text="Slow down a bit please....", chat_id=message.chat_id, reply_to_message_id=message.message_id
         )
         return
-    else:
-        last_used[user.id] = time()
+    config.used_auto_search()
 
     searchable_engines = [engine for engine in engines if engine.best_match_implemented]
 
@@ -288,6 +305,18 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, lock: L
 
     engines_used_html = ", ".join([b(en.name) for en in searchable_engines])
     if not match_found:
+        config.failures_in_a_row += 1
+        if config.failures_in_a_row > 4 and config.auto_search_enabled:
+            config.auto_search_enabled = False
+            update.message.reply_text(
+                emojize(
+                    ":yellow_circle: You had 4 searches in a row returning no results thus I disabled auto search for"
+                    " you. This helps to prevent hitting rate limits of the search engines making the bot more useful"
+                    " for everyone. At the moment the auto search compatible engines are for anime & manga related"
+                    " content. If you mainly search for other material please keep auto search disabled. You can use"
+                    " /auto_search to reenable it."
+                )
+            )
         search_message.edit_text(
             emojize(
                 f":red_circle: I searched for you on {engines_used_html} but didn't find anything. Please try another"
@@ -296,10 +325,12 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, lock: L
             ParseMode.HTML,
         )
     else:
+        config.failures_in_a_row = 0
         search_message.edit_text(
             emojize(
-                f":blue_circle: I searched for you on {engines_used_html}. You can try others above for more results"
-            ),
+                f":blue_circle: I searched for you on {engines_used_html}. You can try others above for more results."
+            )
+            + (" You may reenable /auto_search if you want." if not config.auto_search_enabled else ""),
             ParseMode.HTML,
         )
 
@@ -389,12 +420,12 @@ def build_reply(result: ResultData, meta: MetaData) -> str:
     for key, value in result.items():
         reply += title(key)
         if isinstance(value, set):  # Tags
-            reply += ', '.join(value)
+            reply += ", ".join(value)
         elif isinstance(value, list):
-            reply += ', '.join(map(code, value))
+            reply += ", ".join(map(code, value))
         else:
             reply += code(value)
-        reply += '\n'
+        reply += "\n"
 
     if errors := meta.get("errors"):
         for error in errors:

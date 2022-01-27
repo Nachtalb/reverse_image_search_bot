@@ -22,6 +22,7 @@ SauceNAO, IQDB, Trace
   providers and other credits.
 - `/tips`: Various tips and tricks for better search results
 - `/search`: Reply to a message with an image or video to start a search
+- `/auto_search`: Toggle auto search on and off
 
 ![example](https://raw.githubusercontent.com/Nachtalb/reverse_image_search_bot/master/reverse_image_search_bot/images/help.jpg)
 
