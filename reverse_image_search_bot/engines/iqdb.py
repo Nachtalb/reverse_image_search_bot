@@ -1,7 +1,7 @@
 import re
 
 from cachetools import cached
-from requests_html import HTMLResponse, HTMLSession
+from requests_html import HTMLResponse
 from telegram import InlineKeyboardButton
 from yarl import URL
 
@@ -21,14 +21,12 @@ class IQDBEngine(GenericRISEngine):
 
     url = "https://iqdb.org/?url={query_url}"
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.session = HTMLSession()
+    has_html_session = True
 
     @cached(GenericRISEngine._best_match_cache)
     def best_match(self, url: str | URL) -> ProviderData:
         self.logger.debug("Started looking for %s", url)
-        response: HTMLResponse = self.session.get(self.get_search_link_by_url(url))  # type: ignore
+        response: HTMLResponse = self.html_session.get(self.get_search_link_by_url(url))  # type: ignore
 
         if response.status_code != 200:
             self.logger.debug("Done with search: found nothing")

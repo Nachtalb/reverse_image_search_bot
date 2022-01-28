@@ -1,11 +1,15 @@
+from pathlib import Path
 import random
+import re
+from tempfile import NamedTemporaryFile
 
 from telegram import InlineKeyboardButton
+from user_agent import generate_user_agent
 import validators
 from yarl import URL
 
 from reverse_image_search_bot.engines.types import InternalProviderData, MetaData
-from reverse_image_search_bot.utils import tagify, url_button
+from reverse_image_search_bot.utils import tagify, upload_file, url_button
 from reverse_image_search_bot.utils.helpers import safe_get
 
 from .base import BaseProvider, provider_cache
@@ -31,25 +35,42 @@ class BooruProvider(BaseProvider):
             "types": ["Anime/Manage related Artworks"],
             "site_type": "Imageboard",
         },
+        "3dbooru": {
+            "name": "3D Booru",
+            "url": "http://behoimi.org/",
+            "types": ["Cosplayers"],
+            "site_type": "Imageboard",
+        },
     }
 
     urls = {
         "danbooru": {
+            "check": "danbooru.donmai.us",
             "api_url": "https://danbooru.donmai.us/posts/{post_id}.json",
             "post_url": "https://danbooru.donmai.us/posts/{post_id}",
         },
         "gelbooru": {
+            "check": "gelbooru.com",
+            "id_reg": re.compile(r"id=(\d+)"),
             "api_url": "https://gelbooru.com/index.php?page=dapi&s=post&q=index&json=1&id={post_id}",
             "post_url": "https://gelbooru.com/index.php?page=post&s=view&id={post_id}",
         },
         "yandere": {
+            "check": "yande.re",
             "api_url": "https://yande.re/post.json?tags=id:{post_id}",
             "post_url": "https://yandere.com/index.php?page=post&s=view&id={post_id}",
+        },
+        "3dbooru": {
+            "check": "behoimi.org",
+            "api_url": "http://behoimi.org/post/index.json?tags=id:{post_id}",
+            "post_url": "http://behoimi.org/post/show/{post_id}",
+            "download_thumbnail": True,
         },
     }
 
     def _request(self, api: str, post_id: int) -> dict | None:
-        response = self.session.get(self.urls[api]["api_url"].format(post_id=post_id))
+        headers = {"User-Agent": generate_user_agent()}
+        response = self.session.get(self.urls[api]["api_url"].format(post_id=post_id), headers=headers)
         if response.status_code != 200:
             return
         return response.json()
@@ -77,11 +98,40 @@ class BooruProvider(BaseProvider):
 
     def supports(self, url: URL | str) -> tuple[str, int] | tuple[None, None]:
         url = URL(url)
-        api = {"danbooru.donmai.us": "danbooru", "yande.re": "yandere", "gelbooru.com": "gelbooru"}.get(url.host)  # type: ignore
-        post_id = url.parts[-1] if url.parts and url.host != "gelbooru.com" else url.query.get("id")
+        api = next(filter(lambda service: self.urls[service]["check"] == url.host, self.urls))
+        post_id = None
+        if matcher := self.urls[api].get("id_reg"):
+            if match := matcher.match(str(url)):
+                post_id = match.groups()[0]
+        else:
+            post_id = url.parts[-1]
+
         if not api or not post_id or not post_id.isdigit():
             return None, None
         return api, int(post_id)
+
+    def _get_thumbnail(self, api: str, post_id: int, data: dict) -> MetaData:
+        thumbnail_url: str = data.get("file_url", data.get("sample_url", data.get("preview_file_url")))
+
+        if not thumbnail_url:
+            return {}
+        elif self.urls[api].get("download_thumbnail"):
+            headers = {
+                "User-Agent": generate_user_agent(),
+                "Referer": self.urls[api]["post_url"].format(post_id=post_id),
+            }
+            response = self.session.get(thumbnail_url, headers=headers)
+            if response.status_code != 200:
+                return {}
+
+            with NamedTemporaryFile('rb+', delete=False) as file:
+                file.write(response.content)
+                file.seek(0)
+                thumbnail = upload_file(Path(file.name), URL(thumbnail_url).name)
+        else:
+            thumbnail = URL(thumbnail_url)
+
+        return {"thumbnail": thumbnail, "thumbnail_identifier": thumbnail_url}
 
     @provider_cache
     def provide(self, api_or_url: str | URL, post_id: int = None) -> InternalProviderData:
@@ -121,9 +171,11 @@ class BooruProvider(BaseProvider):
         meta: MetaData = {
             "provided_via": self.infos[api]["name"],
             "provided_via_url": URL(self.infos[api]["url"]),
-            "thumbnail": data["file_url"],
             "buttons": buttons,
             "identifier": post_url,
-            "thumbnail_identifier": data["file_url"],
         }
+
+        if thumbnail_data := self._get_thumbnail(api, post_id, data):
+            meta.update(thumbnail_data)
+
         return result, meta

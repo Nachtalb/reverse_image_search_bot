@@ -46,3 +46,4 @@ w3lib==1.22.0
 websockets==10.1
 yarl==1.7.2
 zipp==3.7.0
+random-user-agent==1.0.1
