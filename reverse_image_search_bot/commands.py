@@ -127,13 +127,19 @@ def credits_command(
 
         search_engines += "\n".join(parts) + "\n\n"
 
-    reply = (
-        (Path(__file__).parent / "texts/credits.html")
+    reply_1 = (
+        (Path(__file__).parent / "texts/credits_1.html")
         .read_text()
-        .format(data_providers="\n\n".join(data_providers), search_engines=search_engines)
+        .format(data_providers="\n\n".join(data_providers))
+    )
+    reply_2 = (
+        (Path(__file__).parent / "texts/credits_2.html")
+        .read_text()
+        .format(search_engines=search_engines)
     )
 
-    update.message.reply_html(reply, reply_to_message_id=update.message.message_id, disable_web_page_preview=True)
+    update.message.reply_html(reply_1, reply_to_message_id=update.message.message_id, disable_web_page_preview=True)
+    update.message.reply_html(reply_2, reply_to_message_id=update.message.message_id, disable_web_page_preview=True)
 
 
 def search_command(update: Update, context: CallbackContext):
