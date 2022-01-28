@@ -5,7 +5,6 @@ from .saucenao import SauceNaoEngine
 from .shutterstock import ShutterStockEngine
 from .trace import TraceEngine
 
-
 __all__ = ["engines"]
 
 engines: list[GenericRISEngine] = [
@@ -21,6 +20,14 @@ engines: list[GenericRISEngine] = [
     ),
     TraceEngine(),
     IQDBEngine(),
+    IQDBEngine(
+        "3D IQDB",
+        "https://3d.iqdb.org/?url={query_url}",
+        "3D IQDB is a reverse search engine that scrubs ImageBoards for cosplayer photos.",
+        "https://3d.iqdb.org/",
+        ["Cosplayers"],
+        ["Cosplayers"],
+    ),
     GenericRISEngine(
         "Yandex",
         "https://yandex.com/images/search?url={query_url}&rpt=imageview",
