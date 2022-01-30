@@ -98,7 +98,9 @@ class BooruProvider(BaseProvider):
 
     def supports(self, url: URL | str) -> tuple[str, int] | tuple[None, None]:
         url = URL(url)
-        api = next(filter(lambda service: self.urls[service]["check"] == url.host, self.urls))
+        api = next(filter(lambda service: self.urls[service]["check"] == url.host, self.urls), None)
+        if not api:
+            return None, None
         post_id = None
         if matcher := self.urls[api].get("id_reg"):
             if match := matcher.match(str(url)):
