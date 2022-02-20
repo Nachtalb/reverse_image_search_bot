@@ -157,22 +157,30 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
         attachment = attachment[-1]
 
     try:
-        if (
-            (isinstance(attachment, Document) and attachment.mime_type.startswith("video"))
-            or isinstance(attachment, (Video, Animation))
-            or (isinstance(attachment, Sticker) and attachment.is_video)
-        ):
-            image_url = video_to_url(attachment)  # type: ignore
-        elif (
-            isinstance(attachment, Document) and attachment.mime_type.endswith(("jpeg", "png", "webp"))
-        ) or isinstance(attachment, (PhotoSize, Sticker)):
-            if isinstance(attachment, Sticker) and attachment.is_animated:
-                wait_message.edit_text("Animated stickers are not supported.")
+        image_url = None
+        error = None
+        try:
+            if (
+                (isinstance(attachment, Document) and attachment.mime_type.startswith("video"))
+                or isinstance(attachment, (Video, Animation))
+                or (isinstance(attachment, Sticker) and attachment.is_video)
+            ):
+                image_url = video_to_url(attachment)  # type: ignore
+            elif (
+                isinstance(attachment, Document) and attachment.mime_type.endswith(("jpeg", "png", "webp"))
+            ) or isinstance(attachment, (PhotoSize, Sticker)):
+                if isinstance(attachment, Sticker) and attachment.is_animated:
+                    wait_message.edit_text("Animated stickers are not supported.")
+                    return
+                image_url = image_to_url(attachment)
+        except Exception as e:
+            error = e
+        finally:
+            if not image_url:
+                wait_message.edit_text("Format is not supported")
+                if error is not None:
+                    raise error
                 return
-            image_url = image_to_url(attachment)
-        else:
-            wait_message.edit_text("Format is not supported")
-            return
 
         lock = Lock()
         lock.acquire()
@@ -182,12 +190,6 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
             best_match(update, context, image_url, lock)
     except Exception as error:
         wait_message.edit_text("An error occurred please contact the @Nachtalb for help.")
-        try:
-            image_url  # type: ignore
-        except NameError:
-            image_url = None
-
-        error_to_admin(update, context, f"Error: {error}", image_url, attachment)  # type: ignore
         raise
     wait_message.delete()
 
