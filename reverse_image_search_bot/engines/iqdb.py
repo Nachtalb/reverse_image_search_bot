@@ -50,10 +50,15 @@ class IQDBEngine(GenericRISEngine):
 
         if not result:
             thumbnail = URL(self.url).with_path(rows[0].find("img", first=True).attrs["src"])  # type: ignore
-            reg_match = re.match(r"(\d+)×(\d+) \[(\w+)\]", rows[2].text)  # type: ignore
+            reg_match = re.match(r"(?:(\d+)×(\d+))? ?\[(\w+)\]", rows[2].text)  # type: ignore
             width, height, rating = reg_match.groups()  # type: ignore
 
-            result = {"Size": f"{width}x{height}", "Rating": rating}
+            result = {}
+            if width and height:
+                result["Size"] = f"{width}x{height}"
+            if rating:
+                result["Rating"] = rating
+
             meta.update({"thumbnail": thumbnail})
             buttons.append(url_button(link))
 
