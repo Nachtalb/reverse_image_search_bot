@@ -51,7 +51,10 @@ class PixivProvider(BaseProvider):
                     return
         data = self.api.illust_detail(illust_id)
         if data.error:
-            self.logger.warning("Could not retrieve data: {data.error.user_message}")
+            if "Error Message: invalid_grant" in data.error.message:
+                self.api.auth()  # Refresh token which dies after 1h
+                return self.request(illust_id)
+            self.logger.warning("Could not retrieve data: {data.error.user_message or data.error.message}")
             return
         return data.illust
 
@@ -69,7 +72,7 @@ class PixivProvider(BaseProvider):
         for index, image in enumerate(image_urls):
             url = image.get("large", image.get("medium"))
             if get_original:
-                url = image.get("original")
+                url = image.get("original", url)
             urls.append((url, data.id, index))
 
         with ThreadPoolExecutor(max_workers=5) as executor:
@@ -85,7 +88,7 @@ class PixivProvider(BaseProvider):
             self.api.download(url, fname=out)
             return upload_file(out, file_name=f"{post_id}_p{index}{Path(url).name}")
 
-    def provide(self, illust_id: int | str, page: int = None) -> InternalProviderData:
+    def provide(self, illust_id: int | str) -> InternalProviderData:
         if not self.authenticated:
             return {}, {}
 
@@ -99,7 +102,7 @@ class PixivProvider(BaseProvider):
 
         result = {
             emojize(":orange_circle:"): (
-                "This post contains more than 10 artworks, open the source to find your exact one"
+                "This post contains more than 10 artworks. Open the post to find your image."
                 if data.page_count > 10
                 else None
             ),

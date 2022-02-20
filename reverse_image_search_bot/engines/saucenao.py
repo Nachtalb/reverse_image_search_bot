@@ -52,7 +52,13 @@ class SauceNaoEngine(GenericRISEngine):
     def _5_provider(self, data: ResponseData) -> InternalProviderData:
         """Pixiv"""
         # __import__('ipdb').set_trace()
-        result, meta = pixiv.provide(data['pixiv_id'])  # type: ignore
+        try:
+            result, meta = pixiv.provide(data['pixiv_id'])  # type: ignore
+        except Exception as e:
+            self.logger.exception(e)
+            self.logger.warning('Error in pixiv provider')
+            result = meta = None
+
         if result and meta:
             return result, meta
         else:
