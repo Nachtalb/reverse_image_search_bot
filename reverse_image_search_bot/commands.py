@@ -9,7 +9,6 @@ from time import time
 from typing import Callable
 
 from PIL import Image
-from cleverdict import CleverDict, get_app_dir
 from emoji import emojize
 from moviepy.video.io.VideoFileClip import VideoFileClip
 from telegram import (
@@ -20,7 +19,6 @@ from telegram import (
     User,
 )
 from telegram import Animation, Document, Message, PhotoSize, Sticker, Video
-from telegram.error import BadRequest
 from telegram.ext import CallbackContext
 from telegram.parsemode import ParseMode
 from yarl import URL
@@ -129,15 +127,9 @@ def credits_command(
         search_engines += "\n".join(parts) + "\n\n"
 
     reply_1 = (
-        (Path(__file__).parent / "texts/credits_1.html")
-        .read_text()
-        .format(data_providers="\n\n".join(data_providers))
+        (Path(__file__).parent / "texts/credits_1.html").read_text().format(data_providers="\n\n".join(data_providers))
     )
-    reply_2 = (
-        (Path(__file__).parent / "texts/credits_2.html")
-        .read_text()
-        .format(search_engines=search_engines)
-    )
+    reply_2 = (Path(__file__).parent / "texts/credits_2.html").read_text().format(search_engines=search_engines)
 
     update.message.reply_html(reply_1, reply_to_message_id=update.message.message_id, disable_web_page_preview=True)
     update.message.reply_html(reply_2, reply_to_message_id=update.message.message_id, disable_web_page_preview=True)
@@ -460,7 +452,7 @@ def video_to_url(attachment: Document | Video) -> URL:
 
 def image_to_url(attachment: PhotoSize | Sticker | Document) -> URL:
     if isinstance(attachment, Document):
-        extension = attachment.file_name.lower().rsplit('.', 1)[1].strip('.')
+        extension = attachment.file_name.lower().rsplit(".", 1)[1].strip(".")
     else:
         extension = "jpg" if isinstance(attachment, PhotoSize) else "png"
 
