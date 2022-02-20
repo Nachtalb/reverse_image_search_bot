@@ -74,6 +74,10 @@ def url_icon(url: URL | str, with_icon: bool = True, with_text: bool = True, cus
             text = "Book Walker"
         case "behoimi.org":
             text = "3D Booru"
+        case "chan.sankakucomplex.com" | "c1.sankakucomplex.com" | "sankakucomplex.com":
+            text = "Sankaku Complex"
+        case "idol.sankakucomplex.com":
+            text = "Idol Sankaku Complex"
         case _:
             text = url.host.split(".")[-2].replace('_', ' ').replace('-', ' ').title()  # type: ignore
 

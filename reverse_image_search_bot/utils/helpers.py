@@ -38,10 +38,10 @@ def get_file_from_url(url: str | URL):
     return get_file(str(url).replace(UPLOADER["url"].rstrip("/") + "/", ""))
 
 
-def tagify(tags: list[str] | str) -> set[str]:
+def tagify(tags: list[str] | set[str] | str) -> set[str]:
     if not tags:
         return set()
-    tags = " ".join(map(lambda s: s.replace(" ", "_"), tags)) if isinstance(tags, list) else tags
+    tags = " ".join(map(lambda s: s.replace(" ", "_"), tags)) if isinstance(tags, (list, set)) else tags
     tags = re.sub(r"(?![_a-zA-Z0-9\s]).", "_", tags).split(" ")
     return {f"#{tag}".lower() for tag in filter(lambda t: t and not t[0].isdigit(), tags)}
 

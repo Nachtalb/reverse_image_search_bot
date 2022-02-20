@@ -8,7 +8,11 @@ from user_agent import generate_user_agent
 import validators
 from yarl import URL
 
-from reverse_image_search_bot.engines.types import InternalProviderData, MetaData
+from reverse_image_search_bot.engines.types import (
+    InternalProviderData,
+    InternalResultData,
+    MetaData,
+)
 from reverse_image_search_bot.utils import tagify, upload_file, url_button
 from reverse_image_search_bot.utils.helpers import safe_get
 
@@ -41,6 +45,12 @@ class BooruProvider(BaseProvider):
             "types": ["Cosplayers"],
             "site_type": "Imageboard",
         },
+        "sankaku": {
+            "name": "SankakuComplex",
+            "url": "https://c1.sankakucomplex.com/",
+            "types": ["Anime/Manga related Artworks"],
+            "site_type": "Imageboard",
+        },
     }
 
     urls = {
@@ -65,6 +75,11 @@ class BooruProvider(BaseProvider):
             "api_url": "http://behoimi.org/post/index.json?tags=id:{post_id}",
             "post_url": "http://behoimi.org/post/show/{post_id}",
             "download_thumbnail": True,
+        },
+        "sankaku": {
+            "check": "chan.sankakucomplex.com",
+            "api_url": "https://capi-v2.sankakucomplex.com/posts/{post_id}",
+            "post_url": "https://chan.sankakucomplex.com/post/show/{post_id}",  # beta.sankakucomplex.com seems to have different post IDs
         },
     }
 
@@ -135,6 +150,45 @@ class BooruProvider(BaseProvider):
 
         return {"thumbnail": thumbnail, "thumbnail_identifier": thumbnail_url}
 
+    def _get_tags(self, data: dict) -> InternalResultData:
+        main_tags = data.get('tag_string_general', data.get('tags', ''))
+        if isinstance(main_tags, list):
+            kinds = {
+                0: 'general',
+                1: 'artist',
+                2: 'general',  # Don't know exactly what kind of tags belong here but it seems to include loli
+                3: 'copyright',
+                4: 'character',
+                5: 'general',  # Seems to be parrent tag, eg. bdsm > (bondage, dominance, ..)
+                8: 'meta',     # Meta information about the image not it's content directly, eg. high_resolution, large_filesize etc.
+                9: 'general',  # Some kind of descriptive of the kind of action, eg. extreme content, contentious content
+
+                # Haven't seen any 6 & 7 so I can't determine what they are
+            }
+            tags = {}
+            for tag in main_tags:
+                kind = kinds.get(tag['type'])
+                if kind:
+                    tags.setdefault(kind, [])
+                    tags[kind].append(tag)
+
+            chartags = set(tags.get('character', []))
+            authortags = set(tags.get('artist', []))
+            copyrighttags = set(tags.get('copyrighttags', []))
+            main_tags = set(tags.get('general', []) + tags.get('meta', []))
+        else:
+            chartags = set(data.get('tag_string_character', '').split(' '))
+            authortags = set(data.get('tag_string_artist', '').split(' '))
+            copyrighttags = set(data.get('tag_string_copyright', '').split(' '))
+            main_tags = set(main_tags.split(' ')) - copyrighttags - authortags - chartags
+
+        return {
+            'Character': tagify(chartags) or None,
+            'Tags': tagify(random.choices(list(main_tags), k=5)) or None,
+            'By': tagify(authortags) or None,
+            'Copyright': copyrighttags or None,
+        }
+
     @provider_cache
     def provide(self, api_or_url: str | URL, post_id: int = None) -> InternalProviderData:
         if isinstance(api_or_url, URL) or validators.url(api_or_url):  # type: ignore
@@ -159,16 +213,14 @@ class BooruProvider(BaseProvider):
 
         result = {
             "Title": data.get("Title"),
-            "Character": tagify(data.get("tag_string_character", [])) or None,
+            'By': None,  # Placeholder to keep the order
             "Size": "{}x{}".format(
                 data["image_width" if api == "danbooru" else "width"],
                 data["image_height" if api == "danbooru" else "height"],
             ),
-            "Tags": tagify(random.choices(data["tag_string_general" if api == "danbooru" else "tags"].split(" "), k=5)),
-            "By": tagify(data.get("tag_string_artist", [])) or None,
-            "Copyright": data.get("tag_string_copyright", "").split(" "),
             "Rating": rating,
         }
+        result.update(self._get_tags(data))
 
         meta: MetaData = {
             "provided_via": self.infos[api]["name"],
