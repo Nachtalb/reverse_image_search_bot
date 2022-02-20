@@ -68,7 +68,7 @@ class BooruProvider(BaseProvider):
         "yandere": {
             "check": "yande.re",
             "api_url": "https://yande.re/post.json?tags=id:{post_id}",
-            "post_url": "https://yandere.com/index.php?page=post&s=view&id={post_id}",
+            "post_url": "https://yande.re/post/show/{post_id}",
         },
         "3dbooru": {
             "check": "behoimi.org",
