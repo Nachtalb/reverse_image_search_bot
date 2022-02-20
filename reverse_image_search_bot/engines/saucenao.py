@@ -1,4 +1,3 @@
-from functools import partial
 from threading import Lock
 from time import time
 from urllib.parse import quote_plus
@@ -12,7 +11,7 @@ from yarl import URL
 from reverse_image_search_bot.settings import SAUCENAO_API
 from reverse_image_search_bot.utils import tagify, url_button
 
-from .data_providers import anilist, booru, mangadex
+from .data_providers import anilist, booru, mangadex, pixiv
 from .generic import GenericRISEngine
 from .types import InternalProviderData, MetaData, ProviderData
 
@@ -52,15 +51,20 @@ class SauceNaoEngine(GenericRISEngine):
 
     def _5_provider(self, data: ResponseData) -> InternalProviderData:
         """Pixiv"""
-        return (
-            {"Title": data["title"], "Creator": data["member_name"]},
-            {
-                "buttons": [
-                    url_button(f"https://www.pixiv.net/en/artworks/{data['pixiv_id']}", text="Source"),
-                    url_button(f"https://www.pixiv.net/en/users/{data['member_id']}", text="Artist"),
-                ]
-            },
-        )
+        # __import__('ipdb').set_trace()
+        result, meta = pixiv.provide(data['pixiv_id'])  # type: ignore
+        if result and meta:
+            return result, meta
+        else:
+            return (
+                {"Title": data["title"], "Creator": data["member_name"]},
+                {
+                    "buttons": [
+                        url_button(f"https://www.pixiv.net/en/artworks/{data['pixiv_id']}", text="Source"),
+                        url_button(f"https://www.pixiv.net/en/users/{data['member_id']}", text="Artist"),
+                    ]
+                },
+            )
 
     def _37_provider(self, data: ResponseData) -> InternalProviderData:
         """Mangadex"""
@@ -179,9 +183,10 @@ class SauceNaoEngine(GenericRISEngine):
             result, new_meta = self._default_provider(data["data"])
 
         meta.update(new_meta)
+        thumbnail = meta.get('thumbnail', data['header']['thumbnail'])
         meta.update(
             {
-                "thumbnail": URL(meta.get("thumbnail", data["header"]["thumbnail"])),
+                "thumbnail": URL(thumbnail) if isinstance(thumbnail, str) else thumbnail,
                 "similarity": float(data["header"]["similarity"]),
             }
         )

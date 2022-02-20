@@ -100,7 +100,8 @@ ENV/
 # mypy
 .mypy_cache/
 
-### Animu Image Search Bot
+### Reverse Image Search Bot
 settings.py
 log/
 tmp/
+.pixiv_auth

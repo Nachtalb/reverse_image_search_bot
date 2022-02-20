@@ -11,6 +11,8 @@ from webbrowser import open as open_url
 
 import requests
 
+from reverse_image_search_bot.config import PixivConfig
+
 # Latest app version can be found using GET /v1/application-info/android
 USER_AGENT = "PixivAndroidApp/5.0.234 (Android 11; Pixel 5)"
 REDIRECT_URI = "https://app-api.pixiv.net/web/v1/users/auth/pixiv/callback"
@@ -49,6 +51,10 @@ def print_auth_token_response(response):
     print("access_token:", access_token)
     print("refresh_token:", refresh_token)
     print("expires_in:", data.get("expires_in", 0))
+
+    config = PixivConfig()
+    config.refresh_token = refresh_token
+    config.access_token = access_token
 
 
 def login():

@@ -15,7 +15,7 @@ class MetaData(TypedDict, total=False):
     errors: list[str]
     provided_via: str
     provided_via_url: URL
-    thumbnail: URL
+    thumbnail: URL | list[URL]
     similarity: int | float
     buttons: list[InlineKeyboardButton]
     identifier: str

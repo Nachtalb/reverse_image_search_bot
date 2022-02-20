@@ -18,7 +18,15 @@ from telegram import (
     Update,
     User,
 )
-from telegram import Animation, Document, Message, PhotoSize, Sticker, Video
+from telegram import (
+    Animation,
+    Document,
+    InputMediaPhoto,
+    Message,
+    PhotoSize,
+    Sticker,
+    Video,
+)
 from telegram.ext import CallbackContext
 from telegram.parsemode import ParseMode
 from yarl import URL
@@ -372,19 +380,25 @@ def _best_match_search(update: Update, context: CallbackContext, engines: list[G
                         result = {}
                         result["Duplicate search result omitted"] = ""
                     elif identifier not in identifiers and thumbnail_identifier in thumbnail_identifiers:
-                        result["Dplicate thumbnail omitted"] = ""
+                        result["Duplicate thumbnail omitted"] = ""
                         del meta["thumbnail"]
                     elif identifier in identifiers and thumbnail_identifier in thumbnail_identifiers:
                         continue
 
                     wait_for(lock)
 
-                    message.reply_html(
-                        text=build_reply(result, meta),
+                    reply, media_group = build_reply(result, meta)
+                    provider_msg = message.reply_html(
+                        reply,
                         reply_markup=InlineKeyboardMarkup(button_list),
                         reply_to_message_id=message.message_id,
-                        disable_web_page_preview="errors" in meta,
+                        disable_web_page_preview=bool(media_group) or "errors" in meta,
                     )
+                    if media_group:
+                        message.reply_media_group(
+                            media_group,  # type: ignore
+                            reply_to_message_id=provider_msg.message_id,
+                        )
                     if "errors" not in meta and result:
                         match_found = True
                     if identifier:
@@ -404,7 +418,7 @@ def _best_match_search(update: Update, context: CallbackContext, engines: list[G
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
-def build_reply(result: ResultData, meta: MetaData) -> str:
+def build_reply(result: ResultData, meta: MetaData) -> tuple[str, list[InputMediaPhoto] | None]:
     reply = f"Provided by: {a(b(meta['provider']), meta['provider_url'])}"  # type: ignore
 
     if via := meta.get("provided_via"):
@@ -416,8 +430,12 @@ def build_reply(result: ResultData, meta: MetaData) -> str:
     if similarity := meta.get("similarity"):
         reply += f" with {b(str(similarity) + '%')} similarity"
 
+    media_group = []
     if thumbnail := meta.get("thumbnail"):
-        reply = hidden_a(thumbnail) + reply
+        if isinstance(thumbnail, URL):
+            reply = hidden_a(thumbnail) + reply
+        else:
+            media_group = [InputMediaPhoto(str(url), filename=Path(str(url)).name) for url in thumbnail]
 
     reply += "\n\n"
 
@@ -435,7 +453,10 @@ def build_reply(result: ResultData, meta: MetaData) -> str:
         for error in errors:
             reply += error
 
-    return reply
+    if media_group:
+        return reply, media_group
+
+    return reply, None
 
 
 def video_to_url(attachment: Document | Video | Sticker) -> URL:
