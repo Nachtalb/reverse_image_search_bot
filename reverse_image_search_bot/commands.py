@@ -157,9 +157,15 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
         attachment = attachment[-1]
 
     try:
-        if (isinstance(attachment, Document) and attachment.mime_type.startswith('video')) or isinstance(attachment, (Video, Animation)):
+        if (
+            (isinstance(attachment, Document) and attachment.mime_type.startswith("video"))
+            or isinstance(attachment, (Video, Animation))
+            or (isinstance(attachment, Sticker) and attachment.is_video)
+        ):
             image_url = video_to_url(attachment)  # type: ignore
-        elif (isinstance(attachment, Document) and attachment.mime_type.endswith(('jpeg', 'png', 'webp'))) or isinstance(attachment, (PhotoSize, Sticker)):
+        elif (
+            isinstance(attachment, Document) and attachment.mime_type.endswith(("jpeg", "png", "webp"))
+        ) or isinstance(attachment, (PhotoSize, Sticker)):
             if isinstance(attachment, Sticker) and attachment.is_animated:
                 wait_message.edit_text("Animated stickers are not supported.")
                 return
@@ -430,7 +436,7 @@ def build_reply(result: ResultData, meta: MetaData) -> str:
     return reply
 
 
-def video_to_url(attachment: Document | Video) -> URL:
+def video_to_url(attachment: Document | Video | Sticker) -> URL:
     filename = f"{attachment.file_unique_id}.jpg"
     if uploader.file_exists(filename):
         return uploader.get_url(filename)
