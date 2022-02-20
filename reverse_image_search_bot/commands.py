@@ -59,6 +59,7 @@ def auto_search_command(update: Update, _: CallbackContext):
         update.message.reply_html("You have disabled auto search")
     else:
         config.auto_search_enabled = True
+        config.failures_in_a_row = 0
         update.message.reply_text("You have enabled auto search")
 
 
