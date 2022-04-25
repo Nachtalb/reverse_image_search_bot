@@ -20,9 +20,9 @@ lxml==4.7.1
 moviepy==1.0.3
 multidict==5.2.0
 numpy==1.22.0
-paramiko==2.9.2
+paramiko==2.10.3
 parse==1.19.0
-Pillow==9.0.0
+Pillow==9.1.0
 proglog==0.1.9
 pycparser==2.21
 pyee==8.2.2
@@ -32,6 +32,7 @@ pyquery==1.4.3
 python-telegram-bot==13.10
 pytz==2021.3
 pytz-deprecation-shim==0.1.0.post0
+random-user-agent==1.0.1
 requests==2.27.1
 requests-html==0.10.0
 six==1.16.0
@@ -46,4 +47,3 @@ w3lib==1.22.0
 websockets==10.1
 yarl==1.7.2
 zipp==3.7.0
-random-user-agent==1.0.1
