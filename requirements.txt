@@ -19,10 +19,10 @@ importlib-metadata==4.10.0
 lxml==4.7.1
 moviepy==1.0.3
 multidict==5.2.0
-numpy==1.22.0
+numpy==1.23.0
 paramiko==2.10.3
 parse==1.19.0
-Pillow==9.1.0
+Pillow==9.2.0
 proglog==0.1.9
 pycparser==2.21
 pyee==8.2.2
@@ -41,7 +41,7 @@ tornado==6.1
 tqdm==4.62.3
 tzdata==2021.5
 tzlocal==4.1
-urllib3==1.26.8
+urllib3==1.26.9
 validators==0.18.2
 w3lib==1.22.0
 websockets==10.1
