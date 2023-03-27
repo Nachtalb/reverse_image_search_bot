@@ -1,38 +1,26 @@
-[tool.black]
-line-length = 120
-target-version = ['py310']
-experimental-string-processing = true
-
 [tool.poetry]
-name = "reverse-image-search-bot"
-version = "1.0.0"
-description = "Discover https://t.me/reverse_image_search_bot, a convenient Telegram bot that delivers instant reverse image search engine links and in-app results upon receiving media, simplifying your quest for related images, sources, and additional information."
+name = "reverse-image-search"
+version = "2.0.0"
+description = "A Telegram bot that provides direct reverse image search links for various engines like Google, Yandex, SauceNAO, IQDB, and more. Send an image, sticker or video/gif, and get search results from multiple platforms. Supports auto search and offers various tips for better search results."
 authors = ["Nachtalb <na@nachtalb.io>"]
 license = "LGPL-3.0"
 readme = "README.md"
-packages = [{include = "reverse_image_search_bot"}]
+packages = [{include = "reverse_image_search"}]
 
 [tool.poetry.dependencies]
-python = "^3.11"
-python-magic = "0.4.24"
-validators = "0.18.2"
-python-telegram-bot = {version = "13.11", extras = ["json", "socks"]}
-gppt = "1.6"
-cleverdict = "1.9.1"
-paramiko = {version = "2.9.2", extras = ["all"]}
-pixiv-api = "1.0.0"
-moviepy = "1.0.3"
-pyopenssl = "21.0.0"
-emoji = "^2.2.0"
-user-agent = "^0.1.10"
-requests-html = "^0.10.0"
-yarl = "^1.8.2"
+python = "^3.11, <3.12.0"
+bot-manager = {git = "https://github.com/Nachtalb/bot_manager.git", rev = "master"}
 
 
 [tool.poetry.group.dev.dependencies]
 ipdb = "^0.13.13"
-ipython = {extras = ["black"], version = "^8.12.0"}
+ipython = {extras = ["black"], version = "^8.11.0"}
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 120
+target-version = ['py311']
+preview = true
