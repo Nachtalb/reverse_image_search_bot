@@ -10,6 +10,8 @@ packages = [{include = "reverse_image_search"}]
 [tool.poetry.dependencies]
 python = "^3.11, <3.12.0"
 bot-manager = {git = "https://github.com/Nachtalb/bot_manager.git", rev = "master"}
+aiohttp = {extras = ["speedups"], version = "^3.8.4"}
+pillow = "^9.4.0"
 
 
 [tool.poetry.group.dev.dependencies]

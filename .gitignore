@@ -209,9 +209,3 @@ tags
 [._]*.un~
 
 # End of https://www.toptal.com/developers/gitignore/api/python,vim,linux
-
-### Reverse Image Search Bot
-settings.py
-log/
-tmp/
-.pixiv_auth
