@@ -23,7 +23,11 @@ class ReverseImageSearch(Application):
         await super().on_initialize()
         self.application.add_handler(CommandHandler("start", self.cmd_start))
         self.application.add_handler(
-            MessageHandler((filters.PHOTO | filters.Document.JPG) & filters.ChatType.PRIVATE, self.hndl_image)
+            MessageHandler(
+                (filters.PHOTO | filters.Document.Category("image/") | filters.Sticker.STATIC)
+                & filters.ChatType.PRIVATE,
+                self.hndl_image,
+            )
         )
 
         self.session = ClientSession()
@@ -39,7 +43,7 @@ class ReverseImageSearch(Application):
         if (
             not update.message
             or not update.effective_chat
-            or (not update.message.photo and not update.message.document)
+            or (not update.message.photo and not update.message.document and not update.message.sticker)
         ):
             return
 
@@ -48,9 +52,9 @@ class ReverseImageSearch(Application):
             await update.message.reply_text("File not supported")
             return
 
-        get_file = create_task(
-            update.message.photo[-1].get_file() if update.message.photo else update.message.document.get_file()
-        )
+        tg_file = update.message.document or update.message.sticker or update.message.photo[-1]
+        get_file = create_task(tg_file.get_file())
+
         message = await update.message.reply_text("Working on it...")
 
         result_message: Message | None = None
