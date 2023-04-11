@@ -11,7 +11,7 @@ engines: list[GenericRISEngine] = [
     SauceNaoEngine(),
     GenericRISEngine(
         "Google",
-        "https://www.google.com/searchbyimage?safe=off&image_url={query_url}",
+        "https://www.google.com/searchbyimage?safe=off&sbisrc=tg&image_url={query_url}",
         "Google LLC is an American multinational technology company that specializes in Internet-related services and"
         " products.",
         "https://google.com/",
