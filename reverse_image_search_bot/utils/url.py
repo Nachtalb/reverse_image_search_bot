@@ -87,7 +87,7 @@ def url_icon(url: URL | str, with_icon: bool = True, with_text: bool = True, cus
         text = ""
     if not with_icon:
         icon = ""
-    return emojize(f"{icon} {text}", use_aliases=True)
+    return emojize(f"{icon} {text}", language="alias")
 
 
 def url_button(
