@@ -1,44 +1,41 @@
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import BinaryIO
-
-from aiohttp import ClientSession
-from telegram import InlineKeyboardButton
-from telegram.ext import filters
-from yarl import URL
+from abc import ABCMeta, abstractmethod
 
 
-@dataclass
-class SearchResponse:
-    engine: "SearchEngine"
-    text: str
-    buttons: list[InlineKeyboardButton] = field(default_factory=list)
-    attachment: BinaryIO | None = None
-    attachment_type: filters._Photo | filters._Video | None = None
-    link: str | None = None
+class SearchEngine(metaclass=ABCMeta):
+    """
+    Abstract base class for search engine implementations.
 
+    Attributes:
+        name (str): The name of the search engine.
+        description (str): A brief description of the search engine.
+        pros (list[str]): A list of the search engine's advantages.
+        cons (list[str]): A list of the search engine's disadvantages.
+        credit_url (str): The URL to the search engine's website.
+        query_url_template (str): The template for generating search URLs.
+    """
 
-class SearchEngine:
-    supports: filters.BaseFilter = filters.PHOTO
-    name: str = "Search"
-    description: str = "This is the base search engine"
-    credits: str = "https://example.com"
+    name: str
+    description: str
+    pros: list[str]
+    cons: list[str]
+    credit_url: str
+    query_url_template: str
 
-    needs_webserver: bool = True  # Determines if the engine needs a webserver with public facing files
-    supports_direct_search: bool = False  # If the engine can search for results on its own
+    @abstractmethod
+    def __init__(self):
+        if not all(
+            hasattr(self, attr) for attr in ("name", "description", "pros", "cons", "credit_url", "query_url_template")
+        ):
+            raise NotImplementedError("All required attributes must be provided by the subclass.")
 
-    def __init__(self, session: ClientSession, credentials: dict[str, str] = {}) -> None:
-        self.session = session
-        self.credentials = credentials or {}
+    def generate_search_url(self, file_url: str) -> str:
+        """
+        Generate a search URL for the given file URL.
 
-    async def search_photo(self, file: Path | URL) -> SearchResponse | None:
-        raise NotImplemented
+        Args:
+            file_url (str): The URL of the file to be searched.
 
-    async def search_video(self, file: Path | URL) -> SearchResponse | None:
-        raise NotImplemented
-
-    async def direct_search_photo(self, file: Path | URL) -> SearchResponse | None:
-        raise NotImplemented
-
-    async def direct_search_video(self, file: Path | URL) -> SearchResponse | None:
-        raise NotImplemented
+        Returns:
+            str: The search URL generated using the query_url_template.
+        """
+        return self.query_url_template.format(file_url=file_url)

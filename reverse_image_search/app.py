@@ -1,37 +1,39 @@
-from asyncio import as_completed, create_task
 from pathlib import Path
-from tempfile import NamedTemporaryFile, _TemporaryFileWrapper
 
-from aiohttp import ClientSession
 from bots import Application
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Message, Update
-from telegram.constants import ParseMode
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CommandHandler, ContextTypes, MessageHandler, filters
+from yarl import URL
 
 from reverse_image_search.engines import engines
-from reverse_image_search.engines.base import SearchEngine, SearchResponse
-from reverse_image_search.utils import chunks
+from reverse_image_search.utils import chunks, download_file
 
 
 class ReverseImageSearch(Application):
     class Arguments(Application.Arguments):
-        pass
+        downloads: Path
+        file_url: str
 
     arguments: "ReverseImageSearch.Arguments"
 
     async def on_initialize(self):
         await super().on_initialize()
+        self.arguments.downloads.mkdir(exist_ok=True, parents=True)
+
         self.application.add_handler(CommandHandler("start", self.cmd_start))
         self.application.add_handler(
             MessageHandler(
-                (filters.PHOTO | filters.Document.Category("image/") | filters.Sticker.STATIC)
-                & filters.ChatType.PRIVATE,
-                self.hndl_image,
+                filters.PHOTO
+                | filters.Sticker.STATIC
+                | filters.Sticker.VIDEO
+                | filters.Document.VIDEO
+                | filters.Document.IMAGE
+                | filters.ANIMATION,
+                self.hndl_search,
             )
         )
 
-        self.session = ClientSession()
-        self.engines = [engine(self.session) for engine in engines]
+        self.engines = engines
 
     async def cmd_start(self, update: Update, _: ContextTypes.DEFAULT_TYPE):
         if not update.message:
@@ -39,70 +41,34 @@ class ReverseImageSearch(Application):
 
         await update.message.reply_text("Hello")
 
-    async def hndl_image(self, update: Update, _: ContextTypes.DEFAULT_TYPE):
+    async def hndl_search(self, update: Update, _: ContextTypes.DEFAULT_TYPE):
+        # Basically only for nice symbols / please the linter
         if (
             not update.message
             or not update.effective_chat
-            or (not update.message.photo and not update.message.document and not update.message.sticker)
+            or (
+                not update.message.photo
+                and not update.message.document
+                and not update.message.sticker
+                and not update.message.animation
+            )
         ):
             return
 
-        applicable_engines = self._get_applicable_engines(update)
-        if not applicable_engines:
-            await update.message.reply_text("File not supported")
+        file = await download_file(update, self.arguments.downloads)
+        if not file:
+            await update.message.reply_text("Something went wrong, try again or contact the bot author (/help)")
             return
 
-        tg_file = update.message.document or update.message.sticker or update.message.photo[-1]
-        get_file = create_task(tg_file.get_file())
+        file_url = self.arguments.file_url + file.name
 
-        message = await update.message.reply_text("Working on it...")
+        buttons = [
+            InlineKeyboardButton(engine.name, engine.generate_search_url(str(file_url))) for engine in self.engines
+        ]
+        buttons = list(chunks(buttons, 3))
 
-        result_message: Message | None = None
-        with NamedTemporaryFile() as file:
-            await (await get_file).download_to_drive(file.name)
-
-            async for response in self._engine_map(applicable_engines, "direct_search_photo", Path(file.name)):
-                result_message = await self._send_response(message, response)
-
-        if not result_message:
-            await message.edit_text("Nothing found")
-        else:
-            await message.delete()
-
-    async def _send_response(self, message: Message, response: SearchResponse) -> Message | None:
-        buttons = response.buttons
-        if response.link:
-            buttons.append(InlineKeyboardButton(text="More", url=response.link))
-
-        text = f"{response.engine.name} Search Engine: \n\n{response.text}"
-
-        inline_markup = InlineKeyboardMarkup(list(chunks(buttons, 3)))
-
-        if response.attachment:
-            match response.attachment_type:
-                case filters._Photo():
-                    return await message.reply_photo(
-                        response.attachment,
-                        caption=text,
-                        reply_markup=inline_markup,
-                        parse_mode=ParseMode.MARKDOWN_V2,
-                    )
-                case filters._Video():
-                    return await message.reply_video(
-                        response.attachment,
-                        caption=text,
-                        reply_markup=inline_markup,
-                        parse_mode=ParseMode.MARKDOWN_V2,
-                    )
-        else:
-            return await message.reply_markdown_v2(text, reply_markup=inline_markup)
-
-    async def _engine_map(self, engines: list[SearchEngine], method: str, file: Path):
-        methods = filter(None, [getattr(engine, method) for engine in engines])
-
-        for task in as_completed([method(file) for method in methods]):
-            if response := await task:
-                yield response
-
-    def _get_applicable_engines(self, update: Update) -> list[SearchEngine]:
-        return [engine for engine in self.engines if engine.supports.check_update(update)]
+        await update.message.reply_text(
+            "Use one of the buttons to open the search engine.",
+            reply_markup=InlineKeyboardMarkup(buttons),
+            reply_to_message_id=update.message.id,
+        )
