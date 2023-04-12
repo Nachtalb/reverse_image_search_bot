@@ -41,22 +41,31 @@ async def download_file(update: Update, downloads_dir: Path) -> Path | None:
     Returns:
         A pathlib.Path object representing the path to the downloaded file (or the first frame image if the file is a video), or None if the update message is empty.
     """
-    if not update.message:
+    msg = update.message
+    if not msg:
         return
 
-    unloaded_tg_file = update.message.document or update.message.sticker or update.message.photo[-1]
+    unloaded_tg_file = msg.document or msg.video or msg.sticker or msg.photo[-1]
     loaded_tg_file = await unloaded_tg_file.get_file()
+
     suffix = Path(loaded_tg_file.file_path).suffix  # pyright: ignore[reportGeneralTypeIssues]
     file_location = downloads_dir / (create_short_hash(unloaded_tg_file.file_unique_id) + suffix)
+    image_location = file_location.with_stem(".jpg")
+
+    if file_location.is_file():
+        return file_location
+    elif image_location.is_file():
+        return image_location
 
     await loaded_tg_file.download_to_drive(file_location)
 
-    if update.message.video or update.message.animation or (update.message.sticker and update.message.sticker.is_video):
+    if msg.video or msg.animation or (msg.sticker and msg.sticker.is_video):
         # Extract the first frame of the video as an image
         video_reader = imageio.get_reader(file_location, "ffmpeg")  # pyright: ignore[reportGeneralTypeIssues]
         first_frame = video_reader.get_data(0)
         image_location = downloads_dir / (create_short_hash(unloaded_tg_file.file_unique_id) + ".jpg")
         imageio.imwrite(image_location, first_frame)
+        file_location.unlink()
         return image_location
     else:
         return file_location

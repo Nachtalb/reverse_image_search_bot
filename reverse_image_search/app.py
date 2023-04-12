@@ -26,6 +26,7 @@ class ReverseImageSearch(Application):
                 filters.PHOTO
                 | filters.Sticker.STATIC
                 | filters.Sticker.VIDEO
+                | filters.VIDEO
                 | filters.Document.VIDEO
                 | filters.Document.IMAGE
                 | filters.ANIMATION,
@@ -48,6 +49,7 @@ class ReverseImageSearch(Application):
             or not update.effective_chat
             or (
                 not update.message.photo
+                and not update.message.video
                 and not update.message.document
                 and not update.message.sticker
                 and not update.message.animation
