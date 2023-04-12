@@ -2,6 +2,7 @@ import hashlib
 from pathlib import Path
 from typing import Generator, Sequence, TypeVar
 
+import imageio
 from telegram import Update
 
 T = TypeVar("T")
@@ -29,15 +30,16 @@ def create_short_hash(text: str) -> str:
 
 
 async def download_file(update: Update, downloads_dir: Path) -> Path | None:
-    """Downloads a file from a Telegram update to a specified location with a filename that includes a hash of the file ID.
+    """
+    Downloads a file from a Telegram update to a specified location with a filename that includes a hash of the file ID.
+    If the downloaded file is a video, it extracts the first frame as an image.
 
     Args:
         update: A Telegram update object that contains the file to be downloaded.
         downloads_dir: A pathlib.Path object representing the directory where the downloaded file will be saved.
 
     Returns:
-        A pathlib.Path object representing the path to the downloaded file.
-
+        A pathlib.Path object representing the path to the downloaded file (or the first frame image if the file is a video), or None if the update message is empty.
     """
     if not update.message:
         return
@@ -48,4 +50,13 @@ async def download_file(update: Update, downloads_dir: Path) -> Path | None:
     file_location = downloads_dir / (create_short_hash(unloaded_tg_file.file_unique_id) + suffix)
 
     await loaded_tg_file.download_to_drive(file_location)
-    return file_location
+
+    if update.message.video or update.message.animation or (update.message.sticker and update.message.sticker.is_video):
+        # Extract the first frame of the video as an image
+        video_reader = imageio.get_reader(file_location, "ffmpeg")  # pyright: ignore[reportGeneralTypeIssues]
+        first_frame = video_reader.get_data(0)
+        image_location = downloads_dir / (create_short_hash(unloaded_tg_file.file_unique_id) + ".jpg")
+        imageio.imwrite(image_location, first_frame)
+        return image_location
+    else:
+        return file_location
