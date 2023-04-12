@@ -9,7 +9,11 @@ class SauceNaoSearchEngine(SearchEngine):
     """
 
     name = "SauceNAO"
-    description = "SauceNAO reverse image search"
+    description = (
+        "SauceNAO is a reverse image search engine specializing in finding the source of anime, manga, and similar"
+        " artwork. It has a large database and can provide accurate results for identifying the artists, sources, and"
+        " related information for the images."
+    )
     pros = ["Anime and manga focused", "Fast results"]
     cons = ["Limited to specific sources"]
     credit_url = "https://saucenao.com"
