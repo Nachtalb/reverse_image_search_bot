@@ -1,4 +1,7 @@
 from abc import ABCMeta, abstractmethod
+from typing import AsyncGenerator
+
+from reverse_image_search.providers.base import MessageConstruct
 
 
 class SearchEngine(metaclass=ABCMeta):
@@ -39,3 +42,6 @@ class SearchEngine(metaclass=ABCMeta):
             str: The search URL generated using the query_url_template.
         """
         return self.query_url_template.format(file_url=file_url)
+
+    async def search(self, file_url: str) -> AsyncGenerator[MessageConstruct | None, None]:
+        yield

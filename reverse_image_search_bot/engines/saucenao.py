@@ -3,6 +3,7 @@ from time import time
 from urllib.parse import quote_plus
 
 from cachetools import cached
+from pydantic import BaseModel
 from requests import Session
 from telegram import InlineKeyboardButton
 import validators
@@ -33,6 +34,9 @@ class SauceNaoEngine(GenericRISEngine):
 
     ResponseData = dict[str, str | int | list[str]]
 
+    class Config(BaseModel):
+        api_key: str
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.session = Session()
@@ -53,10 +57,10 @@ class SauceNaoEngine(GenericRISEngine):
         """Pixiv"""
         # __import__('ipdb').set_trace()
         try:
-            result, meta = pixiv.provide(data['pixiv_id'])  # type: ignore
+            result, meta = pixiv.provide(data["pixiv_id"])  # type: ignore
         except Exception as e:
             self.logger.exception(e)
-            self.logger.warning('Error in pixiv provider')
+            self.logger.warning("Error in pixiv provider")
             result = meta = None
 
         if result and meta:
@@ -189,7 +193,7 @@ class SauceNaoEngine(GenericRISEngine):
             result, new_meta = self._default_provider(data["data"])
 
         meta.update(new_meta)
-        thumbnail = meta.get('thumbnail', data['header']['thumbnail'])
+        thumbnail = meta.get("thumbnail", data["header"]["thumbnail"])
         meta.update(
             {
                 "thumbnail": URL(thumbnail) if isinstance(thumbnail, str) else thumbnail,
