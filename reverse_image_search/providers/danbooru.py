@@ -1,4 +1,3 @@
-from random import choices
 from typing import Any
 
 from aiohttp import ClientSession
@@ -6,7 +5,7 @@ from emoji import emojize
 from pydantic import BaseModel
 from tgtools.api.danbooru import DanbooruApi
 from tgtools.models.danbooru import RATING
-from tgtools.telegram.text import tagify
+from tgtools.telegram.text import tagified_string
 from yarl import URL
 
 from .base import Info, MessageConstruct, Provider
@@ -31,10 +30,10 @@ class DanbooruProvider(Provider):
 
         text: dict[str, str | Info] = {
             "Rating": "",
-            "Artist": ", ".join(tagify(post.tags_artist)),
-            "Tags": ", ".join(tagify(choices(list(post.tags), k=10))),
-            "Characters": ", ".join(tagify(post.tags_character)),
-            "Copyright": ", ".join(tagify(post.tags_copyright)),
+            "Artist": tagified_string(post.tags_artist),
+            "Tags": tagified_string(post.tags, 10),
+            "Characters": tagified_string(post.tags_character),
+            "Copyright": tagified_string(post.tags_copyright),
         }
         if post.rating:
             rating_emoji = emojize(":no_one_under_eighteen:" if RATING.level(post.rating) > 1 else ":cherry_blossom:")
