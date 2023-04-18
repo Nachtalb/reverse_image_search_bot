@@ -22,9 +22,10 @@ class DanbooruProvider(Provider):
         self.api = DanbooruApi(session, username, api_key)
 
     async def provide(self, data: dict[str, Any]) -> MessageConstruct | None:
-        if "id" not in data:
+        id_ = data.get("danbooru_id")
+        if not id_:
             return
-        post = await self.api.post(data["id"])
+        post = await self.api.post(id_)
         if not post:
             return
 

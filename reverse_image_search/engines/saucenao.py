@@ -1,10 +1,10 @@
-from asyncio import as_completed
-from typing import AsyncGenerator, Callable, Coroutine
+from asyncio import Lock, as_completed
+from typing import AsyncGenerator, Coroutine
 
-from aiohttp import ClientSession, ContentTypeError
+from aiohttp import ClientSession
 from pydantic import BaseModel
 
-from reverse_image_search.providers.base import Provider, MessageConstruct
+from reverse_image_search.providers.base import MessageConstruct, Provider
 
 from .base import SearchEngine
 
@@ -57,6 +57,7 @@ class SauceNaoSearchEngine(SearchEngine):
         self.api_key = api_key
         self.session = session
         self.providers = providers
+        self.provider_lock = Lock()
 
     async def _api_search(self, file_url: str) -> dict:
         """
@@ -97,12 +98,11 @@ class SauceNaoSearchEngine(SearchEngine):
             result
             for result in results.get("results", [])
             if float(result["header"]["similarity"]) >= self.min_similarity
+            and result["header"]["index_id"] in self.provider_mapping
         ]
 
         tasks: list[Coroutine[MessageConstruct | None, None, None]] = [
-            getattr(self, self.provider_mapping[result["header"]["index_id"]])(result)
-            for result in filtered_results
-            if result["header"]["index_id"] in self.provider_mapping
+            getattr(self, self.provider_mapping[result["header"]["index_id"]])(result) for result in filtered_results
         ]
 
         for task in as_completed(tasks):
@@ -110,8 +110,5 @@ class SauceNaoSearchEngine(SearchEngine):
                 yield msg
 
     async def _booru(self, data: dict[str, dict[str, str | int | list[str]]]) -> MessageConstruct | None:
-        id_ = data["data"].get("danbooru_id")
-        if not id_:
-            return
-
-        return await self.providers["danbooru"].provide({"id": id_})
+        if danbooru_id := data["data"].get("danbooru_id"):
+            return await self._safe_search({"danbooru_id": danbooru_id}, "danbooru")
