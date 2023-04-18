@@ -7,6 +7,7 @@ from telegram import Document, InlineKeyboardButton, InlineKeyboardMarkup, Messa
 from telegram.constants import ParseMode
 from telegram.ext import CommandHandler, ContextTypes, MessageHandler, filters
 from tgtools.models.file_summary import FileSummary, URLFileSummary
+from tgtools.telegram.compatibility import make_tg_compatible
 from tgtools.telegram.text import host_emoji, host_name
 
 from reverse_image_search.engines import initiate_engines
@@ -106,35 +107,39 @@ class ReverseImageSearch(Application):
 
         text = message.caption
 
+        summary = type_ = None
         if message.file:
-            if isinstance(message.file, URLFileSummary) and message.type in [PhotoSize, Video]:
-                text += f'\n<a href="{message.file.url}">{ZWS}</a>'
-                message.type = None
+            summary, type_ = await make_tg_compatible(message.file)
 
-            file = message.file.file if isinstance(message.file, FileSummary) else message.file.url
+        if summary:
+            if isinstance(summary, URLFileSummary) and type_ in [PhotoSize, Video]:
+                text += f'\n<a href="{summary.url}">{ZWS}</a>'
+                type_ = None
 
-            if message.type == PhotoSize:
+            file = summary.file if isinstance(summary, FileSummary) else summary.url
+
+            if type_ == PhotoSize:
                 return await query_message.reply_photo(
                     file,
                     caption=text,
                     reply_markup=buttons,
-                    filename=str(message.file.file_name),
+                    filename=str(summary.file_name),
                     parse_mode=ParseMode.HTML,
                 )
-            elif message.type == Video:
+            elif type_ == Video:
                 return await query_message.reply_video(
                     file,
                     caption=text,
                     reply_markup=buttons,
-                    filename=str(message.file.file_name),
+                    filename=str(summary.file_name),
                     parse_mode=ParseMode.HTML,
                 )
-            elif message.type == Document:
+            elif type_ == Document:
                 return await query_message.reply_document(
                     file,
                     caption=text,
                     reply_markup=buttons,
-                    filename=str(message.file.file_name),
+                    filename=str(summary.file_name),
                     parse_mode=ParseMode.HTML,
                 )
         await query_message.reply_html(text, reply_markup=buttons)

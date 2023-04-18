@@ -1,8 +1,7 @@
 from abc import ABCMeta, abstractmethod
-from typing import Any, Literal, Type
+from typing import Any, Literal
 from dataclasses import dataclass
 
-from telegram import Document, PhotoSize, Video
 from tgtools.telegram.compatibility.base import MediaSummary
 
 
@@ -31,7 +30,6 @@ class Info:
 
 @dataclass
 class MessageConstruct:
-    type: Type[Document] | Type[Video] | Type[PhotoSize] | None
     source_url: str
     additional_urls: list[str]
     text: dict[str, str | Info | None]
