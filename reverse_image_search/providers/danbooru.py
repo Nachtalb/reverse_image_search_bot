@@ -11,7 +11,7 @@ from tgtools.telegram.compatibility import make_tg_compatible
 from tgtools.telegram.text import tagify
 from yarl import URL
 
-from .base import MessageConstruct, Provider
+from .base import Info, MessageConstruct, Provider
 
 
 class DanbooruProvider(Provider):
@@ -31,18 +31,16 @@ class DanbooruProvider(Provider):
         if not post:
             return
 
-        caption = ""
+        text: dict[str, str | Info] = {
+            "Rating": "",
+            "Artist": ", ".join(tagify(post.tags_artist)),
+            "Tags": ", ".join(tagify(choices(list(post.tags), k=10))),
+            "Characters": ", ".join(tagify(post.tags_character)),
+            "Copyright": ", ".join(tagify(post.tags_copyright)),
+        }
         if post.rating:
             rating_emoji = emojize(":no_one_under_eighteen:" if RATING.level(post.rating) > 1 else ":cherry_blossom:")
-            caption += f"Rating: {rating_emoji} <code>{post.rating_simple}</code>\n"
-        if post.tags_artist:
-            caption += f"Artist: {', '.join(tagify(post.tags_artist))}\n"
-        if post.tags:
-            caption += f"Tags: {', '.join(tagify(choices(list(post.tags), k=10)))}\n"
-        if post.tags_character:
-            caption += f"Characters: {', '.join(tagify(post.tags_character))}\n"
-        if post.tags_copyright:
-            caption += f"Copyright: {', '.join(tagify(post.tags_copyright))}"
+            text["Rating"] = Info(f"{rating_emoji} {post.rating_simple}", "code")
 
         summary, as_document = await make_tg_compatible(post.file_summary)
 
@@ -54,8 +52,8 @@ class DanbooruProvider(Provider):
 
         return MessageConstruct(
             type=type_,
-            caption=caption,
             source_url=source or post.url,
             additional_urls=[] if not post.source else [post.url],
             file=summary,
+            text=text,
         )

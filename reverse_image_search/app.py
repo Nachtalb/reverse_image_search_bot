@@ -104,11 +104,11 @@ class ReverseImageSearch(Application):
 
         buttons = InlineKeyboardMarkup(tuple(chunks(buttons, 3)))
 
-        __import__("ipdb").set_trace()
+        text = message.caption
 
         if message.file:
             if isinstance(message.file, URLFileSummary) and message.type in [PhotoSize, Video]:
-                message.caption += f'\n<a href="{message.file.url}">{ZWS}</a>'
+                text += f'\n<a href="{message.file.url}">{ZWS}</a>'
                 message.type = None
 
             file = message.file.file if isinstance(message.file, FileSummary) else message.file.url
@@ -116,7 +116,7 @@ class ReverseImageSearch(Application):
             if message.type == PhotoSize:
                 return await query_message.reply_photo(
                     file,
-                    caption=message.caption,
+                    caption=text,
                     reply_markup=buttons,
                     filename=str(message.file.file_name),
                     parse_mode=ParseMode.HTML,
@@ -124,7 +124,7 @@ class ReverseImageSearch(Application):
             elif message.type == Video:
                 return await query_message.reply_video(
                     file,
-                    caption=message.caption,
+                    caption=text,
                     reply_markup=buttons,
                     filename=str(message.file.file_name),
                     parse_mode=ParseMode.HTML,
@@ -132,9 +132,9 @@ class ReverseImageSearch(Application):
             elif message.type == Document:
                 return await query_message.reply_document(
                     file,
-                    caption=message.caption,
+                    caption=text,
                     reply_markup=buttons,
                     filename=str(message.file.file_name),
                     parse_mode=ParseMode.HTML,
                 )
-        await query_message.reply_html(message.caption, reply_markup=buttons)
+        await query_message.reply_html(text, reply_markup=buttons)
