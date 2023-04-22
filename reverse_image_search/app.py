@@ -111,10 +111,6 @@ class ReverseImageSearch(Application):
             summary, type_ = await make_tg_compatible(message.file)
 
         if summary:
-            if isinstance(summary, URLFileSummary) and type_ in [PhotoSize, Video]:
-                text += f'\n<a href="{summary.url}">{ZWS}</a>'
-                type_ = None
-
             file = summary.file if isinstance(summary, FileSummary) else summary.url
 
             if type_ == PhotoSize:
