@@ -8,12 +8,12 @@ from telegram.constants import ParseMode
 from telegram.ext import CommandHandler, ContextTypes, MessageHandler, filters
 from tgtools.models.file_summary import FileSummary
 from tgtools.telegram.compatibility import make_tg_compatible
-from tgtools.utils.urls.emoji import host_emoji, host_name
+from tgtools.utils.urls.emoji import host_name
 
 from reverse_image_search.engines import initiate_engines
 from reverse_image_search.engines.saucenao import SauceNaoSearchEngine
 from reverse_image_search.providers import initiate_data_providers
-from reverse_image_search.providers.base import MessageConstruct
+from reverse_image_search.providers.base import SearchResult
 from reverse_image_search.providers.booru import BooruProvider
 from reverse_image_search.utils import chunks, download_file
 
@@ -93,23 +93,25 @@ class ReverseImageSearch(Application):
 
         inline_search_results = stream.merge(*[engine.search(file_url) for engine in self.engines])
         async with inline_search_results.stream() as streamer:
-            async for item in streamer:
-                if not item:
+            async for result in streamer:
+                if not result or result.message is None:
                     continue
-                await self.send_message_construct(item, update.message)
+                await self.send_message_construct(result, update.message)
 
-    async def send_message_construct(self, message: MessageConstruct, query_message: Message):
-        buttons = [InlineKeyboardButton(f"{host_emoji(message.source_url)} Source", message.source_url)]
-        for url in message.additional_urls:
+    async def send_message_construct(self, result: SearchResult, query_message: Message):
+        buttons = [
+            InlineKeyboardButton(host_name(result.message.provider_url, with_emoji=True), result.message.provider_url)
+        ]
+        for url in result.message.additional_urls:
             buttons.append(InlineKeyboardButton(host_name(url, with_emoji=True), url=url))
 
         buttons = InlineKeyboardMarkup(tuple(chunks(buttons, 3)))
 
-        text = message.caption
+        text = result.caption
 
         summary = type_ = None
-        if message.file:
-            summary, type_ = await make_tg_compatible(message.file)
+        if result.message.file:
+            summary, type_ = await make_tg_compatible(result.message.file)
 
         if summary:
             if isinstance(summary, FileSummary):

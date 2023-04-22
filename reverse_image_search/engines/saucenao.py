@@ -4,7 +4,7 @@ from typing import AsyncGenerator, Coroutine
 from aiohttp import ClientSession
 from pydantic import BaseModel
 
-from reverse_image_search.providers.base import MessageConstruct, Provider
+from reverse_image_search.providers.base import MessageConstruct, Provider, SearchResult
 
 from .base import SearchEngine
 
@@ -91,7 +91,7 @@ class SauceNaoSearchEngine(SearchEngine):
         ) as response:
             return await response.json()
 
-    async def search(self, file_url: str) -> AsyncGenerator[MessageConstruct, None]:
+    async def search(self, file_url: str) -> AsyncGenerator[SearchResult, None]:
         results = await self._api_search(file_url)
 
         filtered_results = [
@@ -109,7 +109,7 @@ class SauceNaoSearchEngine(SearchEngine):
             if msg := await task:
                 yield msg
 
-    async def _booru(self, data: dict[str, dict[str, str | int | list[str]]]) -> MessageConstruct | None:
+    async def _booru(self, data: dict[str, dict[str, str | int | list[str]]]) -> SearchResult | None:
         if post_id := data["data"].get("danbooru_id"):
             return await self._safe_search({"id": post_id, "provider": "danbooru"}, "booru")
         elif post_id := data["data"].get("yandere_id"):

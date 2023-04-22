@@ -8,7 +8,7 @@ from tgtools.api.yandere import YandereApi
 from tgtools.models.booru_post import RATING
 from tgtools.telegram.text import tagified_string
 
-from .base import Info, MessageConstruct, Provider
+from .base import Info, MessageConstruct, Provider, ProviderInfo
 
 
 class BooruProvider(Provider):
@@ -18,6 +18,8 @@ class BooruProvider(Provider):
         danbooru (DanbooruApi): An instance of the DanbooruApi class.
         yandere (YandereApi): An instance of the YandereApi class.
     """
+
+    name = "Booru"
 
     class Config(BaseModel):
         """Configuration for the BooruProvider.
@@ -40,6 +42,25 @@ class BooruProvider(Provider):
         """
         self.danbooru = DanbooruApi(session, BasicAuth(config.danbooru_username, config.danbooru_api_key))
         self.yandere = YandereApi(session)
+
+    def provider_info(self, data: dict[str, Any]) -> ProviderInfo:
+        """
+        Fetch and process a booru post.
+
+        Args:
+            data (dict[str, Any]): A dictionary containing the provider name and post ID.
+
+        Returns:
+            MessageConstruct | None: A MessageConstruct object containing the processed image
+                                     data or None if the provider is not supported.
+        """
+        match data["provider"]:
+            case "danbooru":
+                return ProviderInfo("Danbooru", str(self.danbooru.url))
+            case "yandere":
+                return ProviderInfo("Yandere", str(self.yandere.url))
+            case _:
+                return super().provider_info(data)
 
     async def provide(self, data: dict[str, Any]) -> MessageConstruct | None:
         """
@@ -87,11 +108,11 @@ class BooruProvider(Provider):
             rating_emoji = emojize(":no_one_under_eighteen:" if RATING.level(post.rating) > 1 else ":cherry_blossom:")
             text["Rating"] = Info(f"{rating_emoji} {post.rating_simple}", "code")
 
-        source_url, booru_url = post.main_source, str(post.url)
+        source_url = post.main_source
 
         return MessageConstruct(
-            source_url=source_url if source_url else booru_url,
-            additional_urls=[booru_url] if source_url else [],
+            provider_url=str(post.url),
+            additional_urls=[source_url] if source_url else [],
             file=post.file_summary,
             text=text,
         )

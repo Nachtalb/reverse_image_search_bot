@@ -3,7 +3,7 @@ from asyncio import Lock
 from time import time
 from typing import Any, AsyncGenerator, TypedDict
 
-from reverse_image_search.providers.base import MessageConstruct, Provider
+from reverse_image_search.providers.base import Provider, SearchResult
 
 
 class CachedSearchResult(TypedDict):
@@ -16,7 +16,7 @@ class CachedSearchResult(TypedDict):
     """
 
     found: int
-    message: MessageConstruct | None
+    result: SearchResult | None
 
 
 runtime_cache: dict[frozenset[tuple[str, Any]], CachedSearchResult] = {}
@@ -57,7 +57,7 @@ class SearchEngine(metaclass=ABCMeta):
         self.providers = providers
         self.provider_lock = Lock()
 
-    def _get_cached(self, query: frozenset[tuple[str, Any]]) -> MessageConstruct | None | bool:
+    def _get_cached(self, query: frozenset[tuple[str, Any]]) -> SearchResult | None | bool:
         """Get cached result for a given query.
 
         Fetches the cached result for a given query if it exists and is not expired.
@@ -66,28 +66,26 @@ class SearchEngine(metaclass=ABCMeta):
             query (Any): The query for which to fetch the cached result.
 
         Returns:
-            MessageConstruct | None | bool: The cached result if it exists and is not expired, otherwise False.
+            SearchResult | None | bool: The cached result if it exists and is not expired, otherwise False.
         """
         if (result := runtime_cache.get(query)) and time() - result["found"] < self.cache_time:
-            return result["message"]
+            return result["result"]
         return False
 
-    def _add_cached(
-        self, query: frozenset[tuple[str, Any]], message: MessageConstruct | None = None
-    ) -> MessageConstruct | None:
+    def _add_cached(self, query: frozenset[tuple[str, Any]], result: SearchResult | None = None) -> SearchResult | None:
         """Add a cached result for a given query.
 
         Stores the given message as the cached result for the specified query.
 
         Args:
             query (Any): The query for which to store the cached result.
-            message (MessageConstruct | None, optional): The message to store as the cached result. Defaults to None.
+            message (SearchResult | None, optional): The message to store as the cached result. Defaults to None.
 
         Returns:
-            MessageConstruct | None: Returns the given message back
+            SearchResult | None: Returns the given message back
         """
-        runtime_cache[query] = CachedSearchResult(found=int(time()), message=message)
-        return message
+        runtime_cache[query] = CachedSearchResult(found=int(time()), result=result)
+        return result
 
     def generate_search_url(self, file_url: str) -> str:
         """
@@ -101,7 +99,7 @@ class SearchEngine(metaclass=ABCMeta):
         """
         return self.query_url_template.format(file_url=file_url)
 
-    async def _safe_search(self, query: dict[str, Any], provider_name: str) -> MessageConstruct | None:
+    async def _safe_search(self, query: dict[str, Any], provider_name: str) -> SearchResult | None:
         """
         Perform a safe search by querying the provider in a locked context.
 
@@ -113,7 +111,7 @@ class SearchEngine(metaclass=ABCMeta):
             provider_name (str): The name of the provider to use for the search.
 
         Returns:
-            MessageConstruct | None: The search result if successful, otherwise None.
+            SearchResult | None: The search result if successful, otherwise None.
         """
         async with self.provider_lock:
             search_query = frozenset(query.items())
@@ -121,7 +119,10 @@ class SearchEngine(metaclass=ABCMeta):
                 return result
             self._add_cached(search_query)  # Reserve spot until provider is finished
 
-        return self._add_cached(search_query, await self.providers[provider_name].provide(query))
+        message = await self.providers[provider_name].provide(query)
+        provider_info = self.providers[provider_name].provider_info(query)
 
-    async def search(self, file_url: str) -> AsyncGenerator[MessageConstruct | None, None]:
+        return self._add_cached(search_query, SearchResult(self, provider_info, message))
+
+    async def search(self, file_url: str) -> AsyncGenerator[SearchResult | None, None]:
         yield
