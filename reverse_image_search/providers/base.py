@@ -1,6 +1,6 @@
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING, Any, Literal
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Literal
 
 from tgtools.telegram.compatibility.base import MediaSummary
 

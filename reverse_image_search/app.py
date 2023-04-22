@@ -5,6 +5,7 @@ from aiostream import stream
 from bots import Application
 from telegram import Document, InlineKeyboardButton, InlineKeyboardMarkup, Message, PhotoSize, Update, Video
 from telegram.constants import ParseMode
+from telegram.error import BadRequest
 from telegram.ext import CommandHandler, ContextTypes, MessageHandler, filters
 from tgtools.models.file_summary import FileSummary
 from tgtools.telegram.compatibility import make_tg_compatible
@@ -96,9 +97,12 @@ class ReverseImageSearch(Application):
             async for result in streamer:
                 if not result or result.message is None:
                     continue
-                await self.send_message_construct(result, update.message)
+                try:
+                    await self.send_message_construct(result, update.message)
+                except BadRequest:
+                    await self.send_message_construct(result, update.message, force_download=True)
 
-    async def send_message_construct(self, result: SearchResult, query_message: Message):
+    async def send_message_construct(self, result: SearchResult, query_message: Message, force_download: bool = False):
         buttons = [
             InlineKeyboardButton(host_name(result.message.provider_url, with_emoji=True), result.message.provider_url)
         ]
@@ -111,7 +115,7 @@ class ReverseImageSearch(Application):
 
         summary = type_ = None
         if result.message.file:
-            summary, type_ = await make_tg_compatible(result.message.file)
+            summary, type_ = await make_tg_compatible(result.message.file, force_download)
 
         if summary:
             if isinstance(summary, FileSummary):
