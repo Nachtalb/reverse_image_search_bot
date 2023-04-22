@@ -83,7 +83,7 @@ class ReverseImageSearch(Application):
         buttons = [
             InlineKeyboardButton(engine.name, engine.generate_search_url(str(file_url))) for engine in self.engines
         ]
-        buttons = list(chunks(buttons, 3))
+        buttons = [[InlineKeyboardButton("Open Image", url=file_url)]] + list(chunks(buttons, 3))
 
         await update.message.reply_text(
             "Use one of the buttons to open the search engine.",
