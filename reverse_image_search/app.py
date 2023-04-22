@@ -79,7 +79,6 @@ class ReverseImageSearch(Application):
             return
 
         file_url = self.arguments.file_url + file.name
-        file_url = "https://v2.nachtalb.io/ris/f/AQADlrsxG08-IVJ-.jpg"
 
         buttons = [
             InlineKeyboardButton(engine.name, engine.generate_search_url(str(file_url))) for engine in self.engines
