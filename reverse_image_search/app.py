@@ -6,7 +6,7 @@ from bots import Application
 from telegram import Document, InlineKeyboardButton, InlineKeyboardMarkup, Message, PhotoSize, Update, Video
 from telegram.constants import ParseMode
 from telegram.ext import CommandHandler, ContextTypes, MessageHandler, filters
-from tgtools.models.file_summary import FileSummary, URLFileSummary
+from tgtools.models.file_summary import FileSummary
 from tgtools.telegram.compatibility import make_tg_compatible
 from tgtools.telegram.text import host_emoji, host_name
 
@@ -111,7 +111,11 @@ class ReverseImageSearch(Application):
             summary, type_ = await make_tg_compatible(message.file)
 
         if summary:
-            file = summary.file if isinstance(summary, FileSummary) else summary.url
+            if isinstance(summary, FileSummary):
+                file = summary.file
+                file.seek(0)
+            else:
+                file = summary.url
 
             if type_ == PhotoSize:
                 return await query_message.reply_photo(
