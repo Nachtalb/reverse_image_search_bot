@@ -113,4 +113,4 @@ class SauceNaoSearchEngine(SearchEngine):
         if post_id := data["data"].get("danbooru_id"):
             return await self._safe_search({"id": post_id, "provider": "danbooru"}, "booru")
         elif post_id := data["data"].get("yandere_id"):
-            return await self._safe_search({"id": post_id, "provider": "danbooru"}, "booru")
+            return await self._safe_search({"id": post_id, "provider": "yandere"}, "booru")
