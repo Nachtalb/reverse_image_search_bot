@@ -110,5 +110,7 @@ class SauceNaoSearchEngine(SearchEngine):
                 yield msg
 
     async def _booru(self, data: dict[str, dict[str, str | int | list[str]]]) -> MessageConstruct | None:
-        if danbooru_id := data["data"].get("danbooru_id"):
-            return await self._safe_search({"danbooru_id": danbooru_id}, "danbooru")
+        if post_id := data["data"].get("danbooru_id"):
+            return await self._safe_search({"id": post_id, "provider": "danbooru"}, "booru")
+        elif post_id := data["data"].get("yandere_id"):
+            return await self._safe_search({"id": post_id, "provider": "danbooru"}, "booru")

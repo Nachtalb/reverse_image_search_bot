@@ -14,7 +14,7 @@ from reverse_image_search.engines import initiate_engines
 from reverse_image_search.engines.saucenao import SauceNaoSearchEngine
 from reverse_image_search.providers import initiate_data_providers
 from reverse_image_search.providers.base import MessageConstruct
-from reverse_image_search.providers.danbooru import DanbooruProvider
+from reverse_image_search.providers.booru import BooruProvider
 from reverse_image_search.utils import chunks, download_file
 
 ZWS = "​"
@@ -25,7 +25,7 @@ class ReverseImageSearch(Application):
         downloads: Path
         file_url: str
         saucenao: SauceNaoSearchEngine.Config
-        danbooru: DanbooruProvider.Config
+        boorus: BooruProvider.Config
 
     arguments: "ReverseImageSearch.Arguments"
 
@@ -78,6 +78,7 @@ class ReverseImageSearch(Application):
             return
 
         file_url = self.arguments.file_url + file.name
+        file_url = "https://v2.nachtalb.io/ris/f/AQADlrsxG08-IVJ-.jpg"
 
         buttons = [
             InlineKeyboardButton(engine.name, engine.generate_search_url(str(file_url))) for engine in self.engines
