@@ -8,7 +8,7 @@ from telegram.constants import ParseMode
 from telegram.ext import CommandHandler, ContextTypes, MessageHandler, filters
 from tgtools.models.file_summary import FileSummary
 from tgtools.telegram.compatibility import make_tg_compatible
-from tgtools.telegram.text import host_emoji, host_name
+from tgtools.utils.urls.emoji import host_emoji, host_name
 
 from reverse_image_search.engines import initiate_engines
 from reverse_image_search.engines.saucenao import SauceNaoSearchEngine

@@ -6,7 +6,6 @@ from pydantic import BaseModel
 from tgtools.api.danbooru import DanbooruApi
 from tgtools.api.yandere import YandereApi
 from tgtools.models.booru_post import RATING
-from tgtools.models.danbooru_post import DanbooruPost
 from tgtools.telegram.text import tagified_string
 
 from .base import Info, MessageConstruct, Provider
@@ -88,15 +87,11 @@ class BooruProvider(Provider):
             rating_emoji = emojize(":no_one_under_eighteen:" if RATING.level(post.rating) > 1 else ":cherry_blossom:")
             text["Rating"] = Info(f"{rating_emoji} {post.rating_simple}", "code")
 
-        result = MessageConstruct(
-            source_url=str(post.url),
-            additional_urls=[] if not post.source else [str(post.url)],
+        source_url, booru_url = post.main_source, str(post.url)
+
+        return MessageConstruct(
+            source_url=source_url if source_url else booru_url,
+            additional_urls=[booru_url] if source_url else [],
             file=post.file_summary,
             text=text,
         )
-
-        match post:
-            case DanbooruPost():
-                result.source_url = f"https://www.pixiv.net/artworks/{post.pixiv_id}" if post.pixiv_id else post.source
-
-        return result
