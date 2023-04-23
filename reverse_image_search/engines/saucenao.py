@@ -39,6 +39,8 @@ class SauceNaoSearchEngine(SearchEngine):
     provider_mapping = {
         9: "_booru",
         12: "_booru",
+        25: "_booru",
+        26: "_booru",
     }
 
     class Config(BaseModel):
@@ -114,4 +116,8 @@ class SauceNaoSearchEngine(SearchEngine):
             return await self._safe_search({"id": post_id, "provider": "danbooru"}, "booru")
         elif post_id := data["data"].get("yandere_id"):
             return await self._safe_search({"id": post_id, "provider": "yandere"}, "booru")
+        elif post_id := data["data"].get("gelbooru_id"):
+            return await self._safe_search({"id": post_id, "provider": "gelbooru"}, "booru")
+        elif post_id := data["data"].get("konachan_id"):
+            return await self._safe_search({"id": post_id, "provider": "konachan"}, "booru")
         return None

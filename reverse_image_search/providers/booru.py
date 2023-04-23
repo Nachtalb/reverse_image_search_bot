@@ -3,7 +3,7 @@ from typing import Any
 from aiohttp import BasicAuth, ClientSession
 from emoji import emojize
 from pydantic import BaseModel
-from tgtools.api import DanbooruApi, YandereApi
+from tgtools.api import DanbooruApi, YandereApi, GelbooruApi, KonachanApi
 from tgtools.models import RATING
 from tgtools.telegram.text import tagified_string
 
@@ -16,6 +16,8 @@ class BooruProvider(Provider):
     Attributes:
         danbooru (DanbooruApi): An instance of the DanbooruApi class.
         yandere (YandereApi): An instance of the YandereApi class.
+        gelbooru (GelbooruApi): An instance of the GelbooruApi class.
+        threedbooru (ThreeDBooruApi): An instance of the ThreeDBooruApi class.
     """
 
     name = "Booru"
@@ -41,6 +43,8 @@ class BooruProvider(Provider):
         """
         self.danbooru = DanbooruApi(session, BasicAuth(config.danbooru_username, config.danbooru_api_key))
         self.yandere = YandereApi(session)
+        self.gelbooru = GelbooruApi(session)
+        self.konachan = KonachanApi(session)
 
     def provider_info(self, data: dict[str, Any] | None) -> ProviderInfo:
         """
@@ -61,6 +65,10 @@ class BooruProvider(Provider):
                 return ProviderInfo("Danbooru", str(self.danbooru.url))
             case "yandere":
                 return ProviderInfo("Yandere", str(self.yandere.url))
+            case "gelbooru":
+                return ProviderInfo("Gelbooru", str(self.gelbooru.url))
+            case "konachan":
+                return ProviderInfo("Konachan", str(self.konachan.url))
             case _:
                 return super().provider_info(data)
 
@@ -89,6 +97,10 @@ class BooruProvider(Provider):
                 provider = self.danbooru
             case "yandere":
                 provider = self.yandere
+            case "gelbooru":
+                provider = self.gelbooru
+            case "konachan":
+                provider = self.konachan
             case _:
                 return None
 
