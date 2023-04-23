@@ -16,7 +16,6 @@ imageio = {extras = ["ffmpeg"], version = "^2.27.0"}
 tgtools = {git = "https://github.com/Nachtalb/tgtools", rev = "master"}
 aiostream = "^0.4.5"
 
-
 [tool.poetry.group.dev.dependencies]
 ipdb = "^0.13.13"
 ipython = {extras = ["black"], version = "^8.11.0"}
@@ -32,3 +31,6 @@ preview = true
 
 [tool.ruff]
 line-length = 120
+
+[tool.mypy]
+ignore_missing_imports = true

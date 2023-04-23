@@ -4,7 +4,7 @@ from typing import AsyncGenerator, Coroutine
 from aiohttp import ClientSession
 from pydantic import BaseModel
 
-from reverse_image_search.providers.base import MessageConstruct, Provider, SearchResult
+from reverse_image_search.providers.base import Provider, SearchResult
 
 from .base import SearchEngine
 
@@ -101,7 +101,7 @@ class SauceNaoSearchEngine(SearchEngine):
             and result["header"]["index_id"] in self.provider_mapping
         ]
 
-        tasks: list[Coroutine[MessageConstruct | None, None, None]] = [
+        tasks: list[Coroutine[None, None, SearchResult | None]] = [
             getattr(self, self.provider_mapping[result["header"]["index_id"]])(result) for result in filtered_results
         ]
 
@@ -114,3 +114,4 @@ class SauceNaoSearchEngine(SearchEngine):
             return await self._safe_search({"id": post_id, "provider": "danbooru"}, "booru")
         elif post_id := data["data"].get("yandere_id"):
             return await self._safe_search({"id": post_id, "provider": "yandere"}, "booru")
+        return None

@@ -120,7 +120,7 @@ class Provider(metaclass=ABCMeta):
         return ProviderInfo(self.name, self.credit_url)
 
     @abstractmethod
-    async def provide(self, data: dict[str, Any]) -> MessageConstruct:
+    async def provide(self, data: dict[str, Any]) -> MessageConstruct | None:
         """
         Provide a MessageConstruct with the given information.
 

@@ -122,7 +122,7 @@ class SearchEngine(metaclass=ABCMeta):
         message = await self.providers[provider_name].provide(query)
         provider_info = self.providers[provider_name].provider_info(query)
 
-        return self._add_cached(search_query, SearchResult(self, provider_info, message))
+        return self._add_cached(search_query, SearchResult(self, provider_info, message) if message else None)
 
     async def search(self, file_url: str) -> AsyncGenerator[SearchResult | None, None]:
-        yield
+        yield  # type: ignore

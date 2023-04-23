@@ -8,7 +8,7 @@ from tgtools.api.yandere import YandereApi
 from tgtools.models.booru_post import RATING
 from tgtools.telegram.text import tagified_string
 
-from .base import Info, MessageConstruct, Provider, ProviderInfo
+from reverse_image_search.providers.base import Info, MessageConstruct, Provider, ProviderInfo
 
 
 class BooruProvider(Provider):
@@ -43,7 +43,7 @@ class BooruProvider(Provider):
         self.danbooru = DanbooruApi(session, BasicAuth(config.danbooru_username, config.danbooru_api_key))
         self.yandere = YandereApi(session)
 
-    def provider_info(self, data: dict[str, Any]) -> ProviderInfo:
+    def provider_info(self, data: dict[str, Any] | None) -> ProviderInfo:
         """
         Fetch and process a booru post.
 
@@ -54,6 +54,9 @@ class BooruProvider(Provider):
             MessageConstruct | None: A MessageConstruct object containing the processed image
                                      data or None if the provider is not supported.
         """
+        if not data:
+            return super().provider_info(data)
+
         match data["provider"]:
             case "danbooru":
                 return ProviderInfo("Danbooru", str(self.danbooru.url))
@@ -88,17 +91,17 @@ class BooruProvider(Provider):
             case "yandere":
                 provider = self.yandere
             case _:
-                return
+                return None
 
         post_id: int = data["id"]
 
         post = await provider.post(post_id)
 
         if post is None:
-            return
+            return None
 
-        text: dict[str, str | Info] = {
-            "Rating": "",
+        text: dict[str, str | Info | None] = {
+            "Rating": None,
             "Artist": tagified_string(post.tags_artist),
             "Tags": tagified_string(post.tags, 10),
             "Characters": tagified_string(post.tags_character),

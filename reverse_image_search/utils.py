@@ -39,11 +39,12 @@ async def download_file(update: Update, downloads_dir: Path) -> Path | None:
         downloads_dir: A pathlib.Path object representing the directory where the downloaded file will be saved.
 
     Returns:
-        A pathlib.Path object representing the path to the downloaded file (or the first frame image if the file is a video), or None if the update message is empty.
+        A pathlib.Path object representing the path to the downloaded file (or the first frame image if the file is
+        a video), or None if the update message is empty.
     """
     msg = update.message
     if not msg:
-        return
+        return None
 
     unloaded_tg_file = msg.document or msg.video or msg.sticker or msg.photo[-1]
     loaded_tg_file = await unloaded_tg_file.get_file()
