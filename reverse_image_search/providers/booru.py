@@ -3,9 +3,8 @@ from typing import Any
 from aiohttp import BasicAuth, ClientSession
 from emoji import emojize
 from pydantic import BaseModel
-from tgtools.api.danbooru import DanbooruApi
-from tgtools.api.yandere import YandereApi
-from tgtools.models.booru_post import RATING
+from tgtools.api import DanbooruApi, YandereApi
+from tgtools.models import RATING
 from tgtools.telegram.text import tagified_string
 
 from reverse_image_search.providers.base import Info, MessageConstruct, Provider, ProviderInfo
