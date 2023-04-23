@@ -1,0 +1,27 @@
+{
+  "app_configs": [
+    {
+      "arguments": {
+        "downloads": "downloads/",
+        "file_url": "https://example.com/ris_files/",
+        "saucenao": {
+          "api_key": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+        },
+        "boorus": {
+          "danbooru_username": "XXXXX",
+          "danbooru_api_key": "XXXXXXXXXXXXXXXXXXXXXXXX"
+        }
+      },
+      "auto_start": true,
+      "id": "reverse-image-search",
+      "module": "reverse_image_search.app:ReverseImageSearch",
+      "telegram_token": "0000000000:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    }
+  ],
+  "global_log_level": "WARNING",
+  "host": "127.0.0.1",
+  "local_log_level": "INFO",
+  "port": 6543,
+  "uvicorn_args": {},
+  "web_log_level": "INFO"
+}
