@@ -15,6 +15,7 @@ pillow = "^9.4.0"
 imageio = { extras = ["ffmpeg"], version = "^2.27.0" }
 tgtools = { git = "https://github.com/Nachtalb/tgtools", rev = "master" }
 aiostream = "^0.4.5"
+aiopixiv = {git = "https://github.com/Nachtalb/aiopixiv", rev = "master"}
 
 [tool.poetry.group.dev.dependencies]
 ipdb = "^0.13.13"

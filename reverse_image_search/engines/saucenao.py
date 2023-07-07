@@ -37,6 +37,7 @@ class SauceNaoSearchEngine(SearchEngine):
 
     min_similarity = 65
     provider_mapping = {
+        5: "_pixiv",
         9: "_booru",
         12: "_booru",
         25: "_booru",
@@ -55,11 +56,9 @@ class SauceNaoSearchEngine(SearchEngine):
             session (aiohttp.ClientSession): The aiohttp session for making requests.
             providers (list[Formatter]): List of initialised data providers
         """
-        super().__init__()
+        super().__init__(providers)
         self.api_key = api_key
         self.session = session
-        self.providers = providers
-        self.provider_lock = Lock()
 
     async def _api_search(self, file_url: str) -> dict:
         """
@@ -121,3 +120,6 @@ class SauceNaoSearchEngine(SearchEngine):
         elif post_id := data["data"].get("konachan_id"):
             return await self._safe_search({"id": post_id, "provider": "konachan"}, "booru")
         return None
+
+    async def _pixiv(self, data: dict[str, dict[str, str | int | list[str]]]) -> SearchResult | None:
+        return await self._safe_search({"id": data["data"]["pixiv_id"]}, "pixiv")

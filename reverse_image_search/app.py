@@ -16,6 +16,7 @@ from reverse_image_search.engines.saucenao import SauceNaoSearchEngine
 from reverse_image_search.providers import initiate_data_providers
 from reverse_image_search.providers.base import SearchResult
 from reverse_image_search.providers.booru import BooruProvider
+from reverse_image_search.providers.pixiv import PixivProvider
 from reverse_image_search.utils import chunks, download_file
 
 ZWS = "​"
@@ -27,6 +28,7 @@ class ReverseImageSearch(Application):
         file_url: str
         saucenao: SauceNaoSearchEngine.Config
         boorus: BooruProvider.Config
+        pixiv: PixivProvider.Config
 
     arguments: "ReverseImageSearch.Arguments"
 
