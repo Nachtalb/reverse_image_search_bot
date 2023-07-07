@@ -1,24 +1,24 @@
 [tool.poetry]
 name = "reverse-image-search"
-version = "2.0.0"
+version = "2.0.0a0"
 description = "A Telegram bot that provides direct reverse image search links for various engines like Google, Yandex, SauceNAO, IQDB, and more. Send an image, sticker or video/gif, and get search results from multiple platforms. Supports auto search and offers various tips for better search results."
 authors = ["Nachtalb <na@nachtalb.io>"]
 license = "LGPL-3.0"
 readme = "README.md"
-packages = [{include = "reverse_image_search"}]
+packages = [{ include = "reverse_image_search" }]
 
 [tool.poetry.dependencies]
 python = "^3.11, <3.12.0"
-bot-manager = {git = "https://github.com/Nachtalb/bot_manager.git", rev = "master"}
-aiohttp = {extras = ["speedups"], version = "^3.8.4"}
+bot-manager = { git = "https://github.com/Nachtalb/bot_manager.git", rev = "master" }
+aiohttp = { extras = ["speedups"], version = "^3.8.4" }
 pillow = "^9.4.0"
-imageio = {extras = ["ffmpeg"], version = "^2.27.0"}
-tgtools = {git = "https://github.com/Nachtalb/tgtools", rev = "master"}
+imageio = { extras = ["ffmpeg"], version = "^2.27.0" }
+tgtools = { git = "https://github.com/Nachtalb/tgtools", rev = "master" }
 aiostream = "^0.4.5"
 
 [tool.poetry.group.dev.dependencies]
 ipdb = "^0.13.13"
-ipython = {extras = ["black"], version = "^8.11.0"}
+ipython = { extras = ["black"], version = "^8.11.0" }
 
 [build-system]
 requires = ["poetry-core"]
