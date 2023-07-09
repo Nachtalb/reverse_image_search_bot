@@ -1,18 +1,24 @@
 from io import BytesIO
 from pathlib import Path
-from typing import Any
+from typing import Optional
 
 from aiopixiv._api import PixivAPI
 from emoji import emojize
+from PIL import Image
 from pydantic import BaseModel
 from tgtools.models.file_summary import FileSummary
 from tgtools.telegram.text import tagified_string
 from yarl import URL
 
-from reverse_image_search.providers.base import Info, MessageConstruct, Provider
+from reverse_image_search.providers.base import Info, MessageConstruct, Provider, QueryData
 
 
-class PixivProvider(Provider):
+class PixivQuery(QueryData):
+    id: int
+    image_index: Optional[int]
+
+
+class PixivProvider(Provider[PixivQuery]):
     """A provider for fetching and processing pixiv illustrations."""
 
     name = "Pixiv"
@@ -38,7 +44,7 @@ class PixivProvider(Provider):
         """
         self.client = PixivAPI(access_token=config.access_token, refresh_token=config.refresh_token)
 
-    async def provide(self, data: dict[str, Any]) -> MessageConstruct | None:
+    async def provide(self, data: PixivQuery) -> MessageConstruct | None:
         """
         Fetch and process a pixiv illustration.
 

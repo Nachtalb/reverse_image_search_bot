@@ -1,3 +1,4 @@
+import re
 from asyncio import Lock, as_completed
 from typing import AsyncGenerator, Coroutine
 
@@ -5,6 +6,8 @@ from aiohttp import ClientSession
 from pydantic import BaseModel
 
 from reverse_image_search.providers.base import Provider, SearchResult
+from reverse_image_search.providers.booru import BooruQuery
+from reverse_image_search.providers.pixiv import PixivQuery
 
 from .base import SearchEngine
 
@@ -112,14 +115,34 @@ class SauceNaoSearchEngine(SearchEngine):
 
     async def _booru(self, data: dict[str, dict[str, str | int | list[str]]]) -> SearchResult | None:
         if post_id := data["data"].get("danbooru_id"):
-            return await self._safe_search({"id": post_id, "provider": "danbooru"}, "booru")
+            return await self._safe_search(
+                BooruQuery({"id": post_id, "provider": "danbooru"}),  # type: ignore[typeddict-item]
+                "booru",
+            )
         elif post_id := data["data"].get("yandere_id"):
-            return await self._safe_search({"id": post_id, "provider": "yandere"}, "booru")
+            return await self._safe_search(
+                BooruQuery({"id": post_id, "provider": "yandere"}),  # type: ignore[typeddict-item]
+                "booru",
+            )
         elif post_id := data["data"].get("gelbooru_id"):
-            return await self._safe_search({"id": post_id, "provider": "gelbooru"}, "booru")
+            return await self._safe_search(
+                BooruQuery({"id": post_id, "provider": "gelbooru_id"}),  # type: ignore[typeddict-item]
+                "booru",
+            )
         elif post_id := data["data"].get("konachan_id"):
-            return await self._safe_search({"id": post_id, "provider": "konachan"}, "booru")
+            return await self._safe_search(
+                BooruQuery({"id": post_id, "provider": "konachan"}),  # type: ignore[typeddict-item]
+                "booru",
+            )
         return None
 
     async def _pixiv(self, data: dict[str, dict[str, str | int | list[str]]]) -> SearchResult | None:
-        return await self._safe_search({"id": data["data"]["pixiv_id"]}, "pixiv")
+        query_data: PixivQuery = {
+            "id": data["data"]["pixiv_id"],  # type: ignore[typeddict-item]
+            "image_index": None,
+        }
+
+        if match := re.search(r"\d+_p(\d+)", str(data["header"]["index_name"])):
+            query_data["image_index"] = int(match.groups()[0])
+
+        return await self._safe_search(query_data, "pixiv")

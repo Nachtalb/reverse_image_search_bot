@@ -1,16 +1,19 @@
-from typing import Any
-
 from aiohttp import BasicAuth, ClientSession
 from emoji import emojize
 from pydantic import BaseModel
-from tgtools.api import DanbooruApi, YandereApi, GelbooruApi, KonachanApi
+from tgtools.api import DanbooruApi, GelbooruApi, KonachanApi, YandereApi
 from tgtools.models import RATING
 from tgtools.telegram.text import tagified_string
 
-from reverse_image_search.providers.base import Info, MessageConstruct, Provider, ProviderInfo
+from reverse_image_search.providers.base import Info, MessageConstruct, Provider, ProviderInfo, QueryData
 
 
-class BooruProvider(Provider):
+class BooruQuery(QueryData):
+    id: int
+    provider: str
+
+
+class BooruProvider(Provider[BooruQuery]):
     """A provider for fetching and processing booru posts.
 
     Attributes:
@@ -46,12 +49,12 @@ class BooruProvider(Provider):
         self.gelbooru = GelbooruApi(session)
         self.konachan = KonachanApi(session)
 
-    def provider_info(self, data: dict[str, Any] | None) -> ProviderInfo:
+    def provider_info(self, data: BooruQuery | None) -> ProviderInfo:
         """
         Fetch and process a booru post.
 
         Args:
-            data (dict[str, Any]): A dictionary containing the provider name and post ID.
+            data (BooruQuery): A dictionary containing the provider name and post ID.
 
         Returns:
             MessageConstruct | None: A MessageConstruct object containing the processed image
@@ -72,7 +75,7 @@ class BooruProvider(Provider):
             case _:
                 return super().provider_info(data)
 
-    async def provide(self, data: dict[str, Any]) -> MessageConstruct | None:
+    async def provide(self, data: BooruQuery) -> MessageConstruct | None:
         """
         Fetch and process a booru post.
 

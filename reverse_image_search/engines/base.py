@@ -3,7 +3,7 @@ from asyncio import Lock
 from time import time
 from typing import Any, AsyncGenerator, TypedDict
 
-from reverse_image_search.providers.base import Provider, SearchResult
+from reverse_image_search.providers.base import Provider, QueryData, SearchResult
 
 
 class CachedSearchResult(TypedDict):
@@ -99,7 +99,7 @@ class SearchEngine(metaclass=ABCMeta):
         """
         return self.query_url_template.format(file_url=file_url)
 
-    async def _safe_search(self, query: dict[str, Any], provider_name: str) -> SearchResult | None:
+    async def _safe_search(self, query: QueryData, provider_name: str) -> SearchResult | None:
         """
         Perform a safe search by querying the provider in a locked context.
 

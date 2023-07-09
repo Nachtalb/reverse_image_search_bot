@@ -1,11 +1,18 @@
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal, Sequence
+from typing import TYPE_CHECKING, Generic, Literal, Sequence, TypedDict, TypeVar
 
 from tgtools.telegram.compatibility.base import MediaSummary
 
 if TYPE_CHECKING:
     from reverse_image_search.engines.base import SearchEngine
+
+
+class QueryData(TypedDict):
+    pass
+
+
+T_QueryData = TypeVar("T_QueryData", bound=QueryData)
 
 
 @dataclass
@@ -99,7 +106,7 @@ class SearchResult:
         return f"{self.intro}\n\n{self.message.caption}"
 
 
-class Provider(metaclass=ABCMeta):
+class Provider(Generic[T_QueryData], metaclass=ABCMeta):
     """
     Abstract base class for formatters that fetch and format data.
 
@@ -111,7 +118,7 @@ class Provider(metaclass=ABCMeta):
     name: str = "Provider"
     credit_url: str = "https://example.com"
 
-    def provider_info(self, data: dict[str, Any] | None) -> ProviderInfo:
+    def provider_info(self, data: T_QueryData | None) -> ProviderInfo:
         """
         Retrieve ProviderInfo based on input data
 
@@ -123,14 +130,14 @@ class Provider(metaclass=ABCMeta):
         return ProviderInfo(self.name, self.credit_url)
 
     @abstractmethod
-    async def provide(self, data: dict[str, Any]) -> MessageConstruct | None:
+    async def provide(self, data: T_QueryData) -> MessageConstruct | None:
         """
         Provide a MessageConstruct with the given information.
 
         The implementer has to check out how the provider wants the data.
 
         Args:
-            data (dict[str, Any]): A dictionary containing data for the provider to work with.
+            data (TypedDict): A dictionary containing data for the provider to work with.
 
         Returns:
             MessageConstruct: A object containing all information needed for standardised messages.
