@@ -39,13 +39,16 @@ class MessageConstruct:
         provider_url (str): The URL of the found media on the provider.
         additional_urls (list[str]): A list of additional URLs related to the message.
         text (dict[str, str | Info | None]): A dictionary containing the text elements of the message.
-        files (MediaSummary | Sequence[MediaSummary] | None): The media files of the message, if available.
+        file (MediaSummary | None): The main media file sent with the result message.
+        additional_files (Sequence[MediaSummary] | None): Max 10 additional media files, sent in a media group
     """
 
     provider_url: str
     additional_urls: list[str]
     text: dict[str, str | Info | None]
-    files: MediaSummary | Sequence[MediaSummary] | None
+    file: MediaSummary | None
+    additional_files: Sequence[MediaSummary] | None = None
+    additional_files_captions: Sequence[str] | str | None = None
 
     @property
     def caption(self) -> str:

@@ -1,6 +1,5 @@
-from asyncio import create_task, gather
+from itertools import repeat
 from pathlib import Path
-from typing import Sequence
 
 from aiohttp import ClientSession
 from aiostream import stream
@@ -131,73 +130,91 @@ class ReverseImageSearch(Application):
 
         text = result.caption
 
-        if isinstance(result.message.files, Sequence):
-            result_message = await query_message.reply_html(text=text, reply_markup=button_markup)
-            media: list[InputMediaPhoto | InputMediaVideo | InputMediaDocument] = []
-            for file in result.message.files:
-                summary, type_ = await make_tg_compatible(file, force_download)
-                if summary:
-                    if isinstance(summary, FileSummary):
-                        file = summary.file
-                        file.seek(0)
-                    else:
-                        file = summary.url
+        summary = type_ = None
+        if result.message.file:
+            summary, type_ = await make_tg_compatible(result.message.file, force_download)
 
-                    if type_ == PhotoSize:
-                        media.append(InputMediaPhoto(file, filename=summary.file_name.name))
-                    elif type_ == Video:
-                        media.append(
-                            InputMediaVideo(
-                                media=file,
-                                filename=summary.file_name.name,
-                                height=summary.height or None,  # type: ignore
-                                width=summary.width or None,  # type: ignore
-                                supports_streaming=True,
+        if summary:
+            if isinstance(summary, FileSummary):
+                file = summary.file
+                file.seek(0)
+            else:
+                file = summary.url
+
+            if type_ == PhotoSize:
+                main_message = await query_message.reply_photo(
+                    file,
+                    caption=text,
+                    reply_markup=button_markup,
+                    filename=str(summary.file_name),
+                    parse_mode=ParseMode.HTML,
+                )
+            elif type_ == Video:
+                main_message = await query_message.reply_video(
+                    file,
+                    caption=text,
+                    reply_markup=button_markup,
+                    filename=str(summary.file_name),
+                    parse_mode=ParseMode.HTML,
+                )
+            elif type_ == Document:
+                main_message = await query_message.reply_document(
+                    file,
+                    caption=text,
+                    reply_markup=button_markup,
+                    filename=str(summary.file_name),
+                    parse_mode=ParseMode.HTML,
+                )
+            else:
+                main_message = await query_message.reply_html(text, reply_markup=button_markup)
+
+            # TODO: Add user setting to send additional files or not
+            if result.message.additional_files:
+                media: list[InputMediaPhoto | InputMediaVideo | InputMediaDocument] = []
+                captions = result.message.additional_files_captions
+                for file, caption in zip(
+                    result.message.additional_files,
+                    captions if not isinstance(captions, str) and captions is not None else repeat(None),
+                ):
+                    summary, type_ = await make_tg_compatible(file, force_download)
+                    if summary:
+                        if isinstance(summary, FileSummary):
+                            file = summary.file
+                            file.seek(0)
+                        else:
+                            file = summary.url
+
+                        if type_ == PhotoSize:
+                            media.append(
+                                InputMediaPhoto(
+                                    file,
+                                    filename=summary.file_name.name,
+                                    caption=caption,  # type: ignore[arg-type]
+                                )
                             )
-                        )
-                    elif type_ == Document:
-                        media.append(InputMediaDocument(media=file, filename=summary.file_name.name))
+                        elif type_ == Video:
+                            media.append(
+                                InputMediaVideo(
+                                    media=file,
+                                    filename=summary.file_name.name,
+                                    height=summary.height or None,  # type: ignore[arg-type]
+                                    width=summary.width or None,  # type: ignore[arg-type]
+                                    supports_streaming=True,
+                                    caption=caption,  # type: ignore[arg-type]
+                                )
+                            )
+                        elif type_ == Document:
+                            media.append(
+                                InputMediaDocument(
+                                    media=file,
+                                    filename=summary.file_name.name,
+                                    caption=caption,  # type: ignore[arg-type]
+                                )
+                            )
 
-                    await query_message.reply_media_group(
-                        media=media,
-                        parse_mode=ParseMode.HTML,
-                        reply_to_message_id=result_message.message_id,
-                    )
-            return result_message
-        else:
-            summary = type_ = None
-            if result.message.files:
-                summary, type_ = await make_tg_compatible(result.message.files, force_download)
-
-            if summary:
-                if isinstance(summary, FileSummary):
-                    file = summary.file
-                    file.seek(0)
-                else:
-                    file = summary.url
-
-                if type_ == PhotoSize:
-                    return await query_message.reply_photo(
-                        file,
-                        caption=text,
-                        reply_markup=button_markup,
-                        filename=str(summary.file_name),
-                        parse_mode=ParseMode.HTML,
-                    )
-                elif type_ == Video:
-                    return await query_message.reply_video(
-                        file,
-                        caption=text,
-                        reply_markup=button_markup,
-                        filename=str(summary.file_name),
-                        parse_mode=ParseMode.HTML,
-                    )
-                elif type_ == Document:
-                    return await query_message.reply_document(
-                        file,
-                        caption=text,
-                        reply_markup=button_markup,
-                        filename=str(summary.file_name),
-                        parse_mode=ParseMode.HTML,
-                    )
-            await query_message.reply_html(text, reply_markup=button_markup)
+                await query_message.reply_media_group(
+                    media=media,
+                    parse_mode=ParseMode.HTML,
+                    reply_to_message_id=main_message.message_id,
+                    caption=captions if isinstance(captions, str) else None,
+                )

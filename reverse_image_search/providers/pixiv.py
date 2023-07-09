@@ -80,29 +80,55 @@ class PixivProvider(Provider):
         source_url = f"https://www.pixiv.net/en/artworks/{post.id}"
         artist_url = f"https://www.pixiv.net/en/user/{post.user.id}"
 
-        urls = [page.image_urls.best for page in post.meta_pages][:10]
-        files = [BytesIO() for _ in range(len(post.meta_pages[:10]))]
-        mapping = {id(file): (i, page) for i, (page, file) in enumerate(zip(post.meta_pages[:10], files))}
+        pages = post.meta_pages[:10]
 
-        summaries = []
+        main_added = False
+        if data["image_index"] is not None:
+            page = post.meta_pages[data["image_index"]]
+            if page not in pages:
+                pages.append(page)
+                main_added = True
+            main = pages.index(page)
+        else:
+            main = 0
+
+        urls = [page.image_urls.best for page in pages]
+        files = [BytesIO() for _ in range(len(pages))]
+        mapping = {id(file): (i, page) for i, (page, file) in enumerate(zip(pages, files))}
+
+        summaries: dict[int, FileSummary] = {}
         async for file in post.get_client().download_many(urls=urls, files=files):
             index, page = mapping[id(file)]
             extension = URL(page.image_urls.best).name.rsplit(".", 1)[-1]
-            summaries.append(
-                FileSummary(
+
+            with Image.open(file) as image:
+                summaries[index] = FileSummary(
                     file=file,
                     file_name=Path(f"pixiv_{post.id}_p{index}.{extension}"),
-                    height=0,
-                    width=0,
+                    height=image.height,
+                    width=image.width,
                     size=len(file.getvalue()),
                 )
-            )
+
+        if main_added and len(summaries) > 10:
+            main_file = summaries.pop(main)
+        else:
+            main_file = summaries[main]
+
+        additional_files = [summaries[i] for i in range(len(summaries))]
 
         return MessageConstruct(
             provider_url=str(source_url),
             additional_urls=[
                 artist_url,
             ],
-            files=summaries,
             text=text,
+            file=main_file,
+            additional_files=additional_files,
+            additional_files_captions=(
+                f"Only the first 10 out of {len(post.meta_pages)} images are shown, for more use the buttons of the"
+                " result above."
+                if len(post.meta_pages) > 10
+                else None
+            ),
         )
