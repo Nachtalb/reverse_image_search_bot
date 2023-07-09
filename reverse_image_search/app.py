@@ -1,9 +1,22 @@
+from asyncio import create_task, gather
 from pathlib import Path
+from typing import Sequence
 
 from aiohttp import ClientSession
 from aiostream import stream
 from bots import Application
-from telegram import Document, InlineKeyboardButton, InlineKeyboardMarkup, Message, PhotoSize, Update, Video
+from telegram import (
+    Document,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    InputMediaDocument,
+    InputMediaPhoto,
+    InputMediaVideo,
+    Message,
+    PhotoSize,
+    Update,
+    Video,
+)
 from telegram.constants import ParseMode
 from telegram.error import BadRequest
 from telegram.ext import CommandHandler, ContextTypes, MessageHandler, filters
@@ -81,6 +94,7 @@ class ReverseImageSearch(Application):
             return
 
         file_url = self.arguments.file_url + file.name
+        file_url = "https://v2.nachtalb.io/ris/f/AQADWb0xG1lWQVF-.jpg"
 
         buttons = [
             InlineKeyboardButton(engine.name, engine.generate_search_url(str(file_url))) for engine in self.engines
@@ -113,43 +127,77 @@ class ReverseImageSearch(Application):
         for url in result.message.additional_urls:
             buttons.append(InlineKeyboardButton(host_name(url, with_emoji=True), url=url))
 
-        buttons = InlineKeyboardMarkup(tuple(chunks(buttons, 3)))
+        button_markup = InlineKeyboardMarkup(tuple(chunks(buttons, 3)))
 
         text = result.caption
 
-        summary = type_ = None
-        if result.message.file:
-            summary, type_ = await make_tg_compatible(result.message.file, force_download)
+        if isinstance(result.message.files, Sequence):
+            result_message = await query_message.reply_html(text=text, reply_markup=button_markup)
+            media: list[InputMediaPhoto | InputMediaVideo | InputMediaDocument] = []
+            for file in result.message.files:
+                summary, type_ = await make_tg_compatible(file, force_download)
+                if summary:
+                    if isinstance(summary, FileSummary):
+                        file = summary.file
+                        file.seek(0)
+                    else:
+                        file = summary.url
 
-        if summary:
-            if isinstance(summary, FileSummary):
-                file = summary.file
-                file.seek(0)
-            else:
-                file = summary.url
+                    if type_ == PhotoSize:
+                        media.append(InputMediaPhoto(file, filename=summary.file_name.name))
+                    elif type_ == Video:
+                        media.append(
+                            InputMediaVideo(
+                                media=file,
+                                filename=summary.file_name.name,
+                                height=summary.height or None,  # type: ignore
+                                width=summary.width or None,  # type: ignore
+                                supports_streaming=True,
+                            )
+                        )
+                    elif type_ == Document:
+                        media.append(InputMediaDocument(media=file, filename=summary.file_name.name))
 
-            if type_ == PhotoSize:
-                return await query_message.reply_photo(
-                    file,
-                    caption=text,
-                    reply_markup=buttons,
-                    filename=str(summary.file_name),
-                    parse_mode=ParseMode.HTML,
-                )
-            elif type_ == Video:
-                return await query_message.reply_video(
-                    file,
-                    caption=text,
-                    reply_markup=buttons,
-                    filename=str(summary.file_name),
-                    parse_mode=ParseMode.HTML,
-                )
-            elif type_ == Document:
-                return await query_message.reply_document(
-                    file,
-                    caption=text,
-                    reply_markup=buttons,
-                    filename=str(summary.file_name),
-                    parse_mode=ParseMode.HTML,
-                )
-        await query_message.reply_html(text, reply_markup=buttons)
+                    await query_message.reply_media_group(
+                        media=media,
+                        parse_mode=ParseMode.HTML,
+                        reply_to_message_id=result_message.message_id,
+                    )
+            return result_message
+        else:
+            summary = type_ = None
+            if result.message.files:
+                summary, type_ = await make_tg_compatible(result.message.files, force_download)
+
+            if summary:
+                if isinstance(summary, FileSummary):
+                    file = summary.file
+                    file.seek(0)
+                else:
+                    file = summary.url
+
+                if type_ == PhotoSize:
+                    return await query_message.reply_photo(
+                        file,
+                        caption=text,
+                        reply_markup=button_markup,
+                        filename=str(summary.file_name),
+                        parse_mode=ParseMode.HTML,
+                    )
+                elif type_ == Video:
+                    return await query_message.reply_video(
+                        file,
+                        caption=text,
+                        reply_markup=button_markup,
+                        filename=str(summary.file_name),
+                        parse_mode=ParseMode.HTML,
+                    )
+                elif type_ == Document:
+                    return await query_message.reply_document(
+                        file,
+                        caption=text,
+                        reply_markup=button_markup,
+                        filename=str(summary.file_name),
+                        parse_mode=ParseMode.HTML,
+                    )
+            await query_message.reply_html(text, reply_markup=button_markup)

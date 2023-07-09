@@ -1,6 +1,6 @@
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, Sequence
 
 from tgtools.telegram.compatibility.base import MediaSummary
 
@@ -39,13 +39,13 @@ class MessageConstruct:
         provider_url (str): The URL of the found media on the provider.
         additional_urls (list[str]): A list of additional URLs related to the message.
         text (dict[str, str | Info | None]): A dictionary containing the text elements of the message.
-        file (MediaSummary | None): The media summary of the message, if available.
+        files (MediaSummary | Sequence[MediaSummary] | None): The media files of the message, if available.
     """
 
     provider_url: str
     additional_urls: list[str]
     text: dict[str, str | Info | None]
-    file: MediaSummary | None
+    files: MediaSummary | Sequence[MediaSummary] | None
 
     @property
     def caption(self) -> str:
