@@ -7,6 +7,7 @@ from emoji import emojize
 from pydantic import BaseModel
 from tgtools.models.file_summary import FileSummary
 from tgtools.telegram.text import tagified_string
+from yarl import URL
 
 from reverse_image_search.providers.base import Info, MessageConstruct, Provider
 
@@ -79,21 +80,29 @@ class PixivProvider(Provider):
         source_url = f"https://www.pixiv.net/en/artworks/{post.id}"
         artist_url = f"https://www.pixiv.net/en/user/{post.user.id}"
 
-        file = await post.download_first()
+        urls = [page.image_urls.best for page in post.meta_pages][:10]
+        files = [BytesIO() for _ in range(len(post.meta_pages[:10]))]
+        mapping = {id(file): (i, page) for i, (page, file) in enumerate(zip(post.meta_pages[:10], files))}
 
-        file_summary = FileSummary(
-            file_name=Path(file),
-            height=post.height,
-            width=post.width,
-            size=(await file.stat()).st_size,
-            file=BytesIO(await file.read_bytes()),
-        )
+        summaries = []
+        async for file in post.get_client().download_many(urls=urls, files=files):
+            index, page = mapping[id(file)]
+            extension = URL(page.image_urls.best).name.rsplit(".", 1)[-1]
+            summaries.append(
+                FileSummary(
+                    file=file,
+                    file_name=Path(f"pixiv_{post.id}_p{index}.{extension}"),
+                    height=0,
+                    width=0,
+                    size=len(file.getvalue()),
+                )
+            )
 
         return MessageConstruct(
             provider_url=str(source_url),
             additional_urls=[
                 artist_url,
             ],
-            file=file_summary,
+            files=summaries,
             text=text,
         )
