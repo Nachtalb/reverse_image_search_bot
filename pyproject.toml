@@ -6,6 +6,19 @@ authors = ["Nachtalb <na@nachtalb.io>"]
 license = "LGPL-3.0"
 readme = "README.md"
 packages = [{ include = "reverse_image_search" }]
+keywords = ["telegram", "reverse image search", "async", "python-telegram-bot"]
+classifiers = [
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Framework :: AsyncIO",
+  "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
+  "Typing :: Typed",
+]
+homepage = "https://github.com/Nachtalb/reverse_image_search_bot"
 
 [tool.poetry.dependencies]
 python = "^3.11, <3.12.0"
@@ -15,23 +28,35 @@ pillow = "^9.4.0"
 imageio = { extras = ["ffmpeg"], version = "^2.27.0" }
 tgtools = { git = "https://github.com/Nachtalb/tgtools", rev = "master" }
 aiostream = "^0.4.5"
-aiopixiv = {git = "https://github.com/Nachtalb/aiopixiv", rev = "master"}
+aiopixiv = { git = "https://github.com/Nachtalb/aiopixiv", rev = "master" }
 
 [tool.poetry.group.dev.dependencies]
 ipdb = "^0.13.13"
 ipython = { extras = ["black"], version = "^8.11.0" }
+pre-commit = "^3.3.3"
+ruff = "^0.0.278"
+mypy = "^1.4.1"
+isort = "^5.12.0"
+black = "^23.7.0"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
+[tool.isort]
+profile = "black"
+line_length = 120
+
 [tool.black]
 line-length = 120
-target-version = ['py311']
 preview = true
+target-version = ["py311"]
 
 [tool.ruff]
 line-length = 120
 
 [tool.mypy]
-ignore_missing_imports = true
+python_version = "3.11"
+show_error_codes = true
+pretty = true
+strict = true

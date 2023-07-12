@@ -1,0 +1,65 @@
+# pip install pre-commit
+# pre-commit install
+# pre-commit run --all-files
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-ast
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-vcs-permalinks
+      - id: debug-statements
+      - id: end-of-file-fixer
+        exclude: tests/test_changes/
+        files: \.(py|sh|rst|yml|yaml)$
+      - id: mixed-line-ending
+      - id: trailing-whitespace
+        files: \.(py|sh|rst|yml|yaml)$
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.9.0
+    hooks:
+      - id: pyupgrade
+  - repo: https://github.com/psf/black
+    rev: 23.7.0
+    hooks:
+      - id: black
+        args: ["--config=pyproject.toml"]
+  - repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
+        args: ["--sp=pyproject.toml"]
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: v0.0.278
+    hooks:
+      - id: ruff
+        args: ["--config=pyproject.toml"]
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.4.1
+    hooks:
+      - id: mypy
+        args: ["--config-file=pyproject.toml"]
+        additional_dependencies:
+          - yarl
+          - httpx
+          - aiopath
+          - pytest
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.0.0
+    hooks:
+      - id: prettier
+        types_or: [markdown, toml]
+        args: [--prose-wrap=always]
+  - repo: https://github.com/python-poetry/poetry
+    rev: 1.5.0
+    hooks:
+      - id: poetry-check
+      - id: poetry-lock
