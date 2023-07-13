@@ -1,12 +1,10 @@
-from io import BytesIO
 from pathlib import Path
 from typing import Optional
 
 from aiopixiv._api import PixivAPI
 from emoji import emojize
-from PIL import Image
 from pydantic import BaseModel
-from tgtools.models.file_summary import FileSummary
+from tgtools.models.summaries import ToDownload
 from tgtools.telegram.text import tagified_string
 from yarl import URL
 
@@ -86,42 +84,29 @@ class PixivProvider(Provider[PixivQuery]):
         source_url = f"https://www.pixiv.net/en/artworks/{post.id}"
         artist_url = f"https://www.pixiv.net/en/user/{post.user.id}"
 
-        pages = post.meta_pages[:10]
+        client = post.get_client()
+        main_file = ToDownload(
+            url=post.meta_pages[data["image_index"] or 0].image_urls.best,
+            download_method=client.download,
+        )
 
-        main_added = False
-        if data["image_index"] is not None:
-            page = post.meta_pages[data["image_index"]]
-            if page not in pages:
-                pages.append(page)
-                main_added = True
-            main = pages.index(page)
-        else:
-            main = 0
-
-        urls = [page.image_urls.best for page in pages]
-        files = [BytesIO() for _ in range(len(pages))]
-        mapping = {id(file): (i, page) for i, (page, file) in enumerate(zip(pages, files))}
-
-        summaries: dict[int, FileSummary] = {}
-        async for file in post.get_client().download_many(urls=urls, files=files):
-            index, page = mapping[id(file)]
-            extension = URL(page.image_urls.best).name.rsplit(".", 1)[-1]
-
-            with Image.open(file) as image:
-                summaries[index] = FileSummary(
-                    file=file,
-                    file_name=Path(f"pixiv_{post.id}_p{index}.{extension}"),
-                    height=image.height,
-                    width=image.width,
-                    size=len(file.getvalue()),
+        additional_files_captions = None
+        additional_files = []
+        if len(pages := post.meta_pages[:10]) > 1:
+            for index, page in enumerate(pages):
+                url = page.image_urls.best
+                additional_files.append(
+                    ToDownload(
+                        url=url,
+                        download_method=client.download,
+                        filename=f"p_{post.id}_p{index}" + Path(URL(url).name).suffix,
+                    )
                 )
 
-        if main_added and len(summaries) > 10:
-            main_file = summaries.pop(main)
-        else:
-            main_file = summaries[main]
-
-        additional_files = [summaries[i] for i in range(len(summaries))]
+            if len(post.meta_pages) > 10:
+                additional_files_captions = [
+                    f"Theser are the first 10 illustrations out of {len(post.meta_pages)} in the post."
+                ]
 
         return MessageConstruct(
             provider_url=str(source_url),
@@ -131,10 +116,5 @@ class PixivProvider(Provider[PixivQuery]):
             text=text,
             file=main_file,
             additional_files=additional_files,
-            additional_files_captions=(
-                f"Only the first 10 out of {len(post.meta_pages)} images are shown, for more use the buttons of the"
-                " result above."
-                if len(post.meta_pages) > 10
-                else None
-            ),
+            additional_files_captions=additional_files_captions,
         )

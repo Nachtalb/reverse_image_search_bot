@@ -1,8 +1,9 @@
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Generic, Literal, Sequence, TypedDict, TypeVar
+from typing import TYPE_CHECKING, Generic, Literal, Optional, Sequence, TypedDict, TypeVar, Union
 
-from tgtools.telegram.compatibility.base import MediaSummary
+from pydantic import Field
+from tgtools.models.summaries import Downloadable, FileSummary
 
 if TYPE_CHECKING:
     from reverse_image_search.engines.base import SearchEngine
@@ -53,8 +54,8 @@ class MessageConstruct:
     provider_url: str
     additional_urls: list[str]
     text: dict[str, str | Info | None]
-    file: MediaSummary | None
-    additional_files: Sequence[MediaSummary] | None = None
+    file: Optional[Union[FileSummary, Downloadable]] = None
+    additional_files: Sequence[Union[FileSummary, Downloadable]] = Field(default_factory=list)
     additional_files_captions: Sequence[str] | str | None = None
 
     @property

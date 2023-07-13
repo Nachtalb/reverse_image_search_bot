@@ -21,10 +21,10 @@ classifiers = [
 homepage = "https://github.com/Nachtalb/reverse_image_search_bot"
 
 [tool.poetry.dependencies]
-python = "^3.11, <3.12.0"
+python = "^3.11"
 bot-manager = { git = "https://github.com/Nachtalb/bot_manager.git", rev = "master" }
 aiohttp = { extras = ["speedups"], version = "^3.8.4" }
-pillow = "^9.4.0"
+pillow = "^10.0.0"
 imageio = { extras = ["ffmpeg"], version = "^2.27.0" }
 tgtools = { git = "https://github.com/Nachtalb/tgtools", rev = "master" }
 aiostream = "^0.4.5"

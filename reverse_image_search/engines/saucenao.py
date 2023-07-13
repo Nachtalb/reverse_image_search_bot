@@ -1,5 +1,5 @@
 import re
-from asyncio import Lock, as_completed
+from asyncio import as_completed
 from typing import AsyncGenerator, Coroutine
 
 from aiohttp import ClientSession
