@@ -49,7 +49,7 @@ async def download_file(update: Update, downloads_dir: Path) -> Path | None:
     unloaded_tg_file = msg.document or msg.video or msg.sticker or msg.photo[-1]
     loaded_tg_file = await unloaded_tg_file.get_file()
 
-    suffix = Path(loaded_tg_file.file_path).suffix  # pyright: ignore[reportGeneralTypeIssues]
+    suffix = Path(loaded_tg_file.file_path).suffix  # type: ignore[arg-type]
     file_location = downloads_dir / (create_short_hash(unloaded_tg_file.file_unique_id) + suffix)
     image_location = file_location.with_stem(".jpg")
 
@@ -62,7 +62,7 @@ async def download_file(update: Update, downloads_dir: Path) -> Path | None:
 
     if msg.video or msg.animation or (msg.sticker and msg.sticker.is_video):
         # Extract the first frame of the video as an image
-        video_reader = imageio.get_reader(file_location, "ffmpeg")  # pyright: ignore[reportGeneralTypeIssues]
+        video_reader = imageio.get_reader(file_location, "ffmpeg")  # type: ignore[arg-type]
         first_frame = video_reader.get_data(0)
         image_location = downloads_dir / (create_short_hash(unloaded_tg_file.file_unique_id) + ".jpg")
         imageio.imwrite(image_location, first_frame)

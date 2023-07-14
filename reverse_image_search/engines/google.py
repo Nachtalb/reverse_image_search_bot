@@ -18,5 +18,5 @@ class GoogleSearchEngine(SearchEngine):
     credit_url = "https://www.google.com"
     query_url_template = "https://www.google.com/searchbyimage?safe=off&sbisrc=tg&image_url={file_url}"
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()

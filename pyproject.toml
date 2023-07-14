@@ -60,3 +60,7 @@ python_version = "3.11"
 show_error_codes = true
 pretty = true
 strict = true
+
+[[tool.mypy.overrides]]
+module = "aiostream.*"
+ignore_missing_imports = "True"

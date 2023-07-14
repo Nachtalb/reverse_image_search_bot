@@ -1,7 +1,10 @@
+from typing import Any
+
 from aiohttp import BasicAuth, ClientSession
 from emoji import emojize
 from pydantic import BaseModel
 from tgtools.api import DanbooruApi, GelbooruApi, KonachanApi, YandereApi
+from tgtools.api.booru.base import BooruApi
 from tgtools.models import RATING
 from tgtools.telegram.text import tagified_string
 
@@ -95,6 +98,7 @@ class BooruProvider(Provider[BooruQuery]):
             data = {"provider": "yandere", "id": 67890}
             message_construct = await booru_provider.provide(data)
         """
+        provider: BooruApi[Any]
         match data["provider"]:
             case "danbooru":
                 provider = self.danbooru

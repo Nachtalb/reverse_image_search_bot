@@ -2091,7 +2091,7 @@ python-telegram-bot = "^20.2"
 type = "git"
 url = "https://github.com/Nachtalb/tgtools"
 reference = "master"
-resolved_reference = "d7c43144969b10ae6543e3c19eebb6930180092d"
+resolved_reference = "01afad623946834940cc293b053a930dc1068a1c"
 
 [[package]]
 name = "traitlets"

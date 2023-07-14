@@ -48,10 +48,14 @@ repos:
       - id: mypy
         args: ["--config-file=pyproject.toml"]
         additional_dependencies:
-          - yarl
-          - httpx
           - aiopath
+          - git+https://github.com/Nachtalb/aiopixiv#egg=aiopixiv
+          - git+https://github.com/Nachtalb/bot_manager#egg=bot_manager
+          - git+https://github.com/Nachtalb/tgtools#egg=tgtools
+          - httpx
           - pytest
+          - python-telegram-bot
+          - yarl
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v3.0.0
     hooks:

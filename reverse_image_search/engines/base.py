@@ -3,7 +3,7 @@ from asyncio import Lock
 from time import time
 from typing import Any, AsyncGenerator, TypedDict
 
-from reverse_image_search.providers.base import Provider, QueryData, SearchResult
+from reverse_image_search.providers.base import Provider, QueryData, SearchResult, T_QueryData
 
 
 class CachedSearchResult(TypedDict):
@@ -48,7 +48,7 @@ class SearchEngine(metaclass=ABCMeta):
     cache_time: int = 172800
 
     @abstractmethod
-    def __init__(self, providers: dict[str, Provider] = {}):
+    def __init__(self, providers: dict[str, Provider[T_QueryData]] = {}):
         if not all(
             hasattr(self, attr) for attr in ("name", "description", "pros", "cons", "credit_url", "query_url_template")
         ):
@@ -119,8 +119,8 @@ class SearchEngine(metaclass=ABCMeta):
                 return result
             self._add_cached(search_query)  # Reserve spot until provider is finished
 
-        message = await self.providers[provider_name].provide(query)
-        provider_info = self.providers[provider_name].provider_info(query)
+        message = await self.providers[provider_name].provide(query)  # type: ignore[arg-type]
+        provider_info = self.providers[provider_name].provider_info(query)  # type: ignore[arg-type]
 
         return self._add_cached(search_query, SearchResult(self, provider_info, message) if message else None)
 

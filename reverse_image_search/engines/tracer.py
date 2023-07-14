@@ -12,5 +12,5 @@ class TraceSearchEngine(SearchEngine):
     credit_url = "https://trace.moe/"
     query_url_template = "https://trace.moe/?auto&url={file_url}"
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()

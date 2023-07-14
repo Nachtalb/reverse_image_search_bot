@@ -13,5 +13,5 @@ class Ascii2dSearchEngine(SearchEngine):
     credit_url = "https://ascii2d.net/"
     query_url_template = "https://ascii2d.net/search/url/{file_url}"
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()

@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 from aiohttp import ClientSession
 
-from reverse_image_search.providers.base import Provider
+from reverse_image_search.providers.base import Provider, T_QueryData
 
 from .ascii2d import Ascii2dSearchEngine
 from .base import SearchEngine
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 async def initiate_engines(
     session: ClientSession,
     config: "ReverseImageSearch.Arguments",
-    providers: dict[str, Provider],
+    providers: dict[str, Provider[T_QueryData]],
 ) -> list[SearchEngine]:
     return [
         SauceNaoSearchEngine(config.saucenao.api_key, session, providers),

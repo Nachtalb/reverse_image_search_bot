@@ -12,5 +12,5 @@ class SogouSearchEngine(SearchEngine):
     credit_url = "https://pic.sogou.com/"
     query_url_template = "https://pic.sogou.com/ris?flag=1&drag=0&query={file_url}"
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()

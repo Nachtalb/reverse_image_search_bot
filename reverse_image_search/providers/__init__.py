@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from aiohttp import ClientSession
 
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 async def initiate_data_providers(
     session: ClientSession, config: "ReverseImageSearch.Arguments"
-) -> dict[str, Provider]:
+) -> dict[str, Provider[Any]]:
     return {
         "booru": BooruProvider(session, config.boorus),
         "pixiv": PixivProvider(config.pixiv),

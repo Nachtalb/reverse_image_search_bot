@@ -1,6 +1,6 @@
 import re
 from asyncio import as_completed
-from typing import AsyncGenerator, Coroutine
+from typing import Any, AsyncGenerator, Coroutine
 
 from aiohttp import ClientSession
 from pydantic import BaseModel
@@ -50,7 +50,7 @@ class SauceNaoSearchEngine(SearchEngine):
     class Config(BaseModel):
         api_key: str
 
-    def __init__(self, api_key: str, session: ClientSession, providers: dict[str, Provider]):
+    def __init__(self, api_key: str, session: ClientSession, providers: dict[str, Provider[Any]]) -> None:
         """
         Initialise the SauceNaoSearchEngine.
 
@@ -63,7 +63,7 @@ class SauceNaoSearchEngine(SearchEngine):
         self.api_key = api_key
         self.session = session
 
-    async def _api_search(self, file_url: str) -> dict:
+    async def _api_search(self, file_url: str) -> dict[str, Any]:
         """
         Perform a search on the SauceNAO search engine using a file URL.
 
@@ -93,7 +93,7 @@ class SauceNaoSearchEngine(SearchEngine):
             headers=headers,
             params={"api_key": self.api_key, "output_type": 2},
         ) as response:
-            return await response.json()
+            return await response.json()  # type: ignore[no-any-return]
 
     async def search(self, file_url: str) -> AsyncGenerator[SearchResult, None]:
         results = await self._api_search(file_url)

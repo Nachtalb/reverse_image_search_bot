@@ -13,7 +13,7 @@ class IqdbSearchEngine(SearchEngine):
     credit_url = "https://iqdb.org/"
     query_url_template = "https://iqdb.org/?url={file_url}"
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
 
@@ -28,5 +28,5 @@ class Iqdb3DSearchEngine(SearchEngine):
     credit_url = "https://3d.iqdb.org/"
     query_url_template = "https://3d.iqdb.org/?url={file_url}"
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()

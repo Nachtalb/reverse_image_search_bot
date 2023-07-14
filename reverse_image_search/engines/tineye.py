@@ -12,5 +12,5 @@ class TineyeSearchEngine(SearchEngine):
     credit_url = "https://tineye.com/"
     query_url_template = "https://tineye.com/search?url={file_url}"
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()

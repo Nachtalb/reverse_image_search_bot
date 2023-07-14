@@ -12,5 +12,5 @@ class BingSearchEngine(SearchEngine):
     credit_url = "https://www.bing.com/images/"
     query_url_template = "https://www.bing.com/images/search?q=imgurl:{file_url}&view=detailv2&iss=sbi"
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()

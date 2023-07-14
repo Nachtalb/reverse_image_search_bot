@@ -22,7 +22,8 @@ from telegram import (
 from telegram.constants import ParseMode
 from telegram.error import BadRequest
 from telegram.ext import CommandHandler, ContextTypes, MessageHandler, filters
-from tgtools.telegram.compatibility import OutputFileType, make_tg_compatible
+from tgtools.telegram.compatibility import make_tg_compatible
+from tgtools.telegram.compatibility.base import OutputFileType
 from tgtools.utils.types import TELEGRAM_FILES
 from tgtools.utils.urls.emoji import FALLBACK_EMOJIS, host_name
 
@@ -242,12 +243,12 @@ class ReverseImageSearch(Application):
         else:
             clean_captions = captions
 
-        ready_media = []
+        ready_media: list[InputMediaVideo | InputMediaPhoto | InputMediaDocument] = []
         for (file, type_), caption in zip(files, clean_captions):
             if not file:
                 continue
             ready_media.append(
-                await self._get_input_media(
+                await self._get_input_media(  # type: ignore[arg-type]
                     file=file,
                     type_=type_,
                     caption=caption,

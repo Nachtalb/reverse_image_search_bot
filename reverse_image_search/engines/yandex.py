@@ -13,5 +13,5 @@ class YandexSearchEngine(SearchEngine):
     credit_url = "https://yandex.com/images/"
     query_url_template = "https://yandex.com/images/search?url={file_url}&rpt=imageview"
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
