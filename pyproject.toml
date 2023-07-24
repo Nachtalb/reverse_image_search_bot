@@ -31,13 +31,13 @@ aiostream = "^0.4.5"
 aiopixiv = { git = "https://github.com/Nachtalb/aiopixiv", rev = "master" }
 
 [tool.poetry.group.dev.dependencies]
-ipdb = "^0.13.13"
-ipython = { extras = ["black"], version = "^8.11.0" }
-pre-commit = "^3.3.3"
-ruff = "^0.0.278"
-mypy = "^1.4.1"
-isort = "^5.12.0"
-black = "^23.7.0"
+ipdb = ">=0.13.13"
+ipython = { extras = ["black"], version = ">=8.11.0" }
+pre-commit = ">=3.3.3"
+ruff = ">=0.0.278"
+mypy = ">=1.4.1"
+isort = ">=5.12.0"
+black = ">=23.7.0"
 
 [build-system]
 requires = ["poetry-core"]
