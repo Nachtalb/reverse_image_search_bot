@@ -237,6 +237,8 @@ class ReverseImageSearch(Application):
             clean_captions = [captions] + [None] * (len(files) - 1)
         elif captions is None:
             clean_captions = [None] * len(files)
+        elif len(captions) != len(files):
+            clean_captions = list(captions) + [None] * (len(files) - len(captions))
         else:
             clean_captions = captions
 
