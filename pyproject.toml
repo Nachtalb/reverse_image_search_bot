@@ -23,7 +23,7 @@ homepage = "https://github.com/Nachtalb/reverse_image_search_bot"
 [tool.poetry.dependencies]
 python = "^3.11"
 bot-manager = { git = "https://github.com/Nachtalb/bot_manager.git", rev = "master" }
-aiohttp = { extras = ["speedups"], version = "^3.8.4" }
+aiohttp = { extras = ["speedups"], version = "^3.8.5" }
 pillow = "^10.0.0"
 imageio = { extras = ["ffmpeg"], version = "^2.27.0" }
 tgtools = { git = "https://github.com/Nachtalb/tgtools", rev = "master" }
