@@ -177,6 +177,12 @@ class ReverseImageSearch(Application):
         if additional_files_tasks:
             ready_files = [(file, type_) for file, type_ in await gather(*additional_files_tasks) if file is not None]
 
+            if len(additional_files_tasks) != len(ready_files):
+                self.logger.warning(
+                    f"Can't send all additional files, wanted: {len(additional_files_tasks)}, ready:"
+                    f" {len(ready_files)}. The result comes from {result.provider.name}"
+                )
+
             await self._send_media_group(
                 files=ready_files,
                 message=main_message,
