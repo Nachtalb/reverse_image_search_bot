@@ -3,7 +3,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generic, Literal, Optional, Sequence, TypedDict, TypeVar, Union
 
 from pydantic import Field
+from telegram import InlineKeyboardButton
 from tgtools.models.summaries import Downloadable, FileSummary
+from tgtools.utils.urls.emoji import FALLBACK_EMOJIS, host_emoji, host_name
 
 if TYPE_CHECKING:
     from reverse_image_search.engines.base import SearchEngine
@@ -44,15 +46,15 @@ class MessageConstruct:
     """A data class representing a message construct.
 
     Attributes:
-        provider_url (str): The URL of the found media on the provider.
-        additional_urls (list[str]): A list of additional URLs related to the message.
+        provider_url (str | tuple[str, str]): The URL of the found media on the provider.
+        additional_urls (list[str | tuple[str, str]]): A list of additional URLs related to the message.
         text (dict[str, str | Info | None]): A dictionary containing the text elements of the message.
         file (MediaSummary | None): The main media file sent with the result message.
         additional_files (Sequence[MediaSummary] | None): Max 10 additional media files, sent in a media group
     """
 
-    provider_url: str
-    additional_urls: list[str]
+    provider_url: str | tuple[str, str]
+    additional_urls: list[str | tuple[str, str]]
     text: dict[str, str | Info | None]
     file: Optional[Union[FileSummary, Downloadable]] = None
     additional_files: Sequence[Union[FileSummary, Downloadable]] = Field(default_factory=list)
@@ -61,6 +63,32 @@ class MessageConstruct:
     @property
     def caption(self) -> str:
         return "\n".join(f"<b>{title}:</b> {str(content)}" for title, content in self.text.items() if content)
+
+    @property
+    def provider_button(self) -> InlineKeyboardButton:
+        if isinstance(self.provider_url, str):
+            text = host_name(self.provider_url, with_emoji=True, fallback=FALLBACK_EMOJIS["globe"])
+            url = self.provider_url
+        else:
+            text, url = self.provider_url
+            emoji = host_emoji(url, fallback=FALLBACK_EMOJIS["globe"])
+            text = f"{emoji} {text}"
+        return InlineKeyboardButton(text=text, url=url)
+
+    @property
+    def additional_buttons(self) -> list[InlineKeyboardButton]:
+        buttons = []
+        for url_or_tuple in self.additional_urls:
+            if isinstance(url_or_tuple, str):
+                text = host_name(url_or_tuple, with_emoji=True, fallback=FALLBACK_EMOJIS["globe"])
+                url = url_or_tuple
+            else:
+                text, url = url_or_tuple
+                emoji = host_emoji(url, fallback=FALLBACK_EMOJIS["globe"])
+                text = f"{emoji} {text}"
+            buttons.append(InlineKeyboardButton(text=text, url=url))
+
+        return buttons
 
 
 @dataclass

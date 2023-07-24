@@ -105,13 +105,13 @@ class PixivProvider(Provider[PixivQuery]):
 
             if len(post.meta_pages) > 10:
                 additional_files_captions = [
-                    f"Theser are the first 10 illustrations out of {len(post.meta_pages)} in the post."
+                    f"These are the first 10 illustrations out of {len(post.meta_pages)} in the post."
                 ]
 
         return MessageConstruct(
-            provider_url=str(source_url),
+            provider_url=("Artwork", str(source_url)),
             additional_urls=[
-                artist_url,
+                ("Artist", str(artist_url)),
             ],
             text=text,
             file=main_file,

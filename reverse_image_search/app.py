@@ -25,7 +25,6 @@ from telegram.ext import CommandHandler, ContextTypes, MessageHandler, filters
 from tgtools.telegram.compatibility import make_tg_compatible
 from tgtools.telegram.compatibility.base import OutputFileType
 from tgtools.utils.types import TELEGRAM_FILES
-from tgtools.utils.urls.emoji import FALLBACK_EMOJIS, host_name
 
 from reverse_image_search.engines import initiate_engines
 from reverse_image_search.engines.saucenao import SauceNaoSearchEngine
@@ -126,15 +125,7 @@ class ReverseImageSearch(Application):
     async def send_message_construct(
         self, result: SearchResult, query_message: Message, force_download: bool = False
     ) -> None:
-        buttons = [
-            InlineKeyboardButton(
-                host_name(result.message.provider_url, with_emoji=True, fallback=FALLBACK_EMOJIS["globe"]),
-                result.message.provider_url,
-            )
-        ]
-        for url in result.message.additional_urls:
-            buttons.append(InlineKeyboardButton(host_name(url, with_emoji=True), url=url))
-
+        buttons = [result.message.provider_button, *result.message.additional_buttons]
         markup = InlineKeyboardMarkup(tuple(chunks(buttons, 3)))
 
         additional_files_tasks = [
