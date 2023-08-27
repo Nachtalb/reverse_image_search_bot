@@ -1,7 +1,9 @@
+from io import BytesIO
 from pathlib import Path
-from typing import Optional
+from typing import Any, Awaitable, Callable, Optional
 
 from aiopixiv._api import PixivAPI
+from aiopixiv.models.ugoira import UgoiraIllust
 from emoji import emojize
 from pydantic import BaseModel
 from tgtools.models.summaries import ToDownload
@@ -81,37 +83,48 @@ class PixivProvider(Provider[PixivQuery]):
                 ]
             ),
         }
-        source_url = f"https://www.pixiv.net/en/artworks/{post.id}"
-        artist_url = f"https://www.pixiv.net/en/user/{post.user.id}"
-
-        client = post.get_client()
-        main_file = ToDownload(
-            url=post.meta_pages[data["image_index"] or 0].image_urls.best,
-            download_method=client.download,
-        )
 
         additional_files_captions = None
         additional_files = []
-        if len(pages := post.meta_pages[:10]) > 1:
-            for index, page in enumerate(pages):
-                url = page.image_urls.best
-                additional_files.append(
-                    ToDownload(
-                        url=url,
-                        download_method=client.download,
-                        filename=f"p_{post.id}_p{index}" + Path(URL(url).name).suffix,
-                    )
-                )
 
-            if len(post.meta_pages) > 10:
-                additional_files_captions = [
-                    f"These are the first 10 illustrations out of {len(post.meta_pages)} in the post."
-                ]
+        if not isinstance(post, UgoiraIllust):
+            client = post.get_client()
+            main_file = ToDownload(
+                url=post.meta_pages[data["image_index"] or 0].image_urls.best,
+                download_method=client.download,
+            )
+            if len(pages := post.meta_pages[:10]) > 1:
+                for index, page in enumerate(pages):
+                    url = page.image_urls.best
+                    additional_files.append(
+                        ToDownload(
+                            url=url,
+                            download_method=client.download,
+                            filename=f"p_{post.id}_p{index}" + Path(URL(url).name).suffix,
+                        )
+                    )
+
+                if len(post.meta_pages) > 10:
+                    additional_files_captions = [
+                        f"These are the first 10 illustrations out of {len(post.meta_pages)} in the post."
+                    ]
+        else:
+
+            def download_wrapper(illust: UgoiraIllust) -> Callable[..., Awaitable[BytesIO]]:
+                async def download(*_: Any, **__: Any) -> BytesIO:
+                    return await illust.download_as_gif()  # type: ignore[no-any-return]
+
+                return download
+
+            main_file = ToDownload(
+                url=f"p_{post.id}.gif",
+                download_method=download_wrapper(post),
+            )
 
         return MessageConstruct(
-            provider_url=("Artwork", str(source_url)),
+            provider_url=("Artwork", str(f"https://www.pixiv.net/en/artworks/{post.id}")),
             additional_urls=[
-                ("Artist", str(artist_url)),
+                ("Artist", str(f"https://www.pixiv.net/en/user/{post.user.id}")),
             ],
             text=text,
             file=main_file,

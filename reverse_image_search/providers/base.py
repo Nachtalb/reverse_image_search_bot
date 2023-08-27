@@ -1,8 +1,7 @@
 from abc import ABCMeta, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Generic, Literal, Optional, Sequence, TypedDict, TypeVar, Union
 
-from pydantic import Field
 from telegram import InlineKeyboardButton
 from tgtools.models.summaries import Downloadable, FileSummary
 from tgtools.utils.urls.emoji import FALLBACK_EMOJIS, host_emoji, host_name
@@ -57,7 +56,7 @@ class MessageConstruct:
     additional_urls: list[str | tuple[str, str]]
     text: dict[str, str | Info | None]
     file: Optional[Union[FileSummary, Downloadable]] = None
-    additional_files: Sequence[Union[FileSummary, Downloadable]] = Field(default_factory=list)
+    additional_files: Sequence[Union[FileSummary, Downloadable]] = field(default_factory=list)
     additional_files_captions: Sequence[str] | str | None = None
 
     @property
