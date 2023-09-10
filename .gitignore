@@ -1,3 +1,11 @@
+### Reverse Image Search Bot
+settings.py
+log/
+tmp/
+.pixiv_auth
+downloads/
+config.json
+
 # Created by https://www.toptal.com/developers/gitignore/api/python,vim,linux
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,vim,linux
 
@@ -118,7 +126,7 @@ ipython_config.py
 #   This is especially recommended for binary packages to ensure reproducibility, and is more
 #   commonly ignored for libraries.
 #   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
-poetry.lock
+# poetry.lock
 
 # pdm
 #   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
@@ -209,9 +217,3 @@ tags
 [._]*.un~
 
 # End of https://www.toptal.com/developers/gitignore/api/python,vim,linux
-
-### Reverse Image Search Bot
-settings.py
-log/
-tmp/
-.pixiv_auth

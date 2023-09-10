@@ -1,79 +1,57 @@
-# Reverse Image Search Bot
+<!-- markdownlint-disable MD033 -->
+<!-- markdownlint-disable MD013 -->
+<h1 align="center">Image Reverse Search Bot 🕵️‍♂️🔍</h1>
+<p align="center">
+  <img src="https://img.shields.io/badge/License-LGPLv3-blue.svg" alt="License: LGPL-3.0">
+  <img src="https://img.shields.io/github/stars/Nachtalb/reverse_image_search_bot?style=social" alt="GitHub Stars">
+  <img src="https://img.shields.io/github/forks/Nachtalb/reverse_image_search_bot?style=social" alt="GitHub Forks">
+  <img src="https://img.shields.io/github/issues/Nachtalb/reverse_image_search_bot" alt="GitHub Issues">
+  <img src="https://img.shields.io/github/issues-pr/Nachtalb/reverse_image_search_bot" alt="GitHub Pull Requests">
+  <br>
+  <a href="https://github.com/Nachtalb"><img src="https://img.shields.io/badge/Author-Nachtalb-1f425f.svg" alt="Author: Nachtalb"></a>
+  <a href="https://t.me/Nachtalb"><img src="https://img.shields.io/badge/Telegram-Nachtalb-blue" alt="Telegram: Nachtalb"></a>
+  <a href="https://t.me/reverse_image_search_bot"><img src="https://img.shields.io/badge/Bot-Image%20Reverse%20Search-4250b6" alt="Bot: Image Reverse Search"></a>
+</p>
+<!-- markdownlint-enable MD013-->
 
-## How to use me
+> :warning: **Heads up, folks!**: Our trusty bot is currently undergoing a
+> complete makeover! I'm actively developing on the
+> [`na/v2`](https://github.com/Nachtalb/reverse_image_search_bot/pull/22)
+> branch, so make sure to keep an eye on that one instead of `master`.
 
-Send me an image, sticker, video/gif or url and I will send you direct reverse
-image search links for SauceNao, Google, Yandex and the like. For anime images
-I recommend SauceNao, for other images I recommend to use Google, Yandex.
+## About 🌟
 
-Supported engines:
+Introducing Image Reverse Search, your friendly Telegram bot that helps you
+perform reverse image searches for images, videos, and GIFs! 📷🎞️🎉 With support
+for a wide range of search engines, you'll get results directly within Telegram
+for some, while others will provide an inline button leading you to the engine's
+reverse search website. It's like having your personal detective right in your
+pocket! 🕵️‍♂️
 
-- All-in-one: Google, Yandex, Baidu, Shutterstock, Bing, TinEye, Sogou
-- Artworks & Anime: SauceNAO, IQDB, Trace, ascii2d
+## Installation 🛠️
 
-Inline results support:
+1. Clone the repository like a pro!
+2. Copy `config.example.json` to `config.json` and fill in the top-secret
+   information.
+3. Make sure the treasure trove of the `downloads` folder is accessible via the
+   `file_url` provided.
+4. Install the bot using the magical command `poetry install`.
+5. Finally, unleash the bot with `poetry run start-bots`!
 
-SauceNAO, IQDB, Trace
+## Parity with Old Version 🕰️
 
-## Commands
+Our dear bot is missing a few tricks from its older self. Here's what's not yet
+implemented:
 
-- `/help`, `/start`: Show this help message
-- `/credits`: Show all available engines (and what they are best for), data
-  providers and other credits.
-- `/tips`: Various tips and tricks for better search results
-- `/search`: Reply to a message with an image or video to start a search
-- `/auto_search`: Toggle auto search on and off
+- Inline results for Pixiv 🖼️
+- Generic SauceNAO results 🌐
+- MangaDex 📚
+- Anilist 📝
+- Trace.moe 🎥
+- Generic IQDB results 🌐
+- Baidu search link 🇨🇳
 
-![example](https://raw.githubusercontent.com/Nachtalb/reverse_image_search_bot/master/reverse_image_search_bot/images/help.jpg)
+## License 📄
 
-## Author
-
-- [Nachtalb on Github](https://github.com/Nachtalb)
-- [@Nachtalb on Telegram](https://t.me/Nachtalb)
-
-## Donations
-
-- [PayPal](https://paypal.me/Espig)
-- BTC: `3E6Pw8gwLJSyfumpjuJ6CWNKjZJLCmXZ2G`
-- BTC/BSC: `0x3c5211340Db470A31F1a37E343E326db69FF2F5C`
-- ETH: `0x3c5211340Db470A31F1a37E343E326db69FF2F5C`
-- USDC: `0x3c5211340Db470A31F1a37E343E326db69FF2F5C`
-- PayString: `nachtalb$paystring.crypto.com`
-
-## Other Bots
-
-- [@XenianBot](https://t.me/XenianBot) All general purpose but with tons of functionality
-
-## Issues / Contributions
-
-- [Code repository](https://github.com/Nachtalb/reverse_image_search_bot)
-- [@Nachtalb](https://t.me/Nachtalb)
-- via /support at [@XenianBot](https://t.me/Nachtalb)
-
-Thank you for using [@reverse_image_search_bot](https://t.me/reverse_image_search_bot).
-
-### Installation
-
-Requires at least **Python 3.10**.
-
-Best if you create a python virtualenv.
-
-Install all dependencies with:
-
-```bash
-pip install -r requirements.txt
-```
-
-After this is complete, you have to get an API Token from Telegram. You can
-easily get one via [@BotFather](https://t.me/BotFather).
-
-Now that you have your API Token copy the `settings.example.py` to `settings.py`
-and paste in your API Token and so on.
-
-Finally you can use this to start your bot.
-
-```bash
-python run_bot.py
-```
-
-Thank you for using [@reverse_image_search_bot](https://t.me/reverse_image_search_bot).
+This project is proudly licensed under the
+[LGPL-3.0 License](https://licenses.nachtalb.io/#lgpl-3.0). 😎

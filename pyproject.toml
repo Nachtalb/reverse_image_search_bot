@@ -1,38 +1,66 @@
-[tool.black]
-line-length = 120
-target-version = ['py310']
-experimental-string-processing = true
-
 [tool.poetry]
-name = "reverse-image-search-bot"
-version = "1.0.0"
-description = "Discover https://t.me/reverse_image_search_bot, a convenient Telegram bot that delivers instant reverse image search engine links and in-app results upon receiving media, simplifying your quest for related images, sources, and additional information."
+name = "reverse-image-search"
+version = "2.0.0a0"
+description = "A Telegram bot that provides direct reverse image search links for various engines like Google, Yandex, SauceNAO, IQDB, and more. Send an image, sticker or video/gif, and get search results from multiple platforms. Supports auto search and offers various tips for better search results."
 authors = ["Nachtalb <na@nachtalb.io>"]
 license = "LGPL-3.0"
 readme = "README.md"
-packages = [{include = "reverse_image_search_bot"}]
+packages = [{ include = "reverse_image_search" }]
+keywords = ["telegram", "reverse image search", "async", "python-telegram-bot"]
+classifiers = [
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Framework :: AsyncIO",
+  "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
+  "Typing :: Typed",
+]
+homepage = "https://github.com/Nachtalb/reverse_image_search_bot"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-python-magic = "0.4.24"
-validators = "0.18.2"
-python-telegram-bot = {version = "13.11", extras = ["json", "socks"]}
-gppt = "1.6"
-cleverdict = "1.9.1"
-paramiko = {version = "2.9.2", extras = ["all"]}
-pixiv-api = "1.0.0"
-moviepy = "1.0.3"
-pyopenssl = "21.0.0"
-emoji = "^2.2.0"
-user-agent = "^0.1.10"
-requests-html = "^0.10.0"
-yarl = "^1.8.2"
-
+bot-manager = { git = "https://github.com/Nachtalb/bot_manager.git", rev = "master" }
+aiohttp = { extras = ["speedups"], version = "^3.8.4" }
+pillow = "^10.0.0"
+imageio = { extras = ["ffmpeg"], version = "^2.27.0" }
+tgtools = { git = "https://github.com/Nachtalb/tgtools", rev = "master" }
+aiostream = "^0.4.5"
+aiopixiv = { git = "https://github.com/Nachtalb/aiopixiv", rev = "master" }
 
 [tool.poetry.group.dev.dependencies]
-ipdb = "^0.13.13"
-ipython = {extras = ["black"], version = "^8.12.0"}
+ipdb = ">=0.13.13"
+ipython = { extras = ["black"], version = ">=8.11.0" }
+pre-commit = ">=3.3.3"
+ruff = ">=0.0.278"
+mypy = ">=1.4.1"
+isort = ">=5.12.0"
+black = ">=23.7.0"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
+line_length = 120
+
+[tool.black]
+line-length = 120
+preview = true
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.mypy]
+python_version = "3.11"
+show_error_codes = true
+pretty = true
+strict = true
+
+[[tool.mypy.overrides]]
+module = "aiostream.*"
+ignore_missing_imports = "True"
