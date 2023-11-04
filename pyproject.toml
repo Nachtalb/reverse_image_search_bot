@@ -1,0 +1,63 @@
+[tool.poetry]
+name = "ris"
+version = "3.0.0a0"
+description = "Reverse Image Search Bot for Telegram"
+authors = ["Nachtalb <na@nachtalb.io>"]
+license = "LGPL-3.0"
+readme = "README.md"
+keywords = ["telegram", "reverse image search", "async", "aiogram"]
+classifiers = [
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "Framework :: AsyncIO",
+  "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
+  "Typing :: Typed",
+]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+aiogram = { git = "https://github.com/Nachtalb/aiogram.git", rev = "python-3.12", extras = [
+  "fast",
+] }
+aiohttp = { version = "^3.8.6", allow-prereleases = true, extras = [
+  "speedups",
+] }
+aiopath = "^0.7.7"
+
+[tool.poetry.group.dev.dependencies]
+ipdb = "^0.13.13"
+pre-commit = "^3.5.0"
+ruff = "^0.1.4"
+mypy = "^1.6.1"
+isort = "^5.12.0"
+black = "^23.10.1"
+ruff-lsp = "^0.0.42"
+
+[[tool.poetry.source]]
+name = "PyPI"
+priority = "primary"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
+line_length = 120
+
+[tool.black]
+line-length = 120
+preview = true
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.mypy]
+python_version = "3.12"
+show_error_codes = true
+pretty = true
+strict = true
