@@ -16,6 +16,7 @@ from redis.asyncio.client import Redis
 
 from ris.files import prepare
 from ris.s3 import S3Manager
+from ris.utils import chunks
 
 load_dotenv()
 
@@ -26,6 +27,31 @@ if not BASE_URL:
 
 form_router = Router()
 s3: S3Manager = None  # type: ignore[assignment]
+
+simple_engines = {
+    "Google": "https://www.google.com/searchbyimage?safe=off&sbisrc=tg&image_url={file_url}",
+    "Yandex": "https://yandex.com/images/search?url={file_url}&rpt=imageview",
+    "TinEye": "https://tineye.com/search/?url={file_url}",
+    "Bing": "https://www.bing.com/images/searchbyimage?FORM=IRSBIQ&cbir=sbi&imgurl={file_url}",
+    # "Baidu": "https://graph.baidu.com/details?isfromtusoupc=1&tn=pc&queryImageUrl={file_url}",  # Has to be uploaded to Baidu first
+    # "Sogou": "https://pic.sogou.com/ris?query={file_url}",   # Has to be uploaded to Sogou first
+    "IQDB": "https://iqdb.org/?url={file_url}",
+    "ASCII2D": "https://ascii2d.net/search/url/{file_url}",
+    "SauceNAO": "https://saucenao.com/search.php?db=999&url={file_url}",
+    "TraceMoe": "https://trace.moe/?auto&url={file_url}",
+}
+
+
+def get_simple_engine_buttons(file_url: str) -> list[list[InlineKeyboardButton]]:
+    return list(
+        chunks(
+            [
+                InlineKeyboardButton(text=name, url=url.format(file_url=file_url))
+                for name, url in simple_engines.items()
+            ],
+            2,
+        )
+    )
 
 
 class Form(StatesGroup):
@@ -53,16 +79,10 @@ async def search(message: Message, state: FSMContext) -> None:
 
     url = f"{BASE_URL}/{prepared}"
 
-    await message.copy_to(chat_id=message.chat.id)
     await message.reply(
         f"Searching for {url}...",
         reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(text="A", callback_data="A"),
-                    InlineKeyboardButton(text="B", callback_data="B"),
-                ]
-            ],
+            inline_keyboard=get_simple_engine_buttons(url),
         ),
     )
 
