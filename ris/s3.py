@@ -1,3 +1,4 @@
+import mimetypes
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, AsyncGenerator, BinaryIO
@@ -32,12 +33,21 @@ class S3Manager:
         if not bucket:
             raise ValueError("No bucket specified")
 
+        extra_args = {}
+
+        if public:
+            extra_args["ACL"] = "public-read"
+
+        content_type, _ = mimetypes.guess_type(file_path, strict=False)
+        content_type = content_type or "application/octet-stream"
+        extra_args["ContentType"] = content_type
+
         async with self.client() as s3_client:
             await s3_client.upload_fileobj(
                 file_content,
                 bucket,
                 file_path,
-                ExtraArgs={"ACL": "public-read"} if public else {},
+                ExtraArgs=extra_args,
             )
 
     async def file_exists(self, file_path: str | Path, bucket: str = "") -> bool:
