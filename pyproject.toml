@@ -24,6 +24,8 @@ aiohttp = { version = "^3.8.6", allow-prereleases = true, extras = [
   "speedups",
 ] }
 aiopath = "^0.7.7"
+aioboto3 = "^12.0.0"
+python-dotenv = "^1.0.0"
 
 [tool.poetry.group.dev.dependencies]
 ipdb = "^0.13.13"
@@ -33,6 +35,7 @@ mypy = "^1.6.1"
 isort = "^5.12.0"
 black = "^23.10.1"
 ruff-lsp = "^0.0.42"
+types-aioboto3 = {extras = ["aioboto3", "essential"], version = "^12.0.0"}
 
 [[tool.poetry.source]]
 name = "PyPI"

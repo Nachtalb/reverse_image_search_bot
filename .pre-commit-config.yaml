@@ -48,6 +48,8 @@ repos:
           - aiogram@git+https://github.com/Nachtalb/aiogram.git@python-3.12#egg=aiogram[fast,redis]
           - aiopath
           - yarl
+          - types-aioboto3[aioboto3, essential]
+          - python-dotenv
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v3.0.3
     hooks:
