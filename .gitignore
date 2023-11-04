@@ -228,3 +228,5 @@ tags
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/python,vim,linux,visualstudiocode
+
+redis_data

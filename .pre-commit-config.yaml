@@ -45,6 +45,7 @@ repos:
       - id: mypy
         args: ["--config-file=pyproject.toml"]
         additional_dependencies:
+          - aiogram@git+https://github.com/Nachtalb/aiogram.git@python-3.12#egg=aiogram[fast,redis]
           - aiopath
           - yarl
   - repo: https://github.com/pre-commit/mirrors-prettier

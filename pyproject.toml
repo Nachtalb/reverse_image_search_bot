@@ -19,9 +19,7 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.12"
-aiogram = { git = "https://github.com/Nachtalb/aiogram.git", rev = "python-3.12", extras = [
-  "fast",
-] }
+aiogram = {git = "https://github.com/Nachtalb/aiogram.git", rev = "python-3.12", extras = ["fast", "redis"]}
 aiohttp = { version = "^3.8.6", allow-prereleases = true, extras = [
   "speedups",
 ] }
