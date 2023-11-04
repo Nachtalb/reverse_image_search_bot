@@ -67,12 +67,14 @@ async def command_start(message: Message, state: FSMContext) -> None:
     )
 
 
-@form_router.message(Form.search, F.photo)
+@form_router.message(Form.search, F.photo | F.sticker)
 async def search(message: Message, state: FSMContext) -> None:
-    if not message.photo:
+    if not message.photo and not message.sticker:
         return
 
-    prepared = await prepare(message.photo[-1], message.bot, s3)  # type: ignore[arg-type]
+    item = message.photo[-1] if message.photo else message.sticker
+
+    prepared = await prepare(item, message.bot, s3)  # type: ignore[arg-type]
     if not prepared:
         await message.reply("Something went wrong")
         return
