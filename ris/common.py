@@ -21,6 +21,7 @@ LINK_MAP = {
     "iqdb:3dbooru": '<a href="https://3dbooru.com">3dbooru</a>',
     "iqdb:zerochan": '<a href="https://www.zerochan.net">Zerochan</a>',
     "iqdb:e-shuushuu": '<a href="https://e-shuushuu.net">e-shuushuu</a>',
+    "zerochan": '<a href="https://www.zerochan.net">Zerochan</a>',
     "ascii2d": '<a href="https://ascii2d.net">ASCII2D</a>',
     "trace.moe": '<a href="https://trace.moe">TraceMoe</a>',
     "danbooru": '<a href="https://danbooru.donmai.us">Danbooru</a>',

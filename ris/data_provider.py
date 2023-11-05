@@ -120,3 +120,31 @@ async def yandere(id: str | int) -> ProviderResult | None:
         extra_links=[source_link],
         provider_id=provider_id,
     )
+
+
+async def zerochan(id: str | int) -> ProviderResult | None:
+    url = f"https://www.zerochan.net/{id}?json"
+
+    async with common.http_session.get(url, headers={"User-Agent": common.LEGIT_USER_AGENT}) as response:
+        data = await response.json(content_type=None)
+
+    if not data:
+        return None
+
+    tags = data.get("tags", [])
+    nsfw = False
+
+    link = f"https://www.zerochan.net/{id}"
+    file_link = data.get("full", data.get("large"))
+    thumbnail_link = data.get("medium", data.get("small"))
+    source_link = data.get("source")
+
+    provider_id = f"zerochan-{id}"
+
+    return ProviderResult(
+        provider_link=link,
+        main_file=file_link or thumbnail_link,
+        fields={"tags": tags, "nsfw": nsfw},
+        extra_links=[source_link],
+        provider_id=provider_id,
+    )

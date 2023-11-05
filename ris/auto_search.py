@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, AsyncGenerator, Awaitable, Callable
 
 from ris import common
-from ris.data_provider import ProviderResult, danbooru, gelbooru, yandere
+from ris.data_provider import ProviderResult, danbooru, gelbooru, yandere, zerochan
 
 SAUCENAO_API_KEY = os.environ["SAUCENAO_API_KEY"]
 SAUCENAO_MIN_SIMILARITY = float(os.environ["SAUCENAO_MIN_SIMILARITY"])
@@ -112,6 +112,10 @@ async def iqdb(image_url: str, image_id: str) -> AsyncGenerator[Result, None]:
         re.DOTALL,
     )
 
+    provider_map = {
+        "Zerochan": zerochan,
+    }
+
     for match in matches:
         provider = match[2].strip()
         post_link = match[0].strip()
@@ -121,16 +125,21 @@ async def iqdb(image_url: str, image_id: str) -> AsyncGenerator[Result, None]:
         nsfw = match[4].strip().lower() != "safe"
         similarity = match[5].strip()
 
-        result = ProviderResult(
-            provider_id=f"iqdb:{provider.lower()}-{post_id}",
-            provider_link=post_link,
-            main_file=thumbnail_src,
-            fields={
-                "size": size,
-                "nsfw": nsfw,
-            },
-        )
-        yield Result(search_provider="iqdb", provider_result=result, similarity=float(similarity))
+        if provider in provider_map:
+            result = await provider_map[provider](post_id)
+            if result:
+                yield Result(search_provider="iqdb", provider_result=result, similarity=float(similarity))
+        else:
+            result = ProviderResult(
+                provider_id=f"iqdb:{provider.lower()}-{post_id}",
+                provider_link=post_link,
+                main_file=thumbnail_src,
+                fields={
+                    "size": size,
+                    "nsfw": nsfw,
+                },
+            )
+            yield Result(search_provider="iqdb", provider_result=result, similarity=float(similarity))
 
 
 SEARCH_ENGINES = {
@@ -160,6 +169,7 @@ async def producer(image_url: str, image_id: str, queue: Queue[Result | None]) -
     """
     await gather(
         *[consume(engine(image_url, image_id), queue) for engine in SEARCH_ENGINES.values()],
+        return_exceptions=True,
     )
     await queue.put(None)
 
