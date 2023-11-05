@@ -149,7 +149,11 @@ async def search(message: Message, state: FSMContext) -> None:
             found = True
         else:
             logger.info(f"Searching for {url}...")
-            async for result in search_all_engines(url, file_id):
+            async for result in search_all_engines(
+                url,
+                file_id,
+                enabled_engines=await common.redis_storage.get_enabled_engines(user_id=message.from_user.id),  # type: ignore[union-attr]
+            ):
                 found = True
                 await send_result(message, result.provider_result, result.search_provider)
 

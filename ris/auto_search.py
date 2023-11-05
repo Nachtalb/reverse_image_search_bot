@@ -160,16 +160,21 @@ async def consume(generator: AsyncGenerator[Result, None], queue: Queue[Result |
         await queue.put(item)
 
 
-async def producer(image_url: str, image_id: str, queue: Queue[Result | None]) -> None:
+async def producer(image_url: str, image_id: str, queue: Queue[Result | None], enabled_engines: set[str]) -> None:
     """Produce results from search engines.
 
     Args:
         image_url (str): Image url.
         image_id (str): Image id.
         queue (Queue[Result | None]): Queue to put results into.
+        enabled_engines (set[str]): List of enabled search engines.
     """
     await gather(
-        *[consume(engine(image_url, image_id), queue) for engine in SEARCH_ENGINES.values()],
+        *[
+            consume(engine(image_url, image_id), queue)
+            for name, engine in SEARCH_ENGINES.items()
+            if name in enabled_engines
+        ],
         return_exceptions=True,
     )
     await queue.put(None)
@@ -191,7 +196,9 @@ async def consumer(queue: Queue[Result | None]) -> AsyncGenerator[Result, None]:
         yield result
 
 
-async def search_all_engines(image_url: str, image_id: str) -> AsyncGenerator[Result, None]:
+async def search_all_engines(
+    image_url: str, image_id: str, enabled_engines: set[str] = set(SEARCH_ENGINES.keys())
+) -> AsyncGenerator[Result, None]:
     """Search for image using all search engines.
 
     It also stores the results in redis storage.
@@ -199,12 +206,13 @@ async def search_all_engines(image_url: str, image_id: str) -> AsyncGenerator[Re
     Args:
         image_url (str): Image url.
         image_id (str): Image id.
+        enabled_engines (set[str], optional): List of enabled search engines. Defaults to all available.
 
     Yields:
         AsyncGenerator[Result, None]: Async generator of results.
     """
     queue: Queue[Result | None] = Queue()
-    producer_task = asyncio.create_task(producer(image_url, image_id, queue))
+    producer_task = asyncio.create_task(producer(image_url, image_id, queue, enabled_engines))
 
     async for item in consumer(queue):
         yield item
