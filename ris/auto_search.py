@@ -17,10 +17,27 @@ class Result:
 
 
 async def find_existing_results(image_id: str) -> list[ProviderResult]:
+    """Find existing results in redis storage.
+
+    Args:
+        image_id (str): Image id.
+
+    Returns:
+        list[ProviderResult]: List of existing results.
+    """
     return await common.redis_storage.get_provider_results_by_image(image_id)
 
 
 async def saucenao_search(image_url: str, image_id: str) -> AsyncGenerator[Result, None]:
+    """Search for image using saucenao.
+
+    Args:
+        image_url (str): Image url.
+        image_id (str): Image id.
+
+    Yields:
+        AsyncGenerator[Result, None]: Async generator of results.
+    """
     url = f"https://saucenao.com/search.php?url={image_url}"
 
     params: dict[str, Any] = {"output_type": 2}
