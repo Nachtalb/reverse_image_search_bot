@@ -1,6 +1,7 @@
+import asyncio
 import os
 import re
-from asyncio import as_completed
+from asyncio import Queue, as_completed, gather
 from dataclasses import dataclass
 from typing import Any, AsyncGenerator, Awaitable, Callable
 
@@ -75,7 +76,6 @@ async def saucenao_search(image_url: str, image_id: str) -> AsyncGenerator[Resul
     for task in as_completed(tasks):
         result = await task
         if result:
-            await common.redis_storage.add_provider_result(image_id, result)
             yield Result(
                 search_provider="saucenao", provider_result=result, similarity=float(item["header"]["similarity"])
             )
@@ -127,3 +127,72 @@ async def iqdb(image_url: str, image_id: str) -> AsyncGenerator[Result, None]:
             },
         )
         yield Result(search_provider="iqdb", provider_result=result, similarity=float(similarity))
+
+
+SEARCH_ENGINES = {
+    "IQDB": iqdb,
+    "SauceNAO": saucenao_search,
+}
+
+
+async def consume(generator: AsyncGenerator[Result, None], queue: Queue[Result | None]) -> None:
+    """Consume async generator and put results into queue.
+
+    Args:
+        generator (AsyncGenerator[Result, None]): Async generator of results.
+        queue (Queue[Result | None]): Queue to put results into.
+    """
+    async for item in generator:
+        await queue.put(item)
+
+
+async def producer(image_url: str, image_id: str, queue: Queue[Result | None]) -> None:
+    """Produce results from search engines.
+
+    Args:
+        image_url (str): Image url.
+        image_id (str): Image id.
+        queue (Queue[Result | None]): Queue to put results into.
+    """
+    await gather(
+        *[consume(engine(image_url, image_id), queue) for engine in SEARCH_ENGINES.values()],
+    )
+    await queue.put(None)
+
+
+async def consumer(queue: Queue[Result | None]) -> AsyncGenerator[Result, None]:
+    """Consume results from queue.
+
+    Args:
+        queue (Queue[Result | None]): Queue to consume results from.
+
+    Yields:
+        AsyncGenerator[Result, None]: Async generator of results.
+    """
+    while True:
+        result = await queue.get()
+        if result is None:  # None is used as the signal to stop
+            break
+        yield result
+
+
+async def search_all_engines(image_url: str, image_id: str) -> AsyncGenerator[Result, None]:
+    """Search for image using all search engines.
+
+    It also stores the results in redis storage.
+
+    Args:
+        image_url (str): Image url.
+        image_id (str): Image id.
+
+    Yields:
+        AsyncGenerator[Result, None]: Async generator of results.
+    """
+    queue: Queue[Result | None] = Queue()
+    producer_task = asyncio.create_task(producer(image_url, image_id, queue))
+
+    async for item in consumer(queue):
+        yield item
+        await common.redis_storage.add_provider_result(image_id, item.provider_result)
+
+    await producer_task

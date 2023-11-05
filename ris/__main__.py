@@ -16,7 +16,7 @@ from redis.asyncio.client import Redis
 from redis.exceptions import ConnectionError
 
 from ris import common
-from ris.auto_search import find_existing_results, saucenao_search
+from ris.auto_search import find_existing_results, search_all_engines
 from ris.data_provider import ProviderResult
 from ris.files import prepare
 from ris.redis import RedisStorage
@@ -81,12 +81,13 @@ async def send_result(message: Message, result: ProviderResult, search_engine: s
         text += f"Provided by {common.LINK_MAP[provider]}\n\n"
 
     for name, value in result.fields.items():
+        name = name.title()
         if isinstance(value, bool):
             text += f"{name}: {'✔️' if value else '❌'}\n"
         elif isinstance(value, list):
             text += f"{name}: {tagified_string(value, 10)}\n"
         else:
-            text += f"{name}: `{value}`\n"
+            text += f"{name}: <code>{value}</code>\n"
 
     buttons = [
         InlineKeyboardButton(
@@ -143,7 +144,7 @@ async def search(message: Message, state: FSMContext) -> None:
             found = True
         else:
             logger.info(f"Searching for {url}...")
-            async for result in saucenao_search(url, file_id):
+            async for result in search_all_engines(url, file_id):
                 found = True
                 await send_result(message, result.provider_result, result.search_provider)
 
