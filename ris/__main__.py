@@ -79,7 +79,10 @@ async def send_result(message: Message, result: ProviderResult, search_engine: s
     text = f"<a href='{main_file}'>\u200b</a>\n\n"  # TODO: Send media group if we have multuple files
     provider = result.provider_id.split("-")[0]
     if search_engine:
-        text += f"Provided by {common.LINK_MAP[search_engine]} with {common.LINK_MAP[provider]}\n\n"
+        if provider_link := common.LINK_MAP.get(provider):
+            text += f"Provided by {common.LINK_MAP[search_engine]} with {provider_link}\n\n"
+        else:
+            text += f"Provided by {common.LINK_MAP[search_engine]}\n\n"
     else:
         text += f"Provided by {common.LINK_MAP[provider]}\n\n"
 

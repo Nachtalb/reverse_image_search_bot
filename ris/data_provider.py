@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from dataclasses import asdict, dataclass, field
 
 from ris import common
@@ -184,4 +185,45 @@ async def threedbooru(id: str | int) -> ProviderResult | None:
         fields={"tags": tags, "nsfw": nsfw},
         extra_links=[source],
         provider_id=provider_id,
+    )
+
+
+async def eshuushuu(id: str | int) -> ProviderResult | None:
+    logger.debug("Fetch e-shuushuu post %s", id)
+    url = f"https://e-shuushuu.net/image/{id}/"
+
+    async with common.http_session.get(url, headers={"User-Agent": common.LEGIT_USER_AGENT}) as response:
+        html = await response.text()
+
+    if not html:
+        return None
+
+    full_res_image_re = re.search(r'<a class="thumb_image" href="([^"]+)"', html)
+    full_res_image: str = full_res_image_re.group(1) if full_res_image_re else ""
+    if full_res_image:
+        full_res_image = f"https://e-shuushuu.net{full_res_image}"
+
+    tags_reg: str = r'<span class=\'tag\'>"<a href="/tags/\d+">([^<]+)</a>"</span>'
+
+    tags_re = re.findall(tags_reg, html)
+    source_re = re.search(r"Source:\s*</dt>\s*<dd[^>]*>\s*" + tags_reg, html)
+    character_re = re.search(r"Characters:\s*</dt>\s*<dd[^>]*>\s*" + tags_reg, html)
+    artist_re = re.search(r"Artist:\s*</dt>\s*<dd[^>]*>\s*" + tags_reg, html)
+
+    tags = set(tags_re if tags_re else [])
+    source = source_re.group(1) if source_re else ""
+    character = character_re.group(1) if character_re else ""
+    artist = artist_re.group(1) if artist_re else ""
+
+    tags -= {source, character, artist}
+
+    return ProviderResult(
+        provider_link=url,
+        main_file=[full_res_image],
+        fields={
+            "tags": list(tags),
+            "copyrights": [source],
+            "character": character,
+        },
+        provider_id=f"e_shuushuu-{id}",
     )

@@ -6,8 +6,10 @@ from asyncio import Queue, as_completed, gather
 from dataclasses import dataclass
 from typing import Any, AsyncGenerator, Awaitable, Callable
 
+from yarl import URL
+
 from ris import common
-from ris.data_provider import ProviderResult, danbooru, gelbooru, threedbooru, yandere, zerochan
+from ris.data_provider import ProviderResult, danbooru, eshuushuu, gelbooru, threedbooru, yandere, zerochan
 
 SAUCENAO_API_KEY = os.environ["SAUCENAO_API_KEY"]
 SAUCENAO_MIN_SIMILARITY = float(os.environ["SAUCENAO_MIN_SIMILARITY"])
@@ -110,33 +112,37 @@ async def iqdb(image_url: str, image_id: str) -> AsyncGenerator[Result, None]:
         html = await response.text()
 
     matches = re.findall(
-        r'<div><table><tr><th>Best match</th></tr><tr><td class=\'image\'><a href="([^"]+)"><img src=\'([^"]+)\''
-        r' alt="[^"]*" title="[^"]*" width=\'\d+\' height=\'\d+\'></a></td>.*?<td><img alt="icon"'
-        r' src="/icon/[^.]+\.ico" class="service-icon">([^<]+)</td>.*?<td>(\d+×\d+) \[([^\]]+)\]</td>.*?<td>(\d+)%'
-        r" similarity</td>",
+        r'<div><table><tr><th>(?:Best match|Additional match)</th></tr><tr><td class=\'image\'><a href="([^"]+)"><img'
+        r' src=\'([^"]+)\' alt="[^"]*" (?:title="[^"]*" )?width=\'\d+\' height=\'\d+\'></a></td>.*?(?:<td><img'
+        r' alt="icon" src="/icon/[^.]+\.ico" class="service-icon">([^<]+)</td>)?.*?<td>(\d+×\d+)'
+        r" \[([^\]]+)\]</td>.*?<td>(\d+)% similarity</td>",
         html,
         re.DOTALL,
     )
 
     provider_map = {
-        "Zerochan": zerochan,
-        "3dbooru": threedbooru,
+        "www.zerochan.net": zerochan,
+        "behoimi.org": threedbooru,
+        "e-shuushuu.net": eshuushuu,
     }
 
     for match in matches:
         provider = match[2].strip()
         post_link = match[0].strip()
-        post_id = int(post_link.split("/")[-1])
+        post_id = int(post_link.strip("/").split("/")[-1])
         thumbnail_src = match[1].strip()
         size = match[3].strip()
         nsfw = match[4].strip().lower() != "safe"
         similarity = match[5].strip()
 
-        if provider in provider_map:
-            result = await provider_map[provider](post_id)
+        host = URL(post_link).host
+
+        if host in provider_map:
+            result = await provider_map[host](post_id)
             if result:
                 yield Result(search_provider="iqdb", provider_result=result, similarity=float(similarity))
-        else:
+        elif provider:
+            # Fall back to simple iqdb data if no data_provider is available
             result = ProviderResult(
                 provider_id=f"iqdb:{provider.lower()}-{post_id}",
                 provider_link=post_link,

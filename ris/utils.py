@@ -1,6 +1,6 @@
 import re
 from random import choices
-from typing import Generator, Iterable, TypedDict
+from typing import Collection, Generator, Iterable, TypedDict
 
 from yarl import URL
 
@@ -56,12 +56,12 @@ def tagify(tags: Iterable[str] | str) -> set[str]:
     return {f"#_{tag}" if tag[0].isdigit() else f"#{tag}" for tag in filter(None, tags)}
 
 
-def tagified_string(tags: Iterable[str], limit: int = 0) -> str:
+def tagified_string(tags: Collection[str], limit: int = 0) -> str:
     """
     Create a string of hashtag-like strings from a list of tags.
 
     Args:
-        tags (Iterable[str]): An iterable of tags (strings).
+        tags (Sized[str]): An iterable of tags (strings).
         limit (int, optional): The maximum number of tags to include in the output string. Defaults to 0 (no limit).
 
     Returns:
@@ -75,7 +75,7 @@ def tagified_string(tags: Iterable[str], limit: int = 0) -> str:
         "#hello" or "#world"
     """
     if limit:
-        tags = choices(list(tags), k=limit)
+        tags = choices(list(tags), k=limit if limit < len(tags) else len(tags))
     return ", ".join(tagify(tags))
 
 
