@@ -50,16 +50,16 @@ async def saucenao_search(image_url: str, image_id: str) -> AsyncGenerator[Resul
     async with common.http_session.get(url, headers={"User-Agent": common.USER_AGENT}, params=params) as response:
         data = await response.json()
 
-    known_providers: dict[int, Callable[[int], Awaitable[ProviderResult | None]]] = {
-        9: danbooru,
-        12: yandere,
-        25: gelbooru,
-    }
+    known_providers: list[int] = [
+        9,  #  danbooru
+        12,  #  yandere
+        25,  #  gelbooru
+    ]
 
-    id_map = {
-        9: "danbooru_id",
-        12: "yandere_id",
-        25: "gelbooru_id",
+    ids: dict[str, Callable[[int], Awaitable[ProviderResult | None]]] = {
+        "danbooru_id": danbooru,
+        "yandere_id": yandere,
+        "gelbooru_id": gelbooru,
     }
 
     filtered_data = [
@@ -69,11 +69,13 @@ async def saucenao_search(image_url: str, image_id: str) -> AsyncGenerator[Resul
         and item["header"]["index_id"] in known_providers
     ]
 
+    used_ids: set[str] = set()
     tasks: list[Awaitable[ProviderResult | None]] = []
     for item in filtered_data:
-        provider = known_providers[item["header"]["index_id"]]
-        id_field = id_map[item["header"]["index_id"]]
-        tasks.append(provider(item["data"][id_field]))
+        for key, provider in ids.items():
+            if key not in used_ids and key in item["data"]:
+                used_ids.add(key)
+                tasks.append(ids[key](item["data"][key]))
 
     for task in as_completed(tasks):
         result = await task
