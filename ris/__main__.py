@@ -34,6 +34,7 @@ form_router = Router()
 
 simple_engines = {
     "Google": "https://www.google.com/searchbyimage?safe=off&sbisrc=tg&image_url={file_url}",
+    "Google Lens": "https://lens.google.com/uploadbyurl?url={file_url}&safe=off",
     "Yandex": "https://yandex.com/images/search?url={file_url}&rpt=imageview",
     "TinEye": "https://tineye.com/search/?url={file_url}",
     "Bing": "https://www.bing.com/images/searchbyimage?FORM=IRSBIQ&cbir=sbi&imgurl={file_url}",
