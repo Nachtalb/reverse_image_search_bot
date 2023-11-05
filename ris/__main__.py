@@ -13,6 +13,7 @@ from aiogram.fsm.storage.redis import RedisStorage as FSMRedisStorage
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, ReplyKeyboardRemove
 from aiohttp import ClientSession
 from redis.asyncio.client import Redis
+from redis.exceptions import ConnectionError
 
 from ris import common
 from ris.auto_search import find_existing_results, saucenao_search
@@ -160,6 +161,12 @@ async def main() -> None:
         sys.exit(1)
 
     redis = Redis(decode_responses=True)
+    try:
+        await redis.ping()
+        logging.info("Connected to Redis")
+    except ConnectionError as e:
+        logging.fatal(f"Cannot connect to Redis: {e}")
+        sys.exit(1)
     bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)
     dp = Dispatcher(storage=FSMRedisStorage(redis))
     dp.include_router(form_router)
