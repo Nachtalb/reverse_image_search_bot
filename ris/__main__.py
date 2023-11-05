@@ -123,12 +123,13 @@ async def search(message: Message, state: FSMContext) -> None:
         return
 
     url = f"{BASE_URL}/{prepared}"
+    full_keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text="Go To Image", url=url)]] + get_simple_engine_buttons(url),
+    )
 
     reply = await message.reply(
         f"Searching ... <a href='{url}'>\u200b</a>",
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=get_simple_engine_buttons(url),
-        ),
+        reply_markup=full_keyboard,
     )
 
     found = False
@@ -147,7 +148,7 @@ async def search(message: Message, state: FSMContext) -> None:
 
     if not found:
         await common.redis_storage.add_no_found_entry(file_id)
-        await reply.edit_text(f"No results found <a href='{url}'>\u200b</a>")
+        await reply.edit_text(f"No results found <a href='{url}'>\u200b</a>", reply_markup=full_keyboard)
 
 
 @form_router.callback_query()
