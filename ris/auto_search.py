@@ -50,7 +50,7 @@ async def saucenao_search(image_url: str, image_id: str) -> AsyncGenerator[Resul
     async with common.http_session.get(url, headers={"User-Agent": common.USER_AGENT}, params=params) as response:
         data = await response.json()
 
-    known_providers: dict[int, Callable[[int], Awaitable[ProviderResult]]] = {
+    known_providers: dict[int, Callable[[int], Awaitable[ProviderResult | None]]] = {
         9: danbooru,
         12: gelbooru,
     }
@@ -67,7 +67,7 @@ async def saucenao_search(image_url: str, image_id: str) -> AsyncGenerator[Resul
         and item["header"]["index_id"] in known_providers
     ]
 
-    tasks: list[Awaitable[ProviderResult]] = []
+    tasks: list[Awaitable[ProviderResult | None]] = []
     for item in filtered_data:
         provider = known_providers[item["header"]["index_id"]]
         id_field = id_map[item["header"]["index_id"]]

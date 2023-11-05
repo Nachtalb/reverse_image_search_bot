@@ -25,11 +25,14 @@ class ProviderResult:
         return ProviderResult(**json.loads(json_str))
 
 
-async def danbooru(id: str | int) -> ProviderResult:
+async def danbooru(id: str | int) -> ProviderResult | None:
     url = f"https://danbooru.donmai.us/posts/{id}.json"
 
     async with common.http_session.get(url) as response:
         data = await response.json()
+
+    if not data:
+        return None
 
     authors = list(data.get("tag_string_artist", "").split(" "))
     characters = list(data.get("tag_string_character", "").split(" "))
@@ -59,11 +62,14 @@ async def danbooru(id: str | int) -> ProviderResult:
     )
 
 
-async def gelbooru(id: int | int) -> ProviderResult:
+async def gelbooru(id: str | int) -> ProviderResult | None:
     url = f"https://gelbooru.com/index.php?page=dapi&s=post&q=index&json=1&id={id}"
 
     async with common.http_session.get(url) as response:
         data = await response.json()
+
+    if not data or "post" not in data or not data["post"]:
+        return None
 
     data = data["post"][0]
 
