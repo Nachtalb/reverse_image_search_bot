@@ -6,7 +6,7 @@ from os import getenv
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.enums import ParseMode
-from aiogram.filters import CommandStart
+from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.redis import RedisStorage as FSMRedisStorage
@@ -16,7 +16,7 @@ from redis.asyncio.client import Redis
 from redis.exceptions import ConnectionError
 
 from ris import common
-from ris.auto_search import find_existing_results, search_all_engines
+from ris.auto_search import SEARCH_ENGINES, find_existing_results, search_all_engines
 from ris.data_provider import ProviderResult
 from ris.files import prepare
 from ris.redis import RedisStorage
@@ -61,6 +61,8 @@ def get_simple_engine_buttons(file_url: str) -> list[list[InlineKeyboardButton]]
 
 class Form(StatesGroup):
     search = State()
+    settings = State()
+    enabled_engines = State()
 
 
 @form_router.message(CommandStart())
@@ -155,10 +157,88 @@ async def search(message: Message, state: FSMContext) -> None:
         await reply.edit_text(f"No results found <a href='{url}'>\u200b</a>", reply_markup=full_keyboard)
 
 
-@form_router.callback_query()
-async def callback_a(query: CallbackQuery, state: FSMContext) -> None:
-    if query.data in ("A", "B"):
-        await query.answer(f"You've chosen {query.data}")
+async def settings_enabled_engines_dialogue(query: CallbackQuery, state: FSMContext) -> None:
+    enabled_engines = await common.redis_storage.get_enabled_engines(user_id=query.from_user.id)
+    available_engines = {name: name in enabled_engines for name in SEARCH_ENGINES}
+    if not query.message:
+        query.answer("Something went wrong, please use /settings again.")
+        return
+
+    await query.message.edit_text(
+        "<b>Enabled Engines</b>",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=list(
+                chunks(
+                    [
+                        InlineKeyboardButton(
+                            text=f"{'✅' if enabled else '❌'} {name}",
+                            callback_data=f"toggle_engine:{name}",
+                        )
+                        for name, enabled in available_engines.items()
+                    ],
+                    3,
+                )
+            )
+            + [[InlineKeyboardButton(text="Back", callback_data="back")]],
+        ),
+    )
+
+
+@form_router.callback_query(Form.enabled_engines)
+async def callback_enabled_engines(query: CallbackQuery, state: FSMContext) -> None:
+    if not query.message or not query.data:
+        query.answer("Something went wrong, please use /settings again.")
+        return
+
+    if query.data == "back":
+        await open_settings(query.message, state)
+    elif query.data.startswith("toggle_engine:"):
+        engine = query.data.split(":")[1]
+        enabled_engines = await common.redis_storage.get_enabled_engines(user_id=query.from_user.id)
+        if engine in enabled_engines:
+            enabled_engines.remove(engine)
+        else:
+            enabled_engines.add(engine)
+        await common.redis_storage.set_enabled_engines(user_id=query.from_user.id, enabled_engines=enabled_engines)
+        await settings_enabled_engines_dialogue(query, state)
+
+
+@form_router.callback_query(Form.settings)
+async def callback_settings(query: CallbackQuery, state: FSMContext) -> None:
+    if query.data == "enabled_engines":
+        await state.set_state(Form.enabled_engines)
+        await settings_enabled_engines_dialogue(query, state)
+    elif query.data == "back":
+        await state.set_state(Form.search)
+        if not query.message:
+            query.answer("Settings closed! Send me an image.")
+        else:
+            await query.message.edit_text("Settings closed! Send me an image.")
+
+
+@form_router.message(Command("settings", ignore_case=True))
+async def open_settings(message: Message, state: FSMContext) -> None:
+    await state.set_state(Form.settings)
+    reply_markup = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Enabled Engines", callback_data="enabled_engines"),
+            ],
+            [
+                InlineKeyboardButton(text="Back", callback_data="back"),
+            ],
+        ],
+    )
+    if message.from_user.id == (await message.bot.me()).id:  # type: ignore[union-attr]
+        await message.edit_text(
+            "<b>Settings</b>",
+            reply_markup=reply_markup,
+        )
+    else:
+        await message.reply(
+            "<b>Settings</b>",
+            reply_markup=reply_markup,
+        )
 
 
 async def main() -> None:

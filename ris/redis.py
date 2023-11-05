@@ -1,3 +1,5 @@
+from typing import Iterable
+
 from redis.asyncio import Redis
 
 from ris.data_provider import ProviderResult
@@ -88,3 +90,42 @@ class RedisStorage:
     async def reset_all_no_founds(self) -> None:
         """Reset all no found entries"""
         await self.redis_client.delete(*await self.redis_client.keys("ris:no_found:*"))
+
+    async def set_enabled_engines(self, user_id: int, enabled_engines: Iterable[str]) -> None:
+        """Set enabled engines for user
+
+        Args:
+            user_id (int): User id
+            enabled_engines (list[str]): Enabled engines
+        """
+        current_members = await self.get_enabled_engines(user_id)
+        if to_remove := current_members - set(enabled_engines):
+            await self.redis_client.srem(f"ris:settings:{user_id}:enabled_engines", *to_remove)  # type: ignore[misc]
+
+        if to_add := set(enabled_engines) - current_members:
+            await self.redis_client.sadd(f"ris:settings:{user_id}:enabled_engines", *to_add)  # type: ignore[misc]
+
+    async def get_enabled_engines(self, user_id: int) -> set[str]:
+        """Get enabled engines for user
+
+        Args:
+            user_id (int): User id
+
+        Returns:
+            list[str]: Enabled engines
+        """
+        return await self.redis_client.smembers(f"ris:settings:{user_id}:enabled_engines")  # type: ignore[no-any-return, misc]
+
+    async def get_all_user_settings(self, user_id: int) -> dict[str, str]:
+        """Get all user settings
+
+        Get all settings by ris:settings:{user_id}:*
+
+        Args:
+            user_id (int): User id
+
+        Returns:
+            dict[str, str]: User settings
+        """
+        keys = await self.redis_client.keys(f"ris:settings:{user_id}:*")
+        return {key.split(":")[-1]: await self.redis_client.get(key) for key in keys}
