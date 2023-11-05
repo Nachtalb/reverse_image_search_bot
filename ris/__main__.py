@@ -141,9 +141,11 @@ async def search(message: Message, state: FSMContext) -> None:
         reply_markup=full_keyboard,
     )
 
+    use_cache = user_settings.get("search_cache", True)
+
     found = False
-    if not await common.redis_storage.check_no_found_entry(file_id):
-        if results := await find_existing_results(file_id):
+    if not use_cache or not await common.redis_storage.check_no_found_entry(file_id):
+        if use_cache and (results := await find_existing_results(file_id)):
             logger.info(f"Found {len(results)} existing results for {url}")
             await asyncio.gather(
                 *(send_result(message, result) for result in results),
@@ -221,6 +223,14 @@ async def callback_settings(query: CallbackQuery, state: FSMContext) -> None:
     if query.data == "enabled_engines":
         await state.set_state(Form.enabled_engines)
         await settings_enabled_engines_dialogue(query, state)
+    elif query.data == "toggle_search_cache":
+        current_settings: bool = await common.redis_storage.get_user_setting(  # type: ignore[assignment]
+            user_id=query.from_user.id, setting_id="search_cache", default=True
+        )
+        await common.redis_storage.set_user_setting(
+            user_id=query.from_user.id, setting_id="search_cache", value=not current_settings
+        )
+        await open_settings(query, state)
     elif query.data == "back":
         await state.set_state(Form.search)
         if not query.message:
@@ -245,6 +255,10 @@ async def open_settings(message_or_query: Message | CallbackQuery, state: FSMCon
         inline_keyboard=[
             [
                 InlineKeyboardButton(text="Enabled Engines", callback_data="enabled_engines"),
+                InlineKeyboardButton(
+                    text=f"{'✅' if current_settings.get('search_cache', True) else '❌'}  Search Cache",
+                    callback_data="toggle_search_cache",
+                ),
             ],
             [
                 InlineKeyboardButton(text="Back", callback_data="back"),
