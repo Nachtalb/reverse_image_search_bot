@@ -94,6 +94,59 @@ class RedisStorage:
         self.logger.debug("Getting provider results by image id %s", image_id)
         return await self.get_provider_results(await self.get_provider_results_ids_by_image(image_id))
 
+    async def get_users(self) -> list[int]:
+        """Get users
+
+        Returns:
+            list[int]: Users
+        """
+        self.logger.debug("Getting users")
+        keys = await self.redis_client.keys("ris:search:user:*")
+        return [int(key.split(":")[-1]) for key in keys]
+
+    async def get_users_count(self) -> int:
+        """Get users count
+
+        Returns:
+            int: Users count
+        """
+        self.logger.debug("Getting users count")
+        return len(await self.redis_client.keys("ris:search:user:*"))
+
+    async def incr_user_search_count(self, user_id: int) -> int:
+        """Increment user search count
+
+        Args:
+            user_id (int): User id
+
+        Returns:
+            int: New search count
+        """
+        self.logger.debug("Incrementing user search count %s", user_id)
+        await self.redis_client.incr("ris:search:total")
+        return await self.redis_client.incr(f"ris:search:user:{user_id}")  # type: ignore[no-any-return]
+
+    async def get_user_search_count(self, user_id: int) -> int:
+        """Get user search count
+
+        Args:
+            user_id (int): User id
+
+        Returns:
+            int: Search count
+        """
+        self.logger.debug("Getting user search count %s", user_id)
+        return int(await self.redis_client.get(f"ris:search:user:{user_id}"))
+
+    async def get_total_search_count(self) -> int:
+        """Get total search count
+
+        Returns:
+            int: Total search count
+        """
+        self.logger.debug("Getting total search count")
+        return int(await self.redis_client.get("ris:search:total"))
+
     async def add_no_found_entry(self, image_id: str) -> None:
         """Add no found entry
 

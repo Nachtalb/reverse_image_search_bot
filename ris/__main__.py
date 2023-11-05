@@ -131,6 +131,7 @@ async def send_result(message: Message, result: ProviderResult, search_engine: s
 
 
 async def search_for_file(message: Message, file_id: str, file_url: str) -> None:
+    await common.redis_storage.incr_user_search_count(user_id=message.from_user.id)  # type: ignore[union-attr]
     full_keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="Search Again", callback_data=f"search_again:{file_id}")],
@@ -367,6 +368,11 @@ async def open_debug(query: CallbackQuery, state: FSMContext) -> None:
             ],
         ],
     )
+    total_searches = await common.redis_storage.get_total_search_count()
+    searches_text = f"<pre>Searches: {total_searches}</pre>"
+
+    total_users = await common.redis_storage.get_users_count()
+    user_text = f"<pre>Users: {total_users}</pre>"
 
     cache_info = await common.redis_storage.get_cache_info()
     cache_info_text = (
@@ -380,7 +386,7 @@ async def open_debug(query: CallbackQuery, state: FSMContext) -> None:
         "</pre>"
     )
 
-    text = f"<b>Debug Settings</b>\n\n{cache_info_text}"
+    text: str = f"<b>Debug Settings</b>\n\n{user_text}\n\n{searches_text}\n\n{cache_info_text}\n"
 
     message: Message = query.message  # type: ignore[assignment]
     if message.from_user.id == (await message.bot.me()).id:  # type: ignore[union-attr]
