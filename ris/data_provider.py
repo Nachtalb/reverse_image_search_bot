@@ -148,3 +148,32 @@ async def zerochan(id: str | int) -> ProviderResult | None:
         extra_links=[source_link],
         provider_id=provider_id,
     )
+
+
+async def threedbooru(id: str | int) -> ProviderResult | None:
+    url = f"http://behoimi.org/post/index.json?tags=id:{id}"
+
+    async with common.http_session.get(url, headers={"User-Agent": common.LEGIT_USER_AGENT}) as response:
+        data = await response.json()
+
+    if not data or not data[0]:
+        return None
+
+    tags = list(data[0].get("tags", "").split(" "))
+    nsfw = data[0].get("rating", " ")[0] in ["e", "q"]
+
+    link = f"http://behoimi.org/post/show/{id}"
+    file_link = data[0].get(
+        "preview_url"
+    )  # The file_url and sample_url return placeholder images against crawlers etc.
+    source = data[0].get("source")
+
+    provider_id = f"3dbooru-{id}"
+
+    return ProviderResult(
+        provider_link=link,
+        main_file=file_link,
+        fields={"tags": tags, "nsfw": nsfw},
+        extra_links=[source],
+        provider_id=provider_id,
+    )

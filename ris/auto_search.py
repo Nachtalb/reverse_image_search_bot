@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, AsyncGenerator, Awaitable, Callable
 
 from ris import common
-from ris.data_provider import ProviderResult, danbooru, gelbooru, yandere, zerochan
+from ris.data_provider import ProviderResult, danbooru, gelbooru, threedbooru, yandere, zerochan
 
 SAUCENAO_API_KEY = os.environ["SAUCENAO_API_KEY"]
 SAUCENAO_MIN_SIMILARITY = float(os.environ["SAUCENAO_MIN_SIMILARITY"])
@@ -114,6 +114,7 @@ async def iqdb(image_url: str, image_id: str) -> AsyncGenerator[Result, None]:
 
     provider_map = {
         "Zerochan": zerochan,
+        "3dbooru": threedbooru,
     }
 
     for match in matches:

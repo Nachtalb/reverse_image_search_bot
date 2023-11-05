@@ -162,9 +162,14 @@ HOST_MAP: dict[str, Host] = {
         "urls": ["e621.net", "static1.e621.net"],
     },
     "behoimi": {
-        "name": "Behoimi",
+        "name": "3dbooru",
         "emoji": "📷",
-        "urls": ["behoimi.org", "behoimi.org"],
+        "urls": ["behoimi.org"],
+    },
+    "3dbooru": {
+        "name": "3dbooru",
+        "emoji": "📷",
+        "urls": ["behoimi.org"],
     },
 }
 
