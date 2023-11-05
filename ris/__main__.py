@@ -165,8 +165,8 @@ async def search(message: Message, state: FSMContext) -> None:
 
 
 async def settings_enabled_engines_dialogue(query: CallbackQuery, state: FSMContext) -> None:
-    enabled_engines = await common.redis_storage.get_user_setting_set(
-        user_id=query.from_user.id, setting_id="enabled_engines"
+    enabled_engines: set[str] = await common.redis_storage.get_user_setting(  # type: ignore[assignment]
+        user_id=query.from_user.id, setting_id="enabled_engines", default=set(SEARCH_ENGINES.keys())
     )
     available_engines = {name: name in enabled_engines for name in SEARCH_ENGINES}
     if not query.message:
@@ -200,17 +200,17 @@ async def callback_enabled_engines(query: CallbackQuery, state: FSMContext) -> N
         return
 
     if query.data == "back":
-        await open_settings(query.message, state)
+        await open_settings(query, state)
     elif query.data.startswith("toggle_engine:"):
         engine = query.data.split(":")[1]
-        enabled_engines = await common.redis_storage.get_user_setting_set(
-            user_id=query.from_user.id, setting_id="enabled_engines"
+        enabled_engines: set[str] = await common.redis_storage.get_user_setting(  # type: ignore[assignment]
+            user_id=query.from_user.id, setting_id="enabled_engines", default=set(SEARCH_ENGINES.keys())
         )
         if engine in enabled_engines:
             enabled_engines.remove(engine)
         else:
             enabled_engines.add(engine)
-        await common.redis_storage.set_user_setting_set(
+        await common.redis_storage.set_user_setting(
             user_id=query.from_user.id, setting_id="enabled_engines", value=enabled_engines
         )
         await settings_enabled_engines_dialogue(query, state)
@@ -230,7 +230,16 @@ async def callback_settings(query: CallbackQuery, state: FSMContext) -> None:
 
 
 @form_router.message(Command("settings", ignore_case=True))
-async def open_settings(message: Message, state: FSMContext) -> None:
+async def open_settings(message_or_query: Message | CallbackQuery, state: FSMContext) -> None:
+    if isinstance(message_or_query, CallbackQuery):
+        message: Message = message_or_query.message  # type: ignore[assignment]
+        user = message_or_query.from_user
+    else:
+        message = message_or_query
+        user = message.from_user  # type: ignore[assignment]
+
+    current_settings = await common.redis_storage.get_all_user_settings(user_id=user.id)
+
     await state.set_state(Form.settings)
     reply_markup = InlineKeyboardMarkup(
         inline_keyboard=[

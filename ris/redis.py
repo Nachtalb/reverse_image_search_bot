@@ -1,5 +1,6 @@
+import asyncio
 import logging
-from typing import Any
+import re
 
 from redis.asyncio import Redis
 
@@ -106,60 +107,84 @@ class RedisStorage:
         self.logger.debug("Resetting all no found entries")
         await self.redis_client.delete(*await self.redis_client.keys("ris:no_found:*"))
 
-    async def set_user_setting(self, user_id: int, setting_id: str, value: Any) -> None:
+    async def set_user_setting(self, user_id: int, setting_id: str, value: str | int | float | bool | set[str]) -> None:
         """Set user setting
 
         Args:
             user_id (str): User id
-            setting_id (str): Setting id
-            value (Any): Setting value
+            setting_id (str): Setting ID. Will be prefixed with "s_", "i_", "f_", "b_" or "x_" for str, int, float, bool or set respectively
+            value (str | int | float | bool): Setting value
         """
-        self.logger.debug("Setting user setting %s %s %s", user_id, setting_id, value)
-        await self.redis_client.set(f"ris:settings:{user_id}:{setting_id}", value)
+        match value:
+            case bool():
+                if not setting_id.startswith("b_"):
+                    setting_id = "b_" + setting_id
+                value = int(value)
+            case int():
+                if not setting_id.startswith("i_"):
+                    setting_id = "i_" + setting_id
+            case float():
+                if not setting_id.startswith("f_"):
+                    setting_id = "f_" + setting_id
+            case set():
+                if not setting_id.startswith("x_"):
+                    setting_id = "x_" + setting_id
+            case _:
+                if not setting_id.startswith("s_"):
+                    setting_id = "s_" + setting_id
 
-    async def get_user_setting(self, user_id: int, setting_id: str) -> Any:
+        self.logger.debug("Setting user setting %s %s %s", user_id, setting_id, value)
+
+        if setting_id.startswith("x_") and isinstance(value, set):
+            current_members = await self.redis_client.smembers(f"ris:settings:{user_id}:{setting_id}")  # type: ignore[misc]
+            if to_remove := current_members - set(value):
+                await self.redis_client.srem(f"ris:settings:{user_id}:{setting_id}", *to_remove)  # type: ignore[misc]
+
+            if to_add := set(value) - current_members:
+                await self.redis_client.sadd(f"ris:settings:{user_id}:{setting_id}", *to_add)  # type: ignore[misc]
+        else:
+            value = str(value)
+            await self.redis_client.set(f"ris:settings:{user_id}:{setting_id}", value)
+
+    async def get_user_setting(
+        self, user_id: int, setting_id: str, default: str | int | float | bool | set[str] | None = None
+    ) -> str | int | float | bool | set[str]:
         """Get user setting
 
         Args:
             user_id (str): User id
-            setting_id (str): Setting id
+            setting_id (str): Setting ID.
+            default (str | int | float | bool | set[str] | None, optional): Default value. None == raise KeyError. Defaults to None.
 
         Returns:
-            Any: Setting value
+            str | int | float | bool | set[str]: Setting value
+
+        Raises:
+            KeyError: Setting not found and no default value
         """
+        if not re.search(r"^[sifbx]_", setting_id):
+            keys = await self.redis_client.keys(f"ris:settings:{user_id}:[sifbx]_{setting_id}")
+            if keys:
+                setting_id = keys[0].split(":")[-1]
+            else:
+                if default is not None:
+                    return default
+                raise KeyError(f"Setting {setting_id} not found")
+
         self.logger.debug("Getting user setting %s %s", user_id, setting_id)
-        return await self.redis_client.get(f"ris:settings:{user_id}:{setting_id}")
+        if setting_id.startswith("x_"):
+            return await self.redis_client.smembers(f"ris:settings:{user_id}:{setting_id}")  # type: ignore[no-any-return, misc]
 
-    async def set_user_setting_set(self, user_id: int, setting_id: str, value: set[str]) -> None:
-        """Set user setting set
+        value = await self.redis_client.get(f"ris:settings:{user_id}:{setting_id}")
+        if setting_id.startswith("i_"):
+            return int(value)
+        elif setting_id.startswith("f_"):
+            return float(value)
+        elif setting_id.startswith("b_"):
+            return bool(int(value))
+        return value  # type: ignore[no-any-return]
 
-        Args:
-            user_id (str): User id
-            setting_id (str): Setting id
-            value (set[str]): Setting value
-        """
-        self.logger.debug("Setting user setting set %s %s %s", user_id, setting_id, value)
-        current_members = await self.get_user_setting_set(user_id, setting_id)
-        if to_remove := current_members - set(value):
-            await self.redis_client.srem(f"ris:settings:{user_id}:{setting_id}", *to_remove)  # type: ignore[misc]
-
-        if to_add := set(value) - current_members:
-            await self.redis_client.sadd(f"ris:settings:{user_id}:{setting_id}", *to_add)  # type: ignore[misc]
-
-    async def get_user_setting_set(self, user_id: int, setting_id: str) -> set[str]:
-        """Get user setting set
-
-        Args:
-            user_id (str): User id
-            setting_id (str): Setting id
-
-        Returns:
-            set[str]: Setting value
-        """
-        self.logger.debug("Getting user setting set %s %s", user_id, setting_id)
-        return await self.redis_client.smembers(f"ris:settings:{user_id}:{setting_id}")  # type: ignore[no-any-return, misc]
-
-    async def get_all_user_settings(self, user_id: int) -> dict[str, str | set[str]]:
+    async def get_all_user_settings(self, user_id: int) -> dict[str, str | int | float | bool | set[str]]:
         """Get all user settings
 
         Get all settings by ris:settings:{user_id}:*
@@ -168,23 +193,13 @@ class RedisStorage:
             user_id (int): User id
 
         Returns:
-            dict[str, str]: User settings
+            dict[str, str | int | float | bool | set[str]]: User settings
         """
         self.logger.debug("Getting all user settings %s", user_id)
         keys = await self.redis_client.keys(f"ris:settings:{user_id}:*")
-        settings = {}
 
-        for key in keys:
-            key_type = await self.redis_client.type(key)
-            value: str | set[str]
-            if key_type == "string":
-                value = await self.redis_client.get(key)
-            elif key_type == "set":
-                value = await self.redis_client.smembers(key)  # type: ignore[misc]
-            else:
-                self.logger.warning("Unknown key type: %s", key_type)
-                continue
-            setting_name = key.split(":")[-1]
-            settings[setting_name] = value
+        async def get_setting(key: str) -> tuple[str, str | int | float | bool | set[str]]:
+            settings_id = key.split(":")[-1]
+            return settings_id[2:], await self.get_user_setting(user_id, settings_id)
 
-        return settings
+        return dict(await asyncio.gather(*[get_setting(key) for key in keys]))
