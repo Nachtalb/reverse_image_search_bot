@@ -9,16 +9,18 @@ from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.fsm.storage.redis import RedisStorage
+from aiogram.fsm.storage.redis import RedisStorage as FSMRedisStorage
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, ReplyKeyboardRemove
-from dotenv import load_dotenv
+from aiohttp import ClientSession
 from redis.asyncio.client import Redis
 
+from ris import common
+from ris.auto_search import find_existing_results, saucenao_search
+from ris.data_provider import ProviderResult
 from ris.files import prepare
+from ris.redis import RedisStorage
 from ris.s3 import S3Manager
-from ris.utils import chunks
-
-load_dotenv()
+from ris.utils import chunks, host_name, tagified_string
 
 BASE_URL = getenv("BASE_URL")
 if not BASE_URL:
@@ -26,7 +28,6 @@ if not BASE_URL:
     sys.exit(1)
 
 form_router = Router()
-s3: S3Manager = None  # type: ignore[assignment]
 
 simple_engines = {
     "Google": "https://www.google.com/searchbyimage?safe=off&sbisrc=tg&image_url={file_url}",
@@ -67,6 +68,45 @@ async def command_start(message: Message, state: FSMContext) -> None:
     )
 
 
+async def send_result(message: Message, result: ProviderResult, search_engine: str = "") -> Message:
+    text = f"<a href='{result.main_file}'>\u200b</a>\n\n"
+    provider = result.provider_id.split("-")[0]
+    if search_engine:
+        text += f"Provided by {common.LINK_MAP[search_engine]} with {common.LINK_MAP[provider]}\n\n"
+    else:
+        text += f"Provided by {common.LINK_MAP[provider]}\n\n"
+
+    for name, value in result.fields.items():
+        if isinstance(value, bool):
+            text += f"{name}: {'✔️' if value else '❌'}\n"
+        elif isinstance(value, list):
+            text += f"{name}: {tagified_string(value, 10)}\n"
+        else:
+            text += f"{name}: `{value}`\n"
+
+    buttons = [
+        InlineKeyboardButton(
+            text=host_name(result.provider_link),
+            url=result.provider_link,
+        ),
+    ]
+
+    for link in result.extra_links:
+        buttons.append(
+            InlineKeyboardButton(
+                text=host_name(link),
+                url=link,
+            ),
+        )
+
+    return await message.reply(
+        text,
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=list(chunks(buttons, 3)),
+        ),
+    )
+
+
 @form_router.message(Form.search, F.photo | F.sticker)
 async def search(message: Message, state: FSMContext) -> None:
     if not message.photo and not message.sticker:
@@ -74,19 +114,37 @@ async def search(message: Message, state: FSMContext) -> None:
 
     item = message.photo[-1] if message.photo else message.sticker
 
-    prepared = await prepare(item, message.bot, s3)  # type: ignore[arg-type]
+    file_id, prepared = await prepare(item, message.bot)  # type: ignore[arg-type]
     if not prepared:
         await message.reply("Something went wrong")
         return
 
     url = f"{BASE_URL}/{prepared}"
 
-    await message.reply(
-        f"Searching for {url}...",
+    reply = await message.reply(
+        f"Searching ... <a href='{url}'>\u200b</a>",
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=get_simple_engine_buttons(url),
         ),
     )
+
+    found = False
+    if not await common.redis_storage.check_no_found_entry(file_id):
+        if results := await find_existing_results(file_id):
+            logging.info(f"Found {len(results)} existing results for {url}")
+            await asyncio.gather(
+                *(send_result(message, result) for result in results),
+            )
+            found = True
+        else:
+            logging.info(f"Searching for {url}...")
+            async for result in saucenao_search(url, file_id):
+                found = True
+                await send_result(message, result.provider_result, result.search_provider)
+
+    if not found:
+        await common.redis_storage.add_no_found_entry(file_id)
+        await reply.edit_text(f"No results found <a href='{url}'>\u200b</a>")
 
 
 @form_router.callback_query()
@@ -96,15 +154,14 @@ async def callback_a(query: CallbackQuery, state: FSMContext) -> None:
 
 
 async def main() -> None:
-    global s3
-
     TOKEN = getenv("BOT_TOKEN")
     if not TOKEN:
         logging.fatal("BOT_TOKEN env variable is not set")
         sys.exit(1)
 
+    redis = Redis(decode_responses=True)
     bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)
-    dp = Dispatcher(storage=RedisStorage(Redis()))
+    dp = Dispatcher(storage=FSMRedisStorage(redis))
     dp.include_router(form_router)
 
     try:
@@ -118,7 +175,14 @@ async def main() -> None:
         logging.fatal(f"Missing env variable {e}")
         sys.exit(1)
 
-    await dp.start_polling(bot)
+    async with ClientSession() as session:
+        # Set up common variables
+        common.http_session = session
+        common.redis = redis
+        common.s3 = s3
+        common.redis_storage = RedisStorage(redis)
+
+        await dp.start_polling(bot)
 
 
 if __name__ == "__main__":
