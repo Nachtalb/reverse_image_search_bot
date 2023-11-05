@@ -1,4 +1,5 @@
-from typing import Iterable
+import logging
+from typing import Any
 
 from redis.asyncio import Redis
 
@@ -7,7 +8,13 @@ from ris.data_provider import ProviderResult
 
 class RedisStorage:
     def __init__(self, redis_client: Redis):
+        """Redis storage
+
+        Args:
+            redis_client (Redis): Redis client
+        """
         self.redis_client = redis_client
+        self.logger = logging.getLogger("ris:redis")
 
     async def add_provider_result(self, image_id: str, result: ProviderResult) -> None:
         """Add provider result to storage and link it to image_id
@@ -91,32 +98,60 @@ class RedisStorage:
         """Reset all no found entries"""
         await self.redis_client.delete(*await self.redis_client.keys("ris:no_found:*"))
 
-    async def set_enabled_engines(self, user_id: int, enabled_engines: Iterable[str]) -> None:
-        """Set enabled engines for user
+    async def set_user_setting(self, user_id: int, setting_id: str, value: Any) -> None:
+        """Set user setting
 
         Args:
-            user_id (int): User id
-            enabled_engines (list[str]): Enabled engines
+            user_id (str): User id
+            setting_id (str): Setting id
+            value (Any): Setting value
         """
-        current_members = await self.get_enabled_engines(user_id)
-        if to_remove := current_members - set(enabled_engines):
-            await self.redis_client.srem(f"ris:settings:{user_id}:enabled_engines", *to_remove)  # type: ignore[misc]
+        self.logger.debug("Setting user setting %s %s %s", user_id, setting_id, value)
+        await self.redis_client.set(f"ris:settings:{user_id}:{setting_id}", value)
 
-        if to_add := set(enabled_engines) - current_members:
-            await self.redis_client.sadd(f"ris:settings:{user_id}:enabled_engines", *to_add)  # type: ignore[misc]
-
-    async def get_enabled_engines(self, user_id: int) -> set[str]:
-        """Get enabled engines for user
+    async def get_user_setting(self, user_id: int, setting_id: str) -> Any:
+        """Get user setting
 
         Args:
-            user_id (int): User id
+            user_id (str): User id
+            setting_id (str): Setting id
 
         Returns:
-            list[str]: Enabled engines
+            Any: Setting value
         """
-        return await self.redis_client.smembers(f"ris:settings:{user_id}:enabled_engines")  # type: ignore[no-any-return, misc]
+        self.logger.debug("Getting user setting %s %s", user_id, setting_id)
+        return await self.redis_client.get(f"ris:settings:{user_id}:{setting_id}")
 
-    async def get_all_user_settings(self, user_id: int) -> dict[str, str]:
+    async def set_user_setting_set(self, user_id: int, setting_id: str, value: set[str]) -> None:
+        """Set user setting set
+
+        Args:
+            user_id (str): User id
+            setting_id (str): Setting id
+            value (set[str]): Setting value
+        """
+        self.logger.debug("Setting user setting set %s %s %s", user_id, setting_id, value)
+        current_members = await self.get_user_setting_set(user_id, setting_id)
+        if to_remove := current_members - set(value):
+            await self.redis_client.srem(f"ris:settings:{user_id}:{setting_id}", *to_remove)  # type: ignore[misc]
+
+        if to_add := set(value) - current_members:
+            await self.redis_client.sadd(f"ris:settings:{user_id}:{setting_id}", *to_add)  # type: ignore[misc]
+
+    async def get_user_setting_set(self, user_id: int, setting_id: str) -> set[str]:
+        """Get user setting set
+
+        Args:
+            user_id (str): User id
+            setting_id (str): Setting id
+
+        Returns:
+            set[str]: Setting value
+        """
+        self.logger.debug("Getting user setting set %s %s", user_id, setting_id)
+        return await self.redis_client.smembers(f"ris:settings:{user_id}:{setting_id}")  # type: ignore[no-any-return, misc]
+
+    async def get_all_user_settings(self, user_id: int) -> dict[str, str | set[str]]:
         """Get all user settings
 
         Get all settings by ris:settings:{user_id}:*
@@ -127,5 +162,21 @@ class RedisStorage:
         Returns:
             dict[str, str]: User settings
         """
+        self.logger.debug("Getting all user settings %s", user_id)
         keys = await self.redis_client.keys(f"ris:settings:{user_id}:*")
-        return {key.split(":")[-1]: await self.redis_client.get(key) for key in keys}
+        settings = {}
+
+        for key in keys:
+            key_type = await self.redis_client.type(key)
+            value: str | set[str]
+            if key_type == "string":
+                value = await self.redis_client.get(key)
+            elif key_type == "set":
+                value = await self.redis_client.smembers(key)  # type: ignore[misc]
+            else:
+                self.logger.warning("Unknown key type: %s", key_type)
+                continue
+            setting_name = key.split(":")[-1]
+            settings[setting_name] = value
+
+        return settings

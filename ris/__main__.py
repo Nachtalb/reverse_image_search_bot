@@ -122,6 +122,8 @@ async def search(message: Message, state: FSMContext) -> None:
     if not message.photo and not message.sticker:
         return
 
+    user_settings = await common.redis_storage.get_all_user_settings(user_id=message.from_user.id)  # type: ignore[union-attr]
+
     item = message.photo[-1] if message.photo else message.sticker
 
     file_id, prepared = await prepare(item, message.bot)  # type: ignore[arg-type]
@@ -152,7 +154,7 @@ async def search(message: Message, state: FSMContext) -> None:
             async for result in search_all_engines(
                 url,
                 file_id,
-                enabled_engines=await common.redis_storage.get_enabled_engines(user_id=message.from_user.id),  # type: ignore[union-attr]
+                enabled_engines=user_settings.get("enabled_engines", set(SEARCH_ENGINES.keys())),  # type: ignore[arg-type]
             ):
                 found = True
                 await send_result(message, result.provider_result, result.search_provider)
@@ -163,7 +165,9 @@ async def search(message: Message, state: FSMContext) -> None:
 
 
 async def settings_enabled_engines_dialogue(query: CallbackQuery, state: FSMContext) -> None:
-    enabled_engines = await common.redis_storage.get_enabled_engines(user_id=query.from_user.id)
+    enabled_engines = await common.redis_storage.get_user_setting_set(
+        user_id=query.from_user.id, setting_id="enabled_engines"
+    )
     available_engines = {name: name in enabled_engines for name in SEARCH_ENGINES}
     if not query.message:
         query.answer("Something went wrong, please use /settings again.")
@@ -199,12 +203,16 @@ async def callback_enabled_engines(query: CallbackQuery, state: FSMContext) -> N
         await open_settings(query.message, state)
     elif query.data.startswith("toggle_engine:"):
         engine = query.data.split(":")[1]
-        enabled_engines = await common.redis_storage.get_enabled_engines(user_id=query.from_user.id)
+        enabled_engines = await common.redis_storage.get_user_setting_set(
+            user_id=query.from_user.id, setting_id="enabled_engines"
+        )
         if engine in enabled_engines:
             enabled_engines.remove(engine)
         else:
             enabled_engines.add(engine)
-        await common.redis_storage.set_enabled_engines(user_id=query.from_user.id, enabled_engines=enabled_engines)
+        await common.redis_storage.set_user_setting_set(
+            user_id=query.from_user.id, setting_id="enabled_engines", value=enabled_engines
+        )
         await settings_enabled_engines_dialogue(query, state)
 
 
