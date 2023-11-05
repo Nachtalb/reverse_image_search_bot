@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import re
 from asyncio import Queue, as_completed, gather
@@ -10,6 +11,8 @@ from ris.data_provider import ProviderResult, danbooru, gelbooru, threedbooru, y
 
 SAUCENAO_API_KEY = os.environ["SAUCENAO_API_KEY"]
 SAUCENAO_MIN_SIMILARITY = float(os.environ["SAUCENAO_MIN_SIMILARITY"])
+
+logger = logging.getLogger("ris.search")
 
 
 @dataclass
@@ -28,6 +31,7 @@ async def find_existing_results(image_id: str) -> list[ProviderResult]:
     Returns:
         list[ProviderResult]: List of existing results.
     """
+    logger.info("Searching for existing results for image %s", image_id)
     return await common.redis_storage.get_provider_results_by_image(image_id)
 
 
@@ -41,6 +45,7 @@ async def saucenao_search(image_url: str, image_id: str) -> AsyncGenerator[Resul
     Yields:
         AsyncGenerator[Result, None]: Async generator of results.
     """
+    logger.info("Searching for image %s using saucenao", image_id)
     url = f"https://saucenao.com/search.php?url={image_url}"
 
     params: dict[str, Any] = {"output_type": 2}
@@ -98,6 +103,7 @@ async def iqdb(image_url: str, image_id: str) -> AsyncGenerator[Result, None]:
     Yields:
         AsyncGenerator[Result, None]: Async generator of results.
     """
+    logger.info("Searching for image %s using iqdb", image_id)
     url = f"https://iqdb.org/?url={image_url}&service[]=6&service[]=11&service[]=7"
 
     async with common.http_session.get(url, headers={"User-Agent": common.LEGIT_USER_AGENT}) as response:

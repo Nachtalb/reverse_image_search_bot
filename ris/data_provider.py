@@ -1,7 +1,10 @@
 import json
+import logging
 from dataclasses import asdict, dataclass, field
 
 from ris import common
+
+logger = logging.getLogger("ris:data_provider")
 
 
 @dataclass
@@ -26,6 +29,7 @@ class ProviderResult:
 
 
 async def danbooru(id: str | int) -> ProviderResult | None:
+    logger.debug("Fetch danbooru post %s", id)
     url = f"https://danbooru.donmai.us/posts/{id}.json"
 
     async with common.http_session.get(url) as response:
@@ -63,6 +67,7 @@ async def danbooru(id: str | int) -> ProviderResult | None:
 
 
 async def gelbooru(id: str | int) -> ProviderResult | None:
+    logger.debug("Fetch gelbooru post %s", id)
     url = f"https://gelbooru.com/index.php?page=dapi&s=post&q=index&json=1&id={id}"
 
     async with common.http_session.get(url) as response:
@@ -93,6 +98,7 @@ async def gelbooru(id: str | int) -> ProviderResult | None:
 
 
 async def yandere(id: str | int) -> ProviderResult | None:
+    logger.debug("Fetch yandere post %s", id)
     url = f"https://yande.re/post.json?tags=id:{id}"
 
     async with common.http_session.get(url) as response:
@@ -123,6 +129,7 @@ async def yandere(id: str | int) -> ProviderResult | None:
 
 
 async def zerochan(id: str | int) -> ProviderResult | None:
+    logger.debug("Fetch zerochan post %s", id)
     url = f"https://www.zerochan.net/{id}?json"
 
     async with common.http_session.get(url, headers={"User-Agent": common.LEGIT_USER_AGENT}) as response:
@@ -151,6 +158,7 @@ async def zerochan(id: str | int) -> ProviderResult | None:
 
 
 async def threedbooru(id: str | int) -> ProviderResult | None:
+    logger.debug("Fetch 3dbooru post %s", id)
     url = f"http://behoimi.org/post/index.json?tags=id:{id}"
 
     async with common.http_session.get(url, headers={"User-Agent": common.LEGIT_USER_AGENT}) as response:

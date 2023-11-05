@@ -23,6 +23,7 @@ class RedisStorage:
             image_id (str): Image id
             result (ProviderResult): Provider result
         """
+        self.logger.debug("Adding provider result %s", result)
         serialized_result = result.to_json()
         primary_key = result.provider_id
         await self.redis_client.set("ris:provider_result:" + primary_key, serialized_result)
@@ -37,6 +38,7 @@ class RedisStorage:
         Returns:
             ProviderResult | None: Provider result
         """
+        self.logger.debug("Getting provider result %s", search_key)
         data = await self.redis_client.get("ris:provider_result:" + search_key)
         return ProviderResult.from_json(data) if data else None
 
@@ -49,6 +51,7 @@ class RedisStorage:
         Returns:
             list[ProviderResult]: Provider results
         """
+        self.logger.debug("Getting provider results %s", search_keys)
         keys = [f"ris:provider_result:{key}" for key in search_keys]
         results = await self.redis_client.mget(keys)
         return [ProviderResult.from_json(result) for result in results if result]
@@ -62,6 +65,7 @@ class RedisStorage:
         Returns:
             list[str]: Provider results ids
         """
+        self.logger.debug("Getting provider results ids by image id %s", image_id)
         return await self.redis_client.smembers("ris:image_to_provider_result_link:" + image_id)  # type: ignore[no-any-return, misc]
 
     async def get_provider_results_by_image(self, image_id: str) -> list[ProviderResult]:
@@ -73,6 +77,7 @@ class RedisStorage:
         Returns:
             list[ProviderResult]: Provider results
         """
+        self.logger.debug("Getting provider results by image id %s", image_id)
         return await self.get_provider_results(await self.get_provider_results_ids_by_image(image_id))
 
     async def add_no_found_entry(self, image_id: str) -> None:
@@ -81,6 +86,7 @@ class RedisStorage:
         Args:
             image_id (str): Image id
         """
+        self.logger.debug("Adding no found entry %s", image_id)
         await self.redis_client.set(f"ris:no_found:{image_id}", "1", ex=60 * 60 * 24)
 
     async def check_no_found_entry(self, image_id: str) -> bool:
@@ -92,10 +98,12 @@ class RedisStorage:
         Returns:
             bool: Does no found entry exists
         """
+        self.logger.debug("Checking no found entry %s", image_id)
         return await self.redis_client.exists(f"ris:no_found:{image_id}")  # type: ignore[no-any-return]
 
     async def reset_all_no_founds(self) -> None:
         """Reset all no found entries"""
+        self.logger.debug("Resetting all no found entries")
         await self.redis_client.delete(*await self.redis_client.keys("ris:no_found:*"))
 
     async def set_user_setting(self, user_id: int, setting_id: str, value: Any) -> None:
