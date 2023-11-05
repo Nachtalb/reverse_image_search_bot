@@ -90,3 +90,33 @@ async def gelbooru(id: str | int) -> ProviderResult | None:
         extra_links=[source_link],
         provider_id=provider_id,
     )
+
+
+async def yandere(id: str | int) -> ProviderResult | None:
+    url = f"https://yande.re/post.json?tags=id:{id}"
+
+    async with common.http_session.get(url) as response:
+        data = await response.json()
+
+    if not data:
+        return None
+
+    data = data[0]
+
+    tags = list(data.get("tags", "").split(" "))
+    nsfw = data.get("rating", " ")[0] in ["e", "q"]
+
+    link = f"https://yande.re/post/show/{id}"
+    file_link = data.get("file_url", data.get("jpeg_url"))
+    thumbnail_link = data.get("sample_url", data.get("preview_url"))
+    source_link = data.get("source")
+
+    provider_id = f"yandere-{id}"
+
+    return ProviderResult(
+        provider_link=link,
+        main_file=file_link or thumbnail_link,
+        fields={"tags": tags, "nsfw": nsfw},
+        extra_links=[source_link],
+        provider_id=provider_id,
+    )

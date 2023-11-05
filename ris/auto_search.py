@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, AsyncGenerator, Awaitable, Callable
 
 from ris import common
-from ris.data_provider import ProviderResult, danbooru, gelbooru
+from ris.data_provider import ProviderResult, danbooru, gelbooru, yandere
 
 SAUCENAO_API_KEY = os.environ["SAUCENAO_API_KEY"]
 SAUCENAO_MIN_SIMILARITY = float(os.environ["SAUCENAO_MIN_SIMILARITY"])
@@ -52,12 +52,14 @@ async def saucenao_search(image_url: str, image_id: str) -> AsyncGenerator[Resul
 
     known_providers: dict[int, Callable[[int], Awaitable[ProviderResult | None]]] = {
         9: danbooru,
-        12: gelbooru,
+        12: yandere,
+        25: gelbooru,
     }
 
     id_map = {
         9: "danbooru_id",
-        12: "gelbooru_id",
+        12: "yandere_id",
+        25: "gelbooru_id",
     }
 
     filtered_data = [
