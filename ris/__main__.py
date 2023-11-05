@@ -117,12 +117,50 @@ async def send_result(message: Message, result: ProviderResult, search_engine: s
     )
 
 
+async def search_for_file(message: Message, file_id: str, file_url: str) -> None:
+    full_keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Search Again", callback_data=f"search_again:{file_id}")],
+            [InlineKeyboardButton(text="Go To Image", url=file_url)],
+        ]
+        + get_simple_engine_buttons(file_url),
+    )
+
+    reply = await message.reply(
+        f"Searching ... <a href='{file_url}'>\u200b</a>",
+        reply_markup=full_keyboard,
+    )
+
+    user_settings = await common.redis_storage.get_all_user_settings(user_id=message.from_user.id)  # type: ignore[union-attr]
+    use_cache = user_settings.get("search_cache", True)
+
+    found = False
+    if not use_cache or not await common.redis_storage.check_no_found_entry(file_id):
+        if use_cache and (results := await find_existing_results(file_id)):
+            logger.info(f"Found {len(results)} existing results for {file_url}")
+            await asyncio.gather(
+                *(send_result(message, result) for result in results),
+            )
+            found = True
+        else:
+            logger.info(f"Searching for {file_url}...")
+            async for result in search_all_engines(
+                file_url,
+                file_id,
+                enabled_engines=user_settings.get("enabled_engines", set(SEARCH_ENGINES.keys())),  # type: ignore[arg-type]
+            ):
+                found = True
+                await send_result(message, result.provider_result, result.search_provider)
+
+    if not found:
+        await common.redis_storage.add_no_found_entry(file_id)
+        await reply.edit_text(f"No results found <a href='{file_url}'>\u200b</a>", reply_markup=full_keyboard)
+
+
 @form_router.message(Form.search, F.photo | F.sticker)
 async def search(message: Message, state: FSMContext) -> None:
     if not message.photo and not message.sticker:
         return
-
-    user_settings = await common.redis_storage.get_all_user_settings(user_id=message.from_user.id)  # type: ignore[union-attr]
 
     item = message.photo[-1] if message.photo else message.sticker
 
@@ -132,38 +170,19 @@ async def search(message: Message, state: FSMContext) -> None:
         return
 
     url = f"{BASE_URL}/{prepared}"
-    full_keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="Go To Image", url=url)]] + get_simple_engine_buttons(url),
-    )
+    await search_for_file(message, file_id, url)
 
-    reply = await message.reply(
-        f"Searching ... <a href='{url}'>\u200b</a>",
-        reply_markup=full_keyboard,
-    )
 
-    use_cache = user_settings.get("search_cache", True)
+@form_router.callback_query(Form.search)
+async def search_again(query: CallbackQuery, state: FSMContext) -> None:
+    if not query.message or not query.data or not query.message.reply_to_message or not query.message.reply_markup:
+        query.answer("Something went wrong, please use /start again.")
+        return
 
-    found = False
-    if not use_cache or not await common.redis_storage.check_no_found_entry(file_id):
-        if use_cache and (results := await find_existing_results(file_id)):
-            logger.info(f"Found {len(results)} existing results for {url}")
-            await asyncio.gather(
-                *(send_result(message, result) for result in results),
-            )
-            found = True
-        else:
-            logger.info(f"Searching for {url}...")
-            async for result in search_all_engines(
-                url,
-                file_id,
-                enabled_engines=user_settings.get("enabled_engines", set(SEARCH_ENGINES.keys())),  # type: ignore[arg-type]
-            ):
-                found = True
-                await send_result(message, result.provider_result, result.search_provider)
-
-    if not found:
-        await common.redis_storage.add_no_found_entry(file_id)
-        await reply.edit_text(f"No results found <a href='{url}'>\u200b</a>", reply_markup=full_keyboard)
+    file_id = query.data.split(":")[1]
+    file_url: str = query.message.reply_markup.inline_keyboard[1][0].url  # type: ignore[assignment]
+    await query.answer("Searching ...")
+    await search_for_file(query.message.reply_to_message, file_id, file_url)
 
 
 async def settings_enabled_engines_dialogue(query: CallbackQuery, state: FSMContext) -> None:
