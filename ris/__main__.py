@@ -82,7 +82,9 @@ async def send_result(message: Message, result: ProviderResult, search_engine: s
 
     for name, value in result.fields.items():
         name = name.title()
-        if isinstance(value, bool):
+        if value is None:
+            continue
+        elif isinstance(value, bool):
             text += f"{name}: {'✔️' if value else '❌'}\n"
         elif isinstance(value, list):
             text += f"{name}: {tagified_string(value, 10)}\n"
@@ -96,7 +98,7 @@ async def send_result(message: Message, result: ProviderResult, search_engine: s
         ),
     ]
 
-    for link in result.extra_links:
+    for link in filter(None, result.extra_links):
         buttons.append(
             InlineKeyboardButton(
                 text=host_name(link),
