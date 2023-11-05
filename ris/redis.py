@@ -94,6 +94,26 @@ class RedisStorage:
         self.logger.debug("Getting provider results by image id %s", image_id)
         return await self.get_provider_results(await self.get_provider_results_ids_by_image(image_id))
 
+    async def save_broadcast_message(self, from_chat_id: int, message_id: int) -> None:
+        """Save broadcast message
+
+        Args:
+            message_id (int): Message id
+        """
+        self.logger.debug("Saving broadcast message %s %s", from_chat_id, message_id)
+        await self.redis_client.set("ris:broadcast_message", f"{from_chat_id}:{message_id}")
+
+    async def get_broadcast_message(self) -> tuple[int, int] | tuple[None, None]:
+        """Get broadcast message
+
+        Returns:
+            tuple[int, int] | tuple[None, None]: Tuple of from_chat_id and message_id
+        """
+        self.logger.debug("Getting broadcast message")
+        if await self.redis_client.exists("ris:broadcast_message"):
+            return tuple(int(x) for x in (await self.redis_client.get("ris:broadcast_message")).split(":"))  # type: ignore[return-value]
+        return None, None
+
     async def get_users(self) -> list[int]:
         """Get users
 

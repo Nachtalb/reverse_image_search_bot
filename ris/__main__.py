@@ -73,6 +73,8 @@ class Form(StatesGroup):
     settings = State()
     enabled_engines = State()
     debug = State()
+    broadcast = State()
+    yes_no_dialogue = State()
 
 
 @form_router.message(CommandStart())
@@ -297,6 +299,79 @@ async def callback_debug(query: CallbackQuery, state: FSMContext) -> None:
         await open_settings(query, state)
     elif query.data == "noop":
         await query.answer()
+    elif query.data == "broadcast":
+        await broadcast_dialogue(query, state)
+
+
+@form_router.callback_query(Form.broadcast)
+async def callback_broadcast(query: CallbackQuery, state: FSMContext) -> None:
+    if query.data == "back":
+        await open_debug(query, state)
+
+
+async def broadcast_dialogue(query: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(Form.broadcast)
+    if not query.message:
+        query.answer("Something went wrong, please use /settings again.")
+        return
+    await query.message.edit_text(
+        "<b>Broadcast</b>\n\n"
+        "Send a message to all users. This can be used to send important updates or announcements.\n\n",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(text="Cancel", callback_data="back"),
+                ],
+            ],
+        ),
+    )
+
+
+@form_router.message(Form.broadcast)
+async def broadcast(message: Message, state: FSMContext) -> None:
+    if not message.text:
+        return
+
+    await common.redis_storage.save_broadcast_message(message_id=message.message_id, from_chat_id=message.chat.id)
+
+    await state.set_state(Form.yes_no_dialogue)
+    await message.reply(
+        "Are you sure you want to send this message to all users?",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(text="Yes", callback_data="yes:send_broadcast"),
+                    InlineKeyboardButton(text="No", callback_data="no:broadcast_dialogue"),
+                ],
+            ],
+        ),
+    )
+
+
+@form_router.callback_query(Form.yes_no_dialogue)
+async def callback_yes_no_dialogue(query: CallbackQuery, state: FSMContext) -> None:
+    if query.data == "yes:send_broadcast":
+        await send_broadcast(query, state)
+    elif query.data == "no:broadcast_dialogue":
+        await query.answer("You aborted the broadcast")
+        await broadcast_dialogue(query, state)
+
+
+async def send_broadcast(query: CallbackQuery, state: FSMContext) -> None:
+    from_chat_id, broadcast_message_id = await common.redis_storage.get_broadcast_message()
+
+    if not broadcast_message_id or not from_chat_id:
+        await query.answer("Something went wrong, please use /settings again.")
+        return
+
+    await query.answer("Sending broadcast ...")
+    await state.set_state(Form.debug)
+    await open_debug(query, state)
+
+    bot: Bot = query.bot  # type: ignore[assignment]
+
+    for user_id in await common.redis_storage.get_users():
+        await bot.copy_message(chat_id=user_id, from_chat_id=from_chat_id, message_id=broadcast_message_id)
 
 
 @form_router.message(Command("settings", ignore_case=True))
@@ -362,6 +437,9 @@ async def open_debug(query: CallbackQuery, state: FSMContext) -> None:
             ],
             [
                 InlineKeyboardButton(text="\u200b", callback_data="noop"),
+            ],
+            [
+                InlineKeyboardButton(text="Send Broadcast", callback_data="broadcast"),
             ],
             [
                 InlineKeyboardButton(text="Back", callback_data="back"),
