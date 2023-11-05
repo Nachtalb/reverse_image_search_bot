@@ -107,6 +107,40 @@ class RedisStorage:
         self.logger.debug("Resetting all no found entries")
         await self.redis_client.delete(*await self.redis_client.keys("ris:no_found:*"))
 
+    async def clear_not_found(self) -> int:
+        """Clear not found entries
+
+        Returns:
+            int: Number of cleared entries
+        """
+        self.logger.debug("Clearing not found entries")
+        keys = await self.redis_client.keys("ris:no_found:*")
+        await self.redis_client.delete(*keys)
+        return len(keys)
+
+    async def clear_provider_results(self) -> int:
+        """Clear results
+
+        Returns:
+            int: Number of cleared entries
+        """
+        self.logger.debug("Clearing results")
+        keys = await self.redis_client.keys("ris:provider_result:*")
+        await self.redis_client.delete(*keys)
+        await self.redis_client.delete(*await self.redis_client.keys("ris:image_to_provider_result_link:*"))
+        return len(keys)
+
+    async def clear_results_full(self) -> tuple[int, int]:
+        """Clear results and not found entries
+
+        Returns:
+            tuple[int, int]: Number of cleared not found entries, Number of cleared results
+        """
+        self.logger.debug("Clearing results and not found entries")
+        total_not_found = await self.clear_not_found()
+        total_results = await self.clear_provider_results()
+        return total_not_found, total_results
+
     async def set_user_setting(self, user_id: int, setting_id: str, value: str | int | float | bool | set[str]) -> None:
         """Set user setting
 

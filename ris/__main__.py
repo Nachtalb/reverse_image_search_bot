@@ -25,7 +25,9 @@ from ris.utils import chunks, host_name, tagified_string
 
 logger = logging.getLogger("ris")
 
+DEBUG_OPTIONS = bool(int(getenv("DEBUG_OPTIONS", 0)))
 BASE_URL = getenv("BASE_URL")
+
 if not BASE_URL:
     logger.fatal("BASE_URL env variable is not set")
     sys.exit(1)
@@ -63,6 +65,7 @@ class Form(StatesGroup):
     search = State()
     settings = State()
     enabled_engines = State()
+    debug = State()
 
 
 @form_router.message(CommandStart())
@@ -245,14 +248,9 @@ async def callback_settings(query: CallbackQuery, state: FSMContext) -> None:
     if query.data == "enabled_engines":
         await state.set_state(Form.enabled_engines)
         await settings_enabled_engines_dialogue(query, state)
-    elif query.data == "toggle_search_cache":
-        current_settings: bool = await common.redis_storage.get_user_setting(  # type: ignore[assignment]
-            user_id=query.from_user.id, setting_id="search_cache", default=True
-        )
-        await common.redis_storage.set_user_setting(
-            user_id=query.from_user.id, setting_id="search_cache", value=not current_settings
-        )
-        await open_settings(query, state)
+    elif query.data == "debug":
+        await state.set_state(Form.debug)
+        await open_debug(query, state)
     elif query.data == "back":
         await state.set_state(Form.search)
         if not query.message:
@@ -261,31 +259,59 @@ async def callback_settings(query: CallbackQuery, state: FSMContext) -> None:
             await query.message.edit_text("Settings closed! Send me an image.")
 
 
+@form_router.callback_query(Form.debug)
+async def callback_debug(query: CallbackQuery, state: FSMContext) -> None:
+    if query.data == "toggle_search_cache":
+        current_settings: bool = await common.redis_storage.get_user_setting(  # type: ignore[assignment]
+            user_id=query.from_user.id, setting_id="search_cache", default=True
+        )
+        await common.redis_storage.set_user_setting(
+            user_id=query.from_user.id, setting_id="search_cache", value=not current_settings
+        )
+        await open_debug(query, state)
+    elif query.data == "clear_not_found":
+        total = await common.redis_storage.clear_not_found()
+        await query.answer(f"Cleared {total} not found entries")
+    elif query.data == "clear_results":
+        total = await common.redis_storage.clear_provider_results()
+        await query.answer(f"Cleared {total} provider result entries")
+    elif query.data == "clear_cache_full":
+        total_not_found, total_results = await common.redis_storage.clear_results_full()
+        await query.answer(f"Cleared {total_not_found} not found and {total_results} provider result entries")
+    elif query.data == "back":
+        await state.set_state(Form.settings)
+        await open_settings(query, state)
+    elif query.data == "noop":
+        await query.answer()
+
+
 @form_router.message(Command("settings", ignore_case=True))
 async def open_settings(message_or_query: Message | CallbackQuery, state: FSMContext) -> None:
     if isinstance(message_or_query, CallbackQuery):
         message: Message = message_or_query.message  # type: ignore[assignment]
-        user = message_or_query.from_user
     else:
         message = message_or_query
-        user = message.from_user  # type: ignore[assignment]
-
-    current_settings = await common.redis_storage.get_all_user_settings(user_id=user.id)
 
     await state.set_state(Form.settings)
-    reply_markup = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="Enabled Engines", callback_data="enabled_engines"),
-                InlineKeyboardButton(
-                    text=f"{'✅' if current_settings.get('search_cache', True) else '❌'}  Search Cache",
-                    callback_data="toggle_search_cache",
-                ),
-            ],
-            [
-                InlineKeyboardButton(text="Back", callback_data="back"),
-            ],
+    buttons = [
+        [
+            InlineKeyboardButton(text="Enabled Engines", callback_data="enabled_engines"),
         ],
+        [
+            InlineKeyboardButton(text="Back", callback_data="back"),
+        ],
+    ]
+
+    if DEBUG_OPTIONS:
+        buttons.insert(
+            0,
+            [
+                InlineKeyboardButton(text="Debug Settings", callback_data="debug"),
+            ],
+        )
+
+    reply_markup = InlineKeyboardMarkup(
+        inline_keyboard=buttons,
     )
     if message.from_user.id == (await message.bot.me()).id:  # type: ignore[union-attr]
         await message.edit_text(
@@ -295,6 +321,48 @@ async def open_settings(message_or_query: Message | CallbackQuery, state: FSMCon
     else:
         await message.reply(
             "<b>Settings</b>",
+            reply_markup=reply_markup,
+        )
+
+
+async def open_debug(query: CallbackQuery, state: FSMContext) -> None:
+    current_settings = await common.redis_storage.get_all_user_settings(user_id=query.from_user.id)
+    await state.set_state(Form.debug)
+    reply_markup = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=f"{'✅' if current_settings.get('search_cache', True) else '❌'}  Search Cache",
+                    callback_data="toggle_search_cache",
+                ),
+            ],
+            [
+                InlineKeyboardButton(text="\u200b", callback_data="noop"),
+            ],
+            [
+                InlineKeyboardButton(text="Clear Not Found", callback_data="clear_not_found"),
+                InlineKeyboardButton(text="Clear Provider Results", callback_data="clear_results"),
+            ],
+            [
+                InlineKeyboardButton(text="Clear Results Fully", callback_data="clear_cache_full"),
+            ],
+            [
+                InlineKeyboardButton(text="\u200b", callback_data="noop"),
+            ],
+            [
+                InlineKeyboardButton(text="Back", callback_data="back"),
+            ],
+        ],
+    )
+    message: Message = query.message  # type: ignore[assignment]
+    if message.from_user.id == (await message.bot.me()).id:  # type: ignore[union-attr]
+        await message.edit_text(
+            "<b>Debug Settings</b>",
+            reply_markup=reply_markup,
+        )
+    else:
+        await message.reply(
+            "<b>Debug Settings</b>",
             reply_markup=reply_markup,
         )
 
