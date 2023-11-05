@@ -23,9 +23,11 @@ from ris.redis import RedisStorage
 from ris.s3 import S3Manager
 from ris.utils import chunks, host_name, tagified_string
 
+logger = logging.getLogger("ris")
+
 BASE_URL = getenv("BASE_URL")
 if not BASE_URL:
-    logging.fatal("BASE_URL env variable is not set")
+    logger.fatal("BASE_URL env variable is not set")
     sys.exit(1)
 
 form_router = Router()
@@ -132,13 +134,13 @@ async def search(message: Message, state: FSMContext) -> None:
     found = False
     if not await common.redis_storage.check_no_found_entry(file_id):
         if results := await find_existing_results(file_id):
-            logging.info(f"Found {len(results)} existing results for {url}")
+            logger.info(f"Found {len(results)} existing results for {url}")
             await asyncio.gather(
                 *(send_result(message, result) for result in results),
             )
             found = True
         else:
-            logging.info(f"Searching for {url}...")
+            logger.info(f"Searching for {url}...")
             async for result in saucenao_search(url, file_id):
                 found = True
                 await send_result(message, result.provider_result, result.search_provider)
@@ -157,15 +159,15 @@ async def callback_a(query: CallbackQuery, state: FSMContext) -> None:
 async def main() -> None:
     TOKEN = getenv("BOT_TOKEN")
     if not TOKEN:
-        logging.fatal("BOT_TOKEN env variable is not set")
+        logger.fatal("BOT_TOKEN env variable is not set")
         sys.exit(1)
 
     redis = Redis(decode_responses=True)
     try:
         await redis.ping()
-        logging.info("Connected to Redis")
+        logger.info("Connected to Redis")
     except ConnectionError as e:
-        logging.fatal(f"Cannot connect to Redis: {e}")
+        logger.fatal(f"Cannot connect to Redis: {e}")
         sys.exit(1)
     bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)
     dp = Dispatcher(storage=FSMRedisStorage(redis))
@@ -179,7 +181,7 @@ async def main() -> None:
             default_bucket=os.environ["S3_DEFAULT_BUCKET"],
         )
     except KeyError as e:
-        logging.fatal(f"Missing env variable {e}")
+        logger.fatal(f"Missing env variable {e}")
         sys.exit(1)
 
     async with ClientSession() as session:
