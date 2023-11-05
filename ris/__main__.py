@@ -75,7 +75,8 @@ async def command_start(message: Message, state: FSMContext) -> None:
 
 
 async def send_result(message: Message, result: ProviderResult, search_engine: str = "") -> Message:
-    text = f"<a href='{result.main_file}'>\u200b</a>\n\n"
+    main_file = result.main_file[0]
+    text = f"<a href='{main_file}'>\u200b</a>\n\n"  # TODO: Send media group if we have multuple files
     provider = result.provider_id.split("-")[0]
     if search_engine:
         text += f"Provided by {common.LINK_MAP[search_engine]} with {common.LINK_MAP[provider]}\n\n"

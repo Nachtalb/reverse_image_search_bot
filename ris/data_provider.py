@@ -49,7 +49,7 @@ async def danbooru(id: str | int) -> ProviderResult | None:
 
     return ProviderResult(
         provider_link=link,
-        main_file=file_link or thumbnail_link,
+        main_file=[file_link or thumbnail_link],
         fields={
             "authors": authors,
             "characters": characters,
@@ -85,7 +85,7 @@ async def gelbooru(id: str | int) -> ProviderResult | None:
 
     return ProviderResult(
         provider_link=link,
-        main_file=file_link or thumbnail_link,
+        main_file=[file_link or thumbnail_link],
         fields={"tags": tags, "nsfw": nsfw},
         extra_links=[source_link],
         provider_id=provider_id,
@@ -115,7 +115,7 @@ async def yandere(id: str | int) -> ProviderResult | None:
 
     return ProviderResult(
         provider_link=link,
-        main_file=file_link or thumbnail_link,
+        main_file=[file_link or thumbnail_link],
         fields={"tags": tags, "nsfw": nsfw},
         extra_links=[source_link],
         provider_id=provider_id,
@@ -143,7 +143,7 @@ async def zerochan(id: str | int) -> ProviderResult | None:
 
     return ProviderResult(
         provider_link=link,
-        main_file=file_link or thumbnail_link,
+        main_file=[file_link or thumbnail_link],
         fields={"tags": tags, "nsfw": nsfw},
         extra_links=[source_link],
         provider_id=provider_id,
@@ -172,7 +172,7 @@ async def threedbooru(id: str | int) -> ProviderResult | None:
 
     return ProviderResult(
         provider_link=link,
-        main_file=file_link,
+        main_file=[file_link],
         fields={"tags": tags, "nsfw": nsfw},
         extra_links=[source],
         provider_id=provider_id,
