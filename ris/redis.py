@@ -1,10 +1,22 @@
 import asyncio
 import logging
 import re
+from typing import TypedDict
 
 from redis.asyncio import Redis
 
 from ris.data_provider import ProviderResult
+
+
+class CacheInfo(TypedDict):
+    entries_results: int
+    entries_links: int
+    entries_not_found: int
+    entries: int
+    volume_results: int
+    volume_links: int
+    volume_not_found: int
+    volume: int
 
 
 class RedisStorage:
@@ -16,6 +28,7 @@ class RedisStorage:
         """
         self.redis_client = redis_client
         self.logger = logging.getLogger("ris:redis")
+        self.logger.setLevel(logging.DEBUG)
 
     async def add_provider_result(self, image_id: str, result: ProviderResult) -> None:
         """Add provider result to storage and link it to image_id
@@ -102,11 +115,6 @@ class RedisStorage:
         self.logger.debug("Checking no found entry %s", image_id)
         return await self.redis_client.exists(f"ris:no_found:{image_id}")  # type: ignore[no-any-return]
 
-    async def reset_all_no_founds(self) -> None:
-        """Reset all no found entries"""
-        self.logger.debug("Resetting all no found entries")
-        await self.redis_client.delete(*await self.redis_client.keys("ris:no_found:*"))
-
     async def clear_not_found(self) -> int:
         """Clear not found entries
 
@@ -115,7 +123,8 @@ class RedisStorage:
         """
         self.logger.debug("Clearing not found entries")
         keys = await self.redis_client.keys("ris:no_found:*")
-        await self.redis_client.delete(*keys)
+        if keys:
+            await self.redis_client.delete(*keys)
         return len(keys)
 
     async def clear_provider_results(self) -> int:
@@ -125,10 +134,52 @@ class RedisStorage:
             int: Number of cleared entries
         """
         self.logger.debug("Clearing results")
-        keys = await self.redis_client.keys("ris:provider_result:*")
-        await self.redis_client.delete(*keys)
-        await self.redis_client.delete(*await self.redis_client.keys("ris:image_to_provider_result_link:*"))
-        return len(keys)
+        total = 0
+        if keys := await self.redis_client.keys("ris:provider_result:*"):
+            await self.redis_client.delete(*keys)
+            total = len(keys)
+        if keys := await self.redis_client.keys("ris:image_to_provider_result_link:*"):
+            await self.redis_client.delete(*keys)
+        return total
+
+    async def get_cache_info(self) -> CacheInfo:
+        """Get cache info
+
+        The cache info contains the number of entries and the volume of the entries:
+        Returns:
+            dict[str, int]: Cache info
+        """
+        keys_results = await self.redis_client.keys("ris:provider_result:*")
+        keys_links = await self.redis_client.keys("ris:image_to_provider_result_link:*")
+        keys_not_found = await self.redis_client.keys("ris:no_found:*")
+
+        entries_results = len(keys_results)
+        entries_links = len(keys_links)
+        entries_not_found = len(keys_not_found)
+
+        volume_results = 0
+        volume_links = 0
+        volume_not_found = 0
+
+        for key in keys_results:
+            volume_results += await self.redis_client.memory_usage(key)
+
+        for key in keys_links:
+            volume_links += await self.redis_client.memory_usage(key)
+
+        for key in keys_not_found:
+            volume_not_found += await self.redis_client.memory_usage(key)
+
+        return {
+            "entries_results": entries_results,
+            "entries_links": entries_links,
+            "entries_not_found": entries_not_found,
+            "entries": entries_results + entries_links + entries_not_found,
+            "volume_results": volume_results,
+            "volume_links": volume_links,
+            "volume_not_found": volume_not_found,
+            "volume": volume_results + volume_links + volume_not_found,
+        }
 
     async def clear_results_full(self) -> tuple[int, int]:
         """Clear results and not found entries

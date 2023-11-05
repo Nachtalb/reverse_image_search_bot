@@ -238,3 +238,24 @@ def host_name(url: str | URL, with_emoji: bool = True, fallback: str = FALLBACK_
         emoji = fallback
 
     return f"{emoji} {name}" if with_emoji else str(name)
+
+
+def human_readable_volume(_bytes: float, right_alignment: int = 4, with_decimal: int = 0) -> str:
+    """Return a human-readable representation of a number of bytes.
+
+    Args:
+        _bytes (float): The number of bytes.
+        right_alignment (int): The number of characters to right-align the numbers to. Defaults to 4.
+        with_decimal (int): The number of decimal places to include. Defaults to 0.
+
+    Returns:
+        str: A human-readable representation of the number of bytes.
+    """
+    if _bytes == 0:
+        return f"{_bytes:>{right_alignment}.{with_decimal}f} B"
+    units = ["B", "KB", "MB", "GB", "TB", "PB"]
+    i = 0
+    while _bytes >= 1024 and i < len(units) - 1:
+        _bytes /= 1024
+        i += 1
+    return f"{_bytes:>{right_alignment}.{with_decimal}f} {units[i]}"

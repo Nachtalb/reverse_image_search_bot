@@ -10,7 +10,14 @@ from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.redis import RedisStorage as FSMRedisStorage
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, ReplyKeyboardRemove
+from aiogram.types import (
+    BotCommand,
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+    ReplyKeyboardRemove,
+)
 from aiohttp import ClientSession
 from redis.asyncio.client import Redis
 from redis.exceptions import ConnectionError
@@ -21,7 +28,7 @@ from ris.data_provider import ProviderResult
 from ris.files import prepare
 from ris.redis import RedisStorage
 from ris.s3 import S3Manager
-from ris.utils import chunks, host_name, tagified_string
+from ris.utils import chunks, host_name, human_readable_volume, tagified_string
 
 logger = logging.getLogger("ris")
 
@@ -272,12 +279,18 @@ async def callback_debug(query: CallbackQuery, state: FSMContext) -> None:
     elif query.data == "clear_not_found":
         total = await common.redis_storage.clear_not_found()
         await query.answer(f"Cleared {total} not found entries")
+        if total != 0:
+            await open_debug(query, state)
     elif query.data == "clear_results":
         total = await common.redis_storage.clear_provider_results()
         await query.answer(f"Cleared {total} provider result entries")
+        if total != 0:
+            await open_debug(query, state)
     elif query.data == "clear_cache_full":
         total_not_found, total_results = await common.redis_storage.clear_results_full()
         await query.answer(f"Cleared {total_not_found} not found and {total_results} provider result entries")
+        if total_not_found + total_results != 0:
+            await open_debug(query, state)
     elif query.data == "back":
         await state.set_state(Form.settings)
         await open_settings(query, state)
@@ -298,7 +311,7 @@ async def open_settings(message_or_query: Message | CallbackQuery, state: FSMCon
             InlineKeyboardButton(text="Enabled Engines", callback_data="enabled_engines"),
         ],
         [
-            InlineKeyboardButton(text="Back", callback_data="back"),
+            InlineKeyboardButton(text="Close", callback_data="back"),
         ],
     ]
 
@@ -354,17 +367,26 @@ async def open_debug(query: CallbackQuery, state: FSMContext) -> None:
             ],
         ],
     )
+
+    cache_info = await common.redis_storage.get_cache_info()
+    cache_info_text = (
+        "<pre>"
+        "Cache Info:\n"
+        f"  Not Found: {cache_info['entries_not_found']:>3} | {human_readable_volume(cache_info['volume_not_found'])}\n"
+        f"  Results:   {cache_info['entries_results']:>3} | {human_readable_volume(cache_info['volume_results'])}\n"
+        f"  Links:     {cache_info['entries_links']:>3} | {human_readable_volume(cache_info['volume_links'])}\n"
+        "\n"
+        f"  Total:     {cache_info['entries']:>3} | {human_readable_volume(cache_info['volume'])}\n"
+        "</pre>"
+    )
+
+    text = f"<b>Debug Settings</b>\n\n{cache_info_text}"
+
     message: Message = query.message  # type: ignore[assignment]
     if message.from_user.id == (await message.bot.me()).id:  # type: ignore[union-attr]
-        await message.edit_text(
-            "<b>Debug Settings</b>",
-            reply_markup=reply_markup,
-        )
+        await message.edit_text(text, reply_markup=reply_markup)
     else:
-        await message.reply(
-            "<b>Debug Settings</b>",
-            reply_markup=reply_markup,
-        )
+        await message.reply(text, reply_markup=reply_markup)
 
 
 async def main() -> None:
@@ -401,6 +423,13 @@ async def main() -> None:
         common.redis = redis
         common.s3 = s3
         common.redis_storage = RedisStorage(redis)
+
+        await bot.set_my_commands(
+            commands=[
+                BotCommand(command="start", description="Start the bot"),
+                BotCommand(command="settings", description="Open settings"),
+            ]
+        )
 
         await dp.start_polling(bot)
 
