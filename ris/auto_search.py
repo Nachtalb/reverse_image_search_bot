@@ -1,4 +1,5 @@
 import os
+import re
 from asyncio import as_completed
 from dataclasses import dataclass
 from typing import Any, AsyncGenerator, Awaitable, Callable
@@ -14,6 +15,7 @@ SAUCENAO_MIN_SIMILARITY = float(os.environ["SAUCENAO_MIN_SIMILARITY"])
 class Result:
     search_provider: str
     provider_result: ProviderResult
+    similarity: float = -1.0
 
 
 async def find_existing_results(image_id: str) -> list[ProviderResult]:
@@ -74,4 +76,54 @@ async def saucenao_search(image_url: str, image_id: str) -> AsyncGenerator[Resul
         result = await task
         if result:
             await common.redis_storage.add_provider_result(image_id, result)
-            yield Result(search_provider="saucenao", provider_result=result)
+            yield Result(
+                search_provider="saucenao", provider_result=result, similarity=float(item["header"]["similarity"])
+            )
+
+
+async def iqdb(image_url: str, image_id: str) -> AsyncGenerator[Result, None]:
+    """Search for image using iqdb.
+
+    Specifically only search e-shuushuu (6), zerochan (11) and 3dbooru (7). The remaining providers
+    are covered by saucenao which provides better results.
+
+    Args:
+        image_url (str): Image url.
+        image_id (str): Image id.
+
+    Yields:
+        AsyncGenerator[Result, None]: Async generator of results.
+    """
+    url = f"https://iqdb.org/?url={image_url}&service[]=6&service[]=11&service[]=7"
+
+    async with common.http_session.get(url, headers={"User-Agent": common.LEGIT_USER_AGENT}) as response:
+        html = await response.text()
+
+    matches = re.findall(
+        r'<div><table><tr><th>Best match</th></tr><tr><td class=\'image\'><a href="([^"]+)"><img src=\'([^"]+)\''
+        r' alt="[^"]*" title="[^"]*" width=\'\d+\' height=\'\d+\'></a></td>.*?<td><img alt="icon"'
+        r' src="/icon/[^.]+\.ico" class="service-icon">([^<]+)</td>.*?<td>(\d+×\d+) \[([^\]]+)\]</td>.*?<td>(\d+)%'
+        r" similarity</td>",
+        html,
+        re.DOTALL,
+    )
+
+    for match in matches:
+        provider = match[2].strip()
+        post_link = match[0].strip()
+        post_id = int(post_link.split("/")[-1])
+        thumbnail_src = match[1].strip()
+        size = match[3].strip()
+        nsfw = match[4].strip().lower() != "safe"
+        similarity = match[5].strip()
+
+        result = ProviderResult(
+            provider_id=f"iqdb:{provider.lower()}-{post_id}",
+            provider_link=post_link,
+            main_file=thumbnail_src,
+            fields={
+                "size": size,
+                "nsfw": nsfw,
+            },
+        )
+        yield Result(search_provider="iqdb", provider_result=result, similarity=float(similarity))

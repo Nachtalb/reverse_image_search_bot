@@ -161,6 +161,11 @@ HOST_MAP: dict[str, Host] = {
         "emoji": "🐕",
         "urls": ["e621.net", "static1.e621.net"],
     },
+    "behoimi": {
+        "name": "Behoimi",
+        "emoji": "📷",
+        "urls": ["behoimi.org", "behoimi.org"],
+    },
 }
 
 URL_MAP = {url: key for key, data in HOST_MAP.items() for url in data["urls"]}
