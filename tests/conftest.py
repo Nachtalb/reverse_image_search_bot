@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import uvloop
 from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
@@ -24,11 +23,6 @@ async def mock_redis_client() -> AsyncMock:
     mock_client.delete = AsyncMock()
     mock_client.mget = AsyncMock()
     mock_client.mget.return_value = []
-
-    pipeline = MagicMock(spec=Pipeline)
-    pipeline.execute = AsyncMock()
-    pipeline.execute.return_value = []
-
-    mock_client.pipeline = MagicMock()
-    mock_client.pipeline.return_value = pipeline
+    mock_client.eval = AsyncMock()
+    mock_client.exists = AsyncMock()
     return mock_client

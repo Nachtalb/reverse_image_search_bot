@@ -1,5 +1,6 @@
 import json
 import re
+from collections.abc import Collection
 from typing import Any, Callable, Type
 
 from redis.asyncio import Redis
@@ -132,7 +133,7 @@ class RedisStorageDataTypesMixin:
         value = self._serialize(value, key)
         await self.redis_client.set(key, value)  # type: ignore[arg-type]
 
-    async def get(self, key: str, default: DATA_TYPES | None = None) -> DATA_TYPES:
+    async def get(self, key: str, default: DATA_TYPES | None = None) -> DATA_TYPES | None:
         """Get that handles all supported data types
 
         Schema:
@@ -146,28 +147,27 @@ class RedisStorageDataTypesMixin:
 
         Returns:
             DATA_TYPES: Value
-
-        Raises:
-            KeyError: Key not found or invalid key format
         """
         if not self._check_key_format(key):
             keys = await self.keys(key)
             if not keys:
-                if default is None:
-                    raise KeyError("Key not found")
                 return default
             key = keys[0]
 
         _, data_type, _ = key.split(":", 2)
 
         if data_type[0] == "x":
+            if not await self.redis_client.exists(key):
+                return default
             value = await self.redis_client.smembers(key)  # type: ignore[misc]
             return self._deserialize(value, key)
 
         value = await self.redis_client.get(key)
+        if value is None:
+            return default
         return self._deserialize(value, key)
 
-    async def mget(self, keys: list[str]) -> list[DATA_TYPES]:
+    async def mget(self, keys: Collection[str], mark_non_existing_sets: bool = True) -> list[DATA_TYPES | None]:
         """Get multiple keys while handling all supported data types including sets
 
         Note:
@@ -177,7 +177,8 @@ class RedisStorageDataTypesMixin:
             if the keys are already known.
 
         Args:
-            keys (list[str]): Keys in the format 'ris:[data_type]:[key]'
+            keys (Collection[str]): Keys in the format 'ris:[data_type]:[key]'
+            mark_non_existing_sets (bool, optional): If True, sets that do not exist will be marked as None in the result list. Defaults to True.
 
         Returns:
             list[DATA_TYPES]: Values
@@ -196,23 +197,36 @@ class RedisStorageDataTypesMixin:
             else:
                 raise ValueError(f"Invalid {key=}format, correct format is 'ris:[data_type]:[key]'")
 
-        values: dict[int, DATA_TYPES] = {}
+        values: dict[int, DATA_TYPES | None] = {}
 
         if set_keys:
-            pipe = self.redis_client.pipeline()
-            [pipe.smembers(key) for key in set_keys.values()]
-            for (index, key), value in zip(set_keys.items(), await pipe.execute()):
-                values[index] = self._deserialize(value, key)
+            lua_script = """
+            local results = {}
+            for i, key in ipairs(KEYS) do
+                if redis.call("EXISTS", key) == 1 then
+                    results[i] = redis.call("SMEMBERS", key)
+                else
+                    results[i] = nil
+                end
+            end
+            return results
+            """
+            result = await self.redis_client.eval(lua_script, len(set_keys), *set_keys.values())  # type: ignore[misc, arg-type]
+            for (index, key), value in zip(set_keys.items(), result):
+                if value is None and mark_non_existing_sets:
+                    values[index] = None
+                else:
+                    values[index] = set() if value is None else self._deserialize(value, key)  # type: ignore[assignment]
 
         if string_keys:
             for (index, key), value in zip(
                 string_keys.items(), await self.redis_client.mget(list(string_keys.values()))
             ):
-                values[index] = self._deserialize(value, key)
+                values[index] = None if value is None else self._deserialize(value, key)
 
         return [values[index] for index in range(len(keys))]
 
-    async def mget_dict(self, keys: list[str]) -> dict[str, DATA_TYPES]:
+    async def mget_dict(self, keys: list[str]) -> dict[str, DATA_TYPES | None]:
         """Get multiple keys at once as a dict
 
         Handles all supported data types including sets.
@@ -228,7 +242,7 @@ class RedisStorageDataTypesMixin:
         """
         return dict(zip(keys, await self.mget(keys)))
 
-    async def mget_dict_short(self, keys: list[str]) -> dict[str, DATA_TYPES]:
+    async def mget_dict_short(self, keys: list[str]) -> dict[str, DATA_TYPES | None]:
         """Get multiple keys at once as a dict without the 'ris:[data_type]:' prefix
 
         Handles all supported data types including sets.

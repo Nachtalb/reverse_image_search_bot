@@ -141,9 +141,8 @@ class TestRedisStorageDateTypesMixin:
     async def test_get_key_not_found_without_default(self) -> None:
         # Test that KeyError is raised when the key is not found and no default is provided
         self.redis.redis_client.keys.return_value = []
-        with pytest.raises(KeyError) as exc_info:
-            await self.redis.get("nonexistent_key")
-        assert "Key not found" in str(exc_info.value)
+        result = await self.redis.get("nonexistent_key")
+        assert result is None
 
     async def test_get_key_not_found_with_default(self) -> None:
         # Test that default is returned when the key is not found
@@ -264,29 +263,24 @@ class TestRedisStorageDateTypesMixin:
 
     async def test_mget_with_valid_keys(self) -> None:
         keys = ["ris:ss:key1", "ris:xi:key2"]
-        self.redis.redis_client.pipeline.return_value.execute.return_value = [{"1", "2"}, {"3", "4"}]
+        self.redis.redis_client.eval.return_value = [{"1", "2"}, {"3", "4"}]
         self.redis.redis_client.mget.return_value = ["value1", "value2"]
         results = await self.redis.mget(keys)
-        # Ensure that the pipeline is used for set keys
-        self.redis.redis_client.pipeline.assert_called_once()
-        self.redis.redis_client.pipeline.return_value.execute.assert_called_once()
-        # Ensure that mget is called for string keys
+        self.redis.redis_client.eval.assert_called_once()
         self.redis.redis_client.mget.assert_called_once_with(["ris:ss:key1"])
         assert results == ["value1", {1, 2}]
 
     async def test_mget_with_mixed_valid_invalid_keys(self) -> None:
         keys = ["ris:ss:key1", "invalid:key2"]
-        self.redis.redis_client.pipeline.return_value.execute.return_value = [{"1", "2"}]
+        self.redis.redis_client.eval.return_value = [{"1", "2"}]
         with pytest.raises(ValueError):
             await self.redis.mget(keys)
 
     async def test_mget_with_all_set_keys(self) -> None:
         keys = ["ris:xi:key1", "ris:xi:key2"]
-        self.redis.redis_client.pipeline.return_value.execute.return_value = [{"1", "2"}, {"3", "4"}]
+        self.redis.redis_client.eval.return_value = [{"1", "2"}, {"3", "4"}]
         results = await self.redis.mget(keys)
-        # Ensure that the pipeline is used for all set keys
-        self.redis.redis_client.pipeline.assert_called_once()
-        self.redis.redis_client.pipeline.return_value.execute.assert_called_once()
+        self.redis.redis_client.eval.assert_called_once()
         assert results == [{1, 2}, {3, 4}]
 
     async def test_mget_with_all_string_keys(self) -> None:
@@ -296,6 +290,25 @@ class TestRedisStorageDateTypesMixin:
         # Ensure that mget is called for all string keys
         self.redis.redis_client.mget.assert_called_once_with(keys)
         assert results == ["value1", "value2"]
+
+    async def test_mget_with_non_existent_set_keys(self) -> None:
+        keys = ["ris:xi:existing", "ris:xi:not_existing"]
+        self.redis.redis_client.eval.return_value = [{"1", "2"}, None]
+        results = await self.redis.mget(keys)
+        assert results == [{1, 2}, None]
+
+    async def test_mget_with_non_existent_string_keys(self) -> None:
+        keys = ["ris:si:existing", "ris:ss:not_existing"]
+        self.redis.redis_client.mget.return_value = [1, None]
+        results = await self.redis.mget(keys)
+        assert results == [1, None]
+
+    async def test_mget_with_non_existent_mixed_keys(self) -> None:
+        keys = ["ris:xi:existing", "ris:xi:not_existing", "ris:si:existing", "ris:ss:not_existing"]
+        self.redis.redis_client.eval.return_value = [{"1", "2"}, None]
+        self.redis.redis_client.mget.return_value = [1, None]
+        result = await self.redis.mget(keys)
+        assert result == [{1, 2}, None, 1, None]
 
     async def test_mget_dict(self) -> None:
         keys = ["ris:ss:key1", "ris:si:key2"]
