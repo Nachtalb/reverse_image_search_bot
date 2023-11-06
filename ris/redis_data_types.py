@@ -1,11 +1,16 @@
 import json
 import re
-from typing import Callable, Type
+from typing import Any, Callable, Type
 
 from redis.asyncio import Redis
 
 DATA_TYPES_CHECK = (str, int, float, bool, dict, list, set)
 DATA_TYPES = str | int | float | bool | dict | list | set[str] | set[int] | set[float] | set[bool]
+
+CONTAINER_MAP = {
+    str: "s",
+    set: "x",
+}
 TYPE_MAP = {
     str: "s",
     int: "i",
@@ -13,40 +18,52 @@ TYPE_MAP = {
     bool: "b",
     dict: "j",  # As JSON
     list: "j",  # As JSON
-    set[str]: "xs",
-    set[int]: "xi",
-    set[float]: "xf",
-    set[bool]: "xb",
 }
 
-SERIALIZE_MAP: dict[Type[DATA_TYPES], Callable[[DATA_TYPES], str | set[str]]] = {
-    int: str,
-    float: str,
-    bool: lambda x: str(int(x)),  # type: ignore[arg-type]
-    set[str]: lambda x: {str(y) for y in x},  # type: ignore[union-attr]
-    set[int]: lambda x: {str(y) for y in x},  # type: ignore[union-attr]
-    set[float]: lambda x: {str(y) for y in x},  # type: ignore[union-attr]
-    set[bool]: lambda x: {str(int(y)) for y in x},  # type: ignore[union-attr]
-    dict: json.dumps,
-    list: json.dumps,
-}
-
-DESERIALIZE_MAP: dict[Type[DATA_TYPES], Callable[[str | set[str]], DATA_TYPES]] = {
-    int: int,  # type: ignore[dict-item]
-    float: float,  # type: ignore[dict-item]
-    bool: lambda x: bool(int(x)),  # type: ignore[arg-type]
-    dict: json.loads,  # type: ignore[dict-item]
-    list: json.loads,  # type: ignore[dict-item]
-    set[int]: lambda x: {int(y) for y in x},
-    set[float]: lambda x: {float(y) for y in x},
-    set[bool]: lambda x: {bool(int(y)) for y in x},
-}
-
+CONTAINER_MAP_REVERSE = {v: k for k, v in CONTAINER_MAP.items()}
 TYPE_MAP_REVERSE = {v: k for k, v in TYPE_MAP.items()}
+
+SERIALIZE_MAP: dict[str, Callable[[DATA_TYPES], str]] = {
+    "s": str,
+    "i": str,
+    "f": str,
+    "b": lambda x: str(int(x)),  # type: ignore[arg-type]
+    "j": json.dumps,
+}
+
+DESERIALIZE_MAP: dict[str, Callable[[str], DATA_TYPES]] = {
+    "s": str,
+    "i": int,
+    "f": float,
+    "b": lambda x: bool(int(x)),
+    "j": json.loads,
+}
 
 
 class RedisStorageDataTypesMixin:
     redis_client: Redis
+
+    # def __serialize[T](self, value: DATA_TYPES, key: str, _map: dict[str, Callable[[Any], T]]) -> T:  Better py3.12 syntax has no support in mypy yet :(
+    def __serialize(self, value: DATA_TYPES, key: str, _map: dict[str, Callable[[Any], Any]]) -> Any:
+        """Serialize value
+
+        Args:
+            value (DATA_TYPES): Value
+            key (str): Key
+            _map (dict[str, Callable[[Any], Any]]): Map
+
+        Returns:
+            Any: Serialized value
+        """
+        if not self._check_key_format(key):
+            raise ValueError("Invalid key format, correct format is 'ris:[data_type]:[key]'")
+        _, data_type, _ = key.split(":", 2)
+        container, _type = tuple(data_type)
+
+        if container == "x":
+            fun = _map[_type]
+            return {fun(val) for val in value}  # type: ignore[union-attr]
+        return _map[_type](value)
 
     def _serialize(self, value: DATA_TYPES, key: str) -> str | set[str]:
         """Serialize value
@@ -58,13 +75,7 @@ class RedisStorageDataTypesMixin:
         Returns:
             str | set[str]: Serialized value
         """
-        if not self._check_key_format(key):
-            raise ValueError("Invalid key format, correct format is 'ris:[data_type]:[key]'")
-        _, data_type, _ = key.split(":", 2)
-        _type = TYPE_MAP_REVERSE[data_type]
-        if _type in SERIALIZE_MAP:
-            return SERIALIZE_MAP[_type](value)
-        return str(value)
+        return self.__serialize(value, key, SERIALIZE_MAP)  # type: ignore[no-any-return]
 
     def _deserialize(self, value: str | set[str], key: str) -> DATA_TYPES:
         """Deserialize value
@@ -76,14 +87,7 @@ class RedisStorageDataTypesMixin:
         Returns:
             DATA_TYPES: Deserialized value
         """
-        if not self._check_key_format(key):
-            raise ValueError("Invalid key format, correct format is 'ris:[data_type]:[key]'")
-        _, data_type, _ = key.split(":", 2)
-
-        _type: Type[DATA_TYPES] = TYPE_MAP_REVERSE[data_type]
-        if _type in DESERIALIZE_MAP:
-            return DESERIALIZE_MAP[_type](value)
-        return value
+        return self.__serialize(value, key, DESERIALIZE_MAP)  # type: ignore[no-any-return]
 
     async def set(self, key: str, value: DATA_TYPES, set_type: Type[str | int | float | bool] = str) -> None:
         """Set that handles all supported data types
@@ -108,7 +112,7 @@ class RedisStorageDataTypesMixin:
                 if data_type[0] != "x":
                     raise ValueError(f"Invalid key or value. Key defines '{data_type}' but value is not a set")
             else:
-                data_type = TYPE_MAP[set[set_type]]  # type: ignore[valid-type]
+                data_type = "x" + TYPE_MAP[set_type]
                 key = f"ris:{data_type}:{key}"
 
             value = self._serialize(value, key)
@@ -122,7 +126,7 @@ class RedisStorageDataTypesMixin:
             return
 
         if not self._check_key_format(key):
-            data_type = TYPE_MAP[type(value)]
+            data_type = "s" + TYPE_MAP[type(value)]
             key = f"ris:{data_type}:{key}"
 
         value = self._serialize(value, key)
@@ -250,7 +254,7 @@ class RedisStorageDataTypesMixin:
             list[str]: Keys
         """
         if not self._check_key_format(pattern):
-            pattern = f"ris:[sifbjx][sifb]?:{pattern}"
+            pattern = f"ris:[sx][sifbj]:{pattern}"
 
         return await self.redis_client.keys(pattern)  # type: ignore[no-any-return]
 
@@ -272,7 +276,7 @@ class RedisStorageDataTypesMixin:
             ValueError: If key contains "ris:" prefix but is not in the correct format
         """
         if key.startswith("ris:"):
-            if match := re.match(r"ris:([sifbjx][sifb]?):(.+)", key):
+            if match := re.match(r"ris:([sx][sifbj]):(.+)", key):
                 return tuple(match.groups())  # type: ignore[return-value]
             raise ValueError("Invalid key format, correct format is 'ris:[data_type]:[key]'")
         return None
