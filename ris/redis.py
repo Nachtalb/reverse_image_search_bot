@@ -518,6 +518,45 @@ class RedisStorage:
         value = await self.redis_client.get(key)
         return self._deserialize(value, key)
 
+    async def mget(self, keys: list[str]) -> list[DATA_TYPES]:
+        """Get multiple keys while handling all supported data types including sets
+
+        Args:
+            keys (list[str]): Keys in the format 'ris:[data_type]:[key]'
+
+        Returns:
+            list[DATA_TYPES]: Values
+
+        Raises:
+            ValueError: Invalid key format
+        """
+        set_keys: dict[int, str] = {}
+        string_keys: dict[int, str] = {}
+        for index, key in enumerate(keys):
+            if key_info := self._check_key_format(key):
+                if key_info[0][0] == "x":
+                    set_keys[index] = key
+                else:
+                    string_keys[index] = key
+            else:
+                raise ValueError(f"Invalid {key=}format, correct format is 'ris:[data_type]:[key]'")
+
+        values: dict[int, DATA_TYPES] = {}
+
+        if set_keys:
+            pipe = self.redis_client.pipeline()
+            [pipe.smembers(key) for key in set_keys.values()]
+            for (index, key), value in zip(set_keys.items(), await pipe.execute()):
+                values[index] = self._deserialize(value, key)
+
+        if string_keys:
+            for (index, key), value in zip(
+                string_keys.items(), await self.redis_client.mget(list(string_keys.values()))
+            ):
+                values[index] = self._deserialize(value, key)
+
+        return [values[index] for index in range(len(keys))]
+
     async def keys(self, pattern: str) -> list[str]:
         """Find keys
 

@@ -261,3 +261,38 @@ class TestRedisStorage:
     async def test_deserialize_invalid_key(self) -> None:
         with pytest.raises(ValueError):
             self.redis._deserialize("value", "invalid:key")
+
+    async def test_mget_with_valid_keys(self) -> None:
+        keys = ["ris:s:key1", "ris:xi:key2"]
+        self.redis.redis_client.pipeline.return_value.execute.return_value = [{"1", "2"}, {"3", "4"}]
+        self.redis.redis_client.mget.return_value = ["value1", "value2"]
+        results = await self.redis.mget(keys)
+        # Ensure that the pipeline is used for set keys
+        self.redis.redis_client.pipeline.assert_called_once()
+        self.redis.redis_client.pipeline.return_value.execute.assert_called_once()
+        # Ensure that mget is called for string keys
+        self.redis.redis_client.mget.assert_called_once_with(["ris:s:key1"])
+        assert results == ["value1", {1, 2}]
+
+    async def test_mget_with_mixed_valid_invalid_keys(self) -> None:
+        keys = ["ris:s:key1", "invalid:key2"]
+        self.redis.redis_client.pipeline.return_value.execute.return_value = [{"1", "2"}]
+        with pytest.raises(ValueError):
+            await self.redis.mget(keys)
+
+    async def test_mget_with_all_set_keys(self) -> None:
+        keys = ["ris:xi:key1", "ris:xi:key2"]
+        self.redis.redis_client.pipeline.return_value.execute.return_value = [{"1", "2"}, {"3", "4"}]
+        results = await self.redis.mget(keys)
+        # Ensure that the pipeline is used for all set keys
+        self.redis.redis_client.pipeline.assert_called_once()
+        self.redis.redis_client.pipeline.return_value.execute.assert_called_once()
+        assert results == [{1, 2}, {3, 4}]
+
+    async def test_mget_with_all_string_keys(self) -> None:
+        keys = ["ris:s:key1", "ris:s:key2"]
+        self.redis.redis_client.mget.return_value = ["value1", "value2"]
+        results = await self.redis.mget(keys)
+        # Ensure that mget is called for all string keys
+        self.redis.redis_client.mget.assert_called_once_with(keys)
+        assert results == ["value1", "value2"]
