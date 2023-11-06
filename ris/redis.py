@@ -305,4 +305,4 @@ class RedisStorage(RedisStorageDataTypesMixin):
         """
         self.logger.debug("Getting all user settings %s", user_id)
         keys = await self.keys(f"settings:{user_id}:*")
-        return await self.mget_dict_short(keys)
+        return {key.split(":")[-1]: value for key, value in (await self.mget_dict(keys)).items()}
