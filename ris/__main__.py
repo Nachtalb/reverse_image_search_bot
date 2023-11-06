@@ -147,7 +147,7 @@ async def search_for_file(message: Message, file_id: str, file_url: str) -> None
         reply_markup=full_keyboard,
     )
 
-    user_settings = await common.redis_storage.get_all_user_settings(user_id=message.from_user.id)  # type: ignore[union-attr]
+    user_settings = await common.redis_storage.get_user_settings(user_id=message.from_user.id)  # type: ignore[union-attr]
     use_cache = user_settings.get("search_cache", True)
 
     found = False
@@ -203,7 +203,7 @@ async def search_again(query: CallbackQuery, state: FSMContext) -> None:
 
 async def settings_enabled_engines_dialogue(query: CallbackQuery, state: FSMContext) -> None:
     enabled_engines: set[str] = await common.redis_storage.get_user_setting(  # type: ignore[assignment]
-        user_id=query.from_user.id, setting_id="enabled_engines", default=set(SEARCH_ENGINES.keys())
+        user_id=query.from_user.id, key="enabled_engines", default=set(SEARCH_ENGINES.keys())
     )
     available_engines = {name: name in enabled_engines for name in SEARCH_ENGINES}
     if not query.message:
@@ -241,14 +241,14 @@ async def callback_enabled_engines(query: CallbackQuery, state: FSMContext) -> N
     elif query.data.startswith("toggle_engine:"):
         engine = query.data.split(":")[1]
         enabled_engines: set[str] = await common.redis_storage.get_user_setting(  # type: ignore[assignment]
-            user_id=query.from_user.id, setting_id="enabled_engines", default=set(SEARCH_ENGINES.keys())
+            user_id=query.from_user.id, key="enabled_engines", default=set(SEARCH_ENGINES.keys())
         )
         if engine in enabled_engines:
             enabled_engines.remove(engine)
         else:
             enabled_engines.add(engine)
         await common.redis_storage.set_user_setting(
-            user_id=query.from_user.id, setting_id="enabled_engines", value=enabled_engines
+            user_id=query.from_user.id, key="enabled_engines", value=enabled_engines
         )
         await settings_enabled_engines_dialogue(query, state)
 
@@ -273,10 +273,10 @@ async def callback_settings(query: CallbackQuery, state: FSMContext) -> None:
 async def callback_debug(query: CallbackQuery, state: FSMContext) -> None:
     if query.data == "toggle_search_cache":
         current_settings: bool = await common.redis_storage.get_user_setting(  # type: ignore[assignment]
-            user_id=query.from_user.id, setting_id="search_cache", default=True
+            user_id=query.from_user.id, key="search_cache", default=True
         )
         await common.redis_storage.set_user_setting(
-            user_id=query.from_user.id, setting_id="search_cache", value=not current_settings
+            user_id=query.from_user.id, key="search_cache", value=not current_settings
         )
         await open_debug(query, state)
     elif query.data == "clear_not_found":
@@ -415,7 +415,7 @@ async def open_settings(message_or_query: Message | CallbackQuery, state: FSMCon
 
 
 async def open_debug(query: CallbackQuery, state: FSMContext) -> None:
-    current_settings = await common.redis_storage.get_all_user_settings(user_id=query.from_user.id)
+    current_settings = await common.redis_storage.get_user_settings(user_id=query.from_user.id)
     await state.set_state(Form.debug)
     reply_markup = InlineKeyboardMarkup(
         inline_keyboard=[
