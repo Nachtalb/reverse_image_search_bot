@@ -1,13 +1,16 @@
-from aiohttp import ClientSession
-from redis.asyncio import Redis
+from typing import TYPE_CHECKING
 
-from ris.redis import RedisStorage
-from ris.s3 import S3Manager
+if TYPE_CHECKING:
+    from aiohttp import ClientSession
+    from redis.asyncio import Redis
 
-redis: Redis = None  # type: ignore[assignment]
-http_session: ClientSession = None  # type: ignore[assignment]
-s3: S3Manager = None  # type: ignore[assignment]
-redis_storage: RedisStorage = None  # type: ignore[assignment]
+    from ris.redis import RedisStorage
+    from ris.s3 import S3Manager
+
+redis: "Redis" = None  # type: ignore[assignment]
+http_session: "ClientSession" = None  # type: ignore[assignment]
+s3: "S3Manager" = None  # type: ignore[assignment]
+redis_storage: "RedisStorage" = None  # type: ignore[assignment]
 
 USER_AGENT = "reverse_image_search_bot/3.0"
 LEGIT_USER_AGENT = (
