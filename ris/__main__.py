@@ -201,6 +201,75 @@ async def search_again(query: CallbackQuery, state: FSMContext) -> None:
     await search_for_file(query.message.reply_to_message, file_id, file_url)
 
 
+@form_router.message(Command("settings", ignore_case=True))
+async def open_settings(message: Message, state: FSMContext) -> None:
+    print("/settings")
+    await state.update_data(dialogue_message_id=None)
+    await _open_settings(message, state)
+
+
+async def _open_settings(message_or_query: Message | CallbackQuery, state: FSMContext) -> None:
+    print("_open_settings")
+    if isinstance(message_or_query, CallbackQuery):
+        message: Message = message_or_query.message  # type: ignore[assignment]
+    else:
+        message = message_or_query
+
+    await state.set_state(Form.settings)
+    buttons = [
+        [
+            InlineKeyboardButton(text="Enabled Engines", callback_data="enabled_engines"),
+        ],
+        [
+            InlineKeyboardButton(text="Close", callback_data="back"),
+        ],
+    ]
+
+    if DEBUG_OPTIONS:
+        buttons.insert(
+            0,
+            [
+                InlineKeyboardButton(text="Debug Settings", callback_data="debug"),
+            ],
+        )
+
+    reply_markup = InlineKeyboardMarkup(
+        inline_keyboard=buttons,
+    )
+    bot: Bot = message.bot  # type: ignore[assignment]
+    message_id = (await state.get_data()).get("dialogue_message_id")
+    if message_id:
+        await bot.edit_message_text(
+            chat_id=message.chat.id,
+            message_id=message_id,
+            text="<b>Settings</b>",
+            reply_markup=reply_markup,
+        )
+    else:
+        message_id = await message.reply(
+            "<b>Settings</b>",
+            reply_markup=reply_markup,
+        )
+        await state.update_data(dialogue_message_id=message_id.message_id)
+
+
+@form_router.callback_query(Form.settings)
+async def callback_settings(query: CallbackQuery, state: FSMContext) -> None:
+    if query.data == "enabled_engines":
+        await state.set_state(Form.enabled_engines)
+        await settings_enabled_engines_dialogue(query, state)
+    elif query.data == "debug":
+        await state.set_state(Form.debug)
+        await open_debug(query, state)
+    elif query.data == "back":
+        await state.update_data(dialogue_message_id=None)
+        await state.set_state(Form.search)
+        if not query.message:
+            query.answer("Settings closed! Send me an image.")
+        else:
+            await query.message.edit_text("Settings closed! Send me an image.")
+
+
 async def settings_enabled_engines_dialogue(query: CallbackQuery, state: FSMContext) -> None:
     settings = await UserSettings.fetch(common.redis_storage, user_id=query.from_user.id)
     available_engines = {name: name in settings.enabled_engines for name in SEARCH_ENGINES}
@@ -262,21 +331,73 @@ async def callback_enabled_engines(query: CallbackQuery, state: FSMContext) -> N
         await settings_enabled_engines_dialogue(query, state)
 
 
-@form_router.callback_query(Form.settings)
-async def callback_settings(query: CallbackQuery, state: FSMContext) -> None:
-    if query.data == "enabled_engines":
-        await state.set_state(Form.enabled_engines)
-        await settings_enabled_engines_dialogue(query, state)
-    elif query.data == "debug":
-        await state.set_state(Form.debug)
-        await open_debug(query, state)
-    elif query.data == "back":
-        await state.update_data(dialogue_message_id=None)
-        await state.set_state(Form.search)
-        if not query.message:
-            query.answer("Settings closed! Send me an image.")
-        else:
-            await query.message.edit_text("Settings closed! Send me an image.")
+async def open_debug(query: CallbackQuery, state: FSMContext) -> None:
+    settings = await UserSettings.fetch(common.redis_storage, user_id=query.from_user.id, fill_keys=["cache_enabled"])
+    await state.set_state(Form.debug)
+    reply_markup = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=f"{'✅' if settings.cache_enabled else '❌'}  Search Cache",
+                    callback_data="toggle_cache_enabled",
+                ),
+            ],
+            [
+                InlineKeyboardButton(text="\u200b", callback_data="noop"),
+            ],
+            [
+                InlineKeyboardButton(text="Clear Not Found", callback_data="clear_not_found"),
+                InlineKeyboardButton(text="Clear Provider Results", callback_data="clear_results"),
+            ],
+            [
+                InlineKeyboardButton(text="Clear Results Fully", callback_data="clear_cache_full"),
+            ],
+            [
+                InlineKeyboardButton(text="\u200b", callback_data="noop"),
+            ],
+            [
+                InlineKeyboardButton(text="Broadcast", callback_data="broadcast"),
+            ],
+            [
+                InlineKeyboardButton(text="Back", callback_data="back"),
+            ],
+        ],
+    )
+    total_searches = await common.redis_storage.get_total_search_count()
+    searches_text = f"<pre>Searches: {total_searches}</pre>"
+
+    total_users = await common.redis_storage.get_total_user_count()
+    user_text = f"<pre>Users: {total_users}</pre>"
+
+    cache_info = await common.redis_storage.get_cache_stats()
+    cache_info_text = (
+        f"<pre>Cache Info:\n  Provider Data:      {cache_info['provider_data']['entries']:>3} |"
+        f" {human_readable_volume(cache_info['provider_data']['memory'])}\n  Provider Data Link:"
+        f" {cache_info['provider_data_image_link']['entries']:>3} |"
+        f" {human_readable_volume(cache_info['provider_data_image_link']['memory'])}\n  Not Found:         "
+        f" {cache_info['not_found']['entries']:>3} | {human_readable_volume(cache_info['not_found']['memory'])}\n\n "
+        f" Total:              {cache_info['total']['entries']:>3} |"
+        f" {human_readable_volume(cache_info['total']['memory'])}\n</pre>"
+    )
+
+    text: str = f"<b>Debug Settings</b>\n\n{user_text}\n\n{searches_text}\n\n{cache_info_text}\n"
+
+    message: Message = query.message  # type: ignore[assignment]
+    bot: Bot = message.bot  # type: ignore[assignment]
+    message_id = (await state.get_data()).get("dialogue_message_id")
+    if message_id:
+        await bot.edit_message_text(
+            chat_id=message.chat.id,
+            message_id=message_id,
+            text=text,
+            reply_markup=reply_markup,
+        )
+    else:
+        message_id = await message.reply(
+            text,
+            reply_markup=reply_markup,
+        )
+        await state.update_data(dialogue_message_id=message_id.message_id)
 
 
 @form_router.callback_query(Form.debug)
@@ -487,127 +608,6 @@ async def send_broadcast(query: CallbackQuery, state: FSMContext) -> None:
             from_chat_id=settings.broadcast_message_chat_id,
             message_id=settings.broadcast_message_id,
         )
-
-
-@form_router.message(Command("settings", ignore_case=True))
-async def open_settings(message: Message, state: FSMContext) -> None:
-    print("/settings")
-    await state.update_data(dialogue_message_id=None)
-    await _open_settings(message, state)
-
-
-async def _open_settings(message_or_query: Message | CallbackQuery, state: FSMContext) -> None:
-    print("_open_settings")
-    if isinstance(message_or_query, CallbackQuery):
-        message: Message = message_or_query.message  # type: ignore[assignment]
-    else:
-        message = message_or_query
-
-    await state.set_state(Form.settings)
-    buttons = [
-        [
-            InlineKeyboardButton(text="Enabled Engines", callback_data="enabled_engines"),
-        ],
-        [
-            InlineKeyboardButton(text="Close", callback_data="back"),
-        ],
-    ]
-
-    if DEBUG_OPTIONS:
-        buttons.insert(
-            0,
-            [
-                InlineKeyboardButton(text="Debug Settings", callback_data="debug"),
-            ],
-        )
-
-    reply_markup = InlineKeyboardMarkup(
-        inline_keyboard=buttons,
-    )
-    bot: Bot = message.bot  # type: ignore[assignment]
-    message_id = (await state.get_data()).get("dialogue_message_id")
-    if message_id:
-        await bot.edit_message_text(
-            chat_id=message.chat.id,
-            message_id=message_id,
-            text="<b>Settings</b>",
-            reply_markup=reply_markup,
-        )
-    else:
-        message_id = await message.reply(
-            "<b>Settings</b>",
-            reply_markup=reply_markup,
-        )
-        await state.update_data(dialogue_message_id=message_id.message_id)
-
-
-async def open_debug(query: CallbackQuery, state: FSMContext) -> None:
-    settings = await UserSettings.fetch(common.redis_storage, user_id=query.from_user.id, fill_keys=["cache_enabled"])
-    await state.set_state(Form.debug)
-    reply_markup = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text=f"{'✅' if settings.cache_enabled else '❌'}  Search Cache",
-                    callback_data="toggle_cache_enabled",
-                ),
-            ],
-            [
-                InlineKeyboardButton(text="\u200b", callback_data="noop"),
-            ],
-            [
-                InlineKeyboardButton(text="Clear Not Found", callback_data="clear_not_found"),
-                InlineKeyboardButton(text="Clear Provider Results", callback_data="clear_results"),
-            ],
-            [
-                InlineKeyboardButton(text="Clear Results Fully", callback_data="clear_cache_full"),
-            ],
-            [
-                InlineKeyboardButton(text="\u200b", callback_data="noop"),
-            ],
-            [
-                InlineKeyboardButton(text="Broadcast", callback_data="broadcast"),
-            ],
-            [
-                InlineKeyboardButton(text="Back", callback_data="back"),
-            ],
-        ],
-    )
-    total_searches = await common.redis_storage.get_total_search_count()
-    searches_text = f"<pre>Searches: {total_searches}</pre>"
-
-    total_users = await common.redis_storage.get_total_user_count()
-    user_text = f"<pre>Users: {total_users}</pre>"
-
-    cache_info = await common.redis_storage.get_cache_stats()
-    cache_info_text = (
-        f"<pre>Cache Info:\n  Provider Data:      {cache_info['provider_data']['entries']:>3} |"
-        f" {human_readable_volume(cache_info['provider_data']['memory'])}\n  Provider Data Link:"
-        f" {cache_info['provider_data_image_link']['entries']:>3} |"
-        f" {human_readable_volume(cache_info['provider_data_image_link']['memory'])}\n  Not Found:         "
-        f" {cache_info['not_found']['entries']:>3} | {human_readable_volume(cache_info['not_found']['memory'])}\n\n "
-        f" Total:              {cache_info['total']['entries']:>3} |"
-        f" {human_readable_volume(cache_info['total']['memory'])}\n</pre>"
-    )
-
-    text: str = f"<b>Debug Settings</b>\n\n{user_text}\n\n{searches_text}\n\n{cache_info_text}\n"
-
-    message: Message = query.message  # type: ignore[assignment]
-    bot: Bot = message.bot  # type: ignore[assignment]
-    message_id = (await state.get_data()).get("dialogue_message_id")
-    if message_id:
-        await bot.edit_message_text(
-            chat_id=message.chat.id,
-            message_id=message_id,
-            text=text,
-            reply_markup=reply_markup,
-        )
-    else:
-        message_id = await message.reply(
-            text,
-            reply_markup=reply_markup,
-        )
-        await state.update_data(dialogue_message_id=message_id.message_id)
 
 
 async def main() -> None:
