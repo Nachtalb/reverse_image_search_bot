@@ -111,7 +111,7 @@ class RedisStorageDataTypesMixin:
             if key_info := self._check_key_format(key):
                 data_type, _ = key_info
                 if data_type[0] != "x":
-                    raise ValueError(f"Invalid key or value. Key defines '{data_type}' but value is not a set")
+                    raise ValueError(f"Invalid key or value. Key defines '{data_type}' but value is a set")
             else:
                 data_type = "x" + TYPE_MAP[set_type]
                 key = f"ris:{data_type}:{key}"
@@ -206,7 +206,7 @@ class RedisStorageDataTypesMixin:
                 if redis.call("EXISTS", key) == 1 then
                     results[i] = redis.call("SMEMBERS", key)
                 else
-                    results[i] = nil
+                    results[i] = false
                 end
             end
             return results
@@ -292,5 +292,5 @@ class RedisStorageDataTypesMixin:
         if key.startswith("ris:"):
             if match := re.match(r"ris:([sx][sifbj]):(.+)", key):
                 return tuple(match.groups())  # type: ignore[return-value]
-            raise ValueError("Invalid key format, correct format is 'ris:[data_type]:[key]'")
+            raise ValueError(f"Invalid {key=} format, correct format is 'ris:[data_type]:[key]'")
         return None

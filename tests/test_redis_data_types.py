@@ -154,7 +154,7 @@ class TestRedisStorageDateTypesMixin:
     async def test_get_invalid_key_format(self) -> None:
         with pytest.raises(ValueError) as exc_info:
             await self.redis.get("ris:invalid_key_format")
-        assert "Invalid key format" in str(exc_info.value)
+        assert "Invalid key" in str(exc_info.value)
 
     async def test_get_set_with_incorrect_inner_type(self) -> None:
         # Test getting a set with an incorrect inner type (e.g., expecting int, getting str)
@@ -201,7 +201,7 @@ class TestRedisStorageDateTypesMixin:
         key = "ris:invalid_format_key"
         with pytest.raises(ValueError) as exc_info:
             self.redis._check_key_format(key)
-        assert "Invalid key format" in str(exc_info.value)
+        assert "Invalid key" in str(exc_info.value)
 
     async def test_check_key_format_without_prefix(self) -> None:
         key = "key_without_prefix"

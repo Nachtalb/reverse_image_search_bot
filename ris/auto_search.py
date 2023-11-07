@@ -9,7 +9,7 @@ from typing import Any, AsyncGenerator, Awaitable, Callable
 from yarl import URL
 
 from ris import common
-from ris.data_provider import ProviderResult, danbooru, eshuushuu, gelbooru, threedbooru, yandere, zerochan
+from ris.data_provider import ProviderData, danbooru, eshuushuu, gelbooru, threedbooru, yandere, zerochan
 
 SAUCENAO_API_KEY = os.environ["SAUCENAO_API_KEY"]
 SAUCENAO_MIN_SIMILARITY = float(os.environ["SAUCENAO_MIN_SIMILARITY"])
@@ -20,11 +20,11 @@ logger = logging.getLogger("ris.search")
 @dataclass
 class Result:
     search_provider: str
-    provider_result: ProviderResult
+    provider_result: ProviderData
     similarity: float = -1.0
 
 
-async def find_existing_results(image_id: str) -> list[ProviderResult]:
+async def find_existing_results(image_id: str) -> list[ProviderData]:
     """Find existing results in redis storage.
 
     Args:
@@ -34,7 +34,7 @@ async def find_existing_results(image_id: str) -> list[ProviderResult]:
         list[ProviderResult]: List of existing results.
     """
     logger.info("Searching for existing results for image %s", image_id)
-    return await common.redis_storage.get_provider_results_by_image(image_id)
+    return await common.redis_storage.get_cached_provider_data_by_image(image_id)
 
 
 async def saucenao_search(image_url: str, image_id: str) -> AsyncGenerator[Result, None]:
@@ -63,7 +63,7 @@ async def saucenao_search(image_url: str, image_id: str) -> AsyncGenerator[Resul
         25,  #  gelbooru
     ]
 
-    ids: dict[str, Callable[[int], Awaitable[ProviderResult | None]]] = {
+    ids: dict[str, Callable[[int], Awaitable[ProviderData | None]]] = {
         "danbooru_id": danbooru,
         "yandere_id": yandere,
         "gelbooru_id": gelbooru,
@@ -77,7 +77,7 @@ async def saucenao_search(image_url: str, image_id: str) -> AsyncGenerator[Resul
     ]
 
     used_ids: set[str] = set()
-    tasks: list[Awaitable[ProviderResult | None]] = []
+    tasks: list[Awaitable[ProviderData | None]] = []
     for item in filtered_data:
         for key, provider in ids.items():
             if key not in used_ids and key in item["data"]:
@@ -143,7 +143,7 @@ async def iqdb(image_url: str, image_id: str) -> AsyncGenerator[Result, None]:
                 yield Result(search_provider="iqdb", provider_result=result, similarity=float(similarity))
         elif provider:
             # Fall back to simple iqdb data if no data_provider is available
-            result = ProviderResult(
+            result = ProviderData(
                 provider_id=f"iqdb:{provider.lower()}-{post_id}",
                 provider_link=post_link,
                 main_file=thumbnail_src,
@@ -228,6 +228,6 @@ async def search_all_engines(
 
     async for item in consumer(queue):
         yield item
-        await common.redis_storage.add_provider_result(image_id, item.provider_result)
+        await common.redis_storage.cache_provider_data(image_id, item.provider_result)
 
     await producer_task

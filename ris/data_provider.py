@@ -9,7 +9,7 @@ logger = logging.getLogger("ris:data_provider")
 
 
 @dataclass
-class ProviderResult:
+class ProviderData:
     provider_id: str  # In the form of "[provider_name]-[id]" (e.g. "danbooru-1234")
     provider_link: str  # Link to the page where the image was found
     main_file: list[str]  # Links to the most relevant file (e.g. the original image or a manga cover)
@@ -24,12 +24,12 @@ class ProviderResult:
         return json.dumps(asdict(self))
 
     @staticmethod
-    def from_json(json_str: str) -> "ProviderResult":
+    def from_json(json_str: str) -> "ProviderData":
         """Converts a JSON string to a ProviderResult object."""
-        return ProviderResult(**json.loads(json_str))
+        return ProviderData(**json.loads(json_str))
 
 
-async def danbooru(id: str | int) -> ProviderResult | None:
+async def danbooru(id: str | int) -> ProviderData | None:
     logger.debug("Fetch danbooru post %s", id)
     url = f"https://danbooru.donmai.us/posts/{id}.json"
 
@@ -52,7 +52,7 @@ async def danbooru(id: str | int) -> ProviderResult | None:
 
     provider_id = f"danbooru-{id}"
 
-    return ProviderResult(
+    return ProviderData(
         provider_link=link,
         main_file=[file_link or thumbnail_link],
         fields={
@@ -67,7 +67,7 @@ async def danbooru(id: str | int) -> ProviderResult | None:
     )
 
 
-async def gelbooru(id: str | int) -> ProviderResult | None:
+async def gelbooru(id: str | int) -> ProviderData | None:
     logger.debug("Fetch gelbooru post %s", id)
     url = f"https://gelbooru.com/index.php?page=dapi&s=post&q=index&json=1&id={id}"
 
@@ -89,7 +89,7 @@ async def gelbooru(id: str | int) -> ProviderResult | None:
 
     provider_id = f"gelbooru-{id}"
 
-    return ProviderResult(
+    return ProviderData(
         provider_link=link,
         main_file=[file_link or thumbnail_link],
         fields={"tags": tags, "nsfw": nsfw},
@@ -98,7 +98,7 @@ async def gelbooru(id: str | int) -> ProviderResult | None:
     )
 
 
-async def yandere(id: str | int) -> ProviderResult | None:
+async def yandere(id: str | int) -> ProviderData | None:
     logger.debug("Fetch yandere post %s", id)
     url = f"https://yande.re/post.json?tags=id:{id}"
 
@@ -120,7 +120,7 @@ async def yandere(id: str | int) -> ProviderResult | None:
 
     provider_id = f"yandere-{id}"
 
-    return ProviderResult(
+    return ProviderData(
         provider_link=link,
         main_file=[file_link or thumbnail_link],
         fields={"tags": tags, "nsfw": nsfw},
@@ -129,7 +129,7 @@ async def yandere(id: str | int) -> ProviderResult | None:
     )
 
 
-async def zerochan(id: str | int) -> ProviderResult | None:
+async def zerochan(id: str | int) -> ProviderData | None:
     logger.debug("Fetch zerochan post %s", id)
     url = f"https://www.zerochan.net/{id}?json"
 
@@ -149,7 +149,7 @@ async def zerochan(id: str | int) -> ProviderResult | None:
 
     provider_id = f"zerochan-{id}"
 
-    return ProviderResult(
+    return ProviderData(
         provider_link=link,
         main_file=[file_link or thumbnail_link],
         fields={"tags": tags, "nsfw": nsfw},
@@ -158,7 +158,7 @@ async def zerochan(id: str | int) -> ProviderResult | None:
     )
 
 
-async def threedbooru(id: str | int) -> ProviderResult | None:
+async def threedbooru(id: str | int) -> ProviderData | None:
     logger.debug("Fetch 3dbooru post %s", id)
     url = f"http://behoimi.org/post/index.json?tags=id:{id}"
 
@@ -179,7 +179,7 @@ async def threedbooru(id: str | int) -> ProviderResult | None:
 
     provider_id = f"3dbooru-{id}"
 
-    return ProviderResult(
+    return ProviderData(
         provider_link=link,
         main_file=[file_link],
         fields={"tags": tags, "nsfw": nsfw},
@@ -188,7 +188,7 @@ async def threedbooru(id: str | int) -> ProviderResult | None:
     )
 
 
-async def eshuushuu(id: str | int) -> ProviderResult | None:
+async def eshuushuu(id: str | int) -> ProviderData | None:
     logger.debug("Fetch e-shuushuu post %s", id)
     url = f"https://e-shuushuu.net/image/{id}/"
 
@@ -217,7 +217,7 @@ async def eshuushuu(id: str | int) -> ProviderResult | None:
 
     tags -= {source, character, artist}
 
-    return ProviderResult(
+    return ProviderData(
         provider_link=url,
         main_file=[full_res_image],
         fields={

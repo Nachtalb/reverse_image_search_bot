@@ -5,7 +5,7 @@ from typing import Collection, Generator, Iterable, TypedDict
 from yarl import URL
 
 
-def chunks[T](lst: list[T], n: int) -> Generator[list[T], None, None]:  # type: ignore[name-defined]  # Syntax not yet supported by mypy
+def chunks[T](lst: list[T], n: int) -> Generator[list[T], None, None]:  # type: ignore
     for i in range(0, len(lst), n):
         yield lst[i : i + n]
 

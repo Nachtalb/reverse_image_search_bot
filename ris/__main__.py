@@ -25,9 +25,10 @@ from redis.exceptions import ConnectionError
 
 from ris import common
 from ris.auto_search import SEARCH_ENGINES, find_existing_results, search_all_engines
-from ris.data_provider import ProviderResult
+from ris.data_provider import ProviderData
 from ris.files import prepare
 from ris.redis import RedisStorage
+from ris.redis_models import UserSettings
 from ris.s3 import S3Manager
 from ris.utils import chunks, host_name, human_readable_volume, tagified_string
 
@@ -87,7 +88,7 @@ async def command_start(message: Message, state: FSMContext) -> None:
     )
 
 
-async def send_result(message: Message, result: ProviderResult, search_engine: str = "") -> Message:
+async def send_result(message: Message, result: ProviderData, search_engine: str = "") -> Message:
     main_file = result.main_file[0]
     text = f"<a href='{main_file}'>\u200b</a>\n\n"  # TODO: Send media group if we have multuple files
     provider = result.provider_id.split("-")[0]
@@ -148,12 +149,11 @@ async def search_for_file(message: Message, file_id: str, file_url: str) -> None
         reply_markup=full_keyboard,
     )
 
-    user_settings = await common.redis_storage.get_user_settings(user_id=message.from_user.id)  # type: ignore[union-attr]
-    use_cache = user_settings.get("search_cache", True)
+    settings: UserSettings = await UserSettings.fetch(common.redis_storage, user_id=message.from_user.id)  # type: ignore[union-attr]
 
     found = False
-    if not use_cache or not await common.redis_storage.check_no_found_entry(file_id):
-        if use_cache and (results := await find_existing_results(file_id)):
+    if not settings.cache_enabled or not await common.redis_storage.is_image_marked_as_not_found(file_id):
+        if settings.cache_enabled and (results := await find_existing_results(file_id)):
             logger.info(f"Found {len(results)} existing results for {file_url}")
             await asyncio.gather(
                 *(send_result(message, result) for result in results),
@@ -161,16 +161,12 @@ async def search_for_file(message: Message, file_id: str, file_url: str) -> None
             found = True
         else:
             logger.info(f"Searching for {file_url}...")
-            async for result in search_all_engines(
-                file_url,
-                file_id,
-                enabled_engines=user_settings.get("enabled_engines", set(SEARCH_ENGINES.keys())),  # type: ignore[arg-type]
-            ):
+            async for result in search_all_engines(file_url, file_id, enabled_engines=settings.enabled_engines):
                 found = True
                 await send_result(message, result.provider_result, result.search_provider)
 
     if not found:
-        await common.redis_storage.add_no_found_entry(file_id)
+        await common.redis_storage.mark_image_as_not_found(file_id)
         await reply.edit_text(f"No results found <a href='{file_url}'>\u200b</a>", reply_markup=full_keyboard)
 
 
@@ -203,10 +199,8 @@ async def search_again(query: CallbackQuery, state: FSMContext) -> None:
 
 
 async def settings_enabled_engines_dialogue(query: CallbackQuery, state: FSMContext) -> None:
-    enabled_engines: set[str] = await common.redis_storage.get_user_setting(  # type: ignore[assignment]
-        user_id=query.from_user.id, key="enabled_engines", default=set(SEARCH_ENGINES.keys())
-    )
-    available_engines = {name: name in enabled_engines for name in SEARCH_ENGINES}
+    settings = await UserSettings.fetch(common.redis_storage, user_id=query.from_user.id)
+    available_engines = {name: name in settings.enabled_engines for name in SEARCH_ENGINES}
     if not query.message:
         query.answer("Something went wrong, please use /settings again.")
         return
@@ -241,16 +235,14 @@ async def callback_enabled_engines(query: CallbackQuery, state: FSMContext) -> N
         await open_settings(query, state)
     elif query.data.startswith("toggle_engine:"):
         engine = query.data.split(":")[1]
-        enabled_engines: set[str] = await common.redis_storage.get_user_setting(  # type: ignore[assignment]
-            user_id=query.from_user.id, key="enabled_engines", default=set(SEARCH_ENGINES.keys())
+        settings = await UserSettings.fetch(
+            common.redis_storage, user_id=query.from_user.id, fill_keys=["enabled_engines"]
         )
-        if engine in enabled_engines:
-            enabled_engines.remove(engine)
+        if engine in settings.enabled_engines:
+            settings.enabled_engines.remove(engine)
         else:
-            enabled_engines.add(engine)
-        await common.redis_storage.set_user_setting(
-            user_id=query.from_user.id, key="enabled_engines", value=enabled_engines
-        )
+            settings.enabled_engines.add(engine)
+        await settings.save(["enabled_engines"])
         await settings_enabled_engines_dialogue(query, state)
 
 
@@ -272,28 +264,29 @@ async def callback_settings(query: CallbackQuery, state: FSMContext) -> None:
 
 @form_router.callback_query(Form.debug)
 async def callback_debug(query: CallbackQuery, state: FSMContext) -> None:
-    if query.data == "toggle_search_cache":
-        current_settings: bool = await common.redis_storage.get_user_setting(  # type: ignore[assignment]
-            user_id=query.from_user.id, key="search_cache", default=True
+    if query.data == "toggle_cache_enabled":
+        settings = await UserSettings.fetch(
+            common.redis_storage, user_id=query.from_user.id, fill_keys=["cache_enabled"]
         )
-        await common.redis_storage.set_user_setting(
-            user_id=query.from_user.id, key="search_cache", value=not current_settings
-        )
+        settings.cache_enabled = not settings.cache_enabled
+        await settings.save(["cache_enabled"])
+
         await open_debug(query, state)
     elif query.data == "clear_not_found":
-        total = await common.redis_storage.clear_not_found()
+        total = await common.redis_storage.clear_not_found_cache()
         await query.answer(f"Cleared {total} not found entries")
         if total != 0:
             await open_debug(query, state)
     elif query.data == "clear_results":
-        total = await common.redis_storage.clear_provider_results()
+        total = await common.redis_storage.clear_provider_data_cache()
         await query.answer(f"Cleared {total} provider result entries")
         if total != 0:
             await open_debug(query, state)
     elif query.data == "clear_cache_full":
-        total_not_found, total_results = await common.redis_storage.clear_results_full()
-        await query.answer(f"Cleared {total_not_found} not found and {total_results} provider result entries")
-        if total_not_found + total_results != 0:
+        total_not_found = await common.redis_storage.clear_not_found_cache()
+        total_provider_data = await common.redis_storage.clear_provider_data_cache()
+        await query.answer(f"Cleared {total_not_found} not found and {total_provider_data} provider result entries")
+        if total_not_found + total_provider_data != 0:
             await open_debug(query, state)
     elif query.data == "back":
         await state.set_state(Form.settings)
@@ -336,16 +329,19 @@ async def callback_broadcast(query: CallbackQuery, state: FSMContext) -> None:
 
 
 async def preview_broadcast(bot: Bot, chat_id: int) -> MessageId | None:
-    from_chat_id, broadcast_message_id = await common.redis_storage.get_broadcast_message()
-    if not broadcast_message_id or not from_chat_id:
+    settings = await UserSettings.fetch(
+        common.redis_storage, user_id=chat_id, fill_keys=["broadcast_message_id", "broadcast_message_chat_id"]
+    )
+    if not settings.broadcast_message_id or not settings.from_chat_id:
         return None
 
     message_id = await bot.copy_message(
         chat_id=chat_id,
-        from_chat_id=from_chat_id,
-        message_id=broadcast_message_id,
+        from_chat_id=settings.broadcast_message_chat_id,
+        message_id=settings.broadcast_message_id,
     )
-    await common.redis_storage.set("broadcast:preview", message_id.message_id)
+    settings.broadcast_message_preview_message_id = message_id.message_id
+    await settings.save(["broadcast_message_preview_message_id"])
     return message_id
 
 
@@ -359,25 +355,39 @@ async def broadcast_dialogue(query_or_message: CallbackQuery | Message, state: F
     else:
         message = query_or_message
 
+    buttons = [
+        [
+            InlineKeyboardButton(text="Back", callback_data="back"),
+        ]
+    ]
+
+    settings = await UserSettings.fetch(
+        common.redis_storage,
+        user_id=message.from_user.id,  # type: ignore[union-attr]
+        fill_keys=["broadcast_message_id"],
+    )
+    if settings.broadcast_message_id:
+        buttons.insert(
+            0,
+            [
+                InlineKeyboardButton(text="📨 Send Broadcast", callback_data="send_broadcast"),
+            ],
+        )
+
     await message.edit_text(
         "<b>Broadcast</b>\n\n"
         "Send a message to all users. This can be used to send important updates or announcements.\n\n",
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(text="📨 Preview then Send", callback_data="send_broadcast"),
-                ],
-                [
-                    InlineKeyboardButton(text="Back", callback_data="back"),
-                ],
-            ],
-        ),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
     )
 
 
 @form_router.message(Form.broadcast)
 async def process_broadcast(message: Message, state: FSMContext) -> None:
-    await common.redis_storage.save_broadcast_message(message_id=message.message_id, from_chat_id=message.chat.id)
+    settings = await UserSettings.fetch(common.redis_storage, user_id=message.from_user.id, fill_keys=[""])  # type: ignore[union-attr]
+    settings.broadcast_message_id = message.message_id
+    settings.broadcast_message_chat_id = message.chat.id
+    await settings.save(["broadcast_message_id", "broadcast_message_chat_id"])
+
     await broadcast_dialogue(message, state)
 
 
@@ -393,22 +403,34 @@ async def callback_yes_no_dialogue(query: CallbackQuery, state: FSMContext) -> N
 
 
 async def send_broadcast(query: CallbackQuery, state: FSMContext) -> None:
-    from_chat_id, broadcast_message_id = await common.redis_storage.get_broadcast_message()
-
-    if not broadcast_message_id or not from_chat_id:
+    settings = await UserSettings.fetch(
+        common.redis_storage,
+        user_id=query.from_user.id,
+        fill_keys=["broadcast_message_id", "broadcast_message_chat_id", "broadcast_message_preview_message_id"],
+    )
+    if not settings.broadcast_message_id or not settings.broadcast_message_chat_id:
         await query.answer("Something went wrong, please use /settings again.")
         return
 
     if query.message:
         await query.message.edit_text("Sending broadcast ...")
 
+    bot: Bot = query.bot  # type: ignore[assignment]
+
+    if settings.broadcast_message_preview_message_id:
+        await bot.delete_message(
+            chat_id=settings.broadcast_message_chat_id, message_id=settings.broadcast_message_preview_message_id
+        )
+
     query.answer()
     await state.set_state(Form.broadcast)
 
-    bot: Bot = query.bot  # type: ignore[assignment]
-
     for user_id in await common.redis_storage.get_users():
-        await bot.copy_message(chat_id=user_id, from_chat_id=from_chat_id, message_id=broadcast_message_id)
+        await bot.copy_message(
+            chat_id=user_id,
+            from_chat_id=settings.broadcast_message_preview_message_id,
+            message_id=settings.broadcast_message_id,
+        )
 
 
 @form_router.message(Command("settings", ignore_case=True))
@@ -452,14 +474,14 @@ async def open_settings(message_or_query: Message | CallbackQuery, state: FSMCon
 
 
 async def open_debug(query: CallbackQuery, state: FSMContext) -> None:
-    current_settings = await common.redis_storage.get_user_settings(user_id=query.from_user.id)
+    settings = await UserSettings.fetch(common.redis_storage, user_id=query.from_user.id, fill_keys=["cache_enabled"])
     await state.set_state(Form.debug)
     reply_markup = InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text=f"{'✅' if current_settings.get('search_cache', True) else '❌'}  Search Cache",
-                    callback_data="toggle_search_cache",
+                    text=f"{'✅' if settings.cache_enabled else '❌'}  Search Cache",
+                    callback_data="toggle_cache_enabled",
                 ),
             ],
             [
@@ -486,19 +508,18 @@ async def open_debug(query: CallbackQuery, state: FSMContext) -> None:
     total_searches = await common.redis_storage.get_total_search_count()
     searches_text = f"<pre>Searches: {total_searches}</pre>"
 
-    total_users = await common.redis_storage.get_users_count()
+    total_users = await common.redis_storage.get_total_user_count()
     user_text = f"<pre>Users: {total_users}</pre>"
 
-    cache_info = await common.redis_storage.get_cache_info()
+    cache_info = await common.redis_storage.get_cache_stats()
     cache_info_text = (
-        "<pre>"
-        "Cache Info:\n"
-        f"  Not Found: {cache_info['entries_not_found']:>3} | {human_readable_volume(cache_info['volume_not_found'])}\n"
-        f"  Results:   {cache_info['entries_results']:>3} | {human_readable_volume(cache_info['volume_results'])}\n"
-        f"  Links:     {cache_info['entries_links']:>3} | {human_readable_volume(cache_info['volume_links'])}\n"
-        "\n"
-        f"  Total:     {cache_info['entries']:>3} | {human_readable_volume(cache_info['volume'])}\n"
-        "</pre>"
+        f"<pre>Cache Info:\n  Provider Data:      {cache_info['provider_data']['entries']:>3} |"
+        f" {human_readable_volume(cache_info['provider_data']['memory'])}\n  Provider Data Link:"
+        f" {cache_info['provider_data_image_link']['entries']:>3} |"
+        f" {human_readable_volume(cache_info['provider_data_image_link']['memory'])}\n  Not Found:         "
+        f" {cache_info['not_found']['entries']:>3} | {human_readable_volume(cache_info['not_found']['memory'])}\n\n "
+        f" Total:              {cache_info['total']['entries']:>3} |"
+        f" {human_readable_volume(cache_info['total']['memory'])}\n</pre>"
     )
 
     text: str = f"<b>Debug Settings</b>\n\n{user_text}\n\n{searches_text}\n\n{cache_info_text}\n"
