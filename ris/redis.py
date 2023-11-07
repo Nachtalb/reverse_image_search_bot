@@ -126,7 +126,7 @@ class RedisStorage(RedisStorageDataTypesMixin):
         if sample_size == 0:
             return 0
         subset = random.sample(keys, sample_size)
-        subset_memory = sum(asyncio.gather(*[self.redis_client.memory_usage(key) for key in subset]))
+        subset_memory = sum(await asyncio.gather(*[self.redis_client.memory_usage(key) for key in subset]))
         return subset_memory * (len(keys) / sample_size)
 
     async def get_cache_stats(self) -> RedisCacheStats:
@@ -183,6 +183,7 @@ class RedisStorage(RedisStorageDataTypesMixin):
         return await self.redis_client.scard(self._active_users_key)  # type: ignore[misc, no-any-return]
 
     async def incr_user_search_count(self, user_id: int) -> None:
+        await self.redis_client.sadd(self._active_users_key, user_id)  # type: ignore[misc]
         await self.redis_client.incr(self._user_search_count_key.format(user_id=user_id))
         await self.redis_client.incr(self._total_search_count_key)
 

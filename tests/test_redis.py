@@ -253,6 +253,27 @@ class TestRedisStorage:
         assert stats["total"]["entries"] == 2 + 2 + 3
         assert stats["total"]["memory"] == 100 + 200 + 10
 
+    async def test_memory_usage_approximation_many_keys(self) -> None:
+        keys = [f"ris:ss:example:{i}" for i in range(100)]
+        self.redis.redis_client.memory_usage = AsyncMock(return_value=100)
+        result = await self.redis._memory_usage_approximation(keys)
+        assert result == 100 * 100
+        assert self.redis.redis_client.memory_usage.await_count == 20
+
+    async def test_memory_usage_approximation_few_keys(self) -> None:
+        keys = [f"ris:ss:example:{i}" for i in range(10)]
+        self.redis.redis_client.memory_usage = AsyncMock(return_value=100)
+        result = await self.redis._memory_usage_approximation(keys)
+        assert result == 100 * 10
+        assert self.redis.redis_client.memory_usage.await_count == 10
+
+    async def test_memory_usage_approximation_no_keys(self) -> None:
+        keys: list[str] = []
+        self.redis.redis_client.memory_usage = AsyncMock(return_value=100)
+        result = await self.redis._memory_usage_approximation(keys)
+        assert result == 0
+        assert self.redis.redis_client.memory_usage.await_count == 0
+
     ### User Data ###
 
     async def test_get_users(self) -> None:
@@ -274,6 +295,7 @@ class TestRedisStorage:
         user_id = 123
         self.redis.redis_client.incr = AsyncMock()
         await self.redis.incr_user_search_count(user_id)
+        self.redis.redis_client.sadd.assert_awaited_with(self.redis._active_users_key, user_id)
         self.redis.redis_client.incr.assert_any_await(self.redis._user_search_count_key.format(user_id=user_id))
         self.redis.redis_client.incr.assert_any_await(self.redis._total_search_count_key)
 
