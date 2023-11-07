@@ -195,6 +195,11 @@ async def search_again(query: CallbackQuery, state: FSMContext) -> None:
         query.answer("Something went wrong, please use /start again.")
         return
 
+    if not query.data.startswith("search_again:"):
+        await query.answer()
+        await query.message.delete()
+        return
+
     file_id = query.data.split(":")[1]
     file_url: str = query.message.reply_markup.inline_keyboard[1][0].url  # type: ignore[assignment]
     await query.answer("Searching ...")
@@ -203,13 +208,13 @@ async def search_again(query: CallbackQuery, state: FSMContext) -> None:
 
 @form_router.message(Command("settings", ignore_case=True))
 async def open_settings(message: Message, state: FSMContext) -> None:
-    print("/settings")
+    if (message_id := (await state.get_data()).get("dialogue_message_id")) and message_id != message.message_id:
+        await message.bot.delete_message(chat_id=message.chat.id, message_id=message_id)  # type: ignore[union-attr]
     await state.update_data(dialogue_message_id=None)
     await _open_settings(message, state)
 
 
 async def _open_settings(message_or_query: Message | CallbackQuery, state: FSMContext) -> None:
-    print("_open_settings")
     if isinstance(message_or_query, CallbackQuery):
         message: Message = message_or_query.message  # type: ignore[assignment]
     else:
