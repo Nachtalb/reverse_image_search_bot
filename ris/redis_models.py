@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
 from typing import ClassVar
 
-from ris.auto_search import SEARCH_ENGINES
 from ris.redis import RedisDataSet
+from ris.search import SEARCH_ENGINES
 
 
 @dataclass

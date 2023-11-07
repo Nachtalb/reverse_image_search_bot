@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ris.data_provider import ProviderData
+from ris.provider_engines import ProviderData
 from ris.redis import RedisDataSet, RedisStorage
 
 

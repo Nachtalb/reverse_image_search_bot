@@ -24,17 +24,19 @@ from redis.asyncio.client import Redis
 from redis.exceptions import ConnectionError
 
 from ris import common
-from ris.auto_search import SEARCH_ENGINES, find_existing_results, search_all_engines
-from ris.data_provider import ProviderData
 from ris.files import prepare
+from ris.provider_engines import ProviderData
 from ris.redis import RedisStorage
 from ris.redis_models import UserSettings
 from ris.s3 import S3Manager
+from ris.search import SEARCH_ENGINES, search
 from ris.utils import chunks, host_name, human_readable_volume, tagified_string
 
 logger = logging.getLogger("ris")
 
 DEBUG_OPTIONS = bool(int(getenv("DEBUG_OPTIONS", 0)))
+LOG_LEVEL = getenv("LOG_LEVEL", "INFO")
+
 BASE_URL = getenv("BASE_URL")
 
 if not BASE_URL:
@@ -88,17 +90,12 @@ async def command_start(message: Message, state: FSMContext) -> None:
     )
 
 
-async def send_result(message: Message, result: ProviderData, search_engine: str = "") -> Message:
-    main_file = result.main_file[0]
-    text = f"<a href='{main_file}'>\u200b</a>\n\n"  # TODO: Send media group if we have multuple files
+async def send_result(message: Message, result: ProviderData) -> Message:
+    main_file = result.main_files[0]  # TODO: Send media group if we have multuple files
+    text = f"<a href='{main_file}'>\u200b</a>\n\n"
+
     provider = result.provider_id.split("-")[0]
-    if search_engine:
-        if provider_link := common.LINK_MAP.get(provider):
-            text += f"Provided by {common.LINK_MAP[search_engine]} with {provider_link}\n\n"
-        else:
-            text += f"Provided by {common.LINK_MAP[search_engine]}\n\n"
-    else:
-        text += f"Provided by {common.LINK_MAP[provider]}\n\n"
+    text += f"Found on {common.LINK_MAP[provider]}\n\n"
 
     for name, value in result.fields.items():
         name = name.title()
@@ -134,6 +131,24 @@ async def send_result(message: Message, result: ProviderData, search_engine: str
     )
 
 
+async def _search_and_send(message: Message, file_id: str, file_url: str) -> int:
+    counter = 0
+    try:
+        settings: UserSettings = await UserSettings.fetch(
+            common.redis_storage,
+            user_id=message.from_user.id,  # type: ignore[union-attr]
+            fill_keys=["cache_enabled", "enabled_engines"],
+        )
+
+        async for result in search(image_id=file_id, image_url=file_url, user_settings=settings):
+            counter += 1
+            await send_result(message, result)
+    except asyncio.TimeoutError as e:
+        logger.warning("Search timed out for %s: %s", file_id, e)
+    finally:
+        return counter
+
+
 async def search_for_file(message: Message, file_id: str, file_url: str) -> None:
     await common.redis_storage.incr_user_search_count(user_id=message.from_user.id)  # type: ignore[union-attr]
     full_keyboard = InlineKeyboardMarkup(
@@ -149,29 +164,17 @@ async def search_for_file(message: Message, file_id: str, file_url: str) -> None
         reply_markup=full_keyboard,
     )
 
-    settings: UserSettings = await UserSettings.fetch(common.redis_storage, user_id=message.from_user.id)  # type: ignore[union-attr]
-
-    found = False
-    if not settings.cache_enabled or not await common.redis_storage.is_image_marked_as_not_found(file_id):
-        if settings.cache_enabled and (results := await find_existing_results(file_id)):
-            logger.info(f"Found {len(results)} existing results for {file_url}")
-            await asyncio.gather(
-                *(send_result(message, result) for result in results),
-            )
-            found = True
-        else:
-            logger.info(f"Searching for {file_url}...")
-            async for result in search_all_engines(file_url, file_id, enabled_engines=settings.enabled_engines):
-                found = True
-                await send_result(message, result.provider_result, result.search_provider)
-
-    if not found:
-        await common.redis_storage.mark_image_as_not_found(file_id)
+    if total_found := await asyncio.wait_for(_search_and_send(message, file_id, file_url), timeout=10):
+        await reply.edit_text(
+            f"Found {total_found} result{'s' if total_found != 1 else ''} <a href='{file_url}'>\u200b</a>",
+            reply_markup=full_keyboard,
+        )
+    else:
         await reply.edit_text(f"No results found <a href='{file_url}'>\u200b</a>", reply_markup=full_keyboard)
 
 
 @form_router.message(Form.search, F.photo | F.sticker)
-async def search(message: Message, state: FSMContext) -> None:
+async def search_handler(message: Message, state: FSMContext) -> None:
     if not message.photo and not message.sticker:
         return
 
@@ -653,5 +656,5 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+    logging.basicConfig(level=logging._nameToLevel.get(LOG_LEVEL, logging.INFO), stream=sys.stdout)
     asyncio.run(main())

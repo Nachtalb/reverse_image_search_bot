@@ -5,7 +5,7 @@ import pytest
 import uvloop
 from redis.asyncio import Redis
 
-from ris.data_provider import ProviderData
+from ris.provider_engines import ProviderData
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
@@ -35,7 +35,7 @@ async def mock_redis_client() -> AsyncMock:
 def provider_data() -> ProviderData:
     return ProviderData(
         provider_id="testbooru-123456",
-        main_file=["https://testbooru.org/images/123456.jpg"],
+        main_files=["https://testbooru.org/images/123456.jpg"],
         extra_links=["https://testbooru.org/images/123456.png"],
         fields={"nsfw": False, "source": "https://testbooru.org/post/123456", "tags": ["tag1", "tag2"]},
         provider_link="https://testbooru.org/post/123456",
@@ -47,14 +47,14 @@ async def provider_data_list() -> list[ProviderData]:
     return [
         ProviderData(
             provider_id="testbooru-123456",
-            main_file=["https://testbooru.org/images/123456.jpg"],
+            main_files=["https://testbooru.org/images/123456.jpg"],
             extra_links=["https://testbooru.org/images/123456.png"],
             fields={"nsfw": False, "source": "https://testbooru.org/post/123456", "tags": ["tag1", "tag2"]},
             provider_link="https://testbooru.org/post/123456",
         ),
         ProviderData(
             provider_id="testbooru-654321",
-            main_file=["https://testbooru.org/images/654321.jpg"],
+            main_files=["https://testbooru.org/images/654321.jpg"],
             extra_links=["https://testbooru.org/images/654321.png"],
             fields={"nsfw": False, "source": "https://testbooru.org/post/654321", "tags": ["tag3", "tag4"]},
             provider_link="https://testbooru.org/post/654321",

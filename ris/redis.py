@@ -6,7 +6,7 @@ from typing import Any, ClassVar, Type, TypedDict
 
 from redis.asyncio import Redis
 
-from ris.data_provider import ProviderData
+from ris.provider_engines import ProviderData
 from ris.redis_data_types import RedisStorageDataTypesMixin
 
 

@@ -2,17 +2,20 @@ import json
 import logging
 import re
 from dataclasses import asdict, dataclass, field
+from typing import Any
+
+from yarl import URL
 
 from ris import common
 
-logger = logging.getLogger("ris:data_provider")
+logger = logging.getLogger("ris.provider_engines")
 
 
 @dataclass
 class ProviderData:
     provider_id: str  # In the form of "[provider_name]-[id]" (e.g. "danbooru-1234")
     provider_link: str  # Link to the page where the image was found
-    main_file: list[str]  # Links to the most relevant file (e.g. the original image or a manga cover)
+    main_files: list[str]  # Links to the most relevant file (e.g. the original image or a manga cover)
 
     fields: dict[str, str | list[str] | bool] = field(
         default_factory=dict
@@ -29,14 +32,63 @@ class ProviderData:
         return ProviderData(**json.loads(json_str))
 
 
-async def danbooru(id: str | int) -> ProviderData | None:
-    logger.debug("Fetch danbooru post %s", id)
+async def saucenao_generic(provider_name: str, id: str, extra_data: Any) -> ProviderData | None:
+    """Process unknown saucenao result."""
+    log_prefix = f"[{id}].saucenao_generic:"
+    logger.debug(f"{log_prefix} processing result from generic result")
+    extra_links = extra_data["data"].pop("ext_urls", [])
+
+    fields = extra_data["data"]
+    for key, value in list(fields.items()):
+        if value is None or value in ["None", "", "null", ["unknown"]]:
+            fields.pop(key)
+        try:
+            if URL(value).host:
+                extra_links.append(fields.pop(key))
+        except TypeError:
+            pass
+
+    provider_id = (
+        f"saucenao-{id}" if not provider_name or provider_name == "unknown" else f"saucenao-{provider_name}-{id}"
+    )
+    return ProviderData(
+        provider_id=provider_id,
+        main_files=[extra_data["header"]["thumbnail"]],
+        provider_link=extra_data["search_link"],
+        fields=extra_data["data"],
+        extra_links=extra_links,
+    )
+
+
+async def iqdb_generic(provider_name: str, id: str, extra_data: Any) -> ProviderData | None:
+    """Process generic iqdb result."""
+    log_prefix = f"[{id}].iqdb_generic:"
+    logger.debug(f"{log_prefix} processing result from generic result")
+
+    provider_id = f"iqdb-{id}" if not provider_name or provider_name == "unknown" else f"iqdb-{provider_name}-{id}"
+    return ProviderData(
+        provider_id=provider_id,
+        main_files=[extra_data["thumbnail_sec"]],
+        provider_link=extra_data["post_link"],
+        fields={
+            "size": extra_data["size"],
+            "nsfw": extra_data["nsfw"],
+        },
+    )
+
+
+async def danbooru(id: str | int, _: Any) -> ProviderData | None:
+    log_prefix = f"[{id}].danbooru:"
+    logger.debug(f"{log_prefix} fetching post")
+
     url = f"https://danbooru.donmai.us/posts/{id}.json"
 
     async with common.http_session.get(url) as response:
+        logger.debug(f"{log_prefix} got response")
         data = await response.json()
 
     if not data:
+        logger.debug(f"{log_prefix} no data")
         return None
 
     authors = list(data.get("tag_string_artist", "").split(" "))
@@ -54,7 +106,7 @@ async def danbooru(id: str | int) -> ProviderData | None:
 
     return ProviderData(
         provider_link=link,
-        main_file=[file_link or thumbnail_link],
+        main_files=[file_link or thumbnail_link],
         fields={
             "authors": authors,
             "characters": characters,
@@ -67,14 +119,17 @@ async def danbooru(id: str | int) -> ProviderData | None:
     )
 
 
-async def gelbooru(id: str | int) -> ProviderData | None:
-    logger.debug("Fetch gelbooru post %s", id)
+async def gelbooru(id: str | int, _: Any) -> ProviderData | None:
+    log_prefix = f"[{id}].gelbooru:"
+    logger.debug(f"{log_prefix} fetching post")
     url = f"https://gelbooru.com/index.php?page=dapi&s=post&q=index&json=1&id={id}"
 
     async with common.http_session.get(url) as response:
+        logger.debug(f"{log_prefix} got response")
         data = await response.json()
 
     if not data or "post" not in data or not data["post"]:
+        logger.debug(f"{log_prefix} no data")
         return None
 
     data = data["post"][0]
@@ -91,21 +146,24 @@ async def gelbooru(id: str | int) -> ProviderData | None:
 
     return ProviderData(
         provider_link=link,
-        main_file=[file_link or thumbnail_link],
+        main_files=[file_link or thumbnail_link],
         fields={"tags": tags, "nsfw": nsfw},
         extra_links=[source_link],
         provider_id=provider_id,
     )
 
 
-async def yandere(id: str | int) -> ProviderData | None:
-    logger.debug("Fetch yandere post %s", id)
+async def yandere(id: str | int, _: Any) -> ProviderData | None:
+    log_prefix = f"[{id}].yandere:"
+    logger.debug(f"{log_prefix} fetching post")
     url = f"https://yande.re/post.json?tags=id:{id}"
 
     async with common.http_session.get(url) as response:
+        logger.debug(f"{log_prefix} got response")
         data = await response.json()
 
     if not data:
+        logger.debug(f"{log_prefix} no data")
         return None
 
     data = data[0]
@@ -122,21 +180,24 @@ async def yandere(id: str | int) -> ProviderData | None:
 
     return ProviderData(
         provider_link=link,
-        main_file=[file_link or thumbnail_link],
+        main_files=[file_link or thumbnail_link],
         fields={"tags": tags, "nsfw": nsfw},
         extra_links=[source_link],
         provider_id=provider_id,
     )
 
 
-async def zerochan(id: str | int) -> ProviderData | None:
-    logger.debug("Fetch zerochan post %s", id)
+async def zerochan(id: str | int, _: Any) -> ProviderData | None:
+    log_prefix = f"[{id}].zerochan:"
+    logger.debug(f"{log_prefix} fetching post")
     url = f"https://www.zerochan.net/{id}?json"
 
     async with common.http_session.get(url, headers={"User-Agent": common.LEGIT_USER_AGENT}) as response:
+        logger.debug(f"{log_prefix} got response")
         data = await response.json(content_type=None)
 
     if not data:
+        logger.debug(f"{log_prefix} no data")
         return None
 
     tags = data.get("tags", [])
@@ -151,21 +212,24 @@ async def zerochan(id: str | int) -> ProviderData | None:
 
     return ProviderData(
         provider_link=link,
-        main_file=[file_link or thumbnail_link],
+        main_files=[file_link or thumbnail_link],
         fields={"tags": tags, "nsfw": nsfw},
         extra_links=[source_link],
         provider_id=provider_id,
     )
 
 
-async def threedbooru(id: str | int) -> ProviderData | None:
-    logger.debug("Fetch 3dbooru post %s", id)
+async def threedbooru(id: str | int, _: Any) -> ProviderData | None:
+    log_prefix = f"[{id}].threedbooru:"
+    logger.debug(f"{log_prefix} fetching post")
     url = f"http://behoimi.org/post/index.json?tags=id:{id}"
 
     async with common.http_session.get(url, headers={"User-Agent": common.LEGIT_USER_AGENT}) as response:
+        logger.debug(f"{log_prefix} got response")
         data = await response.json()
 
     if not data or not data[0]:
+        logger.debug(f"{log_prefix} no data")
         return None
 
     tags = list(data[0].get("tags", "").split(" "))
@@ -181,27 +245,33 @@ async def threedbooru(id: str | int) -> ProviderData | None:
 
     return ProviderData(
         provider_link=link,
-        main_file=[file_link],
+        main_files=[file_link],
         fields={"tags": tags, "nsfw": nsfw},
         extra_links=[source],
         provider_id=provider_id,
     )
 
 
-async def eshuushuu(id: str | int) -> ProviderData | None:
-    logger.debug("Fetch e-shuushuu post %s", id)
+async def eshuushuu(id: str | int, _: Any) -> ProviderData | None:
+    log_prefix = f"[{id}].eshuushuu:"
+    logger.debug(f"{log_prefix} fetching post")
     url = f"https://e-shuushuu.net/image/{id}/"
 
     async with common.http_session.get(url, headers={"User-Agent": common.LEGIT_USER_AGENT}) as response:
+        logger.debug(f"{log_prefix} got response")
         html = await response.text()
 
     if not html:
+        logger.debug(f"{log_prefix} no data")
         return None
 
     full_res_image_re = re.search(r'<a class="thumb_image" href="([^"]+)"', html)
     full_res_image: str = full_res_image_re.group(1) if full_res_image_re else ""
     if full_res_image:
         full_res_image = f"https://e-shuushuu.net{full_res_image}"
+    else:
+        logger.debug(f"{log_prefix} no full res image, regex broken?")
+        return None
 
     tags_reg: str = r'<span class=\'tag\'>"<a href="/tags/\d+">([^<]+)</a>"</span>'
 
@@ -217,9 +287,12 @@ async def eshuushuu(id: str | int) -> ProviderData | None:
 
     tags -= {source, character, artist}
 
+    if not tags:
+        logger.debug(f"{log_prefix} no tags, regex broken?")
+
     return ProviderData(
         provider_link=url,
-        main_file=[full_res_image],
+        main_files=[full_res_image],
         fields={
             "tags": list(tags),
             "copyrights": [source],
