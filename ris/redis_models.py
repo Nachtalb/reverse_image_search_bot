@@ -12,7 +12,6 @@ class UserSettings(RedisDataSet):
     cache_enabled: bool = True
     broadcast_message_chat_id: int | None = None
     broadcast_message_id: int | None = None
-    broadcast_message_preview_message_id: int | None = None
     search_count: int = 0
 
     __keys__: ClassVar[dict[str, str]] = {
@@ -20,6 +19,5 @@ class UserSettings(RedisDataSet):
         "cache_enabled": "ris:sb:user:{user_id}:cache_enabled",
         "broadcast_message_chat_id": "ris:si:user:{user_id}:broadcast:chat_id",
         "broadcast_message_id": "ris:si:user:{user_id}:broadcast:message_id",
-        "broadcast_message_preview_message_id": "ris:si:user:{user_id}:broadcast:preview_message_id",
         "search_count": "ris:si:user:{user_id}:search_count",
     }

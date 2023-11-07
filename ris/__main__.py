@@ -205,24 +205,37 @@ async def settings_enabled_engines_dialogue(query: CallbackQuery, state: FSMCont
         query.answer("Something went wrong, please use /settings again.")
         return
 
-    await query.message.edit_text(
-        "<b>Enabled Engines</b>",
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=list(
-                chunks(
-                    [
-                        InlineKeyboardButton(
-                            text=f"{'✅' if enabled else '❌'} {name}",
-                            callback_data=f"toggle_engine:{name}",
-                        )
-                        for name, enabled in available_engines.items()
-                    ],
-                    3,
-                )
+    bot: Bot = query.bot  # type: ignore[assignment]
+    message_id = (await state.get_data()).get("dialogue_message_id")
+    buttons = InlineKeyboardMarkup(
+        inline_keyboard=list(
+            chunks(
+                [
+                    InlineKeyboardButton(
+                        text=f"{'✅' if enabled else '❌'} {name}",
+                        callback_data=f"toggle_engine:{name}",
+                    )
+                    for name, enabled in available_engines.items()
+                ],
+                3,
             )
-            + [[InlineKeyboardButton(text="Back", callback_data="back")]],
-        ),
+        )
+        + [[InlineKeyboardButton(text="Back", callback_data="back")]],
     )
+
+    if message_id:
+        await bot.edit_message_text(
+            chat_id=query.message.chat.id,
+            message_id=message_id,
+            text="<b>Enabled Engines</b>",
+            reply_markup=buttons,
+        )
+    else:
+        message_id = await query.message.reply(
+            "<b>Enabled Engines</b>",
+            reply_markup=buttons,
+        )
+        await state.update_data(dialogue_message_id=message_id.message_id)
 
 
 @form_router.callback_query(Form.enabled_engines)
@@ -232,7 +245,7 @@ async def callback_enabled_engines(query: CallbackQuery, state: FSMContext) -> N
         return
 
     if query.data == "back":
-        await open_settings(query, state)
+        await _open_settings(query, state)
     elif query.data.startswith("toggle_engine:"):
         engine = query.data.split(":")[1]
         settings = await UserSettings.fetch(
@@ -255,6 +268,7 @@ async def callback_settings(query: CallbackQuery, state: FSMContext) -> None:
         await state.set_state(Form.debug)
         await open_debug(query, state)
     elif query.data == "back":
+        await state.update_data(dialogue_message_id=None)
         await state.set_state(Form.search)
         if not query.message:
             query.answer("Settings closed! Send me an image.")
@@ -290,95 +304,54 @@ async def callback_debug(query: CallbackQuery, state: FSMContext) -> None:
             await open_debug(query, state)
     elif query.data == "back":
         await state.set_state(Form.settings)
-        await open_settings(query, state)
+        await _open_settings(query, state)
     elif query.data == "noop":
         await query.answer()
     elif query.data == "broadcast":
         await broadcast_dialogue(query, state)
 
 
-@form_router.callback_query(Form.broadcast)
-async def callback_broadcast(query: CallbackQuery, state: FSMContext) -> None:
-    if query.data == "back":
-        await open_debug(query, state)
-    if query.data == "send_broadcast":
-        if not query.bot or not query.from_user.id:
-            await query.answer("Something went wrong, please use /settings again.")
-            return
-
-        bc_message = await preview_broadcast(query.bot, query.from_user.id)
-        if not bc_message:
-            await query.answer("Something went wrong, please use /settings again.")
-            return
-
-        await state.set_state(Form.yes_no_dialogue)
-        await query.bot.send_message(
-            chat_id=query.from_user.id,
-            reply_to_message_id=bc_message.message_id,
-            text="Are you sure you want to send this message to all users?",
-            reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(text="Yes", callback_data="yes:send_broadcast"),
-                        InlineKeyboardButton(text="No", callback_data="no:broadcast_dialogue"),
-                    ],
-                ],
-            ),
-        )
-        await query.answer()
-
-
-async def preview_broadcast(bot: Bot, chat_id: int) -> MessageId | None:
-    settings = await UserSettings.fetch(
-        common.redis_storage, user_id=chat_id, fill_keys=["broadcast_message_id", "broadcast_message_chat_id"]
-    )
-    if not settings.broadcast_message_id or not settings.from_chat_id:
-        return None
-
-    message_id = await bot.copy_message(
-        chat_id=chat_id,
-        from_chat_id=settings.broadcast_message_chat_id,
-        message_id=settings.broadcast_message_id,
-    )
-    settings.broadcast_message_preview_message_id = message_id.message_id
-    await settings.save(["broadcast_message_preview_message_id"])
-    return message_id
-
-
 async def broadcast_dialogue(query_or_message: CallbackQuery | Message, state: FSMContext) -> None:
-    await state.set_state(Form.broadcast)
     if isinstance(query_or_message, CallbackQuery):
         if not query_or_message.message:
             query_or_message.answer("Something went wrong, please use /settings again.")
             return
-        message = query_or_message.message
+        chat_id = query_or_message.message.chat.id if query_or_message.message else query_or_message.from_user.id
     else:
-        message = query_or_message
+        chat_id = query_or_message.chat.id
 
-    buttons = [
-        [
-            InlineKeyboardButton(text="Back", callback_data="back"),
-        ]
-    ]
-
+    await state.set_state(Form.broadcast)
     settings = await UserSettings.fetch(
         common.redis_storage,
-        user_id=message.from_user.id,  # type: ignore[union-attr]
+        user_id=query_or_message.from_user.id,  # type: ignore[union-attr]
         fill_keys=["broadcast_message_id"],
     )
-    if settings.broadcast_message_id:
-        buttons.insert(
-            0,
-            [
-                InlineKeyboardButton(text="📨 Send Broadcast", callback_data="send_broadcast"),
-            ],
-        )
 
-    await message.edit_text(
-        "<b>Broadcast</b>\n\n"
-        "Send a message to all users. This can be used to send important updates or announcements.\n\n",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+    buttons = [[InlineKeyboardButton(text="Back", callback_data="back")]]
+
+    if settings.broadcast_message_id:
+        buttons.insert(0, [InlineKeyboardButton(text="📨 Send Broadcast", callback_data="ask_send_broadcast")])
+
+    bot: Bot = query_or_message.bot  # type: ignore[assignment]
+    message_id = (await state.get_data()).get("dialogue_message_id")
+    text: str = (
+        "<b>Broadcast</b>\n\nSend a message to all users. This can be used to send important updates or"
+        " announcements.\n\n"
     )
+    if message_id:
+        await bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text=text,
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+        )
+    else:
+        message = await bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+        )
+        await state.update_data(dialogue_message_id=message.message_id)
 
 
 @form_router.message(Form.broadcast)
@@ -391,50 +364,137 @@ async def process_broadcast(message: Message, state: FSMContext) -> None:
     await broadcast_dialogue(message, state)
 
 
+@form_router.callback_query(Form.broadcast)
+async def callback_broadcast(query: CallbackQuery, state: FSMContext) -> None:
+    if query.data == "back":
+        await open_debug(query, state)
+    if query.data == "ask_send_broadcast":
+        bot: Bot = query.bot  # type: ignore[assignment]
+        bc_message = await preview_broadcast(bot, query.from_user.id, state)
+        if not bc_message:
+            await query.answer("Something went wrong, please use /settings again.")
+            return
+
+        await state.set_state(Form.yes_no_dialogue)
+        await bot.send_message(
+            chat_id=query.message.chat.id if query.message else query.from_user.id,
+            reply_to_message_id=bc_message.message_id,
+            text="Are you sure you want to send this message to all users?",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(text="Yes", callback_data="yes:send_broadcast"),
+                        InlineKeyboardButton(text="No", callback_data="no:abort_broadcast"),
+                    ],
+                ],
+            ),
+        )
+        await query.answer()
+
+
+async def preview_broadcast(bot: Bot, chat_id: int, state: FSMContext) -> MessageId | None:
+    settings = await UserSettings.fetch(
+        common.redis_storage, user_id=chat_id, fill_keys=["broadcast_message_id", "broadcast_message_chat_id"]
+    )
+    if not settings.broadcast_message_id or not settings.broadcast_message_chat_id:
+        return None
+
+    message_id = await bot.copy_message(
+        chat_id=chat_id,
+        from_chat_id=settings.broadcast_message_chat_id,
+        message_id=settings.broadcast_message_id,
+    )
+
+    await state.update_data(broadcast_preview_message_id=message_id.message_id)
+
+    return message_id
+
+
+async def broadcast_cleanup(query: CallbackQuery, state: FSMContext, text: str = "") -> None:
+    data = await state.get_data()
+    bot: Bot = query.bot  # type: ignore[assignment]
+    chat_id = query.message.chat.id or query.from_user.id  # type: ignore[union-attr]
+
+    if message_id := data.get("dialogue_message_id"):
+        await bot.delete_message(
+            chat_id=chat_id,
+            message_id=message_id,
+        )
+        await state.update_data(dialogue_message_id=None)
+
+    if query.message:
+        if text:
+            await bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=query.message.message_id,
+                text=text,
+            )
+        else:
+            await bot.delete_message(
+                chat_id=query.message.chat.id,
+                message_id=query.message.message_id,
+            )
+
+    if preview_message_id := data.get("broadcast_preview_message_id"):
+        await bot.delete_message(
+            chat_id=query.from_user.id,
+            message_id=preview_message_id,
+        )
+        await state.update_data(broadcast_preview_message_id=None)
+
+
 @form_router.callback_query(Form.yes_no_dialogue)
 async def callback_yes_no_dialogue(query: CallbackQuery, state: FSMContext) -> None:
     if query.data == "yes:send_broadcast":
+        await state.set_state(Form.broadcast)
+        await query.answer("Sending broadcast ...")
+        await broadcast_cleanup(query, state, "Sending broadcast ...")
+        await broadcast_dialogue(query, state)
         await send_broadcast(query, state)
-    elif query.data == "no:broadcast_dialogue":
+    elif query.data == "no:abort_broadcast":
         await state.set_state(Form.broadcast)
         await query.answer("You aborted sending the broadcast")
-        if query.message:
-            await query.message.edit_text("You aborted sending the broadcast")
+        await broadcast_cleanup(query, state, "You aborted sending the broadcast.")
+        await broadcast_dialogue(query, state)
 
 
 async def send_broadcast(query: CallbackQuery, state: FSMContext) -> None:
     settings = await UserSettings.fetch(
         common.redis_storage,
         user_id=query.from_user.id,
-        fill_keys=["broadcast_message_id", "broadcast_message_chat_id", "broadcast_message_preview_message_id"],
+        fill_keys=["broadcast_message_id", "broadcast_message_chat_id"],
     )
+    bot: Bot = query.bot  # type: ignore[assignment]
+    chat_id = query.message.chat.id  # type: ignore[union-attr]
+
     if not settings.broadcast_message_id or not settings.broadcast_message_chat_id:
-        await query.answer("Something went wrong, please use /settings again.")
+        await bot.send_message(
+            chat_id=chat_id,
+            text="Something went wrong, please use /settings again.",
+        )
         return
 
-    if query.message:
-        await query.message.edit_text("Sending broadcast ...")
-
-    bot: Bot = query.bot  # type: ignore[assignment]
-
-    if settings.broadcast_message_preview_message_id:
-        await bot.delete_message(
-            chat_id=settings.broadcast_message_chat_id, message_id=settings.broadcast_message_preview_message_id
-        )
-
-    query.answer()
-    await state.set_state(Form.broadcast)
+    print("Sending broadcast")
+    print(settings.broadcast_message_id, settings.broadcast_message_chat_id)
 
     for user_id in await common.redis_storage.get_users():
+        print(f"Sending to {user_id}")
         await bot.copy_message(
             chat_id=user_id,
-            from_chat_id=settings.broadcast_message_preview_message_id,
+            from_chat_id=settings.broadcast_message_chat_id,
             message_id=settings.broadcast_message_id,
         )
 
 
 @form_router.message(Command("settings", ignore_case=True))
-async def open_settings(message_or_query: Message | CallbackQuery, state: FSMContext) -> None:
+async def open_settings(message: Message, state: FSMContext) -> None:
+    print("/settings")
+    await state.update_data(dialogue_message_id=None)
+    await _open_settings(message, state)
+
+
+async def _open_settings(message_or_query: Message | CallbackQuery, state: FSMContext) -> None:
+    print("_open_settings")
     if isinstance(message_or_query, CallbackQuery):
         message: Message = message_or_query.message  # type: ignore[assignment]
     else:
@@ -461,16 +521,21 @@ async def open_settings(message_or_query: Message | CallbackQuery, state: FSMCon
     reply_markup = InlineKeyboardMarkup(
         inline_keyboard=buttons,
     )
-    if message.from_user.id == (await message.bot.me()).id:  # type: ignore[union-attr]
-        await message.edit_text(
-            "<b>Settings</b>",
+    bot: Bot = message.bot  # type: ignore[assignment]
+    message_id = (await state.get_data()).get("dialogue_message_id")
+    if message_id:
+        await bot.edit_message_text(
+            chat_id=message.chat.id,
+            message_id=message_id,
+            text="<b>Settings</b>",
             reply_markup=reply_markup,
         )
     else:
-        await message.reply(
+        message_id = await message.reply(
             "<b>Settings</b>",
             reply_markup=reply_markup,
         )
+        await state.update_data(dialogue_message_id=message_id.message_id)
 
 
 async def open_debug(query: CallbackQuery, state: FSMContext) -> None:
@@ -525,10 +590,21 @@ async def open_debug(query: CallbackQuery, state: FSMContext) -> None:
     text: str = f"<b>Debug Settings</b>\n\n{user_text}\n\n{searches_text}\n\n{cache_info_text}\n"
 
     message: Message = query.message  # type: ignore[assignment]
-    if message.from_user.id == (await message.bot.me()).id:  # type: ignore[union-attr]
-        await message.edit_text(text, reply_markup=reply_markup)
+    bot: Bot = message.bot  # type: ignore[assignment]
+    message_id = (await state.get_data()).get("dialogue_message_id")
+    if message_id:
+        await bot.edit_message_text(
+            chat_id=message.chat.id,
+            message_id=message_id,
+            text=text,
+            reply_markup=reply_markup,
+        )
     else:
-        await message.reply(text, reply_markup=reply_markup)
+        message_id = await message.reply(
+            text,
+            reply_markup=reply_markup,
+        )
+        await state.update_data(dialogue_message_id=message_id.message_id)
 
 
 async def main() -> None:
