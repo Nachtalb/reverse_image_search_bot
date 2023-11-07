@@ -171,6 +171,41 @@ HOST_MAP: dict[str, Host] = {
         "emoji": "📷",
         "urls": ["behoimi.org"],
     },
+    "saucenao": {
+        "name": "SauceNAO",
+        "emoji": "🔍",
+        "urls": ["saucenao.com", "www.saucenao.com"],
+    },
+    "gelbooru": {
+        "name": "Gelbooru",
+        "emoji": "🍨",
+        "urls": ["gelbooru.com", "simg3.gelbooru.com"],
+    },
+    "iqdb": {
+        "name": "IQDB",
+        "emoji": "🔍",
+        "urls": ["iqdb.org", "www.iqdb.org"],
+    },
+    "tracemoe": {
+        "name": "TraceMoe",
+        "emoji": "🔍",
+        "urls": ["trace.moe"],
+    },
+    "ascii2d": {
+        "name": "ASCII2D",
+        "emoji": "🔍",
+        "urls": ["ascii2d.net", "www.ascii2d.net"],
+    },
+    "zerochan": {
+        "name": "Zerochan",
+        "emoji": "🌸",
+        "urls": ["zerochan.net", "static.zerochan.net"],
+    },
+    "konachan": {
+        "name": "Konachan",
+        "emoji": "🎭",
+        "urls": ["konachan.com"],
+    },
 }
 
 URL_MAP = {url: key for key, data in HOST_MAP.items() for url in data["urls"]}
