@@ -1,9 +1,12 @@
 import json
+import logging
 import re
 from collections.abc import Collection
 from typing import Any, Callable, Type
 
 from redis.asyncio import Redis
+
+logger = logging.getLogger("ris:redis")
 
 DATA_TYPES_CHECK = (str, int, float, bool, dict, list, set)
 DATA_TYPES = str | int | float | bool | dict | list | set[str] | set[int] | set[float] | set[bool]
@@ -104,6 +107,7 @@ class RedisStorageDataTypesMixin:
             value (DATA_TYPES): Value
             set_type (Type, optional): Set type. Defaults to str.
         """
+        logger.debug(f"set {key=} {value=}")
         if not isinstance(value, DATA_TYPES_CHECK):
             raise TypeError(f"Value must be one of {DATA_TYPES}")
 
@@ -120,9 +124,11 @@ class RedisStorageDataTypesMixin:
 
             current_set = await self.redis_client.smembers(key)  # type: ignore[misc]
             if to_remove := current_set - value:
+                logger.debug(f"Removing {to_remove=} from {key=}")
                 await self.redis_client.srem(key, *to_remove)  # type: ignore[misc]
 
             if to_add := value - current_set:
+                logger.debug(f"Adding {to_add=} to {key=}")
                 await self.redis_client.sadd(key, *to_add)  # type: ignore[misc]
             return
 
@@ -131,6 +137,7 @@ class RedisStorageDataTypesMixin:
             key = f"ris:{data_type}:{key}"
 
         value = self._serialize(value, key)
+        logger.debug(f"Setting {key=} to {value=}")
         await self.redis_client.set(key, value)  # type: ignore[arg-type]
 
     async def get(self, key: str, default: DATA_TYPES | None = None) -> DATA_TYPES | None:
@@ -148,9 +155,11 @@ class RedisStorageDataTypesMixin:
         Returns:
             DATA_TYPES: Value
         """
+        logger.debug(f"get {key=}")
         if not self._check_key_format(key):
             keys = await self.keys(key)
             if not keys:
+                logger.debug(f"{key=} not found returning {default=}")
                 return default
             key = keys[0]
 
@@ -158,13 +167,17 @@ class RedisStorageDataTypesMixin:
 
         if data_type[0] == "x":
             if not await self.redis_client.exists(key):
+                logger.debug(f"{key=} not found returning {default=}")
                 return default
             value = await self.redis_client.smembers(key)  # type: ignore[misc]
+            logger.debug(f"{key=} found returning {value=}")
             return self._deserialize(value, key)
 
         value = await self.redis_client.get(key)
         if value is None:
+            logger.debug(f"{key=} not found returning {default=}")
             return default
+        logger.debug(f"{key=} found returning {value=}")
         return self._deserialize(value, key)
 
     async def mget(self, keys: Collection[str], mark_non_existing_sets: bool = True) -> list[DATA_TYPES | None]:
@@ -186,6 +199,7 @@ class RedisStorageDataTypesMixin:
         Raises:
             ValueError: Invalid key format
         """
+        logger.debug(f"mget {keys=}")
         set_keys: dict[int, str] = {}
         string_keys: dict[int, str] = {}
         for index, key in enumerate(keys):
@@ -200,6 +214,7 @@ class RedisStorageDataTypesMixin:
         values: dict[int, DATA_TYPES | None] = {}
 
         if set_keys:
+            logger.debug(f"Getting set_keys={set_keys.values()}")
             lua_script = """
             local results = {}
             for i, key in ipairs(KEYS) do
@@ -219,6 +234,7 @@ class RedisStorageDataTypesMixin:
                     values[index] = set() if value is None else self._deserialize(value, key)  # type: ignore[assignment]
 
         if string_keys:
+            logger.debug(f"Getting string_keys={string_keys.values()}")
             for (index, key), value in zip(
                 string_keys.items(), await self.redis_client.mget(list(string_keys.values()))
             ):
@@ -267,6 +283,7 @@ class RedisStorageDataTypesMixin:
         Returns:
             list[str]: Keys
         """
+        logger.debug(f"keys {pattern=}")
         if not self._check_key_format(pattern):
             pattern = f"ris:[sx][sifbj]:{pattern}"
 
