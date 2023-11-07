@@ -88,6 +88,10 @@ class TestRedisStorage:
         assert result.example_value == "value"
         assert result.additional_value == ""  # Use default value defined in dataclass if key is not found
 
+    async def test_retrieve_data_set_with_missing_keys(self) -> None:
+        with pytest.raises(RuntimeError):
+            await self.redis.retrieve_data_set(MockRedisDataSet, example_id=123, fill_keys=["nonexistent_key"])
+
     async def test_save_data_set(self) -> None:
         data_set = MockRedisDataSet(example_id=123, example_value="value")
         expected_key = "ris:ss:additional:123"
@@ -97,6 +101,12 @@ class TestRedisStorage:
 
         self.redis.redis_client.set.assert_awaited_with(expected_key, expected_value)
         self.redis.redis_client.set.await_count == 2
+
+    async def test_save_data_set_with_missing_keys(self) -> None:
+        data_set = MockRedisDataSet(example_id=123, example_value="value")
+
+        with pytest.raises(RuntimeError):
+            await self.redis.save_data_set(data_set, keys=["nonexistent_key"])
 
     async def test_retrieve_data_set_with_fill_keys(self) -> None:
         self.redis.mget = AsyncMock()  # type: ignore[method-assign]

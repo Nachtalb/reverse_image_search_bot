@@ -58,6 +58,8 @@ class RedisStorage(RedisStorageDataTypesMixin):
     ### Redis Data Sets ###
 
     async def retrieve_data_set[T: RedisDataSet](self, _class: Type[T], fill_keys: list[str] = [], **kwargs: Any) -> T:  # type: ignore[name-defined]
+        if missing_keys := (set(fill_keys) - set(_class.__keys__.keys())):
+            raise RuntimeError(f"Key not found in __keys__ in {_class=} : {missing_keys}")
         prepared_keys = {
             attr_name: redis_key.format(**kwargs)
             for attr_name, redis_key in _class.__keys__.items()
@@ -74,6 +76,8 @@ class RedisStorage(RedisStorageDataTypesMixin):
         return obj
 
     async def save_data_set(self, data_set: RedisDataSet, keys: list[str] = []) -> None:
+        if missing_keys := (set(keys) - set(data_set.__keys__.keys())):
+            raise RuntimeError(f"Key not found in __keys__ in {data_set.__class__=} : {missing_keys}")
         for attr_name, redis_key in data_set.__keys__.items():
             if keys and attr_name not in keys:
                 continue
