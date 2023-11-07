@@ -30,7 +30,7 @@ from ris.redis import RedisStorage
 from ris.redis_models import UserSettings
 from ris.s3 import S3Manager
 from ris.search import SEARCH_ENGINES, search
-from ris.utils import chunks, host_name, human_readable_volume, tagified_string
+from ris.utils import boji, chunks, host_name, human_readable_volume, tagified_string
 
 logger = logging.getLogger("ris")
 
@@ -289,7 +289,7 @@ async def settings_enabled_engines_dialogue(query: CallbackQuery, state: FSMCont
             chunks(
                 [
                     InlineKeyboardButton(
-                        text=f"{'✅' if enabled else '❌'} {name}",
+                        text=f"{boji(enabled)} {name}",
                         callback_data=f"toggle_engine:{name}",
                     )
                     for name, enabled in available_engines.items()

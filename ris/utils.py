@@ -5,6 +5,11 @@ from typing import Collection, Generator, Iterable, TypedDict
 from yarl import URL
 
 
+def boji(_bool: bool) -> str:
+    """Return a boolean emoji."""
+    return "✅" if _bool else "❌"
+
+
 def chunks[T](lst: list[T], n: int) -> Generator[list[T], None, None]:  # type: ignore
     for i in range(0, len(lst), n):
         yield lst[i : i + n]
