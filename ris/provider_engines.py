@@ -21,7 +21,7 @@ class ProviderData:
     fields: dict[str, str | list[str] | bool] = field(
         default_factory=dict
     )  # str == single value, list[str] == tags, bool == "Yes"/"No"
-    extra_links: list[str] = field(default_factory=list)  # Links to other relevant pages
+    extra_links: set[str] = field(default_factory=set)  # Links to other relevant pages
 
     def to_json(self) -> str:
         """Converts the object to a JSON string."""
@@ -37,7 +37,7 @@ async def saucenao_generic(provider_name: str, id: str, extra_data: Any) -> Prov
     """Process unknown saucenao result."""
     log_prefix = f"[{id}].saucenao_generic:"
     logger.debug(f"{log_prefix} processing result from generic result")
-    extra_links = extra_data["data"].pop("ext_urls", [])
+    extra_links = set(extra_data["data"].pop("ext_urls", []))
 
     fields = extra_data["data"]
     for key, value in list(fields.items()):
@@ -45,7 +45,7 @@ async def saucenao_generic(provider_name: str, id: str, extra_data: Any) -> Prov
             fields.pop(key)
         try:
             if URL(value).host:
-                extra_links.append(fields.pop(key))
+                extra_links.add(fields.pop(key))
         except TypeError:
             pass
 
@@ -60,6 +60,29 @@ async def saucenao_generic(provider_name: str, id: str, extra_data: Any) -> Prov
         fields=extra_data["data"],
         extra_links=extra_links,
     )
+
+
+def _saucenao_extra_links(data: dict[str, Any]) -> set[str]:
+    """Get extra links from saucenao data."""
+    if not isinstance(data, dict):
+        return []
+    extra_links = set()
+    if "search_link" in data:
+        extra_links.add(data["search_link"])
+
+    for key, value in data.get("data", {}).items():
+        if key == "ext_urls" and isinstance(value, list):
+            extra_links |= set(value)
+        try:
+            if URL(value).host:
+                extra_links.add(value)
+        except TypeError:
+            pass
+    for value in extra_links.copy():
+        if "danbooru.donmai.us" in value and "post/show/" in value:
+            extra_links.remove(value)
+            extra_links.add(value.replace("post/show", "posts"))
+    return extra_links
 
 
 async def iqdb_generic(provider_name: str, id: str, extra_data: Any) -> ProviderData | None:
@@ -80,7 +103,7 @@ async def iqdb_generic(provider_name: str, id: str, extra_data: Any) -> Provider
     )
 
 
-async def danbooru(id: str | int, _: Any) -> ProviderData | None:
+async def danbooru(id: str | int, extra_data: Any) -> ProviderData | None:
     log_prefix = f"[{id}].danbooru:"
     logger.debug(f"{log_prefix} fetching post")
 
@@ -118,12 +141,12 @@ async def danbooru(id: str | int, _: Any) -> ProviderData | None:
             "copyrights": copyrights,
             "nsfw": nsfw,
         },
-        extra_links=[source_link],
+        extra_links={source_link} | _saucenao_extra_links(extra_data),
         provider_id=provider_id,
     )
 
 
-async def gelbooru(id: str | int, _: Any) -> ProviderData | None:
+async def gelbooru(id: str | int, extra_data: Any) -> ProviderData | None:
     log_prefix = f"[{id}].gelbooru:"
     logger.debug(f"{log_prefix} fetching post")
     url = f"https://gelbooru.com/index.php?page=dapi&s=post&q=index&json=1&id={id}"
@@ -153,12 +176,12 @@ async def gelbooru(id: str | int, _: Any) -> ProviderData | None:
         provider_link=link,
         main_files=[file_link or thumbnail_link],
         fields={"tags": tags, "nsfw": nsfw},
-        extra_links=[source_link],
+        extra_links={source_link} | _saucenao_extra_links(extra_data),
         provider_id=provider_id,
     )
 
 
-async def yandere(id: str | int, _: Any) -> ProviderData | None:
+async def yandere(id: str | int, extra_data: Any) -> ProviderData | None:
     log_prefix = f"[{id}].yandere:"
     logger.debug(f"{log_prefix} fetching post")
     url = f"https://yande.re/post.json?tags=id:{id}"
@@ -188,12 +211,12 @@ async def yandere(id: str | int, _: Any) -> ProviderData | None:
         provider_link=link,
         main_files=[file_link or thumbnail_link],
         fields={"tags": tags, "nsfw": nsfw},
-        extra_links=[source_link],
+        extra_links={source_link} | _saucenao_extra_links(extra_data),
         provider_id=provider_id,
     )
 
 
-async def zerochan(id: str | int, _: Any) -> ProviderData | None:
+async def zerochan(id: str | int, extra_data: Any) -> ProviderData | None:
     log_prefix = f"[{id}].zerochan:"
     logger.debug(f"{log_prefix} fetching post")
     url = f"https://www.zerochan.net/{id}?json"
@@ -221,12 +244,12 @@ async def zerochan(id: str | int, _: Any) -> ProviderData | None:
         provider_link=link,
         main_files=[file_link or thumbnail_link],
         fields={"tags": tags, "nsfw": nsfw},
-        extra_links=[source_link],
+        extra_links={source_link} | _saucenao_extra_links(extra_data),
         provider_id=provider_id,
     )
 
 
-async def threedbooru(id: str | int, _: Any) -> ProviderData | None:
+async def threedbooru(id: str | int, extra_data: Any) -> ProviderData | None:
     log_prefix = f"[{id}].threedbooru:"
     logger.debug(f"{log_prefix} fetching post")
     url = f"http://behoimi.org/post/index.json?tags=id:{id}"
@@ -255,12 +278,12 @@ async def threedbooru(id: str | int, _: Any) -> ProviderData | None:
         provider_link=link,
         main_files=[file_link],
         fields={"tags": tags, "nsfw": nsfw},
-        extra_links=[source],
+        extra_links={source} | _saucenao_extra_links(extra_data),
         provider_id=provider_id,
     )
 
 
-async def eshuushuu(id: str | int, _: Any) -> ProviderData | None:
+async def eshuushuu(id: str | int, extra_data: Any) -> ProviderData | None:
     log_prefix = f"[{id}].eshuushuu:"
     logger.debug(f"{log_prefix} fetching post")
     url = f"https://e-shuushuu.net/image/{id}/"
@@ -307,5 +330,6 @@ async def eshuushuu(id: str | int, _: Any) -> ProviderData | None:
             "copyrights": [source],
             "character": character,
         },
+        extra_links=_saucenao_extra_links(extra_data),
         provider_id=f"e_shuushuu-{id}",
     )

@@ -115,7 +115,7 @@ async def send_result(message: Message, result: ProviderData) -> Message:
         ),
     ]
 
-    for link in filter(None, result.extra_links):
+    for link in filter(None, result.extra_links - {result.provider_link}):
         buttons.append(
             InlineKeyboardButton(
                 text=host_name(link),

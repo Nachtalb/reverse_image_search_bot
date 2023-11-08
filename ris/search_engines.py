@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+from copy import deepcopy
 from dataclasses import dataclass
 from hashlib import sha1
 from typing import Any, AsyncGenerator
@@ -99,7 +100,7 @@ async def saucenao(image_url: str, image_id: str) -> AsyncGenerator[SearchResult
                         provider=provider[1],
                         post_id=item["data"][key],
                         similarity=float(item["header"]["similarity"]),
-                        extra_data=item,
+                        extra_data=deepcopy(item),
                         search_link=url,
                     )
                 else:
@@ -110,7 +111,7 @@ async def saucenao(image_url: str, image_id: str) -> AsyncGenerator[SearchResult
                         provider=provider,
                         post_id=item["data"][key],
                         similarity=float(item["header"]["similarity"]),
-                        extra_data=item,
+                        extra_data=deepcopy(item),
                         search_link=url,
                     )
         if not provider_found:
@@ -120,7 +121,7 @@ async def saucenao(image_url: str, image_id: str) -> AsyncGenerator[SearchResult
                 provider="unknown",
                 post_id=sha1(item["header"]["index_name"]).hexdigest(),
                 similarity=float(item["header"]["similarity"]),
-                extra_data=item,
+                extra_data=deepcopy(item),
                 search_link=url,
             )
     logger.info(f"{log_prefix} finished search")
