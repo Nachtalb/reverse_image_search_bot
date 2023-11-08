@@ -98,7 +98,7 @@ class RedisStorage(RedisStorageDataTypesMixin):
         if not provider_ids:
             return []
         keys: list[str] = [self._provider_data_key.format(provider_id=key) for key in provider_ids]
-        return [ProviderData.from_json(data) for data in await self.redis_client.mget(keys)]
+        return [ProviderData.from_json(data) for data in await self.redis_client.mget(keys) if data is not None]
 
     async def get_cached_provider_data_by_image(self, image_id: str) -> list[ProviderData]:
         keys: set[str] = await self.redis_client.smembers(self._provider_data_image_link_key.format(image_id=image_id))  # type: ignore[misc]

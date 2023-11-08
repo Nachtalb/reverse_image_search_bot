@@ -194,6 +194,21 @@ class TestRedisStorage:
         assert all(isinstance(item, ProviderData) for item in result)
         assert len(result) == len(provider_ids)
 
+    async def test_get_cached_provider_data_ignores_none_existing_keys(
+        self, provider_data_list: list[ProviderData]
+    ) -> None:
+        provider_ids = [data.provider_id for data in provider_data_list]
+        keys = [f"ris:sj:provider_data:{provider_id}" for provider_id in provider_ids]
+        redis_return_value = [data.to_json() for data in provider_data_list] + [None]
+
+        self.redis.redis_client.mget.return_value = redis_return_value
+        result: list[ProviderData] = await self.redis.get_cached_provider_data(*provider_ids)
+
+        self.redis.redis_client.mget.assert_awaited_with(keys)
+        assert all(isinstance(item, ProviderData) for item in result)
+        assert len(result) != len(redis_return_value)
+        assert len(result) == 2
+
     async def test_mark_image_as_not_found(self) -> None:
         image_id = "image_not_found"
         await self.redis.mark_image_as_not_found(image_id)
