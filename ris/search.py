@@ -19,6 +19,53 @@ SEARCH_ENGINES = {
 }
 
 
+PRIORITIZED_PROVIDERS = {
+    "danbooru": 0,
+    "zerochan": 0,
+    "pixiv": 20,
+    "3dbooru ": 20,
+    "twitter": 20,
+    "yandere": 30,
+    "gelbooru": 30,
+    "konachan": 30,
+    "eshuushuu": 30,
+}
+
+
+def filter_by_priority(results: list[ProviderData]) -> list[ProviderData]:
+    """Filters out by priority.
+
+    - Providers are initially filtered to only include those with the highest priority number (e.g., all with priority `0` if any, otherwise all with the next lowest number like `20`).
+    - Within this filtered set, if multiple providers have the same `priority_key`, only the provider with the greatest number of `extra_links` is kept.
+    - Each `priority_key` is represented at most once in the final list, corresponding to the provider with the most `extra_links` among those with the same priority level.
+    - If a provider's `priority_key` is not in the `PRIORITIZED_PROVIDERS` dictionary, it is assigned the lowest priority by default.
+
+    Args:
+        results (list[ProviderData]): The results to filter.
+
+    Returns:
+        list[ProviderData]: The filtered results.
+    """
+    if not results:
+        return results
+    default_priority = max(PRIORITIZED_PROVIDERS.values()) + 10
+    highest_priority = min([PRIORITIZED_PROVIDERS.get(provider.priority_key, default_priority) for provider in results])
+    top_priority_providers = [
+        provider
+        for provider in results
+        if PRIORITIZED_PROVIDERS.get(provider.priority_key, default_priority) == highest_priority
+    ]
+    sorted_providers = sorted(top_priority_providers, key=lambda x: (-len(x.extra_links), x.priority_key))
+    unique_providers = []
+    seen_keys = set()
+    for provider in sorted_providers:
+        if provider.priority_key not in seen_keys:
+            unique_providers.append(provider)
+            seen_keys.add(provider.priority_key)
+
+    return unique_providers
+
+
 async def search(image_url: str, image_id: str, user_settings: "UserSettings") -> AsyncGenerator[ProviderData, None]:
     """Step 1: Searches for the image on enabled search engines and yields the results.
 
@@ -37,18 +84,28 @@ async def search(image_url: str, image_id: str, user_settings: "UserSettings") -
     """
     log_prefix = f"[{image_id}].search:"
     logger.info(f"{log_prefix} starting search")
+    logger.debug(f"{log_prefix} {user_settings=}")
 
     if user_settings.cache_enabled:
         logger.debug(f"{log_prefix} checking cache")
-        if await common.redis_storage.is_image_marked_as_not_found(image_id):
-            logger.debug(f"{log_prefix} image is marked as not found")
-            return
-        if results := await common.redis_storage.get_cached_provider_data_by_image(image_id):
-            logger.debug(f"{log_prefix} image is cached")
-            for result in results:
-                yield result
-            return
-        logger.debug(f"{log_prefix} image is not cached")
+        try:
+            if await common.redis_storage.is_image_marked_as_not_found(image_id):
+                logger.debug(f"{log_prefix} image is marked as not found")
+                return
+            if results := await common.redis_storage.get_cached_provider_data_by_image(image_id):
+                logger.debug(f"{log_prefix} image is cached")
+
+                if user_settings.best_results_only:
+                    before = len(results)
+                    results = filter_by_priority(results)
+                    logger.debug(f"{log_prefix} {before=} after={len(results)}")
+                for result in results:
+                    yield result
+                return
+            logger.debug(f"{log_prefix} image is not cached")
+        except Exception as e:
+            logger.exception(e)
+            raise
 
     logger.debug(f"{log_prefix} starting search engine producer and consumer")
     search_queue: Queue[SearchResult | None] = Queue()
@@ -63,6 +120,7 @@ async def search(image_url: str, image_id: str, user_settings: "UserSettings") -
 
     logger.debug(f"{log_prefix} starting provider consumers")
     found = False
+    deferred: list[ProviderData] = []
     while True:
         provider_data = await provider_queue.get()
         if provider_data is None:
@@ -73,7 +131,19 @@ async def search(image_url: str, image_id: str, user_settings: "UserSettings") -
             logger.debug(f"{log_prefix} {provider_data.provider_id=} caching provider data")
             await common.redis_storage.cache_provider_data(image_id, provider_data)
         found = True
+
+        if user_settings.best_results_only:
+            deferred.append(provider_data)
+            logger.debug(f"{log_prefix} {provider_data.provider_id=} deferring result for best results only")
+            continue
         yield provider_data
+
+    if user_settings.best_results_only and deferred:
+        before = len(deferred)
+        logger.debug(f"{log_prefix} filtering deferred results for best results only")
+        for index, result in enumerate(filter_by_priority(deferred)):
+            yield result
+        logger.debug(f"{log_prefix} {before=} after={index + 1}")
 
     logger.debug(f"{log_prefix} stopping search engine producer and consumer")
     if not found and user_settings.cache_enabled:

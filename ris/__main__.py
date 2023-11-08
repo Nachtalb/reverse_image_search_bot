@@ -137,7 +137,7 @@ async def _search_and_send(message: Message, file_id: str, file_url: str) -> int
         settings: UserSettings = await UserSettings.fetch(
             common.redis_storage,
             user_id=message.from_user.id,  # type: ignore[union-attr]
-            fill_keys=["cache_enabled", "enabled_engines"],
+            fill_keys=["cache_enabled", "enabled_engines", "best_results_only"],
         )
 
         async for result in search(image_id=file_id, image_url=file_url, user_settings=settings):
@@ -217,12 +217,25 @@ async def open_settings(message: Message, state: FSMContext) -> None:
 async def _open_settings(message_or_query: Message | CallbackQuery, state: FSMContext) -> None:
     if isinstance(message_or_query, CallbackQuery):
         message: Message = message_or_query.message  # type: ignore[assignment]
+        user_id = message_or_query.from_user.id
     else:
         message = message_or_query
+        user_id = message.from_user.id  # type: ignore[union-attr]
+
+    settings = await UserSettings.fetch(
+        common.redis_storage,
+        user_id=user_id,
+        fill_keys=["best_results_only"],
+    )
+    logger.debug(f"[user_id={settings.user_id}] best_results_only={settings.best_results_only}")
 
     await state.set_state(Form.settings)
     buttons = [
         [
+            InlineKeyboardButton(
+                text=boji(settings.best_results_only) + " Show Best Results Only",
+                callback_data="toggle_best_results_only",
+            ),
             InlineKeyboardButton(text="Enabled Engines", callback_data="enabled_engines"),
         ],
         [
@@ -266,6 +279,17 @@ async def callback_settings(query: CallbackQuery, state: FSMContext) -> None:
     elif query.data == "debug":
         await state.set_state(Form.debug)
         await open_debug(query, state)
+    elif query.data == "toggle_best_results_only":
+        settings = await UserSettings.fetch(
+            common.redis_storage, user_id=query.from_user.id, fill_keys=["best_results_only"]
+        )
+        logger.debug(
+            f"[user_id={settings.user_id}] toggling best_results_only from {settings.best_results_only} to"
+            f" {not settings.best_results_only}"
+        )
+        settings.best_results_only = not settings.best_results_only
+        await settings.save(["best_results_only"])
+        await _open_settings(query, state)
     elif query.data == "back":
         await state.update_data(dialogue_message_id=None)
         await state.set_state(Form.search)

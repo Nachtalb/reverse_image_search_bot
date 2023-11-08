@@ -13,6 +13,7 @@ logger = logging.getLogger("ris.provider_engines")
 
 @dataclass
 class ProviderData:
+    priority_key: str  # The key used to sort the results
     provider_id: str  # In the form of "[provider_name]-[id]" (e.g. "danbooru-1234")
     provider_link: str  # Link to the page where the image was found
     main_files: list[str]  # Links to the most relevant file (e.g. the original image or a manga cover)
@@ -52,6 +53,7 @@ async def saucenao_generic(provider_name: str, id: str, extra_data: Any) -> Prov
         f"saucenao-{id}" if not provider_name or provider_name == "unknown" else f"saucenao-{provider_name}-{id}"
     )
     return ProviderData(
+        priority_key=provider_name if provider_name and provider_name != "unknown" else id,
         provider_id=provider_id,
         main_files=[extra_data["header"]["thumbnail"]],
         provider_link=extra_data["search_link"],
@@ -67,6 +69,7 @@ async def iqdb_generic(provider_name: str, id: str, extra_data: Any) -> Provider
 
     provider_id = f"iqdb-{id}" if not provider_name or provider_name == "unknown" else f"iqdb-{provider_name}-{id}"
     return ProviderData(
+        priority_key=provider_name if provider_name and provider_name != "unknown" else id,
         provider_id=provider_id,
         main_files=[extra_data["thumbnail_sec"]],
         provider_link=extra_data["post_link"],
@@ -105,6 +108,7 @@ async def danbooru(id: str | int, _: Any) -> ProviderData | None:
     provider_id = f"danbooru-{id}"
 
     return ProviderData(
+        priority_key="danbooru",
         provider_link=link,
         main_files=[file_link or thumbnail_link],
         fields={
@@ -145,6 +149,7 @@ async def gelbooru(id: str | int, _: Any) -> ProviderData | None:
     provider_id = f"gelbooru-{id}"
 
     return ProviderData(
+        priority_key="gelbooru",
         provider_link=link,
         main_files=[file_link or thumbnail_link],
         fields={"tags": tags, "nsfw": nsfw},
@@ -179,6 +184,7 @@ async def yandere(id: str | int, _: Any) -> ProviderData | None:
     provider_id = f"yandere-{id}"
 
     return ProviderData(
+        priority_key="yandere",
         provider_link=link,
         main_files=[file_link or thumbnail_link],
         fields={"tags": tags, "nsfw": nsfw},
@@ -211,6 +217,7 @@ async def zerochan(id: str | int, _: Any) -> ProviderData | None:
     provider_id = f"zerochan-{id}"
 
     return ProviderData(
+        priority_key="zerochan",
         provider_link=link,
         main_files=[file_link or thumbnail_link],
         fields={"tags": tags, "nsfw": nsfw},
@@ -244,6 +251,7 @@ async def threedbooru(id: str | int, _: Any) -> ProviderData | None:
     provider_id = f"3dbooru-{id}"
 
     return ProviderData(
+        priority_key="3dbooru",
         provider_link=link,
         main_files=[file_link],
         fields={"tags": tags, "nsfw": nsfw},
@@ -291,6 +299,7 @@ async def eshuushuu(id: str | int, _: Any) -> ProviderData | None:
         logger.debug(f"{log_prefix} no tags, regex broken?")
 
     return ProviderData(
+        priority_key="eshuushuu",
         provider_link=url,
         main_files=[full_res_image],
         fields={

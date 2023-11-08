@@ -46,7 +46,7 @@ async def saucenao(image_url: str, image_id: str) -> AsyncGenerator[SearchResult
     logger.info(f"{log_prefix} starting search")
     url = f"https://saucenao.com/search.php?url={image_url}"
 
-    params: dict[str, Any] = {"output_type": 2}
+    params: dict[str, Any] = {"output_type": 2, "db": 999, "testmode": 1}
     if SAUCENAO_API_KEY:
         logger.debug(f"{log_prefix} using api key")
         params["api_key"] = SAUCENAO_API_KEY
