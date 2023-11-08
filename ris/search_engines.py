@@ -119,7 +119,7 @@ async def saucenao(image_url: str, image_id: str) -> AsyncGenerator[SearchResult
             yield SearchResult(
                 search_provider="saucenao",
                 provider="unknown",
-                post_id=sha1(item["header"]["index_name"]).hexdigest(),
+                post_id=sha1(item["header"]["index_name"].encode()).hexdigest(),
                 similarity=float(item["header"]["similarity"]),
                 extra_data=deepcopy(item),
                 search_link=url,
