@@ -136,6 +136,7 @@ async def search(image_url: str, image_id: str, user_settings: "UserSettings") -
             deferred.append(provider_data)
             logger.debug(f"{log_prefix} {provider_data.provider_id=} deferring result for best results only")
             continue
+        logger.debug(f"{log_prefix} {provider_data.provider_id=} yielding result")
         yield provider_data
 
     if user_settings.best_results_only and deferred:

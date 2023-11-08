@@ -85,7 +85,7 @@ class Form(StatesGroup):
 async def command_start(message: Message, state: FSMContext) -> None:
     await state.set_state(Form.search)
     await message.answer(
-        "Hi there! Send me an image.",
+        "Hello! 📷 Ready to search? Send me an image and let's get started.",
         reply_markup=ReplyKeyboardRemove(),
     )
 
@@ -151,26 +151,30 @@ async def _search_and_send(message: Message, file_id: str, file_url: str) -> int
 
 async def search_for_file(message: Message, file_id: str, file_url: str) -> None:
     await common.redis_storage.incr_user_search_count(user_id=message.from_user.id)  # type: ignore[union-attr]
+    buttons = [[InlineKeyboardButton(text="Go To Image", url=file_url)]]
+    if DEBUG_OPTIONS:
+        buttons.insert(0, [InlineKeyboardButton(text="Search Again", callback_data=f"search_again:{file_id}")])
+
     full_keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="Search Again", callback_data=f"search_again:{file_id}")],
-            [InlineKeyboardButton(text="Go To Image", url=file_url)],
-        ]
-        + get_simple_engine_buttons(file_url),
+        inline_keyboard=buttons + get_simple_engine_buttons(file_url),
     )
 
     reply = await message.reply(
-        f"Searching ... <a href='{file_url}'>\u200b</a>",
+        f"🔍 Initiating reverse image search. Hold tight, this may take a moment. <a href='{file_url}'>\u200b</a>",
         reply_markup=full_keyboard,
     )
 
-    if total_found := await asyncio.wait_for(_search_and_send(message, file_id, file_url), timeout=10):
+    if await asyncio.wait_for(_search_and_send(message, file_id, file_url), timeout=10):
         await reply.edit_text(
-            f"Found {total_found} result{'s' if total_found != 1 else ''} <a href='{file_url}'>\u200b</a>",
+            f"✅ Results are in! Check out the images that match your query. <a href='{file_url}'>\u200b</a>",
             reply_markup=full_keyboard,
         )
     else:
-        await reply.edit_text(f"No results found <a href='{file_url}'>\u200b</a>", reply_markup=full_keyboard)
+        await reply.edit_text(
+            "❌ No matches found. Why not try the Google or Yandex search buttons for a broader search? 🔎 <a"
+            f" href='{file_url}'>\u200b</a>",
+            reply_markup=full_keyboard,
+        )
 
 
 @form_router.message(Form.search, F.photo | F.sticker)
@@ -229,6 +233,13 @@ async def _open_settings(message_or_query: Message | CallbackQuery, state: FSMCo
     )
     logger.debug(f"[user_id={settings.user_id}] best_results_only={settings.best_results_only}")
 
+    text = (
+        '<b>Settings</b>\n\n✨ Currently, "Best Results Only" is'
+        f' <b>{"enabled" if settings.best_results_only else "disabled"}</b>. When enabled, you receive only the'
+        " top-quality results, though it takes a bit longer. If you disable it, you'll get results more quickly, but"
+        " be aware that they may be of mixed quality.\n\n"
+    )
+
     await state.set_state(Form.settings)
     buttons = [
         [
@@ -260,12 +271,12 @@ async def _open_settings(message_or_query: Message | CallbackQuery, state: FSMCo
         await bot.edit_message_text(
             chat_id=message.chat.id,
             message_id=message_id,
-            text="<b>Settings</b>",
+            text=text,
             reply_markup=reply_markup,
         )
     else:
         message_id = await message.reply(
-            "<b>Settings</b>",
+            text,
             reply_markup=reply_markup,
         )
         await state.update_data(dialogue_message_id=message_id.message_id)
@@ -289,14 +300,18 @@ async def callback_settings(query: CallbackQuery, state: FSMContext) -> None:
         )
         settings.best_results_only = not settings.best_results_only
         await settings.save(["best_results_only"])
+        if not settings.best_results_only:
+            await query.answer("Expect quicker searches, but with a broader range of results.")
+        else:
+            await query.answer("Only the top results will be shown; please note the search may take longer.")
         await _open_settings(query, state)
     elif query.data == "back":
         await state.update_data(dialogue_message_id=None)
         await state.set_state(Form.search)
         if not query.message:
-            query.answer("Settings closed! Send me an image.")
+            query.answer("Settings updated 👍. Now, drop an image here to start the search!")
         else:
-            await query.message.edit_text("Settings closed! Send me an image.")
+            await query.message.edit_text("Settings updated 👍. Now, drop an image here to start the search!")
 
 
 async def settings_enabled_engines_dialogue(query: CallbackQuery, state: FSMContext) -> None:
@@ -488,8 +503,8 @@ async def broadcast_dialogue(query_or_message: CallbackQuery | Message, state: F
     bot: Bot = query_or_message.bot  # type: ignore[assignment]
     message_id = (await state.get_data()).get("dialogue_message_id")
     text: str = (
-        "<b>Broadcast</b>\n\nSend a message to all users. This can be used to send important updates or"
-        " announcements.\n\n"
+        "<b>Broadcast Message</b>\n\n"
+        "Distribute an announcement or update to all users. Please use this feature responsibly."
     )
     if message_id:
         await bot.edit_message_text(

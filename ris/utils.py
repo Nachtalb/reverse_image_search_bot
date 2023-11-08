@@ -208,8 +208,48 @@ HOST_MAP: dict[str, Host] = {
     },
     "konachan": {
         "name": "Konachan",
-        "emoji": "🎭",
+        "emoji": "🌟",
         "urls": ["konachan.com"],
+    },
+    "kemono_party": {
+        "name": "Kemono Party",
+        "emoji": "🎭",
+        "urls": ["kemono.party"],
+    },
+    "patreon": {
+        "name": "Patreon",
+        "emoji": "🧡",
+        "urls": ["patreon.com"],
+    },
+    "e-hentai": {
+        "name": "E-Hentai",
+        "emoji": "🔞",
+        "urls": ["e-hentai.org", "ehgt.org"],
+    },
+    "nhentai": {
+        "name": "nhentai",
+        "emoji": "🔞",
+        "urls": ["nhentai.net", "t.nhentai.net"],
+    },
+    "rule34": {
+        "name": "Rule34",
+        "emoji": "🔞",
+        "urls": ["rule34.xxx", "img.rule34.xxx"],
+    },
+    "rule34paheal": {
+        "name": "Rule34 Paheal",
+        "emoji": "🔞",
+        "urls": ["rule34.paheal.net", "img.rule34.paheal.net"],
+    },
+    "exhentai": {
+        "name": "ExHentai",
+        "emoji": "🔞",
+        "urls": ["exhentai.org", "exhentai.xyz"],
+    },
+    "subscribestar": {
+        "name": "SubscribeStar",
+        "emoji": "🩷",
+        "urls": ["subscribestar.com"],
     },
 }
 
