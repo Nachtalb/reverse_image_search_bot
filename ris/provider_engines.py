@@ -14,7 +14,9 @@ logger = logging.getLogger("ris.provider_engines")
 @dataclass
 class ProviderData:
     priority_key: str  # The key used to sort the results
-    provider_id: str  # In the form of "[provider_name]-[id]" (e.g. "danbooru-1234")
+    provider_id: (
+        str  # In the form of "[provider_name]:[id]" [search_engine]:[provider_name]:[id] (e.g. "danbooru:1234" )
+    )
     provider_link: str  # Link to the page where the image was found
     main_files: list[str]  # Links to the most relevant file (e.g. the original image or a manga cover)
 
@@ -56,7 +58,7 @@ async def saucenao_generic(provider_name: str, id: str, extra_data: Any) -> Prov
             pass
 
     provider_id = (
-        f"saucenao-{id}" if not provider_name or provider_name == "unknown" else f"saucenao-{provider_name}-{id}"
+        f"saucenao:{id}" if not provider_name or provider_name == "unknown" else f"saucenao:{provider_name}:{id}"
     )
     return ProviderData(
         priority_key=provider_name if provider_name and provider_name != "unknown" else id,
@@ -96,7 +98,7 @@ async def iqdb_generic(provider_name: str, id: str, extra_data: Any) -> Provider
     log_prefix = f"[{id}].iqdb_generic:"
     logger.debug(f"{log_prefix} processing result from generic result")
 
-    provider_id = f"iqdb-{id}" if not provider_name or provider_name == "unknown" else f"iqdb-{provider_name}-{id}"
+    provider_id = f"iqdb:{id}" if not provider_name or provider_name == "unknown" else f"iqdb:{provider_name}:{id}"
     return ProviderData(
         priority_key=provider_name if provider_name and provider_name != "unknown" else id,
         provider_id=provider_id,
@@ -134,7 +136,7 @@ async def danbooru(id: str | int, extra_data: Any) -> ProviderData | None:
     thumbnail_link = data.get("preview_file_url")
     source_link = data.get("source")
 
-    provider_id = f"danbooru-{id}"
+    provider_id = f"danbooru:{id}"
 
     return ProviderData(
         priority_key="danbooru",
@@ -175,7 +177,7 @@ async def gelbooru(id: str | int, extra_data: Any) -> ProviderData | None:
     thumbnail_link = data.get("sample_url", data.get("preview_url"))
     source_link = data.get("source")
 
-    provider_id = f"gelbooru-{id}"
+    provider_id = f"gelbooru:{id}"
 
     return ProviderData(
         priority_key="gelbooru",
@@ -210,7 +212,7 @@ async def yandere(id: str | int, extra_data: Any) -> ProviderData | None:
     thumbnail_link = data.get("sample_url", data.get("preview_url"))
     source_link = data.get("source")
 
-    provider_id = f"yandere-{id}"
+    provider_id = f"yandere:{id}"
 
     return ProviderData(
         priority_key="yandere",
@@ -243,7 +245,7 @@ async def zerochan(id: str | int, extra_data: Any) -> ProviderData | None:
     thumbnail_link = data.get("medium", data.get("small"))
     source_link = data.get("source")
 
-    provider_id = f"zerochan-{id}"
+    provider_id = f"zerochan:{id}"
 
     return ProviderData(
         priority_key="zerochan",
@@ -277,7 +279,7 @@ async def threedbooru(id: str | int, extra_data: Any) -> ProviderData | None:
     )  # The file_url and sample_url return placeholder images against crawlers etc.
     source = data[0].get("source")
 
-    provider_id = f"3dbooru-{id}"
+    provider_id = f"3dbooru:{id}"
 
     return ProviderData(
         priority_key="3dbooru",
@@ -337,5 +339,5 @@ async def eshuushuu(id: str | int, extra_data: Any) -> ProviderData | None:
             "character": character,
         },
         extra_links=_saucenao_extra_links(extra_data),
-        provider_id=f"e_shuushuu-{id}",
+        provider_id=f"e_shuushuu:{id}",
     )

@@ -94,7 +94,7 @@ async def send_result(message: Message, result: ProviderData) -> Message:
     main_file = result.main_files[0]  # TODO: Send media group if we have multuple files
     text = f"<a href='{main_file}'>\u200b</a>\n\n"
 
-    provider = result.provider_id.split("-")[0]
+    provider = result.provider_id.split(":")[0]
     text += f"Found on {common.LINK_MAP[provider]}\n\n"
 
     for name, value in result.fields.items():

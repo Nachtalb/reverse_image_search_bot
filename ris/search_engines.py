@@ -26,8 +26,8 @@ class SearchResult:
     @property
     def provider_id(self) -> str:
         if self.provider:
-            return f"{self.provider}-{self.post_id}"
-        return f"{self.search_provider}-{self.post_id}"
+            return f"{self.provider}:{self.post_id}"
+        return f"{self.search_provider}:{self.post_id}"
 
 
 logger = logging.getLogger("ris.search_engines")
