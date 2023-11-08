@@ -25,12 +25,18 @@ class ProviderData:
 
     def to_json(self) -> str:
         """Converts the object to a JSON string."""
-        return json.dumps(asdict(self))
+        data = asdict(self)
+        data["extra_links"] = list(data["extra_links"])
+
+        return json.dumps(data)
 
     @staticmethod
     def from_json(json_str: str) -> "ProviderData":
         """Converts a JSON string to a ProviderResult object."""
-        return ProviderData(**json.loads(json_str))
+        data = json.loads(json_str)
+        data["extra_links"] = set(data["extra_links"])
+
+        return ProviderData(**data)
 
 
 async def saucenao_generic(provider_name: str, id: str, extra_data: Any) -> ProviderData | None:
