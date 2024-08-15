@@ -22,8 +22,16 @@ classifiers = [
 ]
 homepage = "https://github.com/Nachtalb/reverse_image_search_bot"
 
+[tool.poetry.scripts]
+ris = "ris.__main__:main"
+
 [tool.poetry.dependencies]
 python = "^3.12"
+yarl = "^1.9.4"
+aiohttp = { extras = ["speedups"], version = "^3.10.3" }
+aiopath = "^0.7.7"
+python-magic = "^0.4.27"
+xxhash = "^3.4.1"
 
 [tool.poetry.group.dev.dependencies]
 ipdb = "^0.13.13"
@@ -55,6 +63,6 @@ show_error_codes = true
 pretty = true
 strict = true
 
-# [[tool.mypy.overrides]]
-# module = "aiostream.*"
-# ignore_missing_imports = "True"
+[[tool.mypy.overrides]]
+module = ["aiopath", "aiohttp", "aiohttp.*"]
+ignore_missing_imports = "True"
