@@ -41,7 +41,7 @@ repos:
     rev: v0.6.0
     hooks:
       - id: ruff
-        args: ["--config=pyproject.toml"]
+        args: ["--config=pyproject.toml", "--fix"]
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.11.1
     hooks:

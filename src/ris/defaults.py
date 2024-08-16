@@ -8,6 +8,7 @@ HOME = AsyncPath(os.path.expanduser("~"))
 CACHE_DIR = HOME / ".cache/ris"
 DOWNLOAD_DIR = CACHE_DIR / "downloads"
 SEARCH_DIR = CACHE_DIR / "searches"
+SOURCE_DIR = CACHE_DIR / "sources"
 
 REPO_URL = "https://github.com/Nachtalb/reverse_image_search_bot"
 USER_AGENT = f"ReverseImageSearch/4.0.0a0 ({sys.platform}; +{REPO_URL})"

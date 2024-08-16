@@ -2,12 +2,12 @@ import xxhash
 from aiohttp import ClientSession
 from aiopath import AsyncPath
 
-from .utils import cache_path
+from .cache import DOWNLOAD_CACHE
 
 __all__ = ["download_file"]
 
 
-async def download_file(url: str, dir: AsyncPath, session: ClientSession, *, force_download: bool = False) -> AsyncPath:
+async def download_file(url: str, dir: AsyncPath, session: ClientSession, *, use_cache: bool = True) -> AsyncPath:
     """Download a file from a URL.
 
     Note:
@@ -17,7 +17,7 @@ async def download_file(url: str, dir: AsyncPath, session: ClientSession, *, for
         url (:obj:`str`): The URL to download the file from.
         dir (:obj:`aiopath.AsyncPath`): The directory to download the file to.
         session (:obj:`aiohttp.ClientSession`): The aiohttp session to use.
-        force_download (:obj:`bool`, optional): Whether to force the download even if the file already exists.
+        use_cache (:obj:`bool`): Whether to use the download cache.
 
     Returns:
         :obj:`aiopath.AsyncPath`: The path to the downloaded file.
@@ -29,9 +29,9 @@ async def download_file(url: str, dir: AsyncPath, session: ClientSession, *, for
     digest = hash.hexdigest()
 
     new_name = f"{digest}"
-    file = await cache_path(dir, new_name)
+    file = await DOWNLOAD_CACHE.cache_path(new_name, _create=True)
 
-    if not force_download and await file.is_file():
+    if use_cache and await file.is_file():
         return file
 
     async with session.get(url) as response:

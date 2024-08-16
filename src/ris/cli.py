@@ -1,55 +1,55 @@
 import asyncio
 import json
 import os
-import shutil
 from argparse import ArgumentParser
 from typing import Any, Callable
 
 import aiohttp
-import xxhash
 from aiopath import AsyncPath
 
-from .defaults import DOWNLOAD_DIR, SEARCH_DIR, create_folders
+from .cache import SEARCH_CACHE
+from .defaults import DOWNLOAD_DIR
+from .distributor import Distributor
+from .file import save_file
 from .http import download_file
-from .search import engines
-from .types import ENGINE
-from .utils import cache_path
+from .search import ENGINES
+from .text import format_source
+from .types import EngineFunc, Errored, Normalized, Normalizer, Source
 
 __all__ = ["main"]
 
 
-async def file_hash(file: AsyncPath) -> str:
-    hash = xxhash.xxh32()
-    async with file.open("rb") as f:
-        while chunk := await f.read(4096):
-            hash.update(chunk)
-    return hash.hexdigest()
+def print_source(source: Source) -> None:
+    text, sources, links = format_source(source)
+    print(text)
+    print()
+    print("Sources:")
+    for source_link in sources:
+        if isinstance(source_link, tuple):
+            print(f" - {source_link[0]} ({source_link[1]})")
+        else:
+            print(f" - {source_link}")
 
-
-async def save_file(file: AsyncPath) -> AsyncPath:
-    hash = await file_hash(file)
-    new_file = await cache_path(DOWNLOAD_DIR, hash)
-    if new_file.exists():
-        return new_file
-    shutil.copy(str(file), str(new_file))
-    return new_file
+    print()
+    print("Links:")
+    for link in links:
+        print(f" - {link}")
 
 
 async def use_engine(
     engine_name: str,
-    engine: ENGINE,
+    engine: EngineFunc,
+    normalizer: Normalizer,
     file: AsyncPath,
     session: aiohttp.ClientSession,
     return_cached: bool = True,
-) -> dict[str, Any]:
-    engine_dir = SEARCH_DIR / engine_name
-    search_file = await cache_path(engine_dir, file.with_suffix(".json").name)
+) -> list[Normalized] | Errored:
+    if return_cached and await SEARCH_CACHE.exists(file.name, sub_dir=engine_name):
+        return await SEARCH_CACHE.get_json(file.name, sub_dir=engine_name)
 
-    if return_cached and await search_file.exists():
-        return json.loads(await search_file.read_text())  # type: ignore[no-any-return]
-
+    result: list[Normalized] | Errored
     try:
-        result = await engine(str(file), session)
+        result = normalizer(await engine(str(file), session), file.name)
     except (aiohttp.ClientResponseError, aiohttp.ClientError) as error:
         error_message = str(error)
         error_data: Any = None
@@ -66,49 +66,65 @@ async def use_engine(
             "error_message": error_message,
             "error_data": error_data,
             "error_type": str(type(error)),
+            "file": str(file),
+            "engine": engine_name,  # type: ignore[typeddict-item]
         }
-    await search_file.write_text(json.dumps(result))
+    await SEARCH_CACHE.set_json(file.name, result, sub_dir=engine_name)
     return result
 
 
+def check_similarity(normalized: Normalized) -> Normalized | None:
+    if normalized["similarity"] < 80:
+        return None
+    return normalized
+
+
 async def search(
-    file: AsyncPath, session: aiohttp.ClientSession, *, return_cached: bool = True
-) -> list[dict[str, Any]]:
-    results = await asyncio.gather(
-        *(
+    file: AsyncPath,
+    session: aiohttp.ClientSession,
+    *,
+    use_search_cache: bool = True,
+    use_provider_cache: bool = True,
+) -> None:
+    distributor = Distributor(print_source, {}, session, use_source_cache=use_provider_cache)
+
+    for runner in asyncio.as_completed(
+        (
             use_engine(
                 engine_name=name,
                 engine=engine,
+                normalizer=normalizer,
                 file=file,
                 session=session,
-                return_cached=return_cached,
+                return_cached=use_search_cache,
             )
-            for name, engine in engines.items()
+            for name, (engine, normalizer) in ENGINES.items()
         ),
-    )
-    return results
+    ):
+        result = await runner
+        if "error" in result:
+            continue
+        distributor.distribute(result, pre_process=check_similarity)
+
+    await distributor.join()
 
 
 async def amain(session: aiohttp.ClientSession) -> None:
     parser = ArgumentParser()
     parser.add_argument("file", type=str, help="File or URL to download")
-    parser.add_argument(
-        "-f", "--force-redownload", action="store_true", help="Force download even if the file already exists"
-    )
-    parser.add_argument("-R", "--no-return-cached", action="store_true", help="Do not return cached search results")
+    parser.add_argument("-F", "--no-file-cache", action="store_true", help="Disable download cache (download again)")
+    parser.add_argument("-R", "--no-search-cache", action="store_true", help="Disable search cache (search again)")
+    parser.add_argument("-P", "--no-provider-cache", action="store_true", help="Disable provider cache (fetch again)")
     args = parser.parse_args()
 
-    await create_folders()
-
     if os.path.exists(args.file):
-        file = await save_file(AsyncPath(args.file))
+        file = await save_file(AsyncPath(args.file), use_cache=not args.no_file_cache)
     else:
-        file = await download_file(
-            url=args.file, dir=DOWNLOAD_DIR, session=session, force_download=args.force_redownload
-        )
+        file = await download_file(url=args.file, dir=DOWNLOAD_DIR, session=session, use_cache=not args.no_file_cache)
 
-    results = await search(file, session, return_cached=not args.no_return_cached)
-    print(json.dumps(results, indent=4, sort_keys=True))
+    await search(
+        file, session, use_search_cache=not args.no_search_cache, use_provider_cache=not args.no_provider_cache
+    )
 
 
 async def session_wrapper(func: Callable[[aiohttp.ClientSession], Any]) -> None:
