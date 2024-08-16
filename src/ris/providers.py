@@ -1,3 +1,4 @@
+import logging
 from typing import TYPE_CHECKING
 
 from aiohttp import ClientSession
@@ -10,15 +11,24 @@ if TYPE_CHECKING:
 
 __all__ = ["PROVIDERS"]
 
+log = logging.getLogger(__name__)
+
 
 async def danbooru(engine_data: Normalized, session: ClientSession, distributor: "Distributor") -> Source | None:
+    log_prefix = Provider.DANBOORU.value
+    log.info(f"{log_prefix}: Getting source data")
+    log.debug(f"{log_prefix}: Engine data: {engine_data}")
+    log.debug(f"{log_prefix}: Distributor: {distributor}")
     id = engine_data["id"]
     url = f"https://danbooru.donmai.us/posts/{id}.json"
 
+    log.debug(f"{log_prefix}: Getting data from {url}")
     async with session.get(url, headers={"User-Agent": USER_AGENT}) as response:
         response.raise_for_status()
+        log.debug(f"{log_prefix}: Response status: {response.status}")
         data = await response.json()
 
+    log.debug(f"{log_prefix}: Parsing data")
     authors = list(data.get("tag_string_artist", "").split(" "))
     characters = list(data.get("tag_string_character", "").split(" "))
     copyrights = list(data.get("tag_string_copyright", "").split(" "))
@@ -32,6 +42,7 @@ async def danbooru(engine_data: Normalized, session: ClientSession, distributor:
 
     link = (file_link, thumbnail_link)
 
+    log.debug(f"{log_prefix}: Creating source")
     return Source(
         platform="danbooru",
         engine_data=engine_data,
@@ -48,16 +59,31 @@ async def danbooru(engine_data: Normalized, session: ClientSession, distributor:
 
 
 async def pixiv(data: Normalized, session: ClientSession, distributor: "Distributor") -> Source | None:
-    pass
+    log_prefix = Provider.PIXIV.value
+    log.info(f"{log_prefix}: Getting source data")
+    log.debug(f"{log_prefix}: Engine data: {data}")
+    log.debug(f"{log_prefix}: Distributor: {distributor}")
+    log.warning(f"{log_prefix}: Not implemented")
+    raise NotImplementedError
 
 
 async def deviantart(data: Normalized, session: ClientSession, distributor: "Distributor") -> Source | None:
+    log_prefix = Provider.DEVIANTART.value
+    log.info(f"{log_prefix}: Getting source data")
+    log.debug(f"{log_prefix}: Engine data: {data}")
+    log.debug(f"{log_prefix}: Distributor: {distributor}")
+    log.warning(f"{log_prefix}: Not implemented")
+    raise NotImplementedError
     pass
 
 
 async def saucenao_provider(data: Normalized, session: ClientSession, distributor: "Distributor") -> Source | None:
-    # Process raw saucenao data if needed
-    pass
+    log_prefix = Provider.SAUCENAO.value
+    log.info(f"{log_prefix}: Getting source data")
+    log.debug(f"{log_prefix}: Engine data: {data}")
+    log.debug(f"{log_prefix}: Distributor: {distributor}")
+    log.warning(f"{log_prefix}: Not implemented")
+    raise NotImplementedError
 
 
 PROVIDERS: dict[Provider, ProviderFunc] = {

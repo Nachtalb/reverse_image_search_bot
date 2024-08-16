@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 from mimetypes import guess_extension
@@ -10,6 +11,8 @@ from .defaults import SAUCENAO_API_KEY, USER_AGENT
 from .types import Engine, EngineFunc, Normalized, Normalizer, Provider
 
 __all__ = ["ENGINES"]
+
+log = logging.getLogger(__name__)
 
 
 snao_id_map = {
@@ -30,9 +33,14 @@ snao_url_map = {
 
 
 def saucenao_normalisation(data: dict[str, Any], file_id: str) -> list[Normalized]:
+    log_prefix = Engine.SAUCENAO.value
+    log.info(f"{log_prefix}: Normalizing data")
+    log.debug(f"{log_prefix}: Data: {data}")
+    log.debug(f"{log_prefix}: File ID: {file_id}")
     results = data["results"]
     normalized: list[Normalized] = []
 
+    log.debug(f"{log_prefix}: Normalizing {len(results)} results")
     for result in results:
         rd = result["data"]
         hd = result["header"]
@@ -40,6 +48,7 @@ def saucenao_normalisation(data: dict[str, Any], file_id: str) -> list[Normalize
         # SIMPLE MAP
         for key, value in snao_id_map.items():
             if key in rd:
+                log.debug(f"{log_prefix}: Mapping {key} to {value}")
                 normalized.append(
                     {
                         "platform": value,
@@ -56,6 +65,7 @@ def saucenao_normalisation(data: dict[str, Any], file_id: str) -> list[Normalize
         for url in ext_urls:
             for platform, regex in snao_url_map.items():
                 if match := re.match(regex, url):
+                    log.debug(f"{log_prefix}: Matching {url} to {platform}")
                     normalized.append(
                         {
                             "platform": platform,
@@ -67,41 +77,56 @@ def saucenao_normalisation(data: dict[str, Any], file_id: str) -> list[Normalize
                         }
                     )
 
+    log.debug(f"{log_prefix}: Normalized {len(normalized)} results")
     return normalized
 
 
 async def saucenao(file_url: str, session: ClientSession) -> dict[str, Any]:
+    log_prefix = Engine.SAUCENAO.value
+    log.info(f"{log_prefix}: Searching for {file_url}")
     params: dict[str, Any] = {"output_type": 2, "db": 999, "testmode": 1}
     if SAUCENAO_API_KEY:
+        log.debug(f"{log_prefix}: Using API key")
         params["api_key"] = SAUCENAO_API_KEY
 
     url = "https://saucenao.com/search.php"
 
     if not os.path.exists(file_url):
+        log.debug(f"{log_prefix}: Using URL search")
         params["url"] = file_url
 
+        log.debug(f"{log_prefix}: Sending request to {url}")
         async with session.get(url, headers={"User-Agent": USER_AGENT}, params=params) as response:
             response.raise_for_status()
             data = await response.json()
+            log.debug(f"{log_prefix}: Response: {data}")
     else:
+        log.debug(f"{log_prefix}: Using file search")
         mime = magic.Magic(mime=True)
         mime_type = mime.from_file(file_url)
         ext = guess_extension(mime_type)
 
+        log.debug(f"{log_prefix}: File MIME type: {mime_type}")
         form_data = FormData()
         with open(file_url, "rb") as file:
             form_data.add_field("file", file, filename=f"image{ext}", content_type=mime_type)
 
+            log.debug(f"{log_prefix}: Sending request to {url}")
             async with session.post(url, headers={"User-Agent": USER_AGENT}, data=form_data, params=params) as response:
                 response.raise_for_status()
                 data = await response.json()
+                log.debug(f"{log_prefix}: Response: {data}")
 
+    log.debug(f"{log_prefix}: Checking status")
     if (status_code := data.get("header", {}).get("status", None)) != 0:
+        log.error(f"{log_prefix}: Error status code: {status_code}")
         message = data.get("header", {}).get("message")
         if not message:
             message = "Unknown error"
             if status_code:
                 message += f" (status code: {status_code})"
+
+        log.error(f"{log_prefix}: Error message: {message}")
 
         raise ClientResponseError(
             response.request_info,

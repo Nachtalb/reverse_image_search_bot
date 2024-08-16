@@ -1,3 +1,5 @@
+import logging
+
 import xxhash
 from aiohttp import ClientSession
 from aiopath import AsyncPath
@@ -5,6 +7,8 @@ from aiopath import AsyncPath
 from .cache import DOWNLOAD_CACHE
 
 __all__ = ["download_file"]
+
+log = logging.getLogger(__name__)
 
 
 async def download_file(url: str, dir: AsyncPath, session: ClientSession, *, use_cache: bool = True) -> AsyncPath:
@@ -25,6 +29,8 @@ async def download_file(url: str, dir: AsyncPath, session: ClientSession, *, use
     Raises:
         :obj:`ValueError`: If the MIME type of the file cannot be determined.
     """
+    log.info(f"Downloading {url}")
+    log.debug(f"Use cache: {use_cache}")
     hash = xxhash.xxh32(url.encode())
     digest = hash.hexdigest()
 
@@ -32,11 +38,15 @@ async def download_file(url: str, dir: AsyncPath, session: ClientSession, *, use
     file = await DOWNLOAD_CACHE.cache_path(new_name, _create=True)
 
     if use_cache and await file.is_file():
+        log.info(f"Using cached file: {file}")
         return file
 
+    log.info(f"Downloading {url} to {file}")
     async with session.get(url) as response:
         response.raise_for_status()
 
+        log.debug(f"Content-Type: {response.content_type}")
+        log.debug(f"Saving file to {file}")
         async with file.open("wb") as file_obj:
             async for chunk in response.content.iter_any():
                 await file_obj.write(chunk)

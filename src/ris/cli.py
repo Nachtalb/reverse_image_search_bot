@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import os
 from argparse import ArgumentParser
 from typing import Any, Callable
@@ -44,13 +45,31 @@ async def use_engine(
     session: aiohttp.ClientSession,
     return_cached: bool = True,
 ) -> list[Normalized] | Errored:
+    logging.info(f"Searching for {file.name} with {engine_name}")
+    logging.debug(f"Return cached: {return_cached}")
+    logging.debug(f"Engine: {engine}")
+    logging.debug(f"Normalizer: {normalizer}")
     if return_cached and await SEARCH_CACHE.exists(file.name, sub_dir=engine_name):
-        return await SEARCH_CACHE.get_json(file.name, sub_dir=engine_name)
+        logging.info("Using cached search result")
+        logging.debug(f"Cache file: {await SEARCH_CACHE.cache_path(file.name, sub_dir=engine_name)}")
+        results = await SEARCH_CACHE.get_json(file.name, sub_dir=engine_name)
+        if isinstance(results, dict) and "error" in results:
+            logging.error(f"Cached search result is an error: {results['error_message']}")
+        logging.debug(f"Results: {results}")
+        return results
 
     result: list[Normalized] | Errored
     try:
-        result = normalizer(await engine(str(file), session), file.name)
+        logging.info(f"Start searching with {engine_name}")
+        raw_results = await engine(str(file), session)
+        logging.info(f"Search result for {engine_name}: {len(raw_results)} results")
+        logging.debug(f"Raw results: {raw_results}")
+        logging.info("Normalizing results")
+        result = normalizer(raw_results, file.name)
+        logging.info(f"Normalized results: {len(result)}")
+        logging.debug(f"Normalized results: {result}")
     except (aiohttp.ClientResponseError, aiohttp.ClientError) as error:
+        logging.error(f"An error occurred while searching with {engine_name}")
         error_message = str(error)
         error_data: Any = None
         if isinstance(error, aiohttp.ClientResponseError):
@@ -69,6 +88,10 @@ async def use_engine(
             "file": str(file),
             "engine": engine_name,  # type: ignore[typeddict-item]
         }
+        logging.error(f"Error: {result}")
+    logging.debug(
+        f"Saving search result to cache for {engine_name} at {await SEARCH_CACHE.cache_path(file.name, sub_dir=engine_name)}"
+    )
     await SEARCH_CACHE.set_json(file.name, result, sub_dir=engine_name)
     return result
 
@@ -86,6 +109,9 @@ async def search(
     use_search_cache: bool = True,
     use_provider_cache: bool = True,
 ) -> None:
+    logging.info(f"Searching for {file.name}")
+    logging.debug(f"Search cache enabled: {use_search_cache}")
+    logging.debug(f"Provider cache enabled: {use_provider_cache}")
     distributor = Distributor(print_source, {}, session, use_source_cache=use_provider_cache)
 
     for runner in asyncio.as_completed(
@@ -102,25 +128,55 @@ async def search(
         ),
     ):
         result = await runner
+        if isinstance(result, list):
+            engine = result[0].get("engine", "unknown")
+            total = len(result)
+        else:
+            engine = result.get("engine", "unknown")
+            total = 0
+        logging.info(f"Search result for {engine}: {total} results")
+        logging.debug(f"Results: {result}")
         if "error" in result:
+            logging.error(f"Error: {result['error_message']}")  # type: ignore[call-overload]
+            logging.error(f"Error: {result}")
             continue
+        logging.info("Distributing results")
         distributor.distribute(result, pre_process=check_similarity)
 
+    logging.info("Waiting for distributor to finish")
     await distributor.join()
+
+
+def setup_logging(verbose: int) -> None:
+    logging_levels = [logging.ERROR, logging.WARNING, logging.INFO, logging.DEBUG]
+    logging_level = logging_levels[min(verbose, len(logging_levels) - 1)]
+    logging.basicConfig(level=logging_level, format="%(asctime)s - %(levelname)s - %(message)s")
+    logging.error("This is an error message")
+    logging.warning("This is a warning message")
+    logging.info("This is an info message")
+    logging.debug("This is a debug message")
 
 
 async def amain(session: aiohttp.ClientSession) -> None:
     parser = ArgumentParser()
     parser.add_argument("file", type=str, help="File or URL to download")
     parser.add_argument("-F", "--no-file-cache", action="store_true", help="Disable download cache (download again)")
-    parser.add_argument("-R", "--no-search-cache", action="store_true", help="Disable search cache (search again)")
+    parser.add_argument("-S", "--no-search-cache", action="store_true", help="Disable search cache (search again)")
     parser.add_argument("-P", "--no-provider-cache", action="store_true", help="Disable provider cache (fetch again)")
+    parser.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity level (up to -vvv)")
     args = parser.parse_args()
 
+    setup_logging(args.verbose)
+    logging.info("Starting")
+
     if os.path.exists(args.file):
+        logging.info("Using local file")
         file = await save_file(AsyncPath(args.file), use_cache=not args.no_file_cache)
     else:
+        logging.info("Downloading file")
         file = await download_file(url=args.file, dir=DOWNLOAD_DIR, session=session, use_cache=not args.no_file_cache)
+
+    logging.info(f"File: {file}")
 
     await search(
         file, session, use_search_cache=not args.no_search_cache, use_provider_cache=not args.no_provider_cache
