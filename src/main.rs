@@ -1,4 +1,9 @@
-use teloxide::{net::Download, prelude::*, types::FileMeta, utils::command::BotCommands};
+use teloxide::{
+    net::Download,
+    prelude::*,
+    types::{FileMeta, PhotoSize},
+    utils::command::BotCommands,
+};
 use thiserror::Error;
 use tokio::fs;
 
@@ -59,13 +64,12 @@ async fn download_file(
     Ok(path)
 }
 
-async fn handle_media(bot: Bot, msg: Message) -> ResponseResult<()> {
+async fn handle_photo(bot: Bot, msg: Message) -> ResponseResult<()> {
     let chat_id = msg.chat.id;
 
+    log::info!("Received Photo in chat {}", chat_id);
+    bot.send_message(chat_id, "Received Photo").await?;
     if let Some(photo_size) = msg.photo() {
-        log::info!("Received Photo in chat {}", chat_id);
-        bot.send_message(chat_id, "Received Photo").await?;
-
         if let Some(photo) = photo_size.last() {
             let file_id = &photo.file.id;
             log::info!("File ID: {}", file_id);
@@ -89,9 +93,22 @@ async fn handle_media(bot: Bot, msg: Message) -> ResponseResult<()> {
                 }
             }
         }
+    }
+
+    Ok(())
+}
+
+async fn handle_video(bot: Bot, msg: Message) -> ResponseResult<()> {
+    log::info!("Received Video in chat {}", msg.chat.id);
+    bot.send_message(msg.chat.id, "Received Video").await?;
+    Ok(())
+}
+
+async fn handle_media(bot: Bot, msg: Message) -> ResponseResult<()> {
+    if msg.photo().is_some() {
+        handle_photo(bot, msg).await?
     } else if msg.video().is_some() {
-        log::info!("Received Video in chat {}", chat_id);
-        bot.send_message(chat_id, "Received Video").await?;
+        handle_video(bot, msg).await?
     } else {
         log::warn!("handle_media called with unexpected message");
     }
