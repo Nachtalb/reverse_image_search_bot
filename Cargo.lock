@@ -1085,6 +1085,7 @@ dependencies = [
  "log",
  "pretty_env_logger",
  "teloxide",
+ "thiserror",
  "tokio",
 ]
 

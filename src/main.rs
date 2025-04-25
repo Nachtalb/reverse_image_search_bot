@@ -1,6 +1,5 @@
-use teloxide::{
-    RequestError, net::Download, prelude::*, types::FileMeta, utils::command::BotCommands,
-};
+use teloxide::{net::Download, prelude::*, types::FileMeta, utils::command::BotCommands};
+use thiserror::Error;
 use tokio::fs;
 
 #[derive(BotCommands, Clone, Debug)]
@@ -30,20 +29,30 @@ async fn answer(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
     Ok(())
 }
 
-async fn download_file(bot: Bot, file_meta: &FileMeta) -> Result<std::path::PathBuf, RequestError> {
+#[derive(Error, Debug)]
+pub enum DownloadError {
+    /// An error occurred while making an API request to Telegram
+    #[error("Telegram API request error: {0}")]
+    Request(#[from] teloxide::RequestError),
+
+    /// An I/O error occurred during local file setup (creating the dest file)
+    #[error("File setup I/O error: {0}")]
+    FileSetup(#[from] std::io::Error),
+
+    // A error occurred during the file download itself.
+    #[error("File download error: {0}")]
+    Download(#[from] teloxide::DownloadError),
+}
+
+async fn download_file(
+    bot: &Bot,
+    file_meta: &FileMeta,
+) -> Result<std::path::PathBuf, DownloadError> {
     let file = bot.get_file(&file_meta.id).await?;
     let filename = format!("{}.jpg", file_meta.id);
 
     let path = output_directory().join(filename);
-    let mut dest = fs::File::create(&path).await.map_err(|io_error| {
-        // Map the error if await resulted in Err
-        log::error!(
-            "Failed to create file asynchronously '{}': {}",
-            path.display(),
-            io_error
-        );
-        RequestError::Io(std::sync::Arc::new(io_error)) // Convert to RequestError::Io
-    })?; // ? now operates on Result<File, RequestError>
+    let mut dest = fs::File::create(&path).await?;
 
     bot.download_file(&file.path, &mut dest).await?;
 
@@ -61,8 +70,24 @@ async fn handle_media(bot: Bot, msg: Message) -> ResponseResult<()> {
             let file_id = &photo.file.id;
             log::info!("File ID: {}", file_id);
 
-            let dest = download_file(bot, &photo.file).await?;
-            log::info!("File ID: {} downloaded to {}", file_id, dest.display());
+            match download_file(&bot, &photo.file).await {
+                Ok(dest) => {
+                    log::info!("File ID: {} downloaded to {}", file_id, dest.display());
+                }
+                Err(err) => {
+                    log::error!("Failed to download/save file ID {}: {}", file_id, err);
+
+                    if let DownloadError::Request(req_err) = err {
+                        return Err(req_err);
+                    } else {
+                        bot.send_message(
+                            chat_id,
+                            "Oh no, something went wrong while trying to save the photo.",
+                        )
+                        .await?;
+                    }
+                }
+            }
         }
     } else if msg.video().is_some() {
         log::info!("Received Video in chat {}", chat_id);
