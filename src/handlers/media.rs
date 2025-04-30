@@ -1,6 +1,7 @@
 use crate::error::DownloadError;
 use crate::handlers::file::download_file;
 
+use teloxide::dispatching::UpdateHandler;
 use teloxide::prelude::*;
 
 async fn handle_photo(bot: Bot, msg: Message) -> ResponseResult<()> {
@@ -72,4 +73,26 @@ pub async fn handle_media(bot: Bot, msg: Message) -> ResponseResult<()> {
     }
 
     Ok(())
+}
+
+pub fn branch() -> UpdateHandler<teloxide::RequestError> {
+    Update::filter_message()
+        .filter(|msg: Message| msg.photo().is_some() || msg.video().is_some())
+        .endpoint(handle_media)
+}
+
+#[cfg(test)]
+mod tests {
+    use teloxide::dptree;
+    use teloxide_tests::{MockBot, MockMessageVideo};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_handle_media() {
+        let tree = dptree::entry().branch(branch());
+        let mut bot = MockBot::new(MockMessageVideo::new(), tree);
+
+        bot.dispatch_and_check_last_text("Received Video").await;
+    }
 }
