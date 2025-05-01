@@ -108,12 +108,21 @@ async fn handle_video(bot: Bot, msg: Message) -> HandlerResult<()> {
     Ok(())
 }
 
-        }
-    }
-
+async fn handle_document(bot: Bot, msg: Message) -> HandlerResult<()> {
+    log::info!("Received document in chat {}", msg.chat.id);
+    bot.send_message(msg.chat.id, "Not implemented yet").await?;
     Ok(())
 }
 
+async fn handle_sticker(bot: Bot, msg: Message) -> HandlerResult<()> {
+    log::info!("Received sticker in chat {}", msg.chat.id);
+    bot.send_message(msg.chat.id, "Not implemented yet").await?;
+    Ok(())
+}
+
+async fn handle_animation(bot: Bot, msg: Message) -> HandlerResult<()> {
+    log::info!("Received animation in chat {}", msg.chat.id);
+    bot.send_message(msg.chat.id, "Not implemented yet").await?;
     Ok(())
 }
 
@@ -122,6 +131,12 @@ pub async fn handle_media(bot: Bot, msg: Message) -> HandlerResult<()> {
         handle_photo(bot, msg).await?
     } else if msg.video().is_some() {
         handle_video(bot, msg).await?
+    } else if msg.document().is_some() {
+        handle_document(bot, msg).await?
+    } else if msg.sticker().is_some() {
+        handle_sticker(bot, msg).await?
+    } else if msg.animation().is_some() {
+        handle_animation(bot, msg).await?
     } else {
         log::warn!("handle_media called with unexpected message");
     }
@@ -131,7 +146,13 @@ pub async fn handle_media(bot: Bot, msg: Message) -> HandlerResult<()> {
 
 pub fn branch() -> UpdateHandler<Box<dyn Error + Send + Sync + 'static>> {
     Update::filter_message()
-        .filter(|msg: Message| msg.photo().is_some() || msg.video().is_some())
+        .filter(|msg: Message| {
+            msg.photo().is_some()
+                || msg.video().is_some()
+                || msg.document().is_some()
+                || msg.sticker().is_some()
+                || msg.animation().is_some()
+        })
         .endpoint(handle_media)
 }
 
@@ -163,7 +184,35 @@ mod tests {
         let tree = dptree::entry().branch(branch());
         let mut bot = MockBot::new(MockMessageVideo::new(), tree);
 
-        bot.dispatch_and_check_last_text("Received Video").await;
+        bot.dispatch_and_check_last_text("Not implemented yet")
+            .await;
+    }
+
+    #[tokio::test]
+    async fn test_handle_document() {
+        let tree = dptree::entry().branch(branch());
+        let mut bot = MockBot::new(MockMessageVideo::new(), tree);
+
+        bot.dispatch_and_check_last_text("Not implemented yet")
+            .await;
+    }
+
+    #[tokio::test]
+    async fn test_handle_sticker() {
+        let tree = dptree::entry().branch(branch());
+        let mut bot = MockBot::new(MockMessageVideo::new(), tree);
+
+        bot.dispatch_and_check_last_text("Not implemented yet")
+            .await;
+    }
+
+    #[tokio::test]
+    async fn test_handle_animation() {
+        let tree = dptree::entry().branch(branch());
+        let mut bot = MockBot::new(MockMessageVideo::new(), tree);
+
+        bot.dispatch_and_check_last_text("Not implemented yet")
+            .await;
     }
 
     #[tokio::test]
