@@ -116,7 +116,18 @@ async fn handle_document(bot: Bot, msg: Message) -> HandlerResult<()> {
 
 async fn handle_sticker(bot: Bot, msg: Message) -> HandlerResult<()> {
     log::info!("Received sticker in chat {}", msg.chat.id);
-    bot.send_message(msg.chat.id, "Not implemented yet").await?;
+
+    if let Some(sticker) = msg.sticker() {
+        if sticker.is_regular() && sticker.is_static() {
+            let dest = download(&bot, &msg, &sticker.file).await?;
+            send_search_message(bot, msg, &get_file_url(dest)).await?;
+        } else if sticker.is_regular() && sticker.is_regular() && sticker.is_video() {
+            bot.send_message(msg.chat.id, "Not implemented yet").await?;
+        } else {
+            bot.send_message(msg.chat.id, "Not supported").await?;
+        }
+    }
+
     Ok(())
 }
 
@@ -158,8 +169,16 @@ pub fn branch() -> UpdateHandler<Box<dyn Error + Send + Sync + 'static>> {
 
 #[cfg(test)]
 mod tests {
-    use teloxide::{dptree, types::InlineKeyboardButtonKind};
-    use teloxide_tests::{MockBot, MockMessagePhoto, MockMessageVideo};
+    use teloxide::{
+        dptree,
+        types::{
+            InlineKeyboardButtonKind, MaskPoint, MaskPosition, StickerFormatFlags, StickerKind,
+        },
+    };
+    use teloxide_tests::{
+        MockBot, MockMessageAnimation, MockMessageDocument, MockMessagePhoto, MockMessageSticker,
+        MockMessageVideo,
+    };
 
     use super::*;
 
@@ -191,25 +210,75 @@ mod tests {
     #[tokio::test]
     async fn test_handle_document() {
         let tree = dptree::entry().branch(branch());
-        let mut bot = MockBot::new(MockMessageVideo::new(), tree);
+        let mut bot = MockBot::new(MockMessageDocument::new(), tree);
 
         bot.dispatch_and_check_last_text("Not implemented yet")
             .await;
     }
 
     #[tokio::test]
-    async fn test_handle_sticker() {
+    async fn test_handle_sticker_regular() {
         let tree = dptree::entry().branch(branch());
-        let mut bot = MockBot::new(MockMessageVideo::new(), tree);
+        let message = MockMessageSticker::new().flags(StickerFormatFlags {
+            is_animated: false,
+            is_video: false,
+        });
+        let mut bot = MockBot::new(message, tree);
+
+        bot.dispatch_and_check_last_text("Search for Image").await;
+    }
+
+    #[tokio::test]
+    async fn test_handle_sticker_animated() {
+        let tree = dptree::entry().branch(branch());
+        let message = MockMessageSticker::new().flags(StickerFormatFlags {
+            is_animated: true,
+            is_video: false,
+        });
+        let mut bot = MockBot::new(message, tree);
+
+        bot.dispatch_and_check_last_text("Not supported").await;
+    }
+
+    #[tokio::test]
+    async fn test_handle_sticker_video() {
+        let tree = dptree::entry().branch(branch());
+        let message = MockMessageSticker::new().flags(StickerFormatFlags {
+            is_animated: false,
+            is_video: true,
+        });
+        let mut bot = MockBot::new(message, tree);
 
         bot.dispatch_and_check_last_text("Not implemented yet")
             .await;
+    }
+
+    #[tokio::test]
+    async fn test_handle_sticker_mask() {
+        let tree = dptree::entry().branch(branch());
+        let message = MockMessageSticker::new().kind(StickerKind::Mask {
+            mask_position: MaskPosition::new(MaskPoint::Eyes, 0.0, 0.0, 0.0),
+        });
+        let mut bot = MockBot::new(message, tree);
+
+        bot.dispatch_and_check_last_text("Not supported").await;
+    }
+
+    #[tokio::test]
+    async fn test_handle_sticker_emoji() {
+        let tree = dptree::entry().branch(branch());
+        let message = MockMessageSticker::new().kind(StickerKind::CustomEmoji {
+            custom_emoji_id: "".to_string(),
+        });
+        let mut bot = MockBot::new(message, tree);
+
+        bot.dispatch_and_check_last_text("Not supported").await;
     }
 
     #[tokio::test]
     async fn test_handle_animation() {
         let tree = dptree::entry().branch(branch());
-        let mut bot = MockBot::new(MockMessageVideo::new(), tree);
+        let mut bot = MockBot::new(MockMessageAnimation::new(), tree);
 
         bot.dispatch_and_check_last_text("Not implemented yet")
             .await;
