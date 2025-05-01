@@ -1,6 +1,7 @@
 mod bot;
 mod error;
 mod handlers;
+mod types;
 mod utils;
 
 // use teloxide::{net::Download, prelude::*, types::FileMeta, utils::command::BotCommands};

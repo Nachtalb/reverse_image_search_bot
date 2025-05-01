@@ -1,10 +1,13 @@
+use std::error::Error;
+
 use crate::error::DownloadError;
 use crate::handlers::file::download_file;
+use crate::types::HandlerResponse;
 
 use teloxide::dispatching::UpdateHandler;
 use teloxide::prelude::*;
 
-async fn handle_photo(bot: Bot, msg: Message) -> ResponseResult<()> {
+async fn handle_photo(bot: Bot, msg: Message) -> HandlerResponse<()> {
     let chat_id = msg.chat.id;
 
     log::info!("Received Photo in chat {}", chat_id);
@@ -21,15 +24,12 @@ async fn handle_photo(bot: Bot, msg: Message) -> ResponseResult<()> {
                 Err(err) => {
                     log::error!("Failed to download/save file ID {}: {}", file_id, err);
 
-                    if let DownloadError::Request(req_err) = err {
-                        return Err(req_err);
-                    } else {
-                        bot.send_message(
-                            chat_id,
-                            "Oh no, something went wrong while trying to save the photo.",
-                        )
-                        .await?;
-                    }
+                    bot.send_message(
+                        chat_id,
+                        "Oh no, something went wrong while trying to save the photo.",
+                    )
+                    .await?;
+                    return Err(Box::new(err));
                 }
             }
 
@@ -63,7 +63,7 @@ async fn handle_video(bot: Bot, msg: Message) -> ResponseResult<()> {
     Ok(())
 }
 
-pub async fn handle_media(bot: Bot, msg: Message) -> ResponseResult<()> {
+pub async fn handle_media(bot: Bot, msg: Message) -> HandlerResponse<()> {
     if msg.photo().is_some() {
         handle_photo(bot, msg).await?
     } else if msg.video().is_some() {
@@ -75,7 +75,7 @@ pub async fn handle_media(bot: Bot, msg: Message) -> ResponseResult<()> {
     Ok(())
 }
 
-pub fn branch() -> UpdateHandler<teloxide::RequestError> {
+pub fn branch() -> UpdateHandler<Box<dyn Error + Send + Sync + 'static>> {
     Update::filter_message()
         .filter(|msg: Message| msg.photo().is_some() || msg.video().is_some())
         .endpoint(handle_media)

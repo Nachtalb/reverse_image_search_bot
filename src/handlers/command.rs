@@ -1,5 +1,7 @@
 use teloxide::{dispatching::UpdateHandler, prelude::*, utils::command::BotCommands};
 
+use crate::types::HandlerResponse;
+
 #[derive(BotCommands, Clone, Debug)]
 #[command(
     rename_rule = "lowercase",
@@ -14,7 +16,7 @@ enum Command {
     Roll,
 }
 
-async fn command_dispatcher(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
+async fn command_dispatcher(bot: Bot, msg: Message, cmd: Command) -> HandlerResponse<()> {
     match cmd {
         Command::Start => bot.send_message(msg.chat.id, "Hello!").await?,
         Command::Help => {
@@ -27,7 +29,7 @@ async fn command_dispatcher(bot: Bot, msg: Message, cmd: Command) -> ResponseRes
     Ok(())
 }
 
-pub fn branch() -> UpdateHandler<teloxide::RequestError> {
+pub fn branch() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync>> {
     Update::filter_message()
         .filter_command::<Command>()
         .endpoint(command_dispatcher)
