@@ -1,6 +1,6 @@
 use teloxide::{dispatching::UpdateHandler, prelude::*, utils::command::BotCommands};
 
-use crate::types::HandlerResponse;
+use crate::types::HandlerResult;
 
 #[derive(BotCommands, Clone, Debug)]
 #[command(
@@ -16,7 +16,7 @@ enum Command {
     Roll,
 }
 
-async fn command_dispatcher(bot: Bot, msg: Message, cmd: Command) -> HandlerResponse<()> {
+async fn command_dispatcher(bot: Bot, msg: Message, cmd: Command) -> HandlerResult<()> {
     match cmd {
         Command::Start => bot.send_message(msg.chat.id, "Hello!").await?,
         Command::Help => {

@@ -1,22 +1,14 @@
 use std::error::Error;
-use teloxide::types::InlineKeyboardButton;
+use std::path::PathBuf;
+use teloxide::types::{FileMeta, InlineKeyboardButton};
 
-use crate::handlers::file::download_file;
-use crate::types::HandlerResponse;
+use crate::types::HandlerResult;
+use crate::utils::{file, keyboard::button};
 
 use teloxide::dispatching::UpdateHandler;
 use teloxide::prelude::*;
 
-fn format_url(template: &str, url: &str) -> reqwest::Url {
-    let formatted = template.replace("{}", url);
-    reqwest::Url::parse(&formatted).unwrap()
-}
-
-fn button(text: &str, template: &str, url: &str) -> InlineKeyboardButton {
-    InlineKeyboardButton::url(text, format_url(template, url))
-}
-
-fn buttons_from_url(url: &str) -> Vec<Vec<InlineKeyboardButton>> {
+fn search_buttons(url: &str) -> Vec<Vec<InlineKeyboardButton>> {
     vec![
         vec![button("Link", "{}", url)],
         vec![
@@ -58,52 +50,74 @@ fn buttons_from_url(url: &str) -> Vec<Vec<InlineKeyboardButton>> {
     ]
 }
 
-async fn handle_photo(bot: Bot, msg: Message) -> HandlerResponse<()> {
+async fn download(
+    bot: &Bot,
+    msg: &Message,
+    file_meta: &FileMeta,
+) -> Result<PathBuf, Box<dyn Error + Send + Sync + 'static>> {
+    match file::download_file(&bot, &file_meta).await {
+        Ok(dest) => {
+            log::info!("File ID: {} downloaded to {}", file_meta.id, dest.display());
+            Ok(dest)
+        }
+        Err(err) => {
+            log::error!("Failed to download/save file ID {}: {}", file_meta.id, err);
+
+            bot.send_message(
+                msg.chat.id,
+                "Oh no, something went wrong while receiving your file.",
+            )
+            .await?;
+            Err(Box::new(err))
+        }
+    }
+}
+
+async fn send_search_message(bot: Bot, msg: Message, url: &str) -> HandlerResult<()> {
+    let keyboard = teloxide::types::InlineKeyboardMarkup::new(search_buttons(&url));
+
+    bot.send_message(msg.chat.id, "Search for Image")
+        .reply_markup(keyboard)
+        .await?;
+
+    Ok(())
+}
+
+fn get_file_url(file: PathBuf) -> String {
+    // DEBUG
+    return "https://ris.naa.gg/f/AQADgMgxGy2sWFB8.jpg".to_string();
+}
+
+async fn handle_photo(bot: Bot, msg: Message) -> HandlerResult<()> {
     let chat_id = msg.chat.id;
 
     log::info!("Received Photo in chat {}", chat_id);
     bot.send_message(chat_id, "Received Photo").await?;
     if let Some(photo_size) = msg.photo() {
         if let Some(photo) = photo_size.last() {
-            let file_id = &photo.file.id;
-            log::info!("File ID: {}", file_id);
+            let dest = download(&bot, &msg, &photo.file).await?;
+            send_search_message(bot, msg, &get_file_url(dest)).await?
+        }
+    }
+    Ok(())
+}
 
-            match download_file(&bot, &photo.file).await {
-                Ok(dest) => {
-                    log::info!("File ID: {} downloaded to {}", file_id, dest.display());
-                }
-                Err(err) => {
-                    log::error!("Failed to download/save file ID {}: {}", file_id, err);
+async fn handle_video(bot: Bot, msg: Message) -> HandlerResult<()> {
+    log::info!("Received Video in chat {}", msg.chat.id);
+    bot.send_message(msg.chat.id, "Not implemented yet").await?;
+    Ok(())
+}
 
-                    bot.send_message(
-                        chat_id,
-                        "Oh no, something went wrong while trying to save the photo.",
-                    )
-                    .await?;
-                    return Err(Box::new(err));
-                }
-            }
-
-            let file_url = "https://ris.naa.gg/f/AQADgMgxGy2sWFB8.jpg";
-
-            let keyboard = teloxide::types::InlineKeyboardMarkup::new(buttons_from_url(file_url));
-
-            bot.send_message(chat_id, "Search for Image")
-                .reply_markup(keyboard)
-                .await?;
         }
     }
 
     Ok(())
 }
 
-async fn handle_video(bot: Bot, msg: Message) -> ResponseResult<()> {
-    log::info!("Received Video in chat {}", msg.chat.id);
-    bot.send_message(msg.chat.id, "Received Video").await?;
     Ok(())
 }
 
-pub async fn handle_media(bot: Bot, msg: Message) -> HandlerResponse<()> {
+pub async fn handle_media(bot: Bot, msg: Message) -> HandlerResult<()> {
     if msg.photo().is_some() {
         handle_photo(bot, msg).await?
     } else if msg.video().is_some() {
@@ -131,7 +145,7 @@ mod tests {
     #[tokio::test]
     async fn test_buttons() {
         let expected_url = "https://domain.com";
-        let buttons = buttons_from_url(expected_url);
+        let buttons = search_buttons(expected_url);
         for button_row in buttons {
             for button in button_row {
                 match button.kind {
@@ -158,9 +172,7 @@ mod tests {
         let message = MockMessagePhoto::new();
         let mut bot = MockBot::new(message, tree);
 
-        bot.dispatch_and_check_last_text(
-            "Oh no, something went wrong while trying to save the photo.",
-        )
-        .await;
+        bot.dispatch_and_check_last_text("Oh no, something went wrong while receiving your file.")
+            .await;
     }
 }
