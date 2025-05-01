@@ -1,10 +1,62 @@
 use std::error::Error;
+use teloxide::types::InlineKeyboardButton;
 
 use crate::handlers::file::download_file;
 use crate::types::HandlerResponse;
 
 use teloxide::dispatching::UpdateHandler;
 use teloxide::prelude::*;
+
+fn format_url(template: &str, url: &str) -> reqwest::Url {
+    let formatted = template.replace("{}", url);
+    reqwest::Url::parse(&formatted).unwrap()
+}
+
+fn button(text: &str, template: &str, url: &str) -> InlineKeyboardButton {
+    InlineKeyboardButton::url(text, format_url(template, url))
+}
+
+fn buttons_from_url(url: &str) -> Vec<Vec<InlineKeyboardButton>> {
+    vec![
+        vec![button("Link", "{}", url)],
+        vec![
+            button("SauceNao", "https://saucenao.com/search.php?url={}", url),
+            button(
+                "Google",
+                "https://www.google.com/searchbyimage?safe=off&sbisrc=tg&image_url={}",
+                url,
+            ),
+        ],
+        vec![
+            button("Trace", "https://trace.moe/?auto&url={}", url),
+            button("IQDB", "https://iqdb.org/?url={}", url),
+        ],
+        vec![
+            button("3D IQDB", "https://3d.iqdb.org/?url={}", url),
+            button(
+                "Yandex",
+                "https://yandex.com/images/search?url={}&rpt=imageview",
+                url,
+            ),
+        ],
+        vec![
+            button(
+                "Bing",
+                "https://www.bing.com/images/search?q=imgurl:{}&view=detailv2&iss=sbi",
+                url,
+            ),
+            button("TinEye", "https://tineye.com/search?url={}", url),
+        ],
+        vec![
+            button(
+                "Sogou",
+                "https://pic.sogou.com/ris?flag=1&drag=0&query={}",
+                url,
+            ),
+            button("ascii2d", "https://ascii2d.net/search/url/{}", url),
+        ],
+    ]
+}
 
 async fn handle_photo(bot: Bot, msg: Message) -> HandlerResponse<()> {
     let chat_id = msg.chat.id;
@@ -34,18 +86,7 @@ async fn handle_photo(bot: Bot, msg: Message) -> HandlerResponse<()> {
 
             let file_url = "https://ris.naa.gg/f/AQADgMgxGy2sWFB8.jpg";
 
-            let buttons = vec![vec![teloxide::types::InlineKeyboardButton::url(
-                "Google Search",
-                reqwest::Url::parse(
-                    format!(
-                        "https://www.google.com/searchbyimage?safe=off&sbisrc=tg&image_url={}",
-                        file_url
-                    )
-                    .as_str(),
-                )
-                .unwrap(),
-            )]];
-            let keyboard = teloxide::types::InlineKeyboardMarkup::new(buttons);
+            let keyboard = teloxide::types::InlineKeyboardMarkup::new(buttons_from_url(file_url));
 
             bot.send_message(chat_id, "Search for Image")
                 .reply_markup(keyboard)
@@ -82,10 +123,26 @@ pub fn branch() -> UpdateHandler<Box<dyn Error + Send + Sync + 'static>> {
 
 #[cfg(test)]
 mod tests {
-    use teloxide::dptree;
+    use teloxide::{dptree, types::InlineKeyboardButtonKind};
     use teloxide_tests::{MockBot, MockMessagePhoto, MockMessageVideo};
 
     use super::*;
+
+    #[tokio::test]
+    async fn test_buttons() {
+        let expected_url = "https://domain.com";
+        let buttons = buttons_from_url(expected_url);
+        for button_row in buttons {
+            for button in button_row {
+                match button.kind {
+                    InlineKeyboardButtonKind::Url(url) => {
+                        assert!(url.as_str().contains(expected_url));
+                    }
+                    _ => panic!("Unexpected button kind"),
+                }
+            }
+        }
+    }
 
     #[tokio::test]
     async fn test_handle_video() {
