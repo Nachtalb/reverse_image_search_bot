@@ -1,6 +1,5 @@
 use std::error::Error;
 
-use crate::error::DownloadError;
 use crate::handlers::file::download_file;
 use crate::types::HandlerResponse;
 
@@ -84,15 +83,27 @@ pub fn branch() -> UpdateHandler<Box<dyn Error + Send + Sync + 'static>> {
 #[cfg(test)]
 mod tests {
     use teloxide::dptree;
-    use teloxide_tests::{MockBot, MockMessageVideo};
+    use teloxide_tests::{MockBot, MockMessagePhoto, MockMessageVideo};
 
     use super::*;
 
     #[tokio::test]
-    async fn test_handle_media() {
+    async fn test_handle_video() {
         let tree = dptree::entry().branch(branch());
         let mut bot = MockBot::new(MockMessageVideo::new(), tree);
 
         bot.dispatch_and_check_last_text("Received Video").await;
+    }
+
+    #[tokio::test]
+    async fn test_handle_photo() {
+        let tree = dptree::entry().branch(branch());
+        let message = MockMessagePhoto::new();
+        let mut bot = MockBot::new(message, tree);
+
+        bot.dispatch_and_check_last_text(
+            "Oh no, something went wrong while trying to save the photo.",
+        )
+        .await;
     }
 }
