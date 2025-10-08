@@ -117,9 +117,32 @@ async fn send_not_supported(bot: Bot, msg: Message) -> HandlerResult<()> {
 }
 
 async fn handle_document_message(bot: Bot, msg: Message) -> HandlerResult<()> {
-    let chat_id = msg.chat.id;
     log::info!("Received document in chat {}", msg.chat.id);
-    bot.send_message(msg.chat.id, "Not implemented yet").await?;
+
+    if let Some(document) = msg.document() {
+        let mut main_type: String = "".to_string();
+        if let Some(mime_type) = &document.mime_type {
+            main_type = mime_type.type_().as_str().to_string();
+        }
+        if let Some(filename) = &document.file_name {
+            let guess = mime_guess::from_path(filename);
+            if let Some(mime_type) = guess.first() {
+                main_type = mime_type.type_().as_str().to_string();
+            }
+        }
+
+        match main_type.as_str() {
+            "image" => {
+                let dest = download(&bot, &msg, &document.file).await?;
+                send_search_message(bot, msg, &get_file_url(dest)).await?
+            }
+            "video" => send_not_implemented(bot, msg).await?,
+            _ => send_not_supported(bot, msg).await?,
+        }
+    } else {
+        send_not_supported(bot, msg).await?
+    }
+
     Ok(())
 }
 
@@ -222,8 +245,43 @@ mod tests {
         let tree = dptree::entry().branch(branch());
         let mut bot = MockBot::new(MockMessageDocument::new(), tree);
 
+        bot.dispatch_and_check_last_text("Not supported").await;
+    }
+
+    #[tokio::test]
+    async fn test_handle_document_message_no_document() {
+        let tree = dptree::entry().branch(branch());
+        let mut bot = MockBot::new(MockMessageDocument::new(), tree);
+
+        bot.dispatch_and_check_last_text("Not supported").await;
+    }
+
+    #[tokio::test]
+    async fn test_handle_document_message_image() {
+        let tree = dptree::entry().branch(branch());
+        let message = MockMessageDocument::new().file_name("image.jpg");
+        let mut bot = MockBot::new(message, tree);
+
+        bot.dispatch_and_check_last_text("Search for Image").await;
+    }
+
+    #[tokio::test]
+    async fn test_handle_document_message_video() {
+        let tree = dptree::entry().branch(branch());
+        let message = MockMessageDocument::new().file_name("video.mp4");
+        let mut bot = MockBot::new(message, tree);
+
         bot.dispatch_and_check_last_text("Not implemented yet")
             .await;
+    }
+
+    #[tokio::test]
+    async fn test_handle_document_message_other() {
+        let tree = dptree::entry().branch(branch());
+        let message = MockMessageDocument::new().file_name("file.pdf");
+        let mut bot = MockBot::new(message, tree);
+
+        bot.dispatch_and_check_last_text("Not supported").await;
     }
 
     #[tokio::test]

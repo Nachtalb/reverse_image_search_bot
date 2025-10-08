@@ -2281,6 +2281,8 @@ name = "rbot"
 version = "0.1.0"
 dependencies = [
  "log",
+ "mime",
+ "mime_guess",
  "pretty_env_logger",
  "reqwest",
  "teloxide",
