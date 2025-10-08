@@ -85,7 +85,7 @@ async fn send_search_message(bot: Bot, msg: Message, url: &str) -> HandlerResult
 
 fn get_file_url(file: PathBuf) -> String {
     // DEBUG
-    return "https://ris.naa.gg/f/AQADgMgxGy2sWFB8.jpg".to_string();
+    return "https://ris.naa.gg/f/AQADuMsxG0FIKFN8.jpg".to_string();
 }
 
 async fn handle_photo(bot: Bot, msg: Message) -> HandlerResult<()> {
