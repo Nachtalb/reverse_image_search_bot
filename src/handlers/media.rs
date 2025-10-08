@@ -104,7 +104,15 @@ async fn handle_photo_message(bot: Bot, msg: Message) -> HandlerResult<()> {
 
 async fn handle_video_message(bot: Bot, msg: Message) -> HandlerResult<()> {
     log::info!("Received Video in chat {}", msg.chat.id);
+    send_not_implemented(bot, msg).await
+}
+
+async fn send_not_implemented(bot: Bot, msg: Message) -> HandlerResult<()> {
     bot.send_message(msg.chat.id, "Not implemented yet").await?;
+    Ok(())
+}
+async fn send_not_supported(bot: Bot, msg: Message) -> HandlerResult<()> {
+    bot.send_message(msg.chat.id, "Not supported").await?;
     Ok(())
 }
 
@@ -123,9 +131,9 @@ async fn handle_sticker_message(bot: Bot, msg: Message) -> HandlerResult<()> {
             let dest = download(&bot, &msg, &sticker.file).await?;
             send_search_message(bot, msg, &get_file_url(dest)).await?;
         } else if sticker.is_regular() && sticker.is_regular() && sticker.is_video() {
-            bot.send_message(msg.chat.id, "Not implemented yet").await?;
+            send_not_implemented(bot, msg).await?;
         } else {
-            bot.send_message(msg.chat.id, "Not supported").await?;
+            send_not_supported(bot, msg).await?;
         }
     }
 
@@ -134,7 +142,7 @@ async fn handle_sticker_message(bot: Bot, msg: Message) -> HandlerResult<()> {
 
 async fn handle_animation_message(bot: Bot, msg: Message) -> HandlerResult<()> {
     log::info!("Received animation in chat {}", msg.chat.id);
-    bot.send_message(msg.chat.id, "Not implemented yet").await?;
+    send_not_implemented(bot, msg).await?;
     Ok(())
 }
 
@@ -151,6 +159,7 @@ pub async fn handle_media_message(bot: Bot, msg: Message) -> HandlerResult<()> {
         handle_animation_message(bot, msg).await?
     } else {
         log::warn!("handle_media called with unexpected message");
+        send_not_supported(bot, msg).await?
     }
 
     Ok(())
