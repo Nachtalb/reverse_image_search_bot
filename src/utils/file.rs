@@ -10,14 +10,18 @@ pub fn output_directory() -> std::path::PathBuf {
     dir
 }
 
+pub fn file_path(file_meta: &FileMeta) -> std::path::PathBuf {
+    let filename = format!("{}.jpg", file_meta.id);
+    output_directory().join(filename)
+}
+
 pub async fn download_file(
     bot: &Bot,
     file_meta: &FileMeta,
 ) -> Result<std::path::PathBuf, DownloadError> {
     let file = bot.get_file(file_meta.id.clone()).await?;
-    let filename = format!("{}.jpg", file_meta.id);
+    let path = file_path(file_meta);
 
-    let path = output_directory().join(filename);
     let mut dest = fs::File::create(&path).await?;
 
     bot.download_file(&file.path, &mut dest).await?;
