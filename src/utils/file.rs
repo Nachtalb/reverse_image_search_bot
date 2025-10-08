@@ -14,7 +14,7 @@ pub async fn download_file(
     bot: &Bot,
     file_meta: &FileMeta,
 ) -> Result<std::path::PathBuf, DownloadError> {
-    let file = bot.get_file(&file_meta.id).await?;
+    let file = bot.get_file(file_meta.id.clone()).await?;
     let filename = format!("{}.jpg", file_meta.id);
 
     let path = output_directory().join(filename);
