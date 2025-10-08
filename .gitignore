@@ -56,3 +56,7 @@ tags
 
 output/
 downloads/
+config.toml
+config.yaml
+config.yml
+config.json

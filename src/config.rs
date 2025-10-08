@@ -24,6 +24,21 @@ struct CliArgs {
     #[serde(skip_serializing_if = "Option::is_none")]
     downloads: Option<String>,
 
+    /// RustyPaste API token
+    #[arg(long, env = "RIS_RUSTYPASTE_TOKEN")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rustypaste_token: Option<String>,
+
+    /// RustyPaste base URL
+    #[arg(long, env = "RIS_RUSTYPASTE_BASE_URL")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rustypaste_base_url: Option<String>,
+
+    /// RustyPaste expiry, format: https://github.com/orhun/rustypaste#expiration (defualt: 7d)
+    #[arg(long, env = "RIS_RUSTYPASTE_EXPIRY")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rustypaste_expiry: Option<String>,
+
     /// Config file path (default: "config.toml")
     #[arg(short, long, env = "RIS_CONFIG")]
     #[serde(skip_serializing)]
@@ -36,6 +51,13 @@ pub struct Config {
     pub(crate) token: String,
     /// Downloads directory
     pub downloads: std::path::PathBuf,
+
+    /// RustyPaste API token
+    pub rustypaste_token: Option<String>,
+    /// RustyPaste base URL
+    pub rustypaste_base_url: Option<String>,
+    /// RustyPaste expiry, format: https://github.com/orhun/rustypaste#expiration
+    pub rustypaste_expiry: Option<String>,
 }
 
 pub(crate) fn get_config() -> &'static Config {
@@ -53,7 +75,8 @@ fn load_config() -> Config {
 
     let defaults = json!({
         "token": "",
-        "downloads": "./downloads"
+        "downloads": "./downloads",
+        "rustypaste_expiry": "7d"
     });
 
     let mut figment = Figment::new().merge(Serialized::defaults(defaults));

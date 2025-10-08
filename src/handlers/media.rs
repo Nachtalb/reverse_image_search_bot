@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use teloxide::types::{FileMeta, InlineKeyboardButton};
 
 use crate::types::HandlerResult;
+use crate::utils::upload;
 use crate::utils::{file, keyboard::button};
 
 use teloxide::dispatching::UpdateHandler;
@@ -79,9 +80,8 @@ async fn send_search_message(bot: &Bot, msg: &Message, url: &str) -> HandlerResu
     Ok(())
 }
 
-fn get_file_url(file: PathBuf) -> String {
-    // DEBUG
-    return "https://ris.naa.gg/f/AQADuMsxG0FIKFN8.jpg".to_string();
+async fn get_file_url(file: PathBuf) -> Result<String, Box<dyn Error + Send + Sync + 'static>> {
+    upload::upload(file.to_str().unwrap()).await
 }
 
 async fn handle_photo_message(bot: Bot, msg: Message) -> HandlerResult<()> {
@@ -134,14 +134,33 @@ async fn handle_video_file(bot: &Bot, msg: &Message, file_meta: &FileMeta) -> Ha
         return Ok(());
     };
 
-    send_search_message(bot, msg, &get_file_url(download_path)).await?;
+    let file_url = match get_file_url(download_path).await {
+        Ok(url) => url,
+        Err(e) => {
+            log::error!("Failed to get file url: {}", e);
+            send_error_message(bot, msg).await?;
+            return Ok(());
+        }
+    };
+
+    send_search_message(bot, msg, &file_url).await?;
 
     Ok(())
 }
 
 async fn handle_image_file(bot: &Bot, msg: &Message, file_meta: &FileMeta) -> HandlerResult<()> {
     let dest = download(bot, msg, file_meta).await?;
-    send_search_message(bot, msg, &get_file_url(dest)).await?;
+
+    let file_url = match get_file_url(dest).await {
+        Ok(url) => url,
+        Err(e) => {
+            log::error!("Failed to get file url: {}", e);
+            send_error_message(bot, msg).await?;
+            return Ok(());
+        }
+    };
+
+    send_search_message(bot, msg, &file_url).await?;
     Ok(())
 }
 
