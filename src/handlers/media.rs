@@ -69,7 +69,7 @@ async fn download(
     }
 }
 
-async fn send_search_message(bot: Bot, msg: Message, url: &str) -> HandlerResult<()> {
+async fn send_search_message(bot: &Bot, msg: &Message, url: &str) -> HandlerResult<()> {
     let keyboard = teloxide::types::InlineKeyboardMarkup::new(search_buttons(url));
 
     bot.send_message(msg.chat.id, "Search for Image")
@@ -92,8 +92,7 @@ async fn handle_photo_message(bot: Bot, msg: Message) -> HandlerResult<()> {
     if let Some(photo_size) = msg.photo()
         && let Some(photo) = photo_size.last()
     {
-        let dest = download(&bot, &msg, &photo.file).await?;
-        send_search_message(bot, msg, &get_file_url(dest)).await?
+        handle_image_file(&bot, &msg, &photo.file).await?
     }
     Ok(())
 }
@@ -110,17 +109,7 @@ async fn handle_video_message(bot: Bot, msg: Message) -> HandlerResult<()> {
 
     bot.send_message(chat_id, "Video Received").await?;
     if let Some(video) = msg.video() {
-        let file_url = file::file_url(&bot, &video.file).await?;
-        let download_path = crate::utils::file::file_path(&video.file);
-        if let Err(e) =
-            crate::utils::video::first_frame(file_url.as_str(), download_path.to_str().unwrap())
-        {
-            log::error!("Failed to get first frame: {}", e);
-            send_error_message(&bot, &msg).await?;
-            return Ok(());
-        };
-
-        send_search_message(bot, msg, &get_file_url(download_path)).await?
+        handle_video_file(&bot, &msg, &video.file).await?
     }
     Ok(())
 }
@@ -131,6 +120,28 @@ async fn send_not_implemented(bot: Bot, msg: Message) -> HandlerResult<()> {
 }
 async fn send_not_supported(bot: Bot, msg: Message) -> HandlerResult<()> {
     bot.send_message(msg.chat.id, "Not supported").await?;
+    Ok(())
+}
+
+async fn handle_video_file(bot: &Bot, msg: &Message, file_meta: &FileMeta) -> HandlerResult<()> {
+    let file_url = file::file_url(bot, file_meta).await?;
+    let download_path = crate::utils::file::file_path(file_meta);
+    if let Err(e) =
+        crate::utils::video::first_frame(file_url.as_str(), download_path.to_str().unwrap())
+    {
+        log::error!("Failed to get first frame: {}", e);
+        send_error_message(bot, msg).await?;
+        return Ok(());
+    };
+
+    send_search_message(bot, msg, &get_file_url(download_path)).await?;
+
+    Ok(())
+}
+
+async fn handle_image_file(bot: &Bot, msg: &Message, file_meta: &FileMeta) -> HandlerResult<()> {
+    let dest = download(bot, msg, file_meta).await?;
+    send_search_message(bot, msg, &get_file_url(dest)).await?;
     Ok(())
 }
 
@@ -150,11 +161,8 @@ async fn handle_document_message(bot: Bot, msg: Message) -> HandlerResult<()> {
         }
 
         match main_type.as_str() {
-            "image" => {
-                let dest = download(&bot, &msg, &document.file).await?;
-                send_search_message(bot, msg, &get_file_url(dest)).await?
-            }
-            "video" => send_not_implemented(bot, msg).await?,
+            "image" => handle_image_file(&bot, &msg, &document.file).await?,
+            "video" => handle_video_file(&bot, &msg, &document.file).await?,
             _ => send_not_supported(bot, msg).await?,
         }
     } else {
@@ -169,10 +177,9 @@ async fn handle_sticker_message(bot: Bot, msg: Message) -> HandlerResult<()> {
 
     if let Some(sticker) = msg.sticker() {
         if sticker.is_regular() && sticker.is_static() {
-            let dest = download(&bot, &msg, &sticker.file).await?;
-            send_search_message(bot, msg, &get_file_url(dest)).await?;
-        } else if sticker.is_regular() && sticker.is_regular() && sticker.is_video() {
-            send_not_implemented(bot, msg).await?;
+            handle_image_file(&bot, &msg, &sticker.file).await?
+        } else if sticker.is_regular() && sticker.is_video() {
+            handle_video_file(&bot, &msg, &sticker.file).await?
         } else {
             send_not_supported(bot, msg).await?;
         }
@@ -290,7 +297,7 @@ mod tests {
         let message = MockMessageDocument::new().file_name("video.mp4");
         let mut bot = MockBot::new(message, tree);
 
-        bot.dispatch_and_check_last_text("Not implemented yet")
+        bot.dispatch_and_check_last_text("Something went wrong")
             .await;
     }
 
@@ -336,7 +343,7 @@ mod tests {
         });
         let mut bot = MockBot::new(message, tree);
 
-        bot.dispatch_and_check_last_text("Not implemented yet")
+        bot.dispatch_and_check_last_text("Something went wrong")
             .await;
     }
 
