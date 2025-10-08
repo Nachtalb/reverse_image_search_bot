@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use crate::handlers;
+use crate::{config::Config, handlers};
 use teloxide::{dispatching::UpdateHandler, prelude::*};
 
 pub fn handler_tree() -> UpdateHandler<Box<dyn Error + Send + Sync + 'static>> {
@@ -9,8 +9,8 @@ pub fn handler_tree() -> UpdateHandler<Box<dyn Error + Send + Sync + 'static>> {
         .branch(handlers::media::branch())
 }
 
-pub async fn run() {
-    let bot = Bot::from_env();
+pub async fn run(config: &Config) {
+    let bot = Bot::new(config.token.clone());
 
     log::info!("Dispatcher configured, starting dispatch...");
 

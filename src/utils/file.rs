@@ -1,15 +1,16 @@
-use std::env;
-
-use crate::error::DownloadError;
+use crate::{config::get_config, error::DownloadError};
 
 use teloxide::{net::Download, prelude::*, types::FileMeta};
 use tokio::fs;
 
-pub async fn file_url(bot: &Bot, file_meta: &FileMeta) -> Result<reqwest::Url, DownloadError> {
+pub(crate) async fn file_url(
+    bot: &Bot,
+    file_meta: &FileMeta,
+) -> Result<reqwest::Url, DownloadError> {
     let file = bot.get_file(file_meta.id.clone()).await?;
     let file_path = file.path;
 
-    let token = env::var("TELOXIDE_TOKEN").expect("TELOXIDE_TOKEN must be set");
+    let token = &get_config().token;
     let mut url = reqwest::Url::parse(teloxide::net::TELEGRAM_API_URL).unwrap();
 
     {
@@ -24,16 +25,16 @@ pub async fn file_url(bot: &Bot, file_meta: &FileMeta) -> Result<reqwest::Url, D
     Ok(url)
 }
 
-pub fn output_directory() -> std::path::PathBuf {
-    let cwd = std::env::current_dir().unwrap();
-    let dir = cwd.join("output");
+pub fn downloads_dir() -> std::path::PathBuf {
+    let config = get_config();
+    let dir = config.downloads.clone();
     std::fs::create_dir_all(&dir).unwrap();
     dir
 }
 
 pub fn file_path(file_meta: &FileMeta) -> std::path::PathBuf {
     let filename = format!("{}.jpg", file_meta.id);
-    output_directory().join(filename)
+    downloads_dir().join(filename)
 }
 
 pub async fn download_file(
@@ -57,7 +58,7 @@ mod tests {
 
     #[test]
     fn creates_output_directory() {
-        let dir = output_directory();
+        let dir = downloads_dir();
         assert!(dir.ends_with("output"));
         assert!(dir.exists());
         assert!(dir.is_dir());
@@ -68,8 +69,8 @@ mod tests {
 
     #[test]
     fn idempotent_output_directory() {
-        let first = output_directory();
-        let second = output_directory();
+        let first = downloads_dir();
+        let second = downloads_dir();
         assert_eq!(first, second);
 
         // Cleanup
