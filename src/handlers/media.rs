@@ -105,8 +105,24 @@ async fn send_error_message(bot: &Bot, msg: &Message) -> HandlerResult<()> {
 }
 
 async fn handle_video_message(bot: Bot, msg: Message) -> HandlerResult<()> {
-    log::info!("Received Video in chat {}", msg.chat.id);
-    send_not_implemented(bot, msg).await
+    let chat_id = msg.chat.id;
+    log::info!("Received Video in chat {}", chat_id);
+
+    bot.send_message(chat_id, "Video Received").await?;
+    if let Some(video) = msg.video() {
+        let file_url = file::file_url(&bot, &video.file).await?;
+        let download_path = crate::utils::file::file_path(&video.file);
+        if let Err(e) =
+            crate::utils::video::first_frame(file_url.as_str(), download_path.to_str().unwrap())
+        {
+            log::error!("Failed to get first frame: {}", e);
+            send_error_message(&bot, &msg).await?;
+            return Ok(());
+        };
+
+        send_search_message(bot, msg, &get_file_url(download_path)).await?
+    }
+    Ok(())
 }
 
 async fn send_not_implemented(bot: Bot, msg: Message) -> HandlerResult<()> {
@@ -239,7 +255,7 @@ mod tests {
         let tree = dptree::entry().branch(branch());
         let mut bot = MockBot::new(MockMessageVideo::new(), tree);
 
-        bot.dispatch_and_check_last_text("Not implemented yet")
+        bot.dispatch_and_check_last_text("Something went wrong")
             .await;
     }
 

@@ -1,7 +1,28 @@
+use std::env;
+
 use crate::error::DownloadError;
 
 use teloxide::{net::Download, prelude::*, types::FileMeta};
 use tokio::fs;
+
+pub async fn file_url(bot: &Bot, file_meta: &FileMeta) -> Result<reqwest::Url, DownloadError> {
+    let file = bot.get_file(file_meta.id.clone()).await?;
+    let file_path = file.path;
+
+    let token = env::var("TELOXIDE_TOKEN").expect("TELOXIDE_TOKEN must be set");
+    let mut url = reqwest::Url::parse(teloxide::net::TELEGRAM_API_URL).unwrap();
+
+    {
+        let mut segments = url
+            .path_segments_mut()
+            .expect("base url cannot be a cannot-be-a-base");
+        segments.push("file");
+        segments.push(&format!("bot{token}"));
+        segments.push(file_path.as_str());
+    }
+
+    Ok(url)
+}
 
 pub fn output_directory() -> std::path::PathBuf {
     let cwd = std::env::current_dir().unwrap();
