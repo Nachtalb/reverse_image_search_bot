@@ -205,7 +205,8 @@ mod tests {
     use teloxide::{
         dptree,
         types::{
-            InlineKeyboardButtonKind, MaskPoint, MaskPosition, StickerFormatFlags, StickerKind,
+            CustomEmojiId, InlineKeyboardButtonKind, MaskPoint, MaskPosition, StickerFormatFlags,
+            StickerKind,
         },
     };
     use teloxide_tests::{
@@ -336,7 +337,7 @@ mod tests {
     async fn test_handle_sticker_emoji() {
         let tree = dptree::entry().branch(branch());
         let message = MockMessageSticker::new().kind(StickerKind::CustomEmoji {
-            custom_emoji_id: "".to_string(),
+            custom_emoji_id: CustomEmojiId("joy".to_string()),
         });
         let mut bot = MockBot::new(message, tree);
 
