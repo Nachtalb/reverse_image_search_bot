@@ -213,15 +213,17 @@ pub(crate) async fn handle_media_message(bot: Bot, msg: Message) -> HandlerResul
     Ok(())
 }
 
+pub(crate) fn filter_for_media_message(msg: Message) -> bool {
+    msg.photo().is_some()
+        || msg.video().is_some()
+        || msg.document().is_some()
+        || msg.sticker().is_some()
+        || msg.animation().is_some()
+}
+
 pub(crate) fn branch() -> UpdateHandler<Box<dyn Error + Send + Sync + 'static>> {
     Update::filter_message()
-        .filter(|msg: Message| {
-            msg.photo().is_some()
-                || msg.video().is_some()
-                || msg.document().is_some()
-                || msg.sticker().is_some()
-                || msg.animation().is_some()
-        })
+        .filter(filter_for_media_message)
         .endpoint(handle_media_message)
 }
 
