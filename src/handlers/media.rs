@@ -63,11 +63,7 @@ async fn download(
         Err(err) => {
             log::error!("Failed to download/save file ID {}: {}", file_meta.id, err);
 
-            bot.send_message(
-                msg.chat.id,
-                "Oh no, something went wrong while receiving your file.",
-            )
-            .await?;
+            send_error_message(bot, msg).await?;
             Err(Box::new(err))
         }
     }
@@ -99,6 +95,12 @@ async fn handle_photo_message(bot: Bot, msg: Message) -> HandlerResult<()> {
         let dest = download(&bot, &msg, &photo.file).await?;
         send_search_message(bot, msg, &get_file_url(dest)).await?
     }
+    Ok(())
+}
+
+async fn send_error_message(bot: &Bot, msg: &Message) -> HandlerResult<()> {
+    bot.send_message(msg.chat.id, "Something went wrong")
+        .await?;
     Ok(())
 }
 
@@ -359,7 +361,7 @@ mod tests {
         let message = MockMessagePhoto::new();
         let mut bot = MockBot::new(message, tree);
 
-        bot.dispatch_and_check_last_text("Oh no, something went wrong while receiving your file.")
+        bot.dispatch_and_check_last_text("Something went wrong")
             .await;
     }
 }
