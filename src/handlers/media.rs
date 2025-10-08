@@ -55,7 +55,7 @@ async fn download(
     msg: &Message,
     file_meta: &FileMeta,
 ) -> Result<PathBuf, Box<dyn Error + Send + Sync + 'static>> {
-    match file::download_file(&bot, &file_meta).await {
+    match file::download_file(bot, file_meta).await {
         Ok(dest) => {
             log::info!("File ID: {} downloaded to {}", file_meta.id, dest.display());
             Ok(dest)
@@ -74,7 +74,7 @@ async fn download(
 }
 
 async fn send_search_message(bot: Bot, msg: Message, url: &str) -> HandlerResult<()> {
-    let keyboard = teloxide::types::InlineKeyboardMarkup::new(search_buttons(&url));
+    let keyboard = teloxide::types::InlineKeyboardMarkup::new(search_buttons(url));
 
     bot.send_message(msg.chat.id, "Search for Image")
         .reply_markup(keyboard)
@@ -93,11 +93,11 @@ async fn handle_photo_message(bot: Bot, msg: Message) -> HandlerResult<()> {
 
     log::info!("Received Photo in chat {}", chat_id);
     bot.send_message(chat_id, "Received Photo").await?;
-    if let Some(photo_size) = msg.photo() {
-        if let Some(photo) = photo_size.last() {
-            let dest = download(&bot, &msg, &photo.file).await?;
-            send_search_message(bot, msg, &get_file_url(dest)).await?
-        }
+    if let Some(photo_size) = msg.photo()
+        && let Some(photo) = photo_size.last()
+    {
+        let dest = download(&bot, &msg, &photo.file).await?;
+        send_search_message(bot, msg, &get_file_url(dest)).await?
     }
     Ok(())
 }
