@@ -1,2 +1,2 @@
-pub mod command;
-pub mod media;
+pub(crate) mod command;
+pub(crate) mod media;

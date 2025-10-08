@@ -25,19 +25,19 @@ pub(crate) async fn file_url(
     Ok(url)
 }
 
-pub fn downloads_dir() -> std::path::PathBuf {
+fn downloads_dir() -> std::path::PathBuf {
     let config = get_config();
     let dir = config.downloads.clone();
     std::fs::create_dir_all(&dir).unwrap();
     dir
 }
 
-pub fn file_path(file_meta: &FileMeta) -> std::path::PathBuf {
+pub(crate) fn file_path(file_meta: &FileMeta) -> std::path::PathBuf {
     let filename = format!("{}.jpg", file_meta.id);
     downloads_dir().join(filename)
 }
 
-pub async fn download_file(
+pub(crate) async fn download_file(
     bot: &Bot,
     file_meta: &FileMeta,
 ) -> Result<std::path::PathBuf, DownloadError> {

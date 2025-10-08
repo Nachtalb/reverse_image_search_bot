@@ -29,7 +29,7 @@ async fn command_dispatcher(bot: Bot, msg: Message, cmd: Command) -> HandlerResu
     Ok(())
 }
 
-pub fn branch() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync>> {
+pub(crate) fn branch() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync>> {
     Update::filter_message()
         .filter_command::<Command>()
         .endpoint(command_dispatcher)

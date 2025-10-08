@@ -1,3 +1,3 @@
-pub mod file;
-pub mod keyboard;
-pub mod video;
+pub(crate) mod file;
+pub(crate) mod keyboard;
+pub(crate) mod video;

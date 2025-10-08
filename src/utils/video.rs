@@ -2,7 +2,7 @@ use opencv::prelude::*;
 use opencv::{core, imgcodecs, videoio};
 use std::error::Error;
 
-pub fn first_frame(
+pub(crate) fn first_frame(
     video_path_or_url: &str,
     dest_path: &str,
 ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {

@@ -3,7 +3,7 @@ use std::error::Error;
 use crate::{config::Config, handlers};
 use teloxide::{dispatching::UpdateHandler, prelude::*};
 
-pub fn handler_tree() -> UpdateHandler<Box<dyn Error + Send + Sync + 'static>> {
+fn handler_tree() -> UpdateHandler<Box<dyn Error + Send + Sync + 'static>> {
     dptree::entry()
         .branch(handlers::command::branch())
         .branch(handlers::media::branch())

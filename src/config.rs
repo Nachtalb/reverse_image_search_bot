@@ -31,11 +31,11 @@ struct CliArgs {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-pub(crate) struct Config {
+pub struct Config {
     /// Telegram bot token
     pub(crate) token: String,
     /// Downloads directory
-    pub(crate) downloads: std::path::PathBuf,
+    pub downloads: std::path::PathBuf,
 }
 
 pub(crate) fn get_config() -> &'static Config {

@@ -194,7 +194,7 @@ async fn handle_animation_message(bot: Bot, msg: Message) -> HandlerResult<()> {
     Ok(())
 }
 
-pub async fn handle_media_message(bot: Bot, msg: Message) -> HandlerResult<()> {
+pub(crate) async fn handle_media_message(bot: Bot, msg: Message) -> HandlerResult<()> {
     if msg.photo().is_some() {
         handle_photo_message(bot, msg).await?
     } else if msg.video().is_some() {
@@ -213,7 +213,7 @@ pub async fn handle_media_message(bot: Bot, msg: Message) -> HandlerResult<()> {
     Ok(())
 }
 
-pub fn branch() -> UpdateHandler<Box<dyn Error + Send + Sync + 'static>> {
+pub(crate) fn branch() -> UpdateHandler<Box<dyn Error + Send + Sync + 'static>> {
     Update::filter_message()
         .filter(|msg: Message| {
             msg.photo().is_some()

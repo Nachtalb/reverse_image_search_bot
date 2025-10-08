@@ -5,6 +5,6 @@ fn format_url(template: &str, url: &str) -> reqwest::Url {
     reqwest::Url::parse(&formatted).unwrap()
 }
 
-pub fn button(text: &str, template: &str, url: &str) -> InlineKeyboardButton {
+pub(crate) fn button(text: &str, template: &str, url: &str) -> InlineKeyboardButton {
     InlineKeyboardButton::url(text, format_url(template, url))
 }
