@@ -88,7 +88,7 @@ fn get_file_url(file: PathBuf) -> String {
     return "https://ris.naa.gg/f/AQADuMsxG0FIKFN8.jpg".to_string();
 }
 
-async fn handle_photo(bot: Bot, msg: Message) -> HandlerResult<()> {
+async fn handle_photo_message(bot: Bot, msg: Message) -> HandlerResult<()> {
     let chat_id = msg.chat.id;
 
     log::info!("Received Photo in chat {}", chat_id);
@@ -102,19 +102,20 @@ async fn handle_photo(bot: Bot, msg: Message) -> HandlerResult<()> {
     Ok(())
 }
 
-async fn handle_video(bot: Bot, msg: Message) -> HandlerResult<()> {
+async fn handle_video_message(bot: Bot, msg: Message) -> HandlerResult<()> {
     log::info!("Received Video in chat {}", msg.chat.id);
     bot.send_message(msg.chat.id, "Not implemented yet").await?;
     Ok(())
 }
 
-async fn handle_document(bot: Bot, msg: Message) -> HandlerResult<()> {
+async fn handle_document_message(bot: Bot, msg: Message) -> HandlerResult<()> {
+    let chat_id = msg.chat.id;
     log::info!("Received document in chat {}", msg.chat.id);
     bot.send_message(msg.chat.id, "Not implemented yet").await?;
     Ok(())
 }
 
-async fn handle_sticker(bot: Bot, msg: Message) -> HandlerResult<()> {
+async fn handle_sticker_message(bot: Bot, msg: Message) -> HandlerResult<()> {
     log::info!("Received sticker in chat {}", msg.chat.id);
 
     if let Some(sticker) = msg.sticker() {
@@ -131,23 +132,23 @@ async fn handle_sticker(bot: Bot, msg: Message) -> HandlerResult<()> {
     Ok(())
 }
 
-async fn handle_animation(bot: Bot, msg: Message) -> HandlerResult<()> {
+async fn handle_animation_message(bot: Bot, msg: Message) -> HandlerResult<()> {
     log::info!("Received animation in chat {}", msg.chat.id);
     bot.send_message(msg.chat.id, "Not implemented yet").await?;
     Ok(())
 }
 
-pub async fn handle_media(bot: Bot, msg: Message) -> HandlerResult<()> {
+pub async fn handle_media_message(bot: Bot, msg: Message) -> HandlerResult<()> {
     if msg.photo().is_some() {
-        handle_photo(bot, msg).await?
+        handle_photo_message(bot, msg).await?
     } else if msg.video().is_some() {
-        handle_video(bot, msg).await?
+        handle_video_message(bot, msg).await?
     } else if msg.document().is_some() {
-        handle_document(bot, msg).await?
+        handle_document_message(bot, msg).await?
     } else if msg.sticker().is_some() {
-        handle_sticker(bot, msg).await?
+        handle_sticker_message(bot, msg).await?
     } else if msg.animation().is_some() {
-        handle_animation(bot, msg).await?
+        handle_animation_message(bot, msg).await?
     } else {
         log::warn!("handle_media called with unexpected message");
     }
@@ -164,7 +165,7 @@ pub fn branch() -> UpdateHandler<Box<dyn Error + Send + Sync + 'static>> {
                 || msg.sticker().is_some()
                 || msg.animation().is_some()
         })
-        .endpoint(handle_media)
+        .endpoint(handle_media_message)
 }
 
 #[cfg(test)]
