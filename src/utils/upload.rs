@@ -19,6 +19,10 @@ pub async fn upload_to_rustypaste(
         request = request.header("Authorization", token);
     }
 
+    if let Some(expiry) = expiry {
+        request = request.header("expire", expiry);
+    }
+
     let res = request.send().await?;
     let uploaded_url = res.text().await?.trim().to_string();
 
