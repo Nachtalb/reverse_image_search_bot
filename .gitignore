@@ -60,3 +60,6 @@ config.toml
 config.yaml
 config.yml
 config.json
+
+# vim
+.vim
