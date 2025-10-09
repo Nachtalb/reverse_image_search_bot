@@ -6,6 +6,7 @@
 - [ ] /help message
 - [ ] /tips message
 - [ ] /credits message
+- [ ] Prevent duplicate uploads
 - [ ] Auto Search
   - [ ] Trace Moe
   - [ ] IQDB
@@ -25,14 +26,14 @@
     - [ ] sankaku
   - [ ] MangaDex
   - [ ] Pixiv
-- [ ] Handle Media
+- [x] Handle Media
   - [x] Photo
   - [x] Video
   - [x] Sticker Image
   - [x] Sticker Video
   - [x] Document Image
   - [x] Document Video
-  - [ ] Animation (GIF)
+  - [x] Animation (GIF)
 - [ ] "Auto Search" preference
   - [ ] Automatic "Auto Search" shut off on spam
 - [ ] 🆕 ban functionality
