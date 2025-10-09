@@ -24,6 +24,11 @@ struct CliArgs {
     #[serde(skip_serializing_if = "Option::is_none")]
     downloads: Option<String>,
 
+    /// Config file path (default: "config.toml")
+    #[arg(short, long, env = "RIS_CONFIG")]
+    #[serde(skip_serializing)]
+    config: Option<String>,
+
     /// RustyPaste API token
     #[arg(long, env = "RIS_RUSTYPASTE_TOKEN")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -39,10 +44,15 @@ struct CliArgs {
     #[serde(skip_serializing_if = "Option::is_none")]
     rustypaste_expiry: Option<String>,
 
-    /// Config file path (default: "config.toml")
-    #[arg(short, long, env = "RIS_CONFIG")]
-    #[serde(skip_serializing)]
-    config: Option<String>,
+    /// TraceMoe API key
+    #[arg(long, env = "RIS_TRACEMOE_API_KEY")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tracemoe_api_key: Option<String>,
+
+    /// TraceMoe Threshold (defualt: 0.95)
+    #[arg(long, env = "RIS_TRACEMOE_THRESHOLD")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tracemoe_threshold: Option<f64>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -58,6 +68,11 @@ pub struct Config {
     pub rustypaste_base_url: Option<String>,
     /// RustyPaste expiry, format: https://github.com/orhun/rustypaste#expiration
     pub rustypaste_expiry: Option<String>,
+
+    /// TraceMoe API key
+    pub tracemoe_api_key: Option<String>,
+    /// TraceMoe Threshold
+    pub tracemoe_threshold: Option<f64>,
 }
 
 pub(crate) fn get_config() -> &'static Config {
@@ -76,7 +91,8 @@ fn load_config() -> Config {
     let defaults = json!({
         "token": "",
         "downloads": "./downloads",
-        "rustypaste_expiry": "7d"
+        "rustypaste_expiry": "7d",
+        "tracemoe_threshold": 0.95,
     });
 
     let mut figment = Figment::new().merge(Serialized::defaults(defaults));

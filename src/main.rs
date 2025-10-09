@@ -1,3 +1,4 @@
+mod auto_search;
 mod bot;
 mod config;
 mod error;

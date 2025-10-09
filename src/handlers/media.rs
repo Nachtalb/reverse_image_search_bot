@@ -77,6 +77,8 @@ async fn send_search_message(bot: &Bot, msg: &Message, url: &str) -> HandlerResu
         .reply_markup(keyboard)
         .await?;
 
+    crate::auto_search::search::search(bot, msg, url).await?;
+
     Ok(())
 }
 
