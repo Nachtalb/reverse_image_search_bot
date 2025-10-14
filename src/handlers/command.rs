@@ -41,15 +41,24 @@ async fn handle_search_message(bot: Bot, msg: Message) -> Result<()> {
     Ok(())
 }
 
+async fn handle_start_message(bot: Bot, msg: Message) -> Result<()> {
+    bot.send_message(
+        msg.chat.id,
+        "Send me a video or image you want to search for!",
+    )
+    .await?;
+    Ok(())
+}
+
+async fn handle_help_message(bot: Bot, msg: Message) -> Result<()> {
+    bot.send_message(msg.chat.id, "Coming Soon ™").await?;
+    Ok(())
+}
+
 async fn command_dispatcher(bot: Bot, msg: Message, cmd: Command) -> Result<()> {
     match cmd {
-        Command::Start => {
-            bot.send_message(msg.chat.id, "Hello!").await?;
-        }
-        Command::Help => {
-            bot.send_message(msg.chat.id, Command::descriptions().to_string())
-                .await?;
-        }
+        Command::Start => handle_start_message(bot, msg).await?,
+        Command::Help => handle_help_message(bot, msg).await?,
         Command::Search => handle_search_message(bot, msg).await?,
     };
 
