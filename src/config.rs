@@ -6,7 +6,6 @@ use figment::{
 use normalize_path::NormalizePath;
 use resolve_path::PathResolveExt;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use tokio::sync::OnceCell;
 
 const DEFAULT_CONFIG_PATH: &str = "config.toml";
@@ -39,7 +38,7 @@ struct CliArgs {
     #[serde(skip_serializing_if = "Option::is_none")]
     rustypaste_base_url: Option<String>,
 
-    /// RustyPaste expiry, format: https://github.com/orhun/rustypaste#expiration (defualt: 7d)
+    /// RustyPaste expiry, format: https://github.com/orhun/rustypaste#expiration (default: 7d)
     #[arg(long, env = "RIS_RUSTYPASTE_EXPIRY")]
     #[serde(skip_serializing_if = "Option::is_none")]
     rustypaste_expiry: Option<String>,
@@ -49,10 +48,15 @@ struct CliArgs {
     #[serde(skip_serializing_if = "Option::is_none")]
     tracemoe_api_key: Option<String>,
 
-    /// TraceMoe Threshold (defualt: 0.95)
+    /// TraceMoe Threshold (default : 0.95)
     #[arg(long, env = "RIS_TRACEMOE_THRESHOLD")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    tracemoe_threshold: Option<f64>,
+    tracemoe_threshold: Option<f32>,
+
+    /// TraceMoe Limit (default: 3)
+    #[arg(long, env = "RIS_TRACEMOE_LIMIT")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tracemoe_limit: Option<usize>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -71,8 +75,25 @@ pub struct Config {
 
     /// TraceMoe API key
     pub tracemoe_api_key: Option<String>,
-    /// TraceMoe Threshold
-    pub tracemoe_threshold: Option<f64>,
+    /// TraceMoe Default Threshold
+    pub tracemoe_threshold: Option<f32>,
+    /// TraceMoe Default Limit
+    pub tracemoe_limit: Option<usize>,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            token: String::from(""),
+            downloads: std::path::PathBuf::from("./downloads"),
+            rustypaste_token: None,
+            rustypaste_base_url: None,
+            rustypaste_expiry: None,
+            tracemoe_api_key: None,
+            tracemoe_threshold: Some(0.95),
+            tracemoe_limit: Some(3),
+        }
+    }
 }
 
 pub(crate) fn get_config() -> &'static Config {
@@ -88,14 +109,7 @@ fn load_config() -> Config {
     log::debug!("Parsing CLI args...");
     let args = CliArgs::parse();
 
-    let defaults = json!({
-        "token": "",
-        "downloads": "./downloads",
-        "rustypaste_expiry": "7d",
-        "tracemoe_threshold": 0.95,
-    });
-
-    let mut figment = Figment::new().merge(Serialized::defaults(defaults));
+    let mut figment = Figment::from(Serialized::defaults(Config::default()));
 
     let config_path = std::path::PathBuf::from(
         &args
@@ -108,10 +122,10 @@ fn load_config() -> Config {
         log::info!("Config file found: {}", config_path.display());
         match config_path.extension() {
             Some(ext) => match ext.to_str() {
-                Some("toml") => figment = figment.merge(Toml::file(config_path)),
-                Some("json") => figment = figment.merge(Json::file(config_path)),
-                Some("yaml") => figment = figment.merge(Yaml::file(config_path)),
-                Some("yml") => figment = figment.merge(Yaml::file(config_path)),
+                Some("toml") => figment = figment.admerge(Toml::file(config_path)),
+                Some("json") => figment = figment.admerge(Json::file(config_path)),
+                Some("yaml") => figment = figment.admerge(Yaml::file(config_path)),
+                Some("yml") => figment = figment.admerge(Yaml::file(config_path)),
                 _ => {
                     log::error!("Cannot identify config file type. Must be .toml, .json or .yaml");
                     std::process::exit(1);
@@ -127,7 +141,7 @@ fn load_config() -> Config {
         std::process::exit(1);
     };
 
-    let mut config: Config = match figment.merge(Serialized::defaults(args)).extract() {
+    let mut config: Config = match figment.admerge(Serialized::defaults(args)).extract() {
         Ok(config) => config,
         Err(err) => {
             log::error!("{}", err);

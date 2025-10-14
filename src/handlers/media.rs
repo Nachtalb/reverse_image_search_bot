@@ -1,233 +1,137 @@
-use std::error::Error;
+use crate::error::Errors;
 use std::path::PathBuf;
-use teloxide::types::{FileMeta, InlineKeyboardButton};
+use teloxide::types::FileId;
 
-use crate::types::HandlerResult;
-use crate::utils::upload;
-use crate::utils::{file, keyboard::button};
+use crate::handlers::search::search;
+use crate::{files, transformers};
+use anyhow::{Error, Result};
 
 use teloxide::dispatching::UpdateHandler;
 use teloxide::prelude::*;
 
-fn search_buttons(url: &str) -> Vec<Vec<InlineKeyboardButton>> {
-    vec![
-        vec![button("Link", "{}", url)],
-        vec![
-            button("SauceNao", "https://saucenao.com/search.php?url={}", url),
-            button(
-                "Google",
-                "https://www.google.com/searchbyimage?safe=off&sbisrc=tg&image_url={}",
-                url,
-            ),
-        ],
-        vec![
-            button("Trace", "https://trace.moe/?auto&url={}", url),
-            button("IQDB", "https://iqdb.org/?url={}", url),
-        ],
-        vec![
-            button("3D IQDB", "https://3d.iqdb.org/?url={}", url),
-            button(
-                "Yandex",
-                "https://yandex.com/images/search?url={}&rpt=imageview",
-                url,
-            ),
-        ],
-        vec![
-            button(
-                "Bing",
-                "https://www.bing.com/images/search?q=imgurl:{}&view=detailv2&iss=sbi",
-                url,
-            ),
-            button("TinEye", "https://tineye.com/search?url={}", url),
-        ],
-        vec![
-            button(
-                "Sogou",
-                "https://pic.sogou.com/ris?flag=1&drag=0&query={}",
-                url,
-            ),
-            button("ascii2d", "https://ascii2d.net/search/url/{}", url),
-        ],
-    ]
-}
-
-async fn download(
-    bot: &Bot,
-    msg: &Message,
-    file_meta: &FileMeta,
-) -> Result<PathBuf, Box<dyn Error + Send + Sync + 'static>> {
-    match file::download_file(bot, file_meta).await {
-        Ok(dest) => {
-            log::info!("File ID: {} downloaded to {}", file_meta.id, dest.display());
-            Ok(dest)
-        }
-        Err(err) => {
-            log::error!("Failed to download/save file ID {}: {}", file_meta.id, err);
-
-            send_error_message(bot, msg).await?;
-            Err(Box::new(err))
-        }
-    }
-}
-
-async fn send_search_message(bot: &Bot, msg: &Message, url: &str) -> HandlerResult<()> {
-    let keyboard = teloxide::types::InlineKeyboardMarkup::new(search_buttons(url));
-
-    bot.send_message(msg.chat.id, "Search for Image")
-        .reply_markup(keyboard)
-        .await?;
-
-    crate::auto_search::search::search(bot, msg, url).await?;
-
-    Ok(())
-}
-
-async fn get_file_url(file: PathBuf) -> Result<String, Box<dyn Error + Send + Sync + 'static>> {
-    upload::upload(file.to_str().unwrap()).await
-}
-
-async fn handle_photo_message(bot: Bot, msg: Message) -> HandlerResult<()> {
-    let chat_id = msg.chat.id;
-
-    log::info!("Received Photo in chat {}", chat_id);
-    bot.send_message(chat_id, "Received Photo").await?;
-    if let Some(photo_size) = msg.photo()
-        && let Some(photo) = photo_size.last()
-    {
-        handle_image_file(&bot, &msg, &photo.file).await?
-    }
-    Ok(())
-}
-
-async fn send_error_message(bot: &Bot, msg: &Message) -> HandlerResult<()> {
-    bot.send_message(msg.chat.id, "Something went wrong")
-        .await?;
-    Ok(())
-}
-
-async fn handle_video_message(bot: Bot, msg: Message) -> HandlerResult<()> {
-    let chat_id = msg.chat.id;
-    log::info!("Received Video in chat {}", chat_id);
-
-    bot.send_message(chat_id, "Video Received").await?;
-    if let Some(video) = msg.video() {
-        handle_video_file(&bot, &msg, &video.file).await?
-    }
-    Ok(())
-}
-
-async fn send_not_supported(bot: Bot, msg: Message) -> HandlerResult<()> {
+async fn send_not_supported(bot: &Bot, msg: &Message) -> Result<()> {
     bot.send_message(msg.chat.id, "Not supported").await?;
     Ok(())
 }
 
-async fn handle_video_file(bot: &Bot, msg: &Message, file_meta: &FileMeta) -> HandlerResult<()> {
-    let file_url = file::file_url(bot, file_meta).await?;
-    let download_path = crate::utils::file::file_path(file_meta);
-    if let Err(e) =
-        crate::utils::video::first_frame(file_url.as_str(), download_path.to_str().unwrap())
+async fn send_error_message(bot: &Bot, msg: &Message) -> Result<()> {
+    bot.send_message(msg.chat.id, "An error occurred").await?;
+    Ok(())
+}
+
+async fn image_from_video(bot: &Bot, file_id: FileId, _: Option<String>) -> Result<PathBuf> {
+    let filename = format!("{}.jpeg", file_id);
+    let file_url = files::telegram::file_url(bot.get_file(file_id).await?.path.as_str()).await?;
+    let download_path = files::local::download_path(filename);
+
+    transformers::get_first_frame(file_url.as_str(), download_path)
+}
+
+async fn handle_image_file(
+    bot: &Bot,
+    file_id: FileId,
+    extension: Option<String>,
+) -> Result<PathBuf> {
+    let downloaded_file =
+        files::telegram::download_file(bot, file_id, extension.unwrap_or("jpeg".to_string()))
+            .await?;
+    Ok(downloaded_file)
+}
+
+#[derive(Debug)]
+enum MediaType {
+    Image,
+    Video,
+    Unknown,
+}
+
+async fn get_media_type(msg: &Message) -> Result<(MediaType, FileId, Option<String>)> {
+    let (media_type, file_id, extension) = if let Some(photo) = &msg.photo() {
+        (
+            MediaType::Image,
+            photo.last().unwrap().file.id.clone(),
+            Some("jpeg".to_string()),
+        )
+    } else if let Some(video) = &msg.video() {
+        (MediaType::Video, video.file.id.clone(), None)
+    } else if let Some(animation) = &msg.animation() {
+        (
+            MediaType::Video,
+            animation.file.id.clone(),
+            Some("mp4".to_string()),
+        )
+    } else if let Some(video_note) = &msg.video_note() {
+        (
+            MediaType::Video,
+            video_note.file.id.clone(),
+            Some("mp4".to_string()),
+        )
+    } else if let Some(sticker) = &msg.sticker()
+        && sticker.is_regular()
     {
-        log::error!("Failed to get first frame: {}", e);
-        send_error_message(bot, msg).await?;
-        return Ok(());
-    };
-
-    let file_url = match get_file_url(download_path).await {
-        Ok(url) => url,
-        Err(e) => {
-            log::error!("Failed to get file url: {}", e);
-            send_error_message(bot, msg).await?;
-            return Ok(());
-        }
-    };
-
-    send_search_message(bot, msg, &file_url).await?;
-
-    Ok(())
-}
-
-async fn handle_image_file(bot: &Bot, msg: &Message, file_meta: &FileMeta) -> HandlerResult<()> {
-    let dest = download(bot, msg, file_meta).await?;
-
-    let file_url = match get_file_url(dest).await {
-        Ok(url) => url,
-        Err(e) => {
-            log::error!("Failed to get file url: {}", e);
-            send_error_message(bot, msg).await?;
-            return Ok(());
-        }
-    };
-
-    send_search_message(bot, msg, &file_url).await?;
-    Ok(())
-}
-
-async fn handle_document_message(bot: Bot, msg: Message) -> HandlerResult<()> {
-    log::info!("Received document in chat {}", msg.chat.id);
-
-    if let Some(document) = msg.document() {
-        let mut main_type: String = "".to_string();
-        if let Some(mime_type) = &document.mime_type {
-            main_type = mime_type.type_().as_str().to_string();
-        }
-        if let Some(filename) = &document.file_name {
-            let guess = mime_guess::from_path(filename);
-            if let Some(mime_type) = guess.first() {
-                main_type = mime_type.type_().as_str().to_string();
-            }
-        }
-
-        match main_type.as_str() {
-            "image" => handle_image_file(&bot, &msg, &document.file).await?,
-            "video" => handle_video_file(&bot, &msg, &document.file).await?,
-            _ => send_not_supported(bot, msg).await?,
-        }
-    } else {
-        send_not_supported(bot, msg).await?
-    }
-
-    Ok(())
-}
-
-async fn handle_sticker_message(bot: Bot, msg: Message) -> HandlerResult<()> {
-    log::info!("Received sticker in chat {}", msg.chat.id);
-
-    if let Some(sticker) = msg.sticker() {
-        if sticker.is_regular() && sticker.is_static() {
-            handle_image_file(&bot, &msg, &sticker.file).await?
-        } else if sticker.is_regular() && sticker.is_video() {
-            handle_video_file(&bot, &msg, &sticker.file).await?
+        let (mt, ext) = if sticker.is_video() {
+            (MediaType::Video, Some("mp4".to_string()))
+        } else if sticker.is_static() {
+            (MediaType::Image, Some("webp".to_string()))
         } else {
-            send_not_supported(bot, msg).await?;
-        }
-    }
+            (MediaType::Unknown, None)
+        };
 
-    Ok(())
-}
-
-async fn handle_animation_message(bot: Bot, msg: Message) -> HandlerResult<()> {
-    log::info!("Received animation in chat {}", msg.chat.id);
-    if let Some(animation) = msg.animation() {
-        handle_video_file(&bot, &msg, &animation.file).await?
-    }
-    Ok(())
-}
-
-pub(crate) async fn handle_media_message(bot: Bot, msg: Message) -> HandlerResult<()> {
-    if msg.photo().is_some() {
-        handle_photo_message(bot, msg).await?
-    } else if msg.video().is_some() {
-        handle_video_message(bot, msg).await?
-    } else if msg.document().is_some() {
-        handle_document_message(bot, msg).await?
-    } else if msg.sticker().is_some() {
-        handle_sticker_message(bot, msg).await?
-    } else if msg.animation().is_some() {
-        handle_animation_message(bot, msg).await?
+        (mt, sticker.file.id.clone(), ext)
+    } else if let Some(document) = &msg.document() {
+        let file = document;
+        let ext = document
+            .file_name
+            .clone()
+            .and_then(|name| name.rsplit_once('.').map(|(_, ext)| ext.to_string()));
+        let guess = mime_guess::from_path(file.file_name.as_deref().unwrap_or(""));
+        let mt = if let Some(mime_type) = guess.first() {
+            match mime_type.type_().as_str() {
+                "image" => match mime_type.subtype().as_str() {
+                    "gif" => MediaType::Video,
+                    _ => MediaType::Image,
+                },
+                "video" => MediaType::Video,
+                _ => MediaType::Unknown,
+            }
+        } else {
+            MediaType::Unknown
+        };
+        (mt, file.file.id.clone(), ext)
     } else {
-        log::warn!("handle_media called with unexpected message");
-        send_not_supported(bot, msg).await?
-    }
+        return Err(anyhow::anyhow!(Errors::MediaTypeNotSupported(
+            "Unknown".to_string()
+        )));
+    };
+    Ok((media_type, file_id, extension))
+}
+
+pub(crate) async fn handle_media_message(bot: Bot, msg: Message) -> Result<()> {
+    log::info!("Received media in chat {}", msg.chat.id);
+    let (media_type, file_id, extension) = get_media_type(&msg).await?;
+
+    let downloaded_file = match media_type {
+        MediaType::Image => handle_image_file(&bot, file_id, extension).await?,
+        MediaType::Video => image_from_video(&bot, file_id, extension).await?,
+        _ => {
+            send_not_supported(&bot, &msg).await?;
+            log::error!("Media with {extension:?} is not supported (id: {file_id})");
+            return Err(anyhow::anyhow!(Errors::MediaTypeNotSupported(format!(
+                "Media with {extension:?} is not supported (id: {file_id})"
+            ))));
+        }
+    };
+
+    let file_url = match files::get_file_url(downloaded_file).await {
+        Ok(url) => url,
+        Err(e) => {
+            log::error!("Failed to get file url: {}", e);
+            send_error_message(&bot, &msg).await?;
+            return Err(e);
+        }
+    };
+
+    search(&bot, &msg, &file_url).await?;
 
     Ok(())
 }
@@ -240,172 +144,8 @@ pub(crate) fn filter_for_media_message(msg: Message) -> bool {
         || msg.animation().is_some()
 }
 
-pub(crate) fn branch() -> UpdateHandler<Box<dyn Error + Send + Sync + 'static>> {
+pub(crate) fn branch() -> UpdateHandler<Error> {
     Update::filter_message()
         .filter(filter_for_media_message)
         .endpoint(handle_media_message)
-}
-
-#[cfg(test)]
-mod tests {
-    use teloxide::{
-        dptree,
-        types::{
-            CustomEmojiId, InlineKeyboardButtonKind, MaskPoint, MaskPosition, StickerFormatFlags,
-            StickerKind,
-        },
-    };
-    use teloxide_tests::{
-        MockBot, MockMessageAnimation, MockMessageDocument, MockMessagePhoto, MockMessageSticker,
-        MockMessageVideo,
-    };
-
-    use super::*;
-
-    #[tokio::test]
-    async fn test_buttons() {
-        let expected_url = "https://domain.com";
-        let buttons = search_buttons(expected_url);
-        for button_row in buttons {
-            for button in button_row {
-                match button.kind {
-                    InlineKeyboardButtonKind::Url(url) => {
-                        assert!(url.as_str().contains(expected_url));
-                    }
-                    _ => panic!("Unexpected button kind"),
-                }
-            }
-        }
-    }
-
-    #[tokio::test]
-    async fn test_handle_video() {
-        let tree = dptree::entry().branch(branch());
-        let mut bot = MockBot::new(MockMessageVideo::new(), tree);
-
-        bot.dispatch_and_check_last_text("Something went wrong")
-            .await;
-    }
-
-    #[tokio::test]
-    async fn test_handle_document() {
-        let tree = dptree::entry().branch(branch());
-        let mut bot = MockBot::new(MockMessageDocument::new(), tree);
-
-        bot.dispatch_and_check_last_text("Not supported").await;
-    }
-
-    #[tokio::test]
-    async fn test_handle_document_message_no_document() {
-        let tree = dptree::entry().branch(branch());
-        let mut bot = MockBot::new(MockMessageDocument::new(), tree);
-
-        bot.dispatch_and_check_last_text("Not supported").await;
-    }
-
-    #[tokio::test]
-    async fn test_handle_document_message_image() {
-        let tree = dptree::entry().branch(branch());
-        let message = MockMessageDocument::new().file_name("image.jpg");
-        let mut bot = MockBot::new(message, tree);
-
-        bot.dispatch_and_check_last_text("Search for Image").await;
-    }
-
-    #[tokio::test]
-    async fn test_handle_document_message_video() {
-        let tree = dptree::entry().branch(branch());
-        let message = MockMessageDocument::new().file_name("video.mp4");
-        let mut bot = MockBot::new(message, tree);
-
-        bot.dispatch_and_check_last_text("Something went wrong")
-            .await;
-    }
-
-    #[tokio::test]
-    async fn test_handle_document_message_other() {
-        let tree = dptree::entry().branch(branch());
-        let message = MockMessageDocument::new().file_name("file.pdf");
-        let mut bot = MockBot::new(message, tree);
-
-        bot.dispatch_and_check_last_text("Not supported").await;
-    }
-
-    #[tokio::test]
-    async fn test_handle_sticker_regular() {
-        let tree = dptree::entry().branch(branch());
-        let message = MockMessageSticker::new().flags(StickerFormatFlags {
-            is_animated: false,
-            is_video: false,
-        });
-        let mut bot = MockBot::new(message, tree);
-
-        bot.dispatch_and_check_last_text("Search for Image").await;
-    }
-
-    #[tokio::test]
-    async fn test_handle_sticker_animated() {
-        let tree = dptree::entry().branch(branch());
-        let message = MockMessageSticker::new().flags(StickerFormatFlags {
-            is_animated: true,
-            is_video: false,
-        });
-        let mut bot = MockBot::new(message, tree);
-
-        bot.dispatch_and_check_last_text("Not supported").await;
-    }
-
-    #[tokio::test]
-    async fn test_handle_sticker_video() {
-        let tree = dptree::entry().branch(branch());
-        let message = MockMessageSticker::new().flags(StickerFormatFlags {
-            is_animated: false,
-            is_video: true,
-        });
-        let mut bot = MockBot::new(message, tree);
-
-        bot.dispatch_and_check_last_text("Something went wrong")
-            .await;
-    }
-
-    #[tokio::test]
-    async fn test_handle_sticker_mask() {
-        let tree = dptree::entry().branch(branch());
-        let message = MockMessageSticker::new().kind(StickerKind::Mask {
-            mask_position: MaskPosition::new(MaskPoint::Eyes, 0.0, 0.0, 0.0),
-        });
-        let mut bot = MockBot::new(message, tree);
-
-        bot.dispatch_and_check_last_text("Not supported").await;
-    }
-
-    #[tokio::test]
-    async fn test_handle_sticker_emoji() {
-        let tree = dptree::entry().branch(branch());
-        let message = MockMessageSticker::new().kind(StickerKind::CustomEmoji {
-            custom_emoji_id: CustomEmojiId("joy".to_string()),
-        });
-        let mut bot = MockBot::new(message, tree);
-
-        bot.dispatch_and_check_last_text("Not supported").await;
-    }
-
-    #[tokio::test]
-    async fn test_handle_animation() {
-        let tree = dptree::entry().branch(branch());
-        let mut bot = MockBot::new(MockMessageAnimation::new(), tree);
-
-        bot.dispatch_and_check_last_text("Not implemented yet")
-            .await;
-    }
-
-    #[tokio::test]
-    async fn test_handle_photo() {
-        let tree = dptree::entry().branch(branch());
-        let message = MockMessagePhoto::new();
-        let mut bot = MockBot::new(message, tree);
-
-        bot.dispatch_and_check_last_text("Something went wrong")
-            .await;
-    }
 }

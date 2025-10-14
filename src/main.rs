@@ -1,9 +1,14 @@
-mod auto_search;
 mod bot;
 mod config;
+mod core;
+mod display;
+mod engines;
 mod error;
+mod files;
 mod handlers;
-mod types;
+mod models;
+mod providers;
+mod transformers;
 mod utils;
 
 #[tokio::main]

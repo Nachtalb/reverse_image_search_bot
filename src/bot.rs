@@ -1,9 +1,9 @@
-use std::error::Error;
+use anyhow::Error;
 
 use crate::{config::Config, handlers};
 use teloxide::{dispatching::UpdateHandler, prelude::*};
 
-fn handler_tree() -> UpdateHandler<Box<dyn Error + Send + Sync + 'static>> {
+fn handler_tree() -> UpdateHandler<Error> {
     dptree::entry()
         .branch(handlers::command::branch())
         .branch(handlers::media::branch())

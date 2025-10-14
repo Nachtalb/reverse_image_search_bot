@@ -1,6 +1,7 @@
+use anyhow::{Error, Result};
 use teloxide::{dispatching::UpdateHandler, prelude::*, utils::command::BotCommands};
 
-use crate::{handlers::media, types::HandlerResult};
+use crate::handlers::media;
 
 #[derive(BotCommands, Clone, Debug)]
 #[command(
@@ -16,7 +17,7 @@ enum Command {
     Search,
 }
 
-async fn handle_search_message(bot: Bot, msg: Message) -> HandlerResult<()> {
+async fn handle_search_message(bot: Bot, msg: Message) -> Result<()> {
     let chat_id = msg.chat.id;
 
     if let Some(reply_to_msg) = msg.reply_to_message() {
@@ -40,7 +41,7 @@ async fn handle_search_message(bot: Bot, msg: Message) -> HandlerResult<()> {
     Ok(())
 }
 
-async fn command_dispatcher(bot: Bot, msg: Message, cmd: Command) -> HandlerResult<()> {
+async fn command_dispatcher(bot: Bot, msg: Message, cmd: Command) -> Result<()> {
     match cmd {
         Command::Start => {
             bot.send_message(msg.chat.id, "Hello!").await?;
@@ -55,7 +56,7 @@ async fn command_dispatcher(bot: Bot, msg: Message, cmd: Command) -> HandlerResu
     Ok(())
 }
 
-pub(crate) fn branch() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync>> {
+pub(crate) fn branch() -> UpdateHandler<Error> {
     Update::filter_message()
         .filter_command::<Command>()
         .endpoint(command_dispatcher)

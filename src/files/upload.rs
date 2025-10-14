@@ -1,14 +1,14 @@
+use anyhow::Result;
 use reqwest::multipart::{Form, Part};
-use std::error::Error;
 
 use crate::config::get_config;
 
-pub async fn upload_to_rustypaste(
+async fn upload_to_rustypaste(
     base_url: &str,
     auth_token: Option<&str>,
     file_path: &str,
     expiry: Option<&str>,
-) -> Result<String, Box<dyn Error + Send + Sync + 'static>> {
+) -> Result<String> {
     let client = reqwest::Client::new();
 
     let mut request = client
@@ -23,7 +23,22 @@ pub async fn upload_to_rustypaste(
         request = request.header("expire", expiry);
     }
 
-    let res = request.send().await?;
+    let res = match request.send().await {
+        Ok(res) => res,
+        Err(err) => {
+            log::error!("Failed to upload file to Rustypaste: {}", err);
+            return Err(anyhow::anyhow!(
+                "Failed to upload file to Rustypaste: {}",
+                err
+            ));
+        }
+    };
+
+    res.error_for_status_ref().map_err(|err| {
+        log::error!("Failed to upload file to Rustypaste: {}", err);
+        anyhow::anyhow!("Failed to upload file to Rustypaste: {}", err)
+    })?;
+
     let uploaded_url = res.text().await?.trim().to_string();
 
     log::info!("File uploaded to Rustypaste: {}", uploaded_url);
@@ -31,22 +46,21 @@ pub async fn upload_to_rustypaste(
     Ok(uploaded_url)
 }
 
-pub(crate) async fn upload(
-    file_path: &str,
-) -> Result<String, Box<dyn Error + Send + Sync + 'static>> {
+pub(crate) async fn upload(file_path: &str) -> Result<String> {
     let config = get_config();
 
     if let Some(base_url) = &config.rustypaste_base_url {
-        log::info!("Uploading file {} to Rustypaste", file_path);
+        log::info!("Uploading file {}", file_path);
 
-        return upload_to_rustypaste(
+        upload_to_rustypaste(
             base_url.as_str(),
             config.rustypaste_token.as_deref(),
             file_path,
             config.rustypaste_expiry.as_deref(),
         )
-        .await;
+        .await
+    } else {
+        log::warn!("Rustypaste base URL is not set in config");
+        Err(anyhow::anyhow!("Rustypaste base URL is not set in config"))
     }
-
-    Err("Rustypaste base URL is not set in config".into())
 }
