@@ -1,4 +1,4 @@
-use crate::models::{AnimeData, Enrichment, EpisodesData, SearchHit, Status, Title, Url};
+use crate::models::{Enrichment, Episodes, SearchHit, Status, Title, Url};
 use crate::providers::DataProvider;
 use anilist_moe::client::AniListClient;
 use anilist_moe::enums::media::MediaStatus;
@@ -30,6 +30,14 @@ impl Anilist {
 
 #[async_trait]
 impl DataProvider for Anilist {
+    fn name(&self) -> &'static str {
+        "anilist"
+    }
+
+    fn priority(&self) -> u8 {
+        10
+    }
+
     fn extract_key(&self, hit: &SearchHit) -> Option<String> {
         let id = match hit.metadata.get("anilist_id") {
             Some(id) => match id {
@@ -66,13 +74,13 @@ impl DataProvider for Anilist {
                         _ => None,
                     };
 
-                    let data = Box::new(AnimeData {
+                    let data = Enrichment {
                         title,
-                        episodes: Some(EpisodesData {
+                        episodes: Some(Episodes {
                             total: media.episodes.and_then(|x| u32::try_from(x).ok()),
                             ..Default::default()
                         }),
-                        cover: media.cover_image.and_then(|x| x.medium),
+                        thumbnail: media.cover_image.and_then(|x| x.medium),
                         tags: Some(
                             media
                                 .tags
@@ -99,7 +107,6 @@ impl DataProvider for Anilist {
                                 .collect(),
                         ),
                         year: media.season_year.and_then(|x| x.try_into().ok()),
-                        enrichers: std::collections::HashSet::from([String::from("anilist")]),
                         status: media.status.map(|status| match status {
                             MediaStatus::Finished => Status::Completed,
                             MediaStatus::Releasing => Status::Ongoing,
@@ -107,9 +114,12 @@ impl DataProvider for Anilist {
                             MediaStatus::Cancelled => Status::Cancelled,
                             MediaStatus::Hiatus => Status::OnHold,
                         }),
-                    });
+                        priority: self.priority(),
+                        enrichers: std::collections::HashSet::from([self.name().to_string()]),
+                        ..Default::default()
+                    };
 
-                    Ok(Some(Enrichment::Anime(data)))
+                    Ok(Some(data))
                 }
                 Err(e) => {
                     log::debug!("Error in Anilist API: {}", e);

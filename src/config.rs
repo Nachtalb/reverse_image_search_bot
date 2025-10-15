@@ -57,6 +57,41 @@ struct CliArgs {
     #[arg(long, env = "RIS_TRACEMOE_LIMIT")]
     #[serde(skip_serializing_if = "Option::is_none")]
     tracemoe_limit: Option<usize>,
+
+    /// IQDB Threshold (default : 0.95)
+    #[arg(long, env = "RIS_IQDB_THRESHOLD")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    iqdb_threshold: Option<f32>,
+
+    /// IQDB Limit (default: 3)
+    #[arg(long, env = "RIS_IQDB_LIMIT")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    iqdb_limit: Option<usize>,
+
+    /// SauceNao API key
+    #[arg(long, env = "RIS_SAUCENAO_API_KEY")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    saucenao_api_key: Option<String>,
+
+    /// SauceNao Threshold (default : 0.95)
+    #[arg(long, env = "RIS_SAUCENAO_THRESHOLD")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    saucenao_threshold: Option<f32>,
+
+    /// SauceNao Limit (default: 3)
+    #[arg(long, env = "RIS_SAUCENAO_LIMIT")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    saucenao_limit: Option<usize>,
+
+    /// Danbooru API
+    #[arg(long, env = "RIS_DANBOORU_API_KEY")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    danbooru_api_key: Option<String>,
+
+    /// Danbooru Username
+    #[arg(long, env = "RIS_DANBOORU_USERNAME")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    danbooru_username: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -79,6 +114,23 @@ pub struct Config {
     pub tracemoe_threshold: Option<f32>,
     /// TraceMoe Default Limit
     pub tracemoe_limit: Option<usize>,
+
+    /// Iqdb Default Threshold
+    pub iqdb_threshold: Option<f32>,
+    /// Iqdb Default Limit
+    pub iqdb_limit: Option<usize>,
+
+    /// SauceNao API key
+    pub saucenao_api_key: Option<String>,
+    /// SauceNao Default Threshold
+    pub saucenao_threshold: Option<f32>,
+    /// SauceNao Default Limit
+    pub saucenao_limit: Option<usize>,
+
+    /// Danbooru API key
+    pub danbooru_api_key: Option<String>,
+    /// Danbooru Username
+    pub danbooru_username: Option<String>,
 }
 
 impl Default for Config {
@@ -92,6 +144,13 @@ impl Default for Config {
             tracemoe_api_key: None,
             tracemoe_threshold: Some(0.95),
             tracemoe_limit: Some(3),
+            iqdb_threshold: Some(95.0),
+            iqdb_limit: Some(3),
+            saucenao_api_key: None,
+            saucenao_threshold: Some(65.0),
+            saucenao_limit: Some(3),
+            danbooru_api_key: None,
+            danbooru_username: None,
         }
     }
 }

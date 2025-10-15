@@ -1,10 +1,22 @@
-use crate::models::AnimeData;
+use crate::models::Enrichment;
 use crate::transformers::tagify;
 
-pub fn format(anime: &AnimeData) -> String {
+pub fn format(data: &Enrichment) -> String {
     let mut ret = String::new();
 
-    if let Some(title) = &anime.title {
+    ret.push_str(
+        format!(
+            "Data from: {}\n",
+            data.enrichers
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+        .as_str(),
+    );
+
+    if let Some(title) = &data.title {
         if let Some(english) = &title.english {
             ret.push_str(&format!("Title: <code>{}</code>\n", english));
         }
@@ -16,7 +28,7 @@ pub fn format(anime: &AnimeData) -> String {
         }
     }
 
-    if let Some(episodes) = &anime.episodes {
+    if let Some(episodes) = &data.episodes {
         if episodes.total.is_some() && episodes.hit.is_some() {
             ret.push_str(&format!(
                 "Episode: <code>{}/{}</code>",
@@ -44,15 +56,41 @@ pub fn format(anime: &AnimeData) -> String {
             ret.push('\n');
         }
     }
-    if let Some(status) = &anime.status {
+
+    if let Some(chapters) = &data.chapters {
+        if chapters.total.is_some() && chapters.hit.is_some() {
+            ret.push_str(&format!(
+                "Chapter: <code>{}/{}</code>\n",
+                chapters.hit.unwrap(),
+                chapters.total.unwrap()
+            ));
+        } else if chapters.total.is_some() {
+            ret.push_str(&format!(
+                "Chapters: <code>{}</code>\n",
+                chapters.total.unwrap()
+            ));
+        } else if chapters.hit.is_some() {
+            ret.push_str(&format!(
+                "Chapter: <code>{}</code>\n",
+                chapters.hit.unwrap()
+            ));
+        }
+    }
+
+    if let Some(status) = &data.status {
         ret.push_str(&format!("Status: <code>{}</code>\n", status));
     }
-    ret.push_str("Type: <code>ANIME</code>\n");
-    if let Some(year) = anime.year {
-        ret.push_str(&format!("Year: <code>{}</code>\n", year));
+
+    if let Some(artist) = &data.artists {
+        ret.push_str(&format!("Artist: {}\n", tagify(artist, false)));
     }
-    if let Some(tags) = &anime.tags {
+
+    if let Some(tags) = &data.tags {
         ret.push_str(&format!("Tags: {}\n", tagify(tags, false)));
+    }
+
+    if let Some(characters) = &data.characters {
+        ret.push_str(&format!("characters: {}\n", tagify(characters, false)));
     }
 
     ret

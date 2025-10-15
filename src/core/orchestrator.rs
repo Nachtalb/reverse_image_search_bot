@@ -1,73 +1,60 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
-    engines::{ReverseEngine, TraceMoe},
-    models::{AnimeData, Enriched, Enrichment, FanartData, GenericData, MangaData},
-    providers::{Anilist, DataProvider},
+    engines::{Iqdb, ReverseEngine, SauceNao, TraceMoe},
+    models::Enrichment,
+    providers::{Anilist, Danbooru, DataProvider, Gelbooru, Safebooru},
 };
 use anyhow::Result;
 use figment::{Figment, providers::Serialized};
-use futures::future::join_all;
-use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc::{self, Receiver};
+use tokio::{
+    sync::mpsc::{self, Receiver},
+    task::JoinHandle,
+};
 
-fn merge_enrichments(enrichments: Vec<Enrichment>) -> Enriched {
-    let mut anime = vec![];
-    let mut manga = vec![];
-    let mut fanart = vec![];
-    let mut generic = vec![];
+fn merge_enrichments(enrichments: Vec<Enrichment>) -> Option<Enrichment> {
+    let mut enrichments = enrichments.clone();
 
-    for e in enrichments {
-        match e {
-            Enrichment::Anime(a) => anime.push(a),
-            Enrichment::Manga(m) => manga.push(m),
-            Enrichment::Fanart(f) => fanart.push(f),
-            Enrichment::Generic(g) => generic.push(g),
-        }
-    }
-
-    let anime = merge_vec::<AnimeData>(anime);
-    let manga = merge_vec::<MangaData>(manga);
-    let fanart = merge_vec::<FanartData>(fanart);
-    let generic = merge_vec::<GenericData>(generic);
-
-    Enriched {
-        anime,
-        manga,
-        fanart,
-        generic,
-    }
-}
-
-fn merge_vec<T>(mut vec: Vec<Box<T>>) -> Option<Box<T>>
-where
-    T: Default + Serialize + for<'de> Deserialize<'de> + Clone,
-{
-    if vec.is_empty() {
+    if enrichments.is_empty() {
         None
-    } else if vec.len() == 1 {
-        Some(vec.pop().unwrap())
+    } else if enrichments.len() == 1 {
+        Some(enrichments.pop().unwrap())
     } else {
-        let mut figment = Figment::from(Serialized::defaults(&vec[0]));
-        for item in vec.into_iter().skip(1) {
+        enrichments.sort_by_key(|e| e.priority);
+
+        let mut figment = Figment::from(Serialized::defaults(&enrichments[0]));
+        for item in enrichments.into_iter().skip(1) {
             figment = figment.admerge(Serialized::defaults(&item));
         }
         figment.extract().ok()
     }
 }
 
-pub async fn reverse_search(url: String) -> Receiver<Result<Enriched>> {
+pub async fn reverse_search(url: String) -> Receiver<Result<Enrichment>> {
     log::info!("Reverse search for {}", url);
     let (tx, rx) = mpsc::channel(32);
-    // let engines = vec![Saucenao::new(), TraceMoe::new()];
-    let engines = vec![TraceMoe::new()];
-    // let providers = Arc::new(vec![Anilist::new(), Mangadex::new(), Pixiv::new()]);
-    let providers = Arc::new(vec![Anilist::new()]);
+    let mut engines: Vec<Box<dyn ReverseEngine + Send + Sync>> =
+        vec![Box::new(TraceMoe::new()), Box::new(SauceNao::new())];
+
+    match Iqdb::create().await {
+        Ok(iqdb) => engines.push(Box::new(iqdb)),
+        Err(e) => log::error!("Failed to create iqdb engine: {}", e),
+    };
+
+    let providers: Arc<Vec<Arc<Box<dyn DataProvider + Send + Sync>>>> = Arc::new(vec![
+        Arc::new(Box::new(Anilist::new())),
+        Arc::new(Box::new(TraceMoe::new())),
+        Arc::new(Box::new(SauceNao::new())),
+        Arc::new(Box::new(Danbooru::new())),
+        Arc::new(Box::new(Gelbooru::new())),
+        Arc::new(Box::new(Safebooru::new())),
+    ]);
 
     for engine in engines {
         let tx = tx.clone();
-        let providers = providers.clone();
         let url = url.clone();
+        let providers = Arc::clone(&providers);
+
         tokio::spawn(async move {
             log::info!("Spawning engine {}", engine.name());
 
@@ -76,40 +63,39 @@ pub async fn reverse_search(url: String) -> Receiver<Result<Enriched>> {
 
                 for hit in hits {
                     let tx = tx.clone();
-                    let providers = providers.clone();
-                    let hit = hit.clone(); // If not Clone, adjust
-                    let engine_enrichment = engine.enrichment(&hit).clone();
+                    let hit = Arc::new(hit);
+                    let providers = Arc::clone(&providers);
 
                     tokio::spawn(async move {
                         log::info!("Spawning provider enrichments");
 
                         let mut enrichments: Vec<Enrichment> = vec![];
+                        let mut handlers: HashMap<String, JoinHandle<Result<Option<Enrichment>>>> =
+                            HashMap::new();
 
-                        if let Some(enrichment) = engine_enrichment {
-                            enrichments.push(enrichment.clone());
+                        for provider in providers.iter().filter(|p| p.can_enrich(&hit)) {
+                            let provider = Arc::clone(provider);
+                            let hit = Arc::clone(&hit);
+                            let name = provider.name().to_string();
+
+                            let handler = tokio::spawn(async move { provider.enrich(&hit).await });
+
+                            handlers.insert(name, handler);
                         }
 
-                        if !hit.metadata.is_empty() {
-                            enrichments.push(Enrichment::Generic(Box::new(GenericData {
-                                key_values: hit.metadata.clone(),
-                            })));
+                        for (name, handler) in handlers {
+                            match handler.await {
+                                Ok(Ok(None)) => (),
+                                Ok(Ok(Some(enrichment))) => {
+                                    enrichments.push(enrichment);
+                                }
+                                Ok(Err(e)) => log::error!("Failed to enrich {}: {}", name, e),
+                                Err(e) => log::error!("Failed to enrich {}: {}", name, e),
+                            }
                         }
 
-                        let enrich_futures = providers
-                            .iter()
-                            .filter(|p| p.can_enrich(&hit))
-                            .map(|p| p.enrich(&hit));
-                        let enrich_results: Vec<Result<Option<Enrichment>>> =
-                            join_all(enrich_futures).await;
-                        enrichments.extend(
-                            enrich_results
-                                .into_iter()
-                                .filter_map(|r| r.ok().and_then(|o| o))
-                                .collect::<Vec<Enrichment>>(),
-                        );
                         log::info!("{} enrichments", enrichments.len());
-                        let merged = merge_enrichments(enrichments);
-                        if merged.any() {
+                        if let Some(merged) = merge_enrichments(enrichments) {
                             let _ = tx.send(Ok(merged)).await;
                         };
                     });

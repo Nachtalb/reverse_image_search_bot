@@ -1,6 +1,7 @@
 use crate::{
     engines::ReverseEngine,
-    models::{AnimeData, Enrichment, EpisodesData, SearchHit},
+    models::{Enrichment, Episodes, SearchHit},
+    providers::DataProvider,
 };
 use async_trait::async_trait;
 
@@ -40,12 +41,78 @@ impl TraceMoe {
             limit: get_config().tracemoe_limit,
         }
     }
+
+    fn name(&self) -> &'static str {
+        "tracemoe"
+    }
+}
+
+#[async_trait]
+impl DataProvider for TraceMoe {
+    fn name(&self) -> &'static str {
+        <TraceMoe>::name(self)
+    }
+
+    fn priority(&self) -> u8 {
+        1
+    }
+
+    fn can_enrich(&self, hit: &SearchHit) -> bool {
+        hit.engine == self.name()
+    }
+
+    fn extract_key(&self, _: &SearchHit) -> Option<String> {
+        None
+    }
+
+    async fn enrich(&self, hit: &SearchHit) -> Result<Option<Enrichment>> {
+        if !self.can_enrich(hit) {
+            return Ok(None);
+        }
+
+        Ok(Some(Enrichment {
+            episodes: hit.metadata.get("hit_episode").and_then(|episode| {
+                if let Value::Number(n) = episode {
+                    let ep = n.as_u64().map(|n| n as u32)?;
+                    hit.metadata.get("hit_timestamp").and_then(|timestamp| {
+                        if let Value::Number(n) = timestamp {
+                            let ts = n.as_f64()?;
+                            Some(Episodes {
+                                hit: Some(ep),
+                                hit_timestamp: Some(ts),
+                                hit_image: hit
+                                    .metadata
+                                    .get("hit_image")
+                                    .unwrap()
+                                    .as_str()
+                                    .map(|s| s.to_string()),
+                                hit_video: hit
+                                    .metadata
+                                    .get("hit_video")
+                                    .unwrap()
+                                    .as_str()
+                                    .map(|s| s.to_string()),
+                                ..Default::default()
+                            })
+                        } else {
+                            None
+                        }
+                    })
+                } else {
+                    None
+                }
+            }),
+            priority: self.priority(),
+            enrichers: std::collections::HashSet::from([String::from(self.name())]),
+            ..Default::default()
+        }))
+    }
 }
 
 #[async_trait]
 impl ReverseEngine for TraceMoe {
     fn name(&self) -> &'static str {
-        "tracemoe"
+        <TraceMoe>::name(self)
     }
 
     fn threshold(&self) -> Option<f32> {
@@ -54,48 +121,6 @@ impl ReverseEngine for TraceMoe {
 
     fn limit(&self) -> Option<usize> {
         self.limit
-    }
-
-    fn enrichment(&self, hit: &SearchHit) -> Option<Enrichment> {
-        if hit.engine == "tracemoe" {
-            Some(Enrichment::Anime(Box::new(AnimeData {
-                episodes: hit.metadata.get("hit_episode").and_then(|episode| {
-                    if let Value::Number(n) = episode {
-                        let ep = n.as_u64().map(|n| n as u32)?;
-                        hit.metadata.get("hit_timestamp").and_then(|timestamp| {
-                            if let Value::Number(n) = timestamp {
-                                let ts = n.as_f64()?;
-                                Some(EpisodesData {
-                                    hit: Some(ep),
-                                    hit_timestamp: Some(ts),
-                                    hit_image: hit
-                                        .metadata
-                                        .get("hit_image")
-                                        .unwrap()
-                                        .as_str()
-                                        .map(|s| s.to_string()),
-                                    hit_video: hit
-                                        .metadata
-                                        .get("hit_video")
-                                        .unwrap()
-                                        .as_str()
-                                        .map(|s| s.to_string()),
-                                    ..Default::default()
-                                })
-                            } else {
-                                None
-                            }
-                        })
-                    } else {
-                        None
-                    }
-                }),
-                enrichers: std::collections::HashSet::from([String::from("tracemoe")]),
-                ..Default::default()
-            })))
-        } else {
-            None
-        }
     }
 
     async fn search(&self, url: &str) -> anyhow::Result<Vec<SearchHit>> {

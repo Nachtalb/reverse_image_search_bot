@@ -18,6 +18,22 @@ pub(crate) fn tagify(tags: &HashSet<String>, escape: bool) -> String {
         })
         .collect::<Vec<_>>()
         .join(", ");
-    log::info!("Tags: {}", tags);
     tags
+}
+
+pub(crate) fn titleize(s: &str) -> String {
+    let mut result = String::new();
+    let mut capitalize_next = true;
+    for c in s.chars() {
+        if capitalize_next && c.is_alphabetic() {
+            result.push(c.to_uppercase().next().unwrap());
+            capitalize_next = false;
+        } else {
+            result.push(c);
+            if c == ' ' {
+                capitalize_next = true;
+            }
+        }
+    }
+    result
 }

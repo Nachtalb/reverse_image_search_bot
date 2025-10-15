@@ -1,10 +1,10 @@
 use futures::future::join_all;
 use reqwest::Url;
-use teloxide::types::{InlineKeyboardButton, InputFile, ParseMode};
+use teloxide::types::{InlineKeyboardButton, InputFile, ParseMode, ReplyMarkup};
 use tokio::task::JoinHandle;
 
 use crate::display;
-use crate::models::{AnimeData, Enriched, FanartData, GenericData, MangaData};
+use crate::models::Enrichment;
 use crate::utils::keyboard::button;
 use anyhow::Result;
 
@@ -19,7 +19,7 @@ pub(crate) async fn search(bot: &Bot, msg: &Message, url: &str) -> Result<()> {
 
     log::info!("Sent search for image to chat {}", msg.chat.id);
     let mut rx = crate::core::orchestrator::reverse_search(url.to_string()).await;
-    let mut handles: Vec<JoinHandle<Result<(), _>>> = Vec::new();
+    let mut handles: Vec<JoinHandle<Result<Message, _>>> = Vec::new();
 
     while let Some(result) = rx.recv().await {
         match result {
@@ -38,7 +38,7 @@ pub(crate) async fn search(bot: &Bot, msg: &Message, url: &str) -> Result<()> {
     let results = join_all(handles).await;
     for result in results {
         match result {
-            Ok(Ok(())) => {}
+            Ok(Ok(_)) => {}
             Ok(Err(e)) => {
                 log::error!("Send failed: {:?}", e);
                 return Err(e);
@@ -54,142 +54,103 @@ pub(crate) async fn search(bot: &Bot, msg: &Message, url: &str) -> Result<()> {
     Ok(())
 }
 
-async fn send_search_result(bot: Bot, msg: Message, result: Enriched) -> Result<()> {
-    if !result.any() {
-        log::warn!("send_search_result called with no enrichments");
-        return Ok(());
-    }
+async fn send_search_result(bot: Bot, msg: Message, result: Enrichment) -> Result<Message> {
+    let text = display::enriched::format(&result);
 
-    let mut send_generic = true;
-
-    if let Some(anime) = result.anime {
-        send_generic = false;
-        match send_anime_search_result_message(&bot, msg.chat.id, &anime).await {
-            Ok(_) => {}
-            Err(err) => {
-                log::error!("Failed to send anime search result: {}", err);
-                Err(err)?
-            }
-        }
-    }
-
-    if let Some(manga) = result.manga {
-        send_generic = false;
-        send_manga_search_result_message(&bot, msg.chat.id, &manga).await?;
-    }
-
-    if let Some(fanart) = result.fanart {
-        send_generic = false;
-        send_fanart_search_result_message(&bot, msg.chat.id, &fanart).await?;
-    }
-
-    if send_generic && let Some(generic) = result.generic {
-        send_generic_search_result_message(&bot, msg.chat.id, &generic).await?;
-    }
-
-    Ok(())
-}
-
-async fn send_video(bot: &Bot, chat_id: ChatId, url: &str, text: String) -> Result<Message> {
-    log::info!("Send video result to: {}", chat_id);
-    let input_file = InputFile::url(Url::parse(url).unwrap());
-    bot.send_video(chat_id, input_file)
-        .caption(text)
-        .show_caption_above_media(true)
-        .parse_mode(ParseMode::Html)
-        .await
-        .map_err(anyhow::Error::from)
-}
-
-async fn send_image(bot: &Bot, chat_id: ChatId, url: &str, text: String) -> Result<Message> {
-    log::info!("Send image result to: {}", chat_id);
-    let input_file = InputFile::url(Url::parse(url).unwrap());
-    bot.send_photo(chat_id, input_file)
-        .caption(text)
-        .show_caption_above_media(true)
-        .parse_mode(ParseMode::Html)
-        .await
-        .map_err(anyhow::Error::from)
-}
-
-async fn send_text(bot: &Bot, chat_id: ChatId, text: String) -> Result<Message> {
-    log::info!("Send text result to: {}", chat_id);
-    bot.send_message(chat_id, text)
-        .parse_mode(ParseMode::Html)
-        .await
-        .map_err(anyhow::Error::from)
-}
-
-async fn send_generic_search_result_message(
-    bot: &Bot,
-    chat_id: ChatId,
-    generic: &GenericData,
-) -> Result<()> {
-    log::info!("Sending generic search result");
-    let text = display::generic::format(generic);
-
-    send_text(bot, chat_id, text).await?;
-
-    Ok(())
-}
-
-async fn send_fanart_search_result_message(
-    bot: &Bot,
-    chat_id: ChatId,
-    fanart: &FanartData,
-) -> Result<Message> {
-    log::info!("Sending fanart search result");
-    let text = display::fanart::format(fanart);
-
-    if let Some(url_data) = &fanart.main_url
-        && let Some(url) = &url_data.url
-    {
-        send_image(bot, chat_id, url, text).await
-    } else {
-        send_text(bot, chat_id, text).await
-    }
-}
-
-async fn send_manga_search_result_message(
-    bot: &Bot,
-    chat_id: ChatId,
-    manga: &MangaData,
-) -> Result<Message> {
-    log::info!("Sending manga search result");
-    let text = display::manga::format(manga);
-
-    if let Some(cover) = &manga.cover {
-        send_image(bot, chat_id, cover, text).await
-    } else {
-        send_text(bot, chat_id, text).await
-    }
-}
-
-async fn send_anime_search_result_message(
-    bot: &Bot,
-    chat_id: ChatId,
-    anime: &AnimeData,
-) -> Result<Message> {
-    log::info!("Sending anime search result");
-    let text = display::anime::format(anime);
-
-    let video = anime
+    let video = result
         .episodes
         .clone()
-        .and_then(|episodes| episodes.hit_video);
-    let image = &anime
+        .and_then(|episodes| episodes.hit_video)
+        .or(result.video.clone());
+    let image = &result
         .episodes
         .clone()
         .and_then(|episodes| episodes.hit_image)
-        .or(anime.cover.clone());
+        .or(result.thumbnail.clone());
+
+    let raw_buttons = display::telegram_buttons(&result.main_url, &result.urls);
+    let buttons = if raw_buttons.is_empty() {
+        None
+    } else {
+        Some(ReplyMarkup::inline_kb(raw_buttons))
+    };
+
+    let chat_id = msg.chat.id;
 
     if let Some(video) = video {
-        send_video(bot, chat_id, &video, text).await
+        send_video(&bot, chat_id, &video, text, buttons).await
     } else if let Some(image) = image {
-        send_image(bot, chat_id, image, text).await
+        send_image(&bot, chat_id, image, text, buttons).await
     } else {
-        send_text(bot, chat_id, text).await
+        send_text(&bot, chat_id, text, buttons).await
     }
+}
+
+async fn send_video(
+    bot: &Bot,
+    chat_id: ChatId,
+    url: &str,
+    text: String,
+    buttons: Option<ReplyMarkup>,
+) -> Result<Message> {
+    log::info!("Send video result to: {}", chat_id);
+    let input_file = InputFile::url(Url::parse(url).unwrap());
+    let mut message = bot
+        .send_video(chat_id, input_file)
+        .caption(text)
+        .show_caption_above_media(true);
+
+    if let Some(buttons) = buttons {
+        message = message.reply_markup(buttons);
+    }
+
+    message
+        .parse_mode(ParseMode::Html)
+        .await
+        .map_err(anyhow::Error::from)
+}
+
+async fn send_image(
+    bot: &Bot,
+    chat_id: ChatId,
+    url: &str,
+    text: String,
+    buttons: Option<ReplyMarkup>,
+) -> Result<Message> {
+    log::info!("Send image result to: {}", chat_id);
+    let input_file = InputFile::url(Url::parse(url).unwrap());
+    let mut message = bot
+        .send_photo(chat_id, input_file)
+        .caption(text)
+        .show_caption_above_media(true);
+
+    if let Some(buttons) = buttons {
+        message = message.reply_markup(buttons);
+    }
+
+    message
+        .parse_mode(ParseMode::Html)
+        .await
+        .map_err(anyhow::Error::from)
+}
+
+async fn send_text(
+    bot: &Bot,
+    chat_id: ChatId,
+    text: String,
+    buttons: Option<ReplyMarkup>,
+) -> Result<Message> {
+    log::info!("Send text result to: {}", chat_id);
+    let mut message = bot.send_message(chat_id, text);
+
+    if let Some(buttons) = buttons {
+        message = message.reply_markup(buttons);
+    }
+
+    message
+        .parse_mode(ParseMode::Html)
+        .await
+        .map_err(anyhow::Error::from)
 }
 
 fn search_buttons(url: &str) -> Vec<Vec<InlineKeyboardButton>> {
