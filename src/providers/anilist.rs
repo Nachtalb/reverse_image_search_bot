@@ -80,7 +80,7 @@ impl DataProvider for Anilist {
                             total: media.episodes.and_then(|x| u32::try_from(x).ok()),
                             ..Default::default()
                         }),
-                        thumbnail: media.cover_image.and_then(|x| x.medium),
+                        thumbnail: media.cover_image.and_then(|x| x.extra_large),
                         tags: Some(
                             media
                                 .tags
