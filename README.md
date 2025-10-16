@@ -7,22 +7,23 @@
 - [ ] /tips message
 - [ ] /credits message
 - [ ] Prevent duplicate uploads
-- [ ] Auto Search
+- [x] Auto Search
   - [x] Trace Moe
-  - [ ] IQDB
+  - [-] IQDB **API crate broken**
   - [ ] 3dIQDB
-  - [ ] SauceNao
-- [ ] Data Parser
-  - [ ] Generic SauceNao
-  - [ ] Generic TraceMoe
-  - [ ] Generic IQDB
-  - [ ] Generic 3dIQDB
+  - [x] SauceNao
+- [-] Data Parser
+  - [x] Generic SauceNao
+  - [x] Generic TraceMoe
+  - [-] Generic IQDB **Crate does not provide additional data**
+  - [-] Generic 3dIQDB **Crate does not provide additional data**
   - [x] AniList
-  - [ ] Boorus
-    - [ ] Danbooru
-    - [ ] Gelbooru
-    - [ ] Yandere
-    - [ ] 3dbooru
+  - [-] Boorus
+    - [x] Danbooru
+    - [-] Gelbooru **API crate broken**
+    - [-] Safebooru **API crate broken**
+    - [ ] ~Yandere~ **Not worth it**
+    - [ ] ~3dbooru~ **Not worth it**
     - [ ] sankaku
   - [ ] MangaDex
   - [ ] Pixiv
