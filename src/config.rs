@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::Parser;
 use figment::{
     Figment,
@@ -8,149 +10,233 @@ use resolve_path::PathResolveExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::OnceCell;
 
+use crate::cli::CliArgs;
+
 const DEFAULT_CONFIG_PATH: &str = "config.toml";
 static CONFIG: OnceCell<Config> = OnceCell::const_new();
 
-#[derive(Parser, Serialize, Debug)]
-struct CliArgs {
-    /// Telegram bot token
-    #[arg(short, long, env = "RIS_TELEGRAM_TOKEN")]
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct General {
+    /// Path to store downloads
     #[serde(skip_serializing_if = "Option::is_none")]
-    token: Option<String>,
-
-    /// Downloads directory (default: "downloads")
-    #[arg(short, long, env = "RIS_DOWNLOADS")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    downloads: Option<String>,
-
-    /// Config file path (default: "config.toml")
-    #[arg(short, long, env = "RIS_CONFIG")]
-    #[serde(skip_serializing)]
-    config: Option<String>,
-
-    /// RustyPaste API token
-    #[arg(long, env = "RIS_RUSTYPASTE_TOKEN")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    rustypaste_token: Option<String>,
-
-    /// RustyPaste base URL
-    #[arg(long, env = "RIS_RUSTYPASTE_BASE_URL")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    rustypaste_base_url: Option<String>,
-
-    /// RustyPaste expiry, format: https://github.com/orhun/rustypaste#expiration (default: 7d)
-    #[arg(long, env = "RIS_RUSTYPASTE_EXPIRY")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    rustypaste_expiry: Option<String>,
-
-    /// TraceMoe API key
-    #[arg(long, env = "RIS_TRACEMOE_API_KEY")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    tracemoe_api_key: Option<String>,
-
-    /// TraceMoe Threshold (default : 0.95)
-    #[arg(long, env = "RIS_TRACEMOE_THRESHOLD")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    tracemoe_threshold: Option<f32>,
-
-    /// TraceMoe Limit (default: 3)
-    #[arg(long, env = "RIS_TRACEMOE_LIMIT")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    tracemoe_limit: Option<usize>,
-
-    /// IQDB Threshold (default : 0.95)
-    #[arg(long, env = "RIS_IQDB_THRESHOLD")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    iqdb_threshold: Option<f32>,
-
-    /// IQDB Limit (default: 3)
-    #[arg(long, env = "RIS_IQDB_LIMIT")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    iqdb_limit: Option<usize>,
-
-    /// SauceNao API key
-    #[arg(long, env = "RIS_SAUCENAO_API_KEY")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    saucenao_api_key: Option<String>,
-
-    /// SauceNao Threshold (default : 0.95)
-    #[arg(long, env = "RIS_SAUCENAO_THRESHOLD")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    saucenao_threshold: Option<f32>,
-
-    /// SauceNao Limit (default: 3)
-    #[arg(long, env = "RIS_SAUCENAO_LIMIT")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    saucenao_limit: Option<usize>,
-
-    /// Danbooru API
-    #[arg(long, env = "RIS_DANBOORU_API_KEY")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    danbooru_api_key: Option<String>,
-
-    /// Danbooru Username
-    #[arg(long, env = "RIS_DANBOORU_USERNAME")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    danbooru_username: Option<String>,
+    pub downloads_dir: Option<std::path::PathBuf>,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
-pub struct Config {
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct Telegram {
     /// Telegram bot token
-    pub(crate) token: String,
-    /// Downloads directory
-    pub downloads: std::path::PathBuf,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
+}
 
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct RustyPaste {
     /// RustyPaste API token
-    pub rustypaste_token: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
     /// RustyPaste base URL
-    pub rustypaste_base_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
     /// RustyPaste expiry, format: https://github.com/orhun/rustypaste#expiration
-    pub rustypaste_expiry: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expiry: Option<String>,
+}
 
-    /// TraceMoe API key
-    pub tracemoe_api_key: Option<String>,
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct TraceMoe {
+    /// TraceMoe API token
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
     /// TraceMoe Default Threshold
-    pub tracemoe_threshold: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub threshold: Option<f32>,
     /// TraceMoe Default Limit
-    pub tracemoe_limit: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<usize>,
+    /// TraceMoe Enabled
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+}
 
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct Iqdb {
     /// Iqdb Default Threshold
-    pub iqdb_threshold: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub threshold: Option<f32>,
     /// Iqdb Default Limit
-    pub iqdb_limit: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<usize>,
+    /// Iqdb Enabled
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+}
 
-    /// SauceNao API key
-    pub saucenao_api_key: Option<String>,
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct SauceNao {
+    /// SauceNao API token
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
     /// SauceNao Default Threshold
-    pub saucenao_threshold: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub threshold: Option<f32>,
     /// SauceNao Default Limit
-    pub saucenao_limit: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<usize>,
+    /// SauceNao Enabled
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+}
 
-    /// Danbooru API key
-    pub danbooru_api_key: Option<String>,
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct Danbooru {
+    /// Danbooru API token
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
     /// Danbooru Username
-    pub danbooru_username: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub username: Option<String>,
+    /// Danbooru Enabled
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct Gelbooru {
+    /// Gelbooru Enabled
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct Safebooru {
+    /// Safebooru Enabled
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct AniList {
+    /// AniList Enabled
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct Config {
+    pub general: General,
+    pub telegram: Telegram,
+    pub rustypaste: RustyPaste,
+    pub tracemoe: TraceMoe,
+    pub iqdb: Iqdb,
+    pub saucenao: SauceNao,
+    pub danbooru: Danbooru,
+    pub gelbooru: Gelbooru,
+    pub safebooru: Safebooru,
+    pub anilist: AniList,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
-            token: String::from(""),
-            downloads: std::path::PathBuf::from("./downloads"),
-            rustypaste_token: None,
-            rustypaste_base_url: None,
-            rustypaste_expiry: None,
-            tracemoe_api_key: None,
-            tracemoe_threshold: Some(0.95),
-            tracemoe_limit: Some(3),
-            iqdb_threshold: Some(95.0),
-            iqdb_limit: Some(3),
-            saucenao_api_key: None,
-            saucenao_threshold: Some(65.0),
-            saucenao_limit: Some(3),
-            danbooru_api_key: None,
-            danbooru_username: None,
+            general: General {
+                downloads_dir: Some(PathBuf::from("./downloads")),
+            },
+            telegram: Telegram { token: None },
+            rustypaste: RustyPaste {
+                token: None,
+                url: None,
+                expiry: None,
+            },
+            tracemoe: TraceMoe {
+                token: None,
+                threshold: Some(0.95),
+                limit: Some(3),
+                enabled: Some(true),
+            },
+            iqdb: Iqdb {
+                threshold: Some(95.0),
+                limit: Some(3),
+                enabled: Some(true),
+            },
+            saucenao: SauceNao {
+                token: None,
+                threshold: Some(65.0),
+                limit: Some(3),
+                enabled: Some(true),
+            },
+            danbooru: Danbooru {
+                token: None,
+                username: None,
+                enabled: Some(true),
+            },
+            gelbooru: Gelbooru {
+                enabled: Some(true),
+            },
+            safebooru: Safebooru {
+                enabled: Some(true),
+            },
+            anilist: AniList {
+                enabled: Some(true),
+            },
+        }
+    }
+}
+
+impl Config {
+    fn normalize(&mut self) {
+        self.general.downloads_dir = self
+            .general
+            .downloads_dir
+            .clone()
+            .map(|p| p.resolve().normalize());
+    }
+
+    fn validate(&self) -> Result<(), Vec<String>> {
+        let mut errors: Vec<String> = vec![];
+        if self.telegram.token.is_none() {
+            errors.push("Telegram token is required".to_string());
+        }
+
+        if self.general.downloads_dir.is_none() {
+            errors.push("Downloads path is required".to_string());
+        }
+
+        if self.rustypaste.url.is_none() {
+            errors.push("RustyPaste base URL is required".to_string());
+        }
+
+        if !self.tracemoe.enabled.unwrap_or(true) {
+            log::warn!("TraceMoe is disabled");
+        }
+
+        if !self.iqdb.enabled.unwrap_or(true) {
+            log::warn!("IQDB is disabled");
+        }
+
+        if !self.saucenao.enabled.unwrap_or(true) {
+            log::warn!("SauceNao is disabled");
+        }
+
+        if !self.danbooru.enabled.unwrap_or(true) {
+            log::warn!("Danbooru is disabled");
+        }
+
+        if !self.gelbooru.enabled.unwrap_or(true) {
+            log::warn!("Gelbooru is disabled");
+        }
+
+        if !self.safebooru.enabled.unwrap_or(true) {
+            log::warn!("Safebooru is disabled");
+        }
+
+        if !self.anilist.enabled.unwrap_or(true) {
+            log::warn!("AniList is disabled");
+        }
+
+        if !errors.is_empty() {
+            Err(errors)
+        } else {
+            Ok(())
         }
     }
 }
@@ -183,8 +269,7 @@ fn load_config() -> Config {
             Some(ext) => match ext.to_str() {
                 Some("toml") => figment = figment.admerge(Toml::file(config_path)),
                 Some("json") => figment = figment.admerge(Json::file(config_path)),
-                Some("yaml") => figment = figment.admerge(Yaml::file(config_path)),
-                Some("yml") => figment = figment.admerge(Yaml::file(config_path)),
+                Some("yaml") | Some("yml") => figment = figment.admerge(Yaml::file(config_path)),
                 _ => {
                     log::error!("Cannot identify config file type. Must be .toml, .json or .yaml");
                     std::process::exit(1);
@@ -200,7 +285,10 @@ fn load_config() -> Config {
         std::process::exit(1);
     };
 
-    let mut config: Config = match figment.admerge(Serialized::defaults(args)).extract() {
+    let mut config: Config = match figment
+        .admerge(Serialized::defaults(args.to_config()))
+        .extract()
+    {
         Ok(config) => config,
         Err(err) => {
             log::error!("{}", err);
@@ -210,7 +298,12 @@ fn load_config() -> Config {
 
     log::debug!("Loaded config: {:#?}", config);
 
-    config.downloads = config.downloads.resolve().normalize();
-
-    config
+    config.normalize();
+    match config.validate() {
+        Ok(_) => config,
+        Err(err) => {
+            log::error!("{}", err.join("\n"));
+            std::process::exit(1);
+        }
+    }
 }

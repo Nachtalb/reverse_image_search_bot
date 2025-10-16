@@ -16,11 +16,11 @@ static SAFEBOORU_CLIENT: OnceCell<SafebooruClient> = OnceCell::const_new();
 fn get_danbooru_client() -> &'static DanbooruClient {
     if !DANBOORU_CLIENT.initialized() {
         let config = get_config();
-        let client = if let Some(api_key) = &config.danbooru_api_key
-            && let Some(username) = &config.danbooru_username
+        let client = if let Some(token) = &config.danbooru.token
+            && let Some(username) = &config.danbooru.username
         {
             DanbooruClient::builder()
-                .set_credentials(api_key.clone(), username.clone())
+                .set_credentials(token.clone(), username.clone())
                 .build()
         } else {
             DanbooruClient::builder().build()
@@ -119,6 +119,10 @@ impl DataProvider for Danbooru {
 
     fn priority(&self) -> u8 {
         10
+    }
+
+    fn enabled(&self) -> bool {
+        get_config().danbooru.enabled.unwrap()
     }
 
     fn extract_key(&self, hit: &SearchHit) -> Option<String> {
@@ -220,6 +224,10 @@ impl DataProvider for Gelbooru {
         5
     }
 
+    fn enabled(&self) -> bool {
+        get_config().gelbooru.enabled.unwrap()
+    }
+
     fn extract_key(&self, hit: &SearchHit) -> Option<String> {
         extract_key(hit, self.name())
     }
@@ -284,6 +292,10 @@ impl DataProvider for Safebooru {
 
     fn priority(&self) -> u8 {
         5
+    }
+
+    fn enabled(&self) -> bool {
+        get_config().safebooru.enabled.unwrap()
     }
 
     fn extract_key(&self, hit: &SearchHit) -> Option<String> {

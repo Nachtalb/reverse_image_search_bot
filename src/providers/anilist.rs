@@ -1,3 +1,4 @@
+use crate::config::get_config;
 use crate::models::{Enrichment, Episodes, SearchHit, Status, Title, Url};
 use crate::providers::DataProvider;
 use anilist_moe::client::AniListClient;
@@ -36,6 +37,10 @@ impl DataProvider for Anilist {
 
     fn priority(&self) -> u8 {
         10
+    }
+
+    fn enabled(&self) -> bool {
+        get_config().anilist.enabled.unwrap()
     }
 
     fn extract_key(&self, hit: &SearchHit) -> Option<String> {

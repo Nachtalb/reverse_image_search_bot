@@ -49,14 +49,14 @@ async fn upload_to_rustypaste(
 pub(crate) async fn upload(file_path: &str) -> Result<String> {
     let config = get_config();
 
-    if let Some(base_url) = &config.rustypaste_base_url {
+    if let Some(base_url) = &config.rustypaste.url {
         log::info!("Uploading file {}", file_path);
 
         upload_to_rustypaste(
             base_url.as_str(),
-            config.rustypaste_token.as_deref(),
+            config.rustypaste.token.as_deref(),
             file_path,
-            config.rustypaste_expiry.as_deref(),
+            config.rustypaste.expiry.as_deref(),
         )
         .await
     } else {

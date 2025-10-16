@@ -2,7 +2,7 @@ use crate::config::get_config;
 
 fn ensure_downloads_dir() -> std::path::PathBuf {
     let config = get_config();
-    let dir = config.downloads.clone();
+    let dir = config.general.downloads_dir.clone().unwrap();
     std::fs::create_dir_all(&dir).unwrap();
     dir
 }

@@ -19,7 +19,7 @@ static CLIENT: OnceCell<Client> = OnceCell::const_new();
 pub(crate) fn get_client() -> Result<&'static Client> {
     if !CLIENT.initialized() {
         let config = get_config();
-        let client = new_client_with_key(config.tracemoe_api_key.as_deref());
+        let client = new_client_with_key(config.tracemoe.token.as_deref());
         CLIENT.set(client?)?;
     }
 
@@ -37,8 +37,8 @@ impl TraceMoe {
     pub fn new() -> Self {
         Self {
             client: get_client().unwrap(),
-            threshold: get_config().tracemoe_threshold,
-            limit: get_config().tracemoe_limit,
+            threshold: get_config().tracemoe.threshold,
+            limit: get_config().tracemoe.limit,
         }
     }
 
@@ -55,6 +55,10 @@ impl DataProvider for TraceMoe {
 
     fn priority(&self) -> u8 {
         1
+    }
+
+    fn enabled(&self) -> bool {
+        get_config().tracemoe.enabled.unwrap()
     }
 
     fn can_enrich(&self, hit: &SearchHit) -> bool {
@@ -121,6 +125,10 @@ impl ReverseEngine for TraceMoe {
 
     fn limit(&self) -> Option<usize> {
         self.limit
+    }
+
+    fn enabled(&self) -> bool {
+        get_config().tracemoe.enabled.unwrap()
     }
 
     async fn search(&self, url: &str) -> anyhow::Result<Vec<SearchHit>> {

@@ -50,6 +50,10 @@ pub async fn reverse_search(url: String) -> Receiver<Result<Enrichment>> {
         Arc::new(Box::new(Safebooru::new())),
     ]);
     for engine in engines {
+        if !engine.enabled() {
+            log::info!("Skipping disabled engine {}", engine.name());
+            continue;
+        }
         let tx = tx.clone();
         let url = url.clone();
         let providers = Arc::clone(&providers);
@@ -82,6 +86,10 @@ pub async fn reverse_search(url: String) -> Receiver<Result<Enrichment>> {
 
                     for provider in providers.iter().filter(|p| p.can_enrich(&hit)) {
                         let provider = Arc::clone(provider);
+                        if !provider.enabled() {
+                            log::debug!("Skipping disabled provider {}", provider.name());
+                            continue;
+                        }
                         let hit = Arc::clone(&hit);
                         let name = provider.name().to_string();
 

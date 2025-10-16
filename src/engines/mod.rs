@@ -6,6 +6,7 @@ pub trait ReverseEngine {
     fn name(&self) -> &'static str;
     fn threshold(&self) -> Option<f32>;
     fn limit(&self) -> Option<usize>;
+    fn enabled(&self) -> bool;
 
     async fn search(&self, url: &str) -> anyhow::Result<Vec<SearchHit>>;
 

@@ -10,7 +10,7 @@ fn handler_tree() -> UpdateHandler<Error> {
 }
 
 pub async fn run(config: &Config) {
-    let bot = Bot::new(config.token.clone());
+    let bot = Bot::new(config.telegram.token.clone().unwrap());
 
     log::info!("Dispatcher configured, starting dispatch...");
 

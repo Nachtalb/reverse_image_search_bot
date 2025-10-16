@@ -33,8 +33,8 @@ impl Iqdb {
     pub(crate) async fn create() -> Result<Self> {
         Ok(Self {
             client: get_client().await?,
-            threshold: get_config().iqdb_threshold,
-            limit: get_config().iqdb_limit,
+            threshold: get_config().iqdb.threshold,
+            limit: get_config().iqdb.limit,
         })
     }
 }
@@ -51,6 +51,10 @@ impl ReverseEngine for Iqdb {
 
     fn limit(&self) -> Option<usize> {
         self.limit
+    }
+
+    fn enabled(&self) -> bool {
+        get_config().iqdb.enabled.unwrap()
     }
 
     async fn search(&self, url: &str) -> Result<Vec<SearchHit>> {

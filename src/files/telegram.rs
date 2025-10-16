@@ -6,7 +6,7 @@ use crate::files::local;
 use tokio::fs;
 
 pub(crate) async fn file_url(path: &str) -> Result<reqwest::Url, Errors> {
-    let token = &get_config().token;
+    let token = &get_config().telegram.token.clone().unwrap();
     let mut url = reqwest::Url::parse(teloxide::net::TELEGRAM_API_URL).unwrap();
 
     {

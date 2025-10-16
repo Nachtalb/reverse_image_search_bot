@@ -17,9 +17,11 @@ use crate::config::get_config;
 
 fn get_client() -> Client {
     let config = get_config();
-    if let Some(api_key) = config.saucenao_api_key.clone() {
-        HandlerBuilder::default().api_key(api_key.as_str()).build()
+    if let Some(token) = config.saucenao.token.clone() {
+        log::info!("Saucenao token set to {}", token);
+        HandlerBuilder::default().api_key(token.as_str()).build()
     } else {
+        log::warn!("Saucenao token is not set, using public API");
         HandlerBuilder::default().build()
     }
 }
@@ -33,8 +35,8 @@ pub struct SauceNao {
 impl SauceNao {
     pub(crate) fn new() -> Self {
         Self {
-            threshold: get_config().saucenao_threshold,
-            limit: get_config().saucenao_limit,
+            threshold: get_config().saucenao.threshold,
+            limit: get_config().saucenao.limit,
         }
     }
 
@@ -51,6 +53,10 @@ impl DataProvider for SauceNao {
 
     fn priority(&self) -> u8 {
         1
+    }
+
+    fn enabled(&self) -> bool {
+        get_config().saucenao.enabled.unwrap()
     }
 
     fn can_enrich(&self, hit: &SearchHit) -> bool {
@@ -113,6 +119,10 @@ impl ReverseEngine for SauceNao {
 
     fn limit(&self) -> Option<usize> {
         self.limit
+    }
+
+    fn enabled(&self) -> bool {
+        get_config().saucenao.enabled.unwrap()
     }
 
     async fn search(&self, url: &str) -> Result<Vec<SearchHit>> {
