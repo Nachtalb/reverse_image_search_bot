@@ -1,5 +1,6 @@
 use futures::future::join_all;
 use reqwest::Url;
+use teloxide::sugar::request::RequestLinkPreviewExt;
 use teloxide::types::{InlineKeyboardButton, InputFile, ParseMode, ReplyMarkup};
 use tokio::task::JoinHandle;
 
@@ -31,7 +32,12 @@ pub(crate) async fn search(bot: &Bot, msg: &Message, url: &str) -> Result<()> {
                     tokio::spawn(async move { send_search_result(bot, msg, enriched).await });
                 handles.push(handle);
             }
-            Err(_) => break,
+            Err(e) => {
+                log::error!("{}", e);
+                send_error_message(bot, msg.chat.id, &e.to_string())
+                    .await
+                    .unwrap();
+            }
         }
     }
 
@@ -52,6 +58,13 @@ pub(crate) async fn search(bot: &Bot, msg: &Message, url: &str) -> Result<()> {
     log::info!("Reverse search done");
 
     Ok(())
+}
+
+async fn send_error_message(bot: &Bot, chat_id: ChatId, error: &str) -> Result<Message> {
+    bot.send_message(chat_id, error)
+        .disable_link_preview(true)
+        .await
+        .map_err(anyhow::Error::from)
 }
 
 async fn send_search_result(bot: Bot, msg: Message, result: Enrichment) -> Result<Message> {

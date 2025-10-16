@@ -117,7 +117,6 @@ impl ReverseEngine for SauceNao {
 
     async fn search(&self, url: &str) -> Result<Vec<SearchHit>> {
         let client = get_client();
-        log::info!("Saucenao searching for {}", url);
         let sauce = match client.get_sauce(url, None, None) {
             Ok(sauce) => sauce,
             Err(e) => {
@@ -126,8 +125,7 @@ impl ReverseEngine for SauceNao {
             }
         };
 
-        log::info!("Saucenao found {} hits", sauce.len());
-        log::info!("Saucenao hits: {:#?}", sauce.first().unwrap());
+        log::debug!("Saucenao hits: {:#?}", sauce.first().unwrap());
 
         Ok(sauce
             .iter()

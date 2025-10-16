@@ -50,6 +50,8 @@ pub trait ReverseEngine {
             hits
         };
 
+        log::info!("{} hits left from {} hits", hits.len(), self.name(),);
+
         Ok(hits)
     }
 }

@@ -54,6 +54,7 @@ impl ReverseEngine for Iqdb {
     }
 
     async fn search(&self, url: &str) -> Result<Vec<SearchHit>> {
+        log::info!("Searching iqdb for {}", url);
         let res = self.client.check(url).await;
 
         match res {
@@ -69,6 +70,12 @@ impl ReverseEngine for Iqdb {
                         metadata.insert(service.key(), Value::String(id));
                     }
 
+                    log::info!(
+                        "IQDB: Found hit with similarity {} and link {}",
+                        item.similarity,
+                        item.link
+                    );
+
                     SearchHit {
                         engine: self.name().to_string(),
                         similarity: item.similarity,
@@ -77,7 +84,7 @@ impl ReverseEngine for Iqdb {
                     }
                 })
                 .collect()),
-            Err(err) => Err(anyhow::anyhow!(err)),
+            Err(err) => Err(anyhow::Error::msg(err)),
         }
     }
 }
