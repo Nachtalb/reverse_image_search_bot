@@ -15,17 +15,6 @@ use anyhow::Result;
 
 use crate::config::get_config;
 
-fn get_client() -> Client {
-    let config = get_config();
-    if let Some(token) = config.saucenao.token.clone() {
-        log::info!("Saucenao token set to {}", token);
-        HandlerBuilder::default().api_key(token.as_str()).build()
-    } else {
-        log::warn!("Saucenao token is not set, using public API");
-        HandlerBuilder::default().build()
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct SauceNao {
     threshold: Option<f32>,
@@ -42,6 +31,14 @@ impl SauceNao {
 
     fn name(&self) -> &'static str {
         "saucenao"
+    }
+
+    fn client(&self) -> Client {
+        if let Some(token) = get_config().saucenao.token.clone() {
+            HandlerBuilder::default().api_key(token.as_str()).build()
+        } else {
+            HandlerBuilder::default().build()
+        }
     }
 }
 
@@ -126,8 +123,7 @@ impl ReverseEngine for SauceNao {
     }
 
     async fn search(&self, url: &str) -> Result<Vec<SearchHit>> {
-        let client = get_client();
-        let sauce = match client.get_sauce(url, None, None) {
+        let sauce = match self.client().get_sauce(url, None, None) {
             Ok(sauce) => sauce,
             Err(e) => {
                 log::error!("Saucenao error: {}", e);

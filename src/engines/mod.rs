@@ -1,5 +1,8 @@
+use std::sync::Arc;
+
 use crate::models::SearchHit;
 use async_trait::async_trait;
+use once_cell::sync::Lazy;
 
 #[async_trait]
 pub trait ReverseEngine {
@@ -64,3 +67,12 @@ pub mod tracemoe;
 pub use iqdb::Iqdb;
 pub use saucenao::SauceNao;
 pub use tracemoe::TraceMoe;
+
+pub(crate) type BoxedReverseEngine = Box<dyn ReverseEngine + Send + Sync>;
+pub(crate) static ENGINES: Lazy<Arc<Vec<Arc<BoxedReverseEngine>>>> = Lazy::new(|| {
+    Arc::new(vec![
+        // Box::new(Iqdb::new()),
+        Arc::new(Box::new(SauceNao::new())),
+        Arc::new(Box::new(TraceMoe::new())),
+    ])
+});

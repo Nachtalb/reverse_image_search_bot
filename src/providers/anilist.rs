@@ -4,24 +4,17 @@ use crate::providers::DataProvider;
 use anilist_moe::client::AniListClient;
 use anilist_moe::enums::media::MediaStatus;
 use async_trait::async_trait;
-use tokio::sync::OnceCell;
-
-static CLIENT: OnceCell<AniListClient> = OnceCell::const_new();
-
-async fn get_client() -> &'static AniListClient {
-    if !CLIENT.initialized() {
-        let client = AniListClient::new();
-        CLIENT.set(client).unwrap();
-    }
-    CLIENT.get().unwrap()
-}
 
 #[derive(Clone)]
-pub struct Anilist;
+pub struct Anilist {
+    client: AniListClient,
+}
 
 impl Anilist {
     pub fn new() -> Self {
-        Self
+        Self {
+            client: AniListClient::new(),
+        }
     }
 
     fn str_to_i32(&self, s: &str) -> Option<i32> {
@@ -66,8 +59,7 @@ impl DataProvider for Anilist {
             log::debug!("Enriching anilist: {}", string_id);
             let id = self.str_to_i32(&string_id).unwrap();
 
-            let client = get_client().await;
-            match client.anime().get_anime_by_id(id).await {
+            match self.client.anime().get_anime_by_id(id).await {
                 Ok(anime) => {
                     let media = anime.data.media;
                     let title = match media.title {

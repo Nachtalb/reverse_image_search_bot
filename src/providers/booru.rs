@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::config::get_config;
 use crate::models::{Enrichment, SearchHit, Url};
 use crate::providers::DataProvider;
@@ -7,14 +9,24 @@ use booru::Client;
 use booru::danbooru::DanbooruClient;
 use booru::gelbooru::GelbooruClient;
 use booru::safebooru::SafebooruClient;
-use tokio::sync::OnceCell;
 
-static DANBOORU_CLIENT: OnceCell<DanbooruClient> = OnceCell::const_new();
-static GELBOORU_CLIENT: OnceCell<GelbooruClient> = OnceCell::const_new();
-static SAFEBOORU_CLIENT: OnceCell<SafebooruClient> = OnceCell::const_new();
+#[derive(Clone)]
+pub struct Danbooru {
+    client: Arc<DanbooruClient>,
+}
 
-fn get_danbooru_client() -> &'static DanbooruClient {
-    if !DANBOORU_CLIENT.initialized() {
+#[derive(Clone)]
+pub struct Gelbooru {
+    client: Arc<GelbooruClient>,
+}
+
+#[derive(Clone)]
+pub struct Safebooru {
+    client: Arc<SafebooruClient>,
+}
+
+impl Danbooru {
+    pub fn new() -> Self {
         let config = get_config();
         let client = if let Some(token) = &config.danbooru.token
             && let Some(username) = &config.danbooru.username
@@ -25,66 +37,26 @@ fn get_danbooru_client() -> &'static DanbooruClient {
         } else {
             DanbooruClient::builder().build()
         };
-        match DANBOORU_CLIENT.set(client) {
-            Ok(_) => (),
-            Err(e) => {
-                log::error!("Failed to set danbooru client: {}", e);
-            }
+
+        Self {
+            client: Arc::new(client),
         }
-    }
-    DANBOORU_CLIENT.get().unwrap()
-}
-
-fn get_gelbooru_client() -> &'static GelbooruClient {
-    if !GELBOORU_CLIENT.initialized() {
-        let client = GelbooruClient::builder().build();
-        match GELBOORU_CLIENT.set(client) {
-            Ok(_) => (),
-            Err(e) => {
-                log::error!("Failed to set gelbooru client: {}", e);
-            }
-        }
-    }
-    GELBOORU_CLIENT.get().unwrap()
-}
-
-fn get_safebooru_client() -> &'static SafebooruClient {
-    if !SAFEBOORU_CLIENT.initialized() {
-        let client = SafebooruClient::builder().build();
-        match SAFEBOORU_CLIENT.set(client) {
-            Ok(_) => (),
-            Err(e) => {
-                log::error!("Failed to set safebooru client: {}", e);
-            }
-        }
-    }
-    SAFEBOORU_CLIENT.get().unwrap()
-}
-
-#[derive(Clone)]
-pub struct Danbooru;
-
-#[derive(Clone)]
-pub struct Gelbooru;
-
-#[derive(Clone)]
-pub struct Safebooru;
-
-impl Danbooru {
-    pub fn new() -> Self {
-        Self
     }
 }
 
 impl Gelbooru {
     pub fn new() -> Self {
-        Self
+        Self {
+            client: Arc::new(GelbooruClient::builder().build()),
+        }
     }
 }
 
 impl Safebooru {
     pub fn new() -> Self {
-        Self
+        Self {
+            client: Arc::new(SafebooruClient::builder().build()),
+        }
     }
 }
 
@@ -139,9 +111,7 @@ impl DataProvider for Danbooru {
             log::debug!("Enriching {}: {}", self.name(), string_id);
             let id = str_to_u32(&string_id).unwrap();
 
-            let client = get_danbooru_client();
-
-            match client.get_by_id(id).await {
+            match self.client.get_by_id(id).await {
                 Ok(post) => {
                     let image_not_public = post.is_deleted
                         || post.is_banned
@@ -242,9 +212,7 @@ impl DataProvider for Gelbooru {
             log::debug!("Enriching {}: {}", self.name(), string_id);
             let id = str_to_u32(&string_id).unwrap();
 
-            let client = get_gelbooru_client();
-
-            match client.get_by_id(id).await {
+            match self.client.get_by_id(id).await {
                 Ok(post) => {
                     let ext = post.file_url.split('.').last().unwrap();
                     let video = match ext {
@@ -312,9 +280,7 @@ impl DataProvider for Safebooru {
             log::debug!("Enriching {}: {}", self.name(), string_id);
             let id = str_to_u32(&string_id).unwrap();
 
-            let client = get_safebooru_client();
-
-            match client.get_by_id(id).await {
+            match self.client.get_by_id(id).await {
                 Ok(post) => {
                     let ext = post.image.split('.').last().unwrap();
                     let thumbnail = match ext {

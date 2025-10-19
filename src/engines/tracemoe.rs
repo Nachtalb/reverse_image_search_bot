@@ -6,7 +6,6 @@ use crate::{
 use async_trait::async_trait;
 
 use serde_json::Value;
-use tokio::sync::OnceCell;
 use trace_moe::client::Client;
 use trace_moe::tracemoe::{SearchQuery, SearchResponse, new_client_with_key};
 
@@ -14,21 +13,9 @@ use anyhow::Result;
 
 use crate::config::get_config;
 
-static CLIENT: OnceCell<Client> = OnceCell::const_new();
-
-pub(crate) fn get_client() -> Result<&'static Client> {
-    if !CLIENT.initialized() {
-        let config = get_config();
-        let client = new_client_with_key(config.tracemoe.token.as_deref());
-        CLIENT.set(client?)?;
-    }
-
-    Ok(CLIENT.get().unwrap())
-}
-
 #[derive(Clone, Debug)]
 pub struct TraceMoe {
-    client: &'static Client,
+    client: Client,
     threshold: Option<f32>,
     limit: Option<usize>,
 }
@@ -36,7 +23,7 @@ pub struct TraceMoe {
 impl TraceMoe {
     pub fn new() -> Self {
         Self {
-            client: get_client().unwrap(),
+            client: new_client_with_key(get_config().tracemoe.token.as_deref()).unwrap(),
             threshold: get_config().tracemoe.threshold,
             limit: get_config().tracemoe.limit,
         }
