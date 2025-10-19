@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 
+pub(crate) mod image;
 pub(crate) mod local;
 pub(crate) mod telegram;
 pub(crate) mod upload;

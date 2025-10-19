@@ -9,6 +9,7 @@ mod files;
 mod handlers;
 mod models;
 mod providers;
+mod redis;
 mod transformers;
 mod utils;
 

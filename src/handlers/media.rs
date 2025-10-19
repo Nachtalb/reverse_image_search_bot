@@ -1,8 +1,11 @@
 use crate::error::Errors;
+use crate::files::image::get_image_hash;
+use crate::redis::{Redis, get_redis};
+use crate::utils::get_timestamp;
 use std::path::PathBuf;
 use teloxide::types::FileId;
 
-use crate::handlers::search::search;
+use crate::handlers::search::{cached_search, search};
 use crate::{files, transformers};
 use anyhow::{Error, Result};
 
@@ -27,7 +30,7 @@ async fn image_from_video(bot: &Bot, file_id: FileId, _: Option<String>) -> Resu
     transformers::get_first_frame(file_url.as_str(), download_path)
 }
 
-async fn handle_image_file(
+async fn download_tg_file(
     bot: &Bot,
     file_id: FileId,
     extension: Option<String>,
@@ -106,12 +109,39 @@ async fn get_media_type(msg: &Message) -> Result<(MediaType, FileId, Option<Stri
     Ok((media_type, file_id, extension))
 }
 
+async fn get_or_store_similar_image(
+    redis: &Redis,
+    new_image_id: &str,
+    image_hash: Vec<u8>,
+) -> Result<(String, bool)> {
+    match redis.find_similar(&image_hash).await {
+        Ok(similar_images) => {
+            if let Some((id, distance)) = similar_images.first() {
+                log::info!("Found similar image with distance of: {}", distance);
+                return Ok((id.clone(), true));
+            }
+        }
+        Err(e) => {
+            log::warn!("Error finding similar image: {}", e);
+        }
+    };
+
+    log::info!("No similar image found - storing current image");
+    match redis.store_phash(new_image_id, image_hash).await {
+        Ok(_) => Ok((new_image_id.to_string(), false)),
+        Err(e) => {
+            log::error!("Failed to store image hash: {}", e);
+            Err(anyhow::Error::from(e))
+        }
+    }
+}
+
 pub(crate) async fn handle_media_message(bot: Bot, msg: Message) -> Result<()> {
     log::info!("Received media in chat {}", msg.chat.id);
     let (media_type, file_id, extension) = get_media_type(&msg).await?;
 
     let downloaded_file = match media_type {
-        MediaType::Image => handle_image_file(&bot, file_id, extension).await?,
+        MediaType::Image => download_tg_file(&bot, file_id, extension).await?,
         MediaType::Video => image_from_video(&bot, file_id, extension).await?,
         _ => {
             send_not_supported(&bot, &msg).await?;
@@ -122,8 +152,43 @@ pub(crate) async fn handle_media_message(bot: Bot, msg: Message) -> Result<()> {
         }
     };
 
+    let redis = get_redis().await;
+
+    let new_image_id = get_timestamp().to_string();
+    let image_hash: Option<Vec<u8>> = match get_image_hash(downloaded_file.to_str().unwrap()) {
+        Ok(hash) => Some(hash),
+        Err(e) => {
+            log::warn!("Failed to get image hash for {:?}: {}", downloaded_file, e);
+            None
+        }
+    };
+
+    if let Some(image_hash) = &image_hash
+        && let Some(redis) = &redis
+    {
+        match get_or_store_similar_image(redis, &new_image_id, image_hash.clone()).await {
+            Ok((_, false)) => {}
+            Ok((cached_image_id, true)) => match cached_search(&bot, &msg, cached_image_id).await {
+                Ok(_) => return Ok(()),
+                Err(e) => log::error!("Failed to send cached search results: {}", e),
+            },
+            Err(e) => log::warn!("Failed to search redis for similar images: {}", e),
+        }
+    }
+
     let file_url = match files::get_file_url(downloaded_file).await {
-        Ok(url) => url,
+        Ok(url) => {
+            if let Some(redis) = &redis {
+                if let Err(e) = redis
+                    .store(format!("url:{}", new_image_id).as_str(), url.clone())
+                    .await
+                {
+                    log::warn!("Failed to store image url in redis: {}", e);
+                }
+            }
+
+            url
+        }
         Err(e) => {
             log::error!("Failed to get file url: {}", e);
             send_error_message(&bot, &msg).await?;
@@ -131,8 +196,16 @@ pub(crate) async fn handle_media_message(bot: Bot, msg: Message) -> Result<()> {
         }
     };
 
-    search(&bot, &msg, &file_url).await?;
+    if let Some(redis) = redis
+        && let Some(image_hash) = image_hash
+        && let Err(e) = redis.store_phash(new_image_id.as_str(), image_hash).await
+    {
+        log::warn!("Could not store new image in cache {}", e);
+        search(&bot, &msg, &file_url, None).await?;
+        return Ok(());
+    }
 
+    search(&bot, &msg, &file_url, Some(new_image_id)).await?;
     Ok(())
 }
 

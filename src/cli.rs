@@ -4,8 +4,8 @@ use clap::Parser;
 use serde::Serialize;
 
 use crate::config::{
-    AniList, Config, Danbooru, Gelbooru, General, Iqdb, RustyPaste, Safebooru, SauceNao, Telegram,
-    TraceMoe,
+    AniList, Cache, Config, Danbooru, Gelbooru, General, Iqdb, Redis, RustyPaste, Safebooru,
+    SauceNao, Telegram, TraceMoe,
 };
 
 #[derive(Parser, Serialize, Debug)]
@@ -124,13 +124,53 @@ pub(crate) struct CliArgs {
     #[arg(long, env = "RIS_ANILIST_DISABLED")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) anilist_disabled: Option<bool>,
+
+    /// Redis Host
+    #[arg(long, env = "RIS_REDIS_HOST")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) redis_host: Option<String>,
+
+    /// Redis Port
+    #[arg(long, env = "RIS_REDIS_PORT")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) redis_port: Option<u16>,
+
+    /// Redis Expiry
+    #[arg(long, env = "RIS_REDIS_EXPIRY")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) redis_expiry: Option<u64>,
+
+    /// Redis Disabled
+    #[arg(long, env = "RIS_REDIS_DISABLED")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) redis_disabled: Option<bool>,
+
+    /// Image cache search pHash max distance
+    #[arg(long, env = "RIS_PHASH_MAX_DISTANCE")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) phash_max_distance: Option<u32>,
+
+    /// Image cache search max results
+    #[arg(long, env = "RIS_MAX_SEARCH_RESULTS")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) max_search_results: Option<u8>,
 }
 
 impl CliArgs {
     pub fn to_config(self) -> Config {
         Config {
             general: General {
-                downloads_dir: self.downloads.and_then(|p| Some(PathBuf::from(p))),
+                downloads_dir: self.downloads.map(PathBuf::from),
+            },
+            redis: Redis {
+                host: self.redis_host,
+                port: self.redis_port,
+                expiry: self.redis_expiry,
+                enabled: self.redis_disabled.map(|b| !b),
+            },
+            cache: Cache {
+                phash_max_distance: self.phash_max_distance,
+                max_search_results: self.max_search_results,
             },
             telegram: Telegram { token: self.token },
             rustypaste: RustyPaste {
@@ -142,32 +182,32 @@ impl CliArgs {
                 token: self.tracemoe_token,
                 threshold: self.tracemoe_threshold,
                 limit: self.tracemoe_limit,
-                enabled: self.tracemoe_disabled.and_then(|b| Some(!b)),
+                enabled: self.tracemoe_disabled.map(|b| !b),
             },
             iqdb: Iqdb {
                 threshold: self.iqdb_threshold,
                 limit: self.iqdb_limit,
-                enabled: self.iqdb_disabled.and_then(|b| Some(!b)),
+                enabled: self.iqdb_disabled.map(|b| !b),
             },
             saucenao: SauceNao {
                 token: self.saucenao_token,
                 threshold: self.saucenao_threshold,
                 limit: self.saucenao_limit,
-                enabled: self.saucenao_disabled.and_then(|b| Some(!b)),
+                enabled: self.saucenao_disabled.map(|b| !b),
             },
             danbooru: Danbooru {
                 token: self.danbooru_token,
                 username: self.danbooru_username,
-                enabled: self.danbooru_disabled.and_then(|b| Some(!b)),
+                enabled: self.danbooru_disabled.map(|b| !b),
             },
             gelbooru: Gelbooru {
-                enabled: self.gelbooru_disabled.and_then(|b| Some(!b)),
+                enabled: self.gelbooru_disabled.map(|b| !b),
             },
             safebooru: Safebooru {
-                enabled: self.safebooru_disabled.and_then(|b| Some(!b)),
+                enabled: self.safebooru_disabled.map(|b| !b),
             },
             anilist: AniList {
-                enabled: self.anilist_disabled.and_then(|b| Some(!b)),
+                enabled: self.anilist_disabled.map(|b| !b),
             },
         }
     }

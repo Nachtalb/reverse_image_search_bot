@@ -1,4 +1,5 @@
-use futures::future::join_all;
+use std::sync::Arc;
+
 use reqwest::Url;
 use teloxide::sugar::request::RequestLinkPreviewExt;
 use teloxide::types::{InlineKeyboardButton, InputFile, ParseMode, ReplyMarkup};
@@ -6,21 +7,101 @@ use tokio::task::JoinHandle;
 
 use crate::display;
 use crate::models::Enrichment;
+use crate::redis::get_redis;
+use crate::utils::get_timestamp;
 use crate::utils::keyboard::button;
-use anyhow::Result;
+use anyhow::{Error, Result};
 
 use teloxide::prelude::*;
 
-pub(crate) async fn search(bot: &Bot, msg: &Message, url: &str) -> Result<()> {
+pub(crate) async fn cached_search(bot: &Bot, msg: &Message, image_id: String) -> Result<()> {
+    let redis = match get_redis().await {
+        Some(redis) => redis,
+        None => {
+            log::error!("Redis not initialized");
+            return Err(Error::msg("Redis not initialized"));
+        }
+    };
+
+    match redis.get(format!("url:{}", image_id).as_str()).await {
+        Ok(Some(url)) => {
+            if let Err(e) = send_search_keyboard(bot, msg, url.as_str()).await {
+                log::error!("Failed to send search keyboard {}", e);
+            }
+        }
+        Ok(None) => {
+            log::warn!("No url found for image {}", image_id);
+        }
+        Err(e) => {
+            log::warn!("Failed to get url for image {}: {}", image_id, e);
+        }
+    }
+
+    let keys = match redis
+        .get_keys(format!("enriched:{}:*", image_id).as_str())
+        .await
+    {
+        Ok(keys) => {
+            if keys.is_empty() {
+                return Err(Error::msg(format!(
+                    "No cached results for image: {}",
+                    image_id
+                )));
+            }
+            log::info!("Found {} cached results for image {}", keys.len(), image_id);
+            keys
+        }
+        Err(e) => {
+            log::warn!(
+                "Failed to get keys for cached results for image {}: {}",
+                image_id,
+                e
+            );
+            return Err(Error::from(e));
+        }
+    };
+
+    let enriched = match redis.get_structs::<Enrichment>(keys).await {
+        Ok(enriched) => enriched,
+        Err(e) => {
+            log::warn!("Failed to get cached results for image {}: {}", image_id, e);
+            return Err(e);
+        }
+    };
+
+    for enrichment in enriched {
+        let enrichment = Arc::new(enrichment);
+        send_search_result(bot.clone(), msg.clone(), enrichment).await?;
+    }
+
+    Ok(())
+}
+
+async fn send_search_keyboard(bot: &Bot, msg: &Message, url: &str) -> Result<Message> {
     let keyboard = teloxide::types::InlineKeyboardMarkup::new(search_buttons(url));
 
     bot.send_message(msg.chat.id, "Search for Image")
         .reply_markup(keyboard)
-        .await?;
+        .await
+        .map_err(anyhow::Error::from)
+}
+
+pub(crate) async fn search(
+    bot: &Bot,
+    msg: &Message,
+    url: &str,
+    image_id: Option<String>,
+) -> Result<()> {
+    send_search_keyboard(bot, msg, url).await?;
+    let redis = if image_id.is_some() {
+        get_redis().await
+    } else {
+        &None
+    };
 
     log::info!("Sent search for image to chat {}", msg.chat.id);
     let mut rx = crate::core::orchestrator::reverse_search(url.to_string()).await;
-    let mut handles: Vec<JoinHandle<Result<Message, _>>> = Vec::new();
+    let mut handles: Vec<(JoinHandle<Result<Message, _>>, Arc<Enrichment>)> = Vec::new();
 
     while let Some(result) = rx.recv().await {
         match result {
@@ -28,23 +109,41 @@ pub(crate) async fn search(bot: &Bot, msg: &Message, url: &str) -> Result<()> {
                 log::info!("Found enrichments");
                 let bot = bot.clone(); // Cheap
                 let msg = msg.clone(); // Assuming msg also Clone
+                let enriched = Arc::new(enriched);
+                let enriched_to_send = enriched.clone();
                 let handle =
-                    tokio::spawn(async move { send_search_result(bot, msg, enriched).await });
-                handles.push(handle);
+                    tokio::spawn(
+                        async move { send_search_result(bot, msg, enriched_to_send).await },
+                    );
+
+                handles.push((handle, enriched.clone()));
             }
             Err(e) => {
                 log::error!("{}", e);
-                send_error_message(bot, msg.chat.id, &e.to_string())
-                    .await
-                    .unwrap();
             }
         }
     }
 
-    let results = join_all(handles).await;
-    for result in results {
-        match result {
-            Ok(Ok(_)) => {}
+    if handles.is_empty() {
+        log::info!("No enrichments found");
+        send_no_results_message(bot, msg.chat.id).await.unwrap();
+    }
+
+    for (handle, enrichment) in handles {
+        match handle.await {
+            Ok(Ok(_)) => {
+                if let Some(redis) = redis
+                    && let Some(image_id) = &image_id
+                {
+                    let key = format!("enriched:{}:{}", image_id, get_timestamp());
+                    match redis.store_struct(key.as_str(), &enrichment).await {
+                        Err(e) => {
+                            log::warn!("Could not cache enrichment for image {}: {}", image_id, e);
+                        }
+                        Ok(_) => log::info!("Cached enrichment for image {} at: {}", image_id, key),
+                    }
+                }
+            }
             Ok(Err(e)) => {
                 log::error!("Send failed: {:?}", e);
                 return Err(e);
@@ -60,14 +159,15 @@ pub(crate) async fn search(bot: &Bot, msg: &Message, url: &str) -> Result<()> {
     Ok(())
 }
 
-async fn send_error_message(bot: &Bot, chat_id: ChatId, error: &str) -> Result<Message> {
+async fn send_no_results_message(bot: &Bot, chat_id: ChatId) -> Result<Message> {
+    let error = "🔴 I searched for you on SauceNAO, Trace, IQDB, 3D IQDB but didn't find anything.";
     bot.send_message(chat_id, error)
         .disable_link_preview(true)
         .await
         .map_err(anyhow::Error::from)
 }
 
-async fn send_search_result(bot: Bot, msg: Message, result: Enrichment) -> Result<Message> {
+async fn send_search_result(bot: Bot, msg: Message, result: Arc<Enrichment>) -> Result<Message> {
     let text = display::enriched::format(&result);
 
     let video = result

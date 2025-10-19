@@ -122,8 +122,35 @@ pub struct AniList {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct Redis {
+    /// Redis Host
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub host: Option<String>,
+    /// Redis Port
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub port: Option<u16>,
+    /// Expiry
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expiry: Option<u64>,
+    /// Redis Enabled
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct Cache {
+    /// Image pHash max distance
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub phash_max_distance: Option<u32>,
+    /// Max search results
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_search_results: Option<u8>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Config {
     pub general: General,
+    pub redis: Redis,
     pub telegram: Telegram,
     pub rustypaste: RustyPaste,
     pub tracemoe: TraceMoe,
@@ -133,6 +160,7 @@ pub struct Config {
     pub gelbooru: Gelbooru,
     pub safebooru: Safebooru,
     pub anilist: AniList,
+    pub cache: Cache,
 }
 
 impl Default for Config {
@@ -141,7 +169,17 @@ impl Default for Config {
             general: General {
                 downloads_dir: Some(PathBuf::from("./downloads")),
             },
+            redis: Redis {
+                host: Some("127.0.0.1".to_string()),
+                port: Some(6379),
+                expiry: None,
+                enabled: Some(true),
+            },
             telegram: Telegram { token: None },
+            cache: Cache {
+                phash_max_distance: Some(10),
+                max_search_results: Some(5),
+            },
             rustypaste: RustyPaste {
                 token: None,
                 url: None,
