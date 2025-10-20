@@ -23,20 +23,6 @@ pub(crate) async fn cached_search(bot: &Bot, msg: &Message, image_id: String) ->
         }
     };
 
-    match redis.get(format!("url:{}", image_id).as_str()).await {
-        Ok(Some(url)) => {
-            if let Err(e) = send_search_keyboard(bot, msg, url.as_str()).await {
-                log::error!("Failed to send search keyboard {}", e);
-            }
-        }
-        Ok(None) => {
-            log::warn!("No url found for image {}", image_id);
-        }
-        Err(e) => {
-            log::warn!("Failed to get url for image {}: {}", image_id, e);
-        }
-    }
-
     let keys = match redis
         .get_keys(format!("enriched:{}:*", image_id).as_str())
         .await
@@ -68,6 +54,20 @@ pub(crate) async fn cached_search(bot: &Bot, msg: &Message, image_id: String) ->
             return Err(e);
         }
     };
+
+    match redis.get(format!("url:{}", image_id).as_str()).await {
+        Ok(Some(url)) => {
+            if let Err(e) = send_search_keyboard(bot, msg, url.as_str()).await {
+                log::error!("Failed to send search keyboard {}", e);
+            }
+        }
+        Ok(None) => {
+            log::warn!("No url found for image {}", image_id);
+        }
+        Err(e) => {
+            log::warn!("Failed to get url for image {}: {}", image_id, e);
+        }
+    }
 
     for enrichment in enriched {
         let enrichment = Arc::new(enrichment);
