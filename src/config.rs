@@ -66,6 +66,9 @@ pub struct Iqdb {
     /// Iqdb Default Limit
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<usize>,
+    /// Iqdb Timeout in sec
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<u64>,
     /// Iqdb Enabled
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enabled: Option<bool>,
@@ -192,8 +195,9 @@ impl Default for Config {
                 enabled: Some(true),
             },
             iqdb: Iqdb {
-                threshold: Some(95.0),
-                limit: Some(3),
+                threshold: Some(0.90),
+                limit: Some(1),
+                timeout: Some(10),
                 enabled: Some(true),
             },
             saucenao: SauceNao {

@@ -71,8 +71,8 @@ pub use tracemoe::TraceMoe;
 pub(crate) type BoxedReverseEngine = Box<dyn ReverseEngine + Send + Sync>;
 pub(crate) static ENGINES: Lazy<Arc<Vec<Arc<BoxedReverseEngine>>>> = Lazy::new(|| {
     Arc::new(vec![
-        // Box::new(Iqdb::new()),
         Arc::new(Box::new(SauceNao::new())),
         Arc::new(Box::new(TraceMoe::new())),
+        Arc::new(Box::new(Iqdb::new())),
     ])
 });

@@ -65,10 +65,15 @@ pub(crate) struct CliArgs {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) iqdb_threshold: Option<f32>,
 
-    /// IQDB Limit (default: 3)
+    /// IQDB Limit (default: 1)
     #[arg(long, env = "RIS_IQDB_LIMIT")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) iqdb_limit: Option<usize>,
+
+    /// IQDB Timeout in sec (default: 10)
+    #[arg(long, env = "RIS_IQDB_TIMEOUT")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) iqdb_timeout: Option<u64>,
 
     /// Disable IQDB
     #[arg(long, env = "RIS_IQDB_DISABLED")]
@@ -187,6 +192,7 @@ impl CliArgs {
             iqdb: Iqdb {
                 threshold: self.iqdb_threshold,
                 limit: self.iqdb_limit,
+                timeout: self.iqdb_timeout,
                 enabled: self.iqdb_disabled.map(|b| !b),
             },
             saucenao: SauceNao {
