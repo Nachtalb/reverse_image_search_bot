@@ -26,10 +26,6 @@ impl DataProvider for Generic {
         true
     }
 
-    fn extract_key(&self, _: &SearchHit) -> Option<String> {
-        None
-    }
-
     fn can_enrich(&self, hit: &SearchHit) -> bool {
         !hit.metadata.is_empty()
     }

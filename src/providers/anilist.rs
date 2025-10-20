@@ -20,6 +20,19 @@ impl Anilist {
     fn str_to_i32(&self, s: &str) -> Option<i32> {
         s.parse().ok()
     }
+
+    fn extract_key(&self, hit: &SearchHit) -> Option<String> {
+        let id = match hit.metadata.get("anilist_id") {
+            Some(id) => match id {
+                serde_json::Value::Number(number) => number.as_i64().map(|n| n.to_string()),
+                serde_json::Value::String(string) => self.str_to_i32(string).map(|n| n.to_string()),
+                _ => None,
+            },
+            None => None,
+        };
+        log::debug!("Extracted anilist id 3: {:?}", id);
+        id
+    }
 }
 
 #[async_trait]
@@ -34,19 +47,6 @@ impl DataProvider for Anilist {
 
     fn enabled(&self) -> bool {
         get_config().anilist.enabled.unwrap()
-    }
-
-    fn extract_key(&self, hit: &SearchHit) -> Option<String> {
-        let id = match hit.metadata.get("anilist_id") {
-            Some(id) => match id {
-                serde_json::Value::Number(number) => number.as_i64().map(|n| n.to_string()),
-                serde_json::Value::String(string) => self.str_to_i32(string).map(|n| n.to_string()),
-                _ => None,
-            },
-            None => None,
-        };
-        log::debug!("Extracted anilist id 3: {:?}", id);
-        id
     }
 
     fn can_enrich(&self, hit: &SearchHit) -> bool {

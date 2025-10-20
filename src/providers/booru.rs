@@ -97,17 +97,13 @@ impl DataProvider for Danbooru {
         get_config().danbooru.enabled.unwrap()
     }
 
-    fn extract_key(&self, hit: &SearchHit) -> Option<String> {
-        extract_key(hit, self.name())
-    }
-
     fn can_enrich(&self, hit: &SearchHit) -> bool {
         log::debug!("Checking if can enrich {}: {:?}", self.name(), hit);
-        self.extract_key(hit).is_some()
+        extract_key(hit, self.name()).is_some()
     }
 
     async fn enrich(&self, hit: &SearchHit) -> anyhow::Result<Option<Enrichment>> {
-        if let Some(string_id) = self.extract_key(hit) {
+        if let Some(string_id) = extract_key(hit, self.name()) {
             log::debug!("Enriching {}: {}", self.name(), string_id);
             let id = str_to_u32(&string_id).unwrap();
 
@@ -198,17 +194,13 @@ impl DataProvider for Gelbooru {
         get_config().gelbooru.enabled.unwrap()
     }
 
-    fn extract_key(&self, hit: &SearchHit) -> Option<String> {
-        extract_key(hit, self.name())
-    }
-
     fn can_enrich(&self, hit: &SearchHit) -> bool {
         log::debug!("Checking if can enrich {}: {:?}", self.name(), hit);
-        self.extract_key(hit).is_some()
+        extract_key(hit, self.name()).is_some()
     }
 
     async fn enrich(&self, hit: &SearchHit) -> anyhow::Result<Option<Enrichment>> {
-        if let Some(string_id) = self.extract_key(hit) {
+        if let Some(string_id) = extract_key(hit, self.name()) {
             log::debug!("Enriching {}: {}", self.name(), string_id);
             let id = str_to_u32(&string_id).unwrap();
 
@@ -266,17 +258,13 @@ impl DataProvider for Safebooru {
         get_config().safebooru.enabled.unwrap()
     }
 
-    fn extract_key(&self, hit: &SearchHit) -> Option<String> {
-        extract_key(hit, self.name())
-    }
-
     fn can_enrich(&self, hit: &SearchHit) -> bool {
         log::debug!("Checking if can enrich {}: {:?}", self.name(), hit);
-        self.extract_key(hit).is_some()
+        extract_key(hit, self.name()).is_some()
     }
 
     async fn enrich(&self, hit: &SearchHit) -> anyhow::Result<Option<Enrichment>> {
-        if let Some(string_id) = self.extract_key(hit) {
+        if let Some(string_id) = extract_key(hit, self.name()) {
             log::debug!("Enriching {}: {}", self.name(), string_id);
             let id = str_to_u32(&string_id).unwrap();
 

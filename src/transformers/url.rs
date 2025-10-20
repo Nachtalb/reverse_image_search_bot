@@ -49,7 +49,7 @@ impl Service {
             Service::SankakuComplex => "Sankaku Complex".to_string(),
             Service::EShuushuu => "E-Shuushuu".to_string(),
             Service::MangaDex => "MangaDex".to_string(),
-            Service::MangaDexChapter => "MangaDexChapter".to_string(),
+            Service::MangaDexChapter => "MangaDex".to_string(),
             Service::MangaUpdates => "Manga Updates".to_string(),
             Service::MyAnimeList => "MyAnimeList".to_string(),
             Service::Fakku => "Fakku".to_string(),

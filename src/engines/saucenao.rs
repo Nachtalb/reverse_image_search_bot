@@ -60,10 +60,6 @@ impl DataProvider for SauceNao {
         hit.engine == self.name()
     }
 
-    fn extract_key(&self, _: &SearchHit) -> Option<String> {
-        None
-    }
-
     async fn enrich(&self, hit: &SearchHit) -> Result<Option<Enrichment>> {
         if !self.can_enrich(hit) {
             return Ok(None);

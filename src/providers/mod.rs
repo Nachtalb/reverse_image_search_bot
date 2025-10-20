@@ -15,7 +15,6 @@ pub trait DataProvider: Send + Sync {
     fn priority(&self) -> u8;
     fn enabled(&self) -> bool;
     fn can_enrich(&self, hit: &SearchHit) -> bool;
-    fn extract_key(&self, hit: &SearchHit) -> Option<String>;
     async fn enrich(&self, hit: &SearchHit) -> Result<Option<Enrichment>>;
 }
 
