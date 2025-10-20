@@ -30,7 +30,10 @@ async fn setup_redis_data(connection: &mut impl ConnectionLike) -> Result<()> {
                 .arg(1i64)
                 .arg("image:")
                 .arg("PAYLOAD_FIELD")
-                .arg("payload");
+                .arg("payload")
+                .arg("SCHEMA")
+                .arg("id")
+                .arg("TAG");
             create_cmd
                 .query_async::<()>(connection)
                 .await
