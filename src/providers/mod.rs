@@ -21,12 +21,14 @@ pub trait DataProvider: Send + Sync {
 
 pub mod anilist;
 pub mod booru;
+pub mod generic;
 // pub mod pixiv;
 // pub mod anidb;
 // pub mod myanilist;
 
 pub use anilist::Anilist;
 pub use booru::{Danbooru, Gelbooru, Safebooru};
+pub use generic::Generic;
 // pub use mangadex::Mangadex;
 // pub use pixiv::Pixiv;
 // pub use anidb::Anidb;
@@ -35,6 +37,7 @@ pub use booru::{Danbooru, Gelbooru, Safebooru};
 pub(crate) type BoxedDataProvider = Box<dyn DataProvider + Send + Sync>;
 pub(crate) static PROVIDERS: Lazy<Arc<Vec<Arc<BoxedDataProvider>>>> = Lazy::new(|| {
     Arc::new(vec![
+        Arc::new(Box::new(Generic::new())),
         Arc::new(Box::new(Anilist::new())),
         Arc::new(Box::new(TraceMoe::new())),
         Arc::new(Box::new(SauceNao::new())),
