@@ -178,13 +178,12 @@ pub(crate) async fn handle_media_message(bot: Bot, msg: Message) -> Result<()> {
 
     let file_url = match files::get_file_url(downloaded_file).await {
         Ok(url) => {
-            if let Some(redis) = &redis {
-                if let Err(e) = redis
+            if let Some(redis) = &redis
+                && let Err(e) = redis
                     .store(format!("url:{}", new_image_id).as_str(), url.clone())
                     .await
-                {
-                    log::warn!("Failed to store image url in redis: {}", e);
-                }
+            {
+                log::warn!("Failed to store image url in redis: {}", e);
             }
 
             url
@@ -196,7 +195,10 @@ pub(crate) async fn handle_media_message(bot: Bot, msg: Message) -> Result<()> {
         }
     };
 
-    if let Some(redis) = redis
+    if image_hash.is_none() {
+        search(&bot, &msg, &file_url, None).await?;
+        return Ok(());
+    } else if let Some(redis) = redis
         && let Some(image_hash) = image_hash
         && let Err(e) = redis.store_phash(new_image_id.as_str(), image_hash).await
     {
