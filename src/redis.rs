@@ -1,6 +1,6 @@
 use anyhow::{Error, Result};
 use redis::{
-    AsyncCommands, Client, Value,
+    AsyncCommands, Client, HashFieldExpirationOptions, SetExpiry, Value,
     aio::{ConnectionLike, ConnectionManager},
     cmd,
 };
@@ -155,7 +155,16 @@ impl Redis {
 
     pub(crate) async fn store_phash(&self, id: &str, phash: Vec<u8>) -> redis::RedisResult<()> {
         let key = format!("image:{}", id);
-        self.connection().hset(&key, "payload", phash).await
+        if let Some(expiry) = self.expiry {
+            let expiry =
+                HashFieldExpirationOptions::default().set_expiration(SetExpiry::EX(expiry));
+
+            self.connection()
+                .hset_ex(&key, &expiry, &[("payload", phash)])
+                .await
+        } else {
+            self.connection().hset(&key, "payload", phash).await
+        }
     }
 
     pub(crate) async fn find_similar(&self, query_phash: &[u8]) -> Result<Vec<(String, u32)>> {
