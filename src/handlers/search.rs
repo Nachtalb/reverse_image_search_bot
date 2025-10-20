@@ -231,7 +231,13 @@ async fn send_image(
     buttons: Option<ReplyMarkup>,
 ) -> Result<Message> {
     log::info!("Send image result to: {}", chat_id);
-    let input_file = InputFile::url(Url::parse(url).unwrap());
+    let input_file = InputFile::url(match Url::parse(url) {
+        Ok(url) => url,
+        Err(e) => {
+            log::error!("Failed to parse url \"{}\": {}", url, e);
+            return Err(anyhow::Error::from(e));
+        }
+    });
     let mut message = bot
         .send_photo(chat_id, input_file)
         .caption(text)
