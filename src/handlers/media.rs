@@ -153,6 +153,7 @@ pub(crate) async fn handle_media_message(bot: Bot, msg: Message) -> Result<()> {
     };
 
     let redis = get_redis().await;
+    log::debug!("Redis initialized");
 
     let new_image_id = get_timestamp().to_string();
     let image_hash: Option<Vec<u8>> = match get_image_hash(downloaded_file.to_str().unwrap()) {
@@ -167,7 +168,9 @@ pub(crate) async fn handle_media_message(bot: Bot, msg: Message) -> Result<()> {
         && let Some(redis) = &redis
     {
         match get_or_store_similar_image(redis, &new_image_id, image_hash.clone()).await {
-            Ok((_, false)) => {}
+            Ok((_, false)) => {
+                log::info!("No similar image found - stored current image");
+            }
             Ok((cached_image_id, true)) => match cached_search(&bot, &msg, cached_image_id).await {
                 Ok(_) => return Ok(()),
                 Err(e) => log::error!("Failed to send cached search results: {}", e),

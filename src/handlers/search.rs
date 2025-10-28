@@ -15,6 +15,7 @@ use anyhow::{Error, Result};
 use teloxide::prelude::*;
 
 pub(crate) async fn cached_search(bot: &Bot, msg: &Message, image_id: String) -> Result<()> {
+    log::debug!("Cached search for image {}", image_id);
     let redis = match get_redis().await {
         Some(redis) => redis,
         None => {
@@ -23,6 +24,7 @@ pub(crate) async fn cached_search(bot: &Bot, msg: &Message, image_id: String) ->
         }
     };
 
+    log::debug!("Getting keys for cached results for image {}", image_id);
     let keys = match redis
         .get_keys(format!("enriched:{}:*", image_id).as_str())
         .await
@@ -34,7 +36,7 @@ pub(crate) async fn cached_search(bot: &Bot, msg: &Message, image_id: String) ->
                     image_id
                 )));
             }
-            log::info!("Found {} cached results for image {}", keys.len(), image_id);
+            log::debug!("Found {} cached results for image {}", keys.len(), image_id);
             keys
         }
         Err(e) => {
@@ -47,6 +49,7 @@ pub(crate) async fn cached_search(bot: &Bot, msg: &Message, image_id: String) ->
         }
     };
 
+    log::debug!("Getting cached results for image {}", image_id);
     let enriched = match redis.get_structs::<Enrichment>(keys).await {
         Ok(enriched) => enriched,
         Err(e) => {
@@ -55,6 +58,7 @@ pub(crate) async fn cached_search(bot: &Bot, msg: &Message, image_id: String) ->
         }
     };
 
+    log::debug!("Sending search keyboard for image {}", image_id);
     match redis.get(format!("url:{}", image_id).as_str()).await {
         Ok(Some(url)) => {
             if let Err(e) = send_search_keyboard(bot, msg, url.as_str()).await {
@@ -67,6 +71,16 @@ pub(crate) async fn cached_search(bot: &Bot, msg: &Message, image_id: String) ->
         Err(e) => {
             log::warn!("Failed to get url for image {}: {}", image_id, e);
         }
+    }
+
+    if enriched.is_empty() {
+        log::debug!("No cached results found for image {}", image_id);
+    } else {
+        log::debug!(
+            "Found {} cached results for image {}",
+            enriched.len(),
+            image_id
+        );
     }
 
     for enrichment in enriched {
@@ -99,14 +113,14 @@ pub(crate) async fn search(
         &None
     };
 
-    log::info!("Sent search for image to chat {}", msg.chat.id);
+    log::debug!("Sent search for image to chat {}", msg.chat.id);
     let mut rx = crate::core::orchestrator::reverse_search(url.to_string()).await;
     let mut handles: Vec<(JoinHandle<Result<Message, _>>, Arc<Enrichment>)> = Vec::new();
 
     while let Some(result) = rx.recv().await {
         match result {
             Ok(enriched) => {
-                log::info!("Found enrichments");
+                log::debug!("Found enrichments");
                 let bot = bot.clone(); // Cheap
                 let msg = msg.clone(); // Assuming msg also Clone
                 let enriched = Arc::new(enriched);
@@ -125,7 +139,7 @@ pub(crate) async fn search(
     }
 
     if handles.is_empty() {
-        log::info!("No enrichments found");
+        log::debug!("No enrichments found");
         send_no_results_message(bot, msg.chat.id).await.unwrap();
     }
 
@@ -140,7 +154,9 @@ pub(crate) async fn search(
                         Err(e) => {
                             log::warn!("Could not cache enrichment for image {}: {}", image_id, e);
                         }
-                        Ok(_) => log::info!("Cached enrichment for image {} at: {}", image_id, key),
+                        Ok(_) => {
+                            log::debug!("Cached enrichment for image {} at: {}", image_id, key)
+                        }
                     }
                 }
             }
@@ -154,7 +170,7 @@ pub(crate) async fn search(
             }
         }
     }
-    log::info!("Reverse search done");
+    log::debug!("Reverse search done");
 
     Ok(())
 }
@@ -168,6 +184,7 @@ async fn send_no_results_message(bot: &Bot, chat_id: ChatId) -> Result<Message> 
 }
 
 async fn send_search_result(bot: Bot, msg: Message, result: Arc<Enrichment>) -> Result<Message> {
+    log::debug!("Send search result to: {}", msg.chat.id);
     let text = display::enriched::format(&result);
 
     let video = result
@@ -206,7 +223,7 @@ async fn send_video(
     text: String,
     buttons: Option<ReplyMarkup>,
 ) -> Result<Message> {
-    log::info!("Send video result to: {}", chat_id);
+    log::debug!("Send video result to: {}", chat_id);
     let input_file = InputFile::url(Url::parse(url).unwrap());
     let mut message = bot
         .send_video(chat_id, input_file)
@@ -230,7 +247,7 @@ async fn send_image(
     text: String,
     buttons: Option<ReplyMarkup>,
 ) -> Result<Message> {
-    log::info!("Send image result to: {}", chat_id);
+    log::debug!("Send image result to: {}", chat_id);
     let input_file = InputFile::url(match Url::parse(url) {
         Ok(url) => url,
         Err(e) => {
@@ -259,7 +276,7 @@ async fn send_text(
     text: String,
     buttons: Option<ReplyMarkup>,
 ) -> Result<Message> {
-    log::info!("Send text result to: {}", chat_id);
+    log::debug!("Send text result to: {}", chat_id);
     let mut message = bot.send_message(chat_id, text);
 
     if let Some(buttons) = buttons {

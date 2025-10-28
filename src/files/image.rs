@@ -2,6 +2,7 @@ use anyhow::{Error, Result};
 use img_hash::HasherConfig;
 
 pub(crate) fn get_image_hash(path: &str) -> Result<Vec<u8>> {
+    log::info!("Getting hash for image {}", path);
     let image = match image::open(path) {
         Ok(image) => image,
         Err(e) => {

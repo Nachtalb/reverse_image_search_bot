@@ -14,15 +14,16 @@ use crate::config::get_config;
 const HASH_INDEX: &str = "phash_idx";
 
 async fn setup_redis_data(connection: &mut impl ConnectionLike) -> Result<()> {
+    log::debug!("Setting up redis pHash index");
     let mut info_cmd = cmd("FT.INFO");
     info_cmd.arg(HASH_INDEX);
     match info_cmd.query_async::<Value>(connection).await {
         Ok(_) => {
-            log::info!("pHash index exists");
+            log::info!("Redis pHash index already set up");
             Ok(())
         }
         Err(_) => {
-            log::info!("Creating pHash index");
+            log::info!("Setting up redis pHash index");
             let mut create_cmd = cmd("FT.CREATE");
             create_cmd
                 .arg(HASH_INDEX)
@@ -40,12 +41,14 @@ async fn setup_redis_data(connection: &mut impl ConnectionLike) -> Result<()> {
                 .query_async::<()>(connection)
                 .await
                 .map_err(|e| anyhow::anyhow!("Failed to create pHash index: {}", e))?;
+            log::info!("Redis pHash index set up");
             Ok(())
         }
     }
 }
 
 async fn setup_redis() -> Option<Redis> {
+    log::debug!("Setup redis");
     let config = get_config();
     let client = match Client::open(format!(
         "redis://{}:{}",
@@ -80,6 +83,8 @@ async fn setup_redis() -> Option<Redis> {
         }
     };
 
+    log::debug!("Connected to redis");
+
     Some(Redis {
         conn_manager: manager,
         expiry: config.redis.expiry,
@@ -89,6 +94,7 @@ async fn setup_redis() -> Option<Redis> {
 static REDIS: OnceCell<Option<Redis>> = OnceCell::const_new();
 
 pub(crate) async fn get_redis() -> &'static Option<Redis> {
+    log::debug!("Get or init redis");
     REDIS.get_or_init(setup_redis).await
 }
 
