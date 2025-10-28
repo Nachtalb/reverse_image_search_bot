@@ -1,7 +1,9 @@
+use std::time::Duration;
+
 use anyhow::{Error, Result};
 use redis::{
     AsyncCommands, Client, HashFieldExpirationOptions, SetExpiry, Value,
-    aio::{ConnectionLike, ConnectionManager},
+    aio::{ConnectionLike, ConnectionManager, ConnectionManagerConfig},
     cmd,
 };
 use serde::{Deserialize, Serialize};
@@ -56,8 +58,15 @@ async fn setup_redis() -> Option<Redis> {
             return None;
         }
     };
+    log::debug!("Created redis client");
 
-    let manager = match client.get_connection_manager().await {
+    let connection_config = ConnectionManagerConfig::new()
+        .set_connection_timeout(Duration::from_secs(5))
+        .set_response_timeout(Duration::from_secs(5))
+        .set_number_of_retries(1);
+
+    let manager = match ConnectionManager::new_with_config(client.clone(), connection_config).await
+    {
         Ok(mut manager) => match setup_redis_data(&mut manager).await {
             Ok(_) => manager,
             Err(err) => {
