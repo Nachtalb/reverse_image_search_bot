@@ -9,14 +9,14 @@
 - [ ] Prevent duplicate uploads
 - [x] Auto Search
   - [x] Trace Moe
-  - [-] IQDB **API crate broken**
-  - [ ] 3dIQDB
+  - [x] IQDB
+  - [-] ~3dIQDB~ **Not worth it - is not updated anymore**
   - [x] SauceNao
 - [-] Data Parser
   - [x] Generic SauceNao
   - [x] Generic TraceMoe
-  - [-] Generic IQDB **Crate does not provide additional data**
-  - [-] Generic 3dIQDB **Crate does not provide additional data**
+  - [x] Generic IQDB
+  - [-] ~Generic 3dIQDB~ **Dropped 3D IQDB support**
   - [x] AniList
   - [-] Boorus
     - [x] Danbooru
@@ -25,7 +25,7 @@
     - [ ] ~Yandere~ **Not worth it**
     - [ ] ~3dbooru~ **Not worth it**
     - [ ] sankaku
-  - [ ] MangaDex
+  - [x] MangaDex
   - [ ] Pixiv
 - [x] Handle Media
   - [x] Photo
