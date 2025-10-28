@@ -31,6 +31,9 @@ pub enum Service {
     AniList,
     PixivMember,
     PixivArtwork,
+    Bookwalker,
+    AnimePlanet,
+    Kitsu,
     XUser,
     XStatus,
     Unknown(String),
@@ -59,6 +62,9 @@ impl Service {
             Service::AniList => "AniList".to_string(),
             Service::PixivMember => "Pixiv User".to_string(),
             Service::PixivArtwork => "Pixiv Artwork".to_string(),
+            Service::Bookwalker => "Bookwalker".to_string(),
+            Service::AnimePlanet => "AnimePlanet".to_string(),
+            Service::Kitsu => "Kitsu".to_string(),
             Service::XUser => "X User".to_string(),
             Service::XStatus => "X Status".to_string(),
             Service::Unknown(host) => match parse_domain_name(host) {
@@ -87,7 +93,12 @@ impl Service {
             Service::MyAnimeList => '📺',
             Service::AniList => '🎬',
             Service::AniDB => '🗄',
-            Service::MangaDex | Service::MangaDexChapter | Service::MangaUpdates => '📚',
+            Service::MangaDex => '📖',
+            Service::MangaDexChapter => '📄',
+            Service::MangaUpdates => '📈',
+            Service::Bookwalker => '📚',
+            Service::AnimePlanet => '🪐',
+            Service::Kitsu => '🦊',
             Service::Fakku => '💋',
             _ => '🔗',
         }
@@ -115,6 +126,9 @@ impl Service {
             Service::AniList => "anilist".to_string(),
             Service::PixivMember => "pixiv-member".to_string(),
             Service::PixivArtwork => "pixiv".to_string(),
+            Service::Bookwalker => "bookwalker".to_string(),
+            Service::AnimePlanet => "anime-planet".to_string(),
+            Service::Kitsu => "kitsu".to_string(),
             Service::XUser => "x-user".to_string(),
             Service::XStatus => "x-status".to_string(),
             Service::Unknown(host) => format!("unknown-{}", host.to_lowercase()),
@@ -154,6 +168,9 @@ impl Service {
             h if h.contains("e-hentai.org") => Service::EHentai,
             h if h.contains("anidb.net") => Service::AniDB,
             h if h.contains("anilist.co") => Service::AniList,
+            h if h.contains("bookwalker.jp") => Service::Bookwalker,
+            h if h.contains("anime-planet.com") => Service::AnimePlanet,
+            h if h.contains("kitsu.app") => Service::Kitsu,
             h if (h.contains("pixiv.net") && path.contains("artworks"))
                 || h.contains("pximg.net") =>
             {
@@ -196,6 +213,9 @@ impl Service {
             Service::EHentai => re_find(r"/g/([a-zA-Z-0-9]+/[a-zA-Z-0-9]+)", path),
             Service::AniDB => re_find(r"/anime/(\d+)", path),
             Service::AniList => re_find(r"/anime/(\d+)", path),
+            Service::Bookwalker => Some(path.trim_matches('/').to_string()),
+            Service::AnimePlanet => re_find(r"/manga/(\d+)", path),
+            Service::Kitsu => re_find(r"/manga/(\d+)", path),
             Service::PixivMember => re_find(r"/users/(\d+)", path),
             Service::PixivArtwork => {
                 if host.contains("pixiv.net") {
@@ -249,6 +269,9 @@ impl Service {
             "ehentai-gallery" => Some(Service::EHentai),
             "anidb" => Some(Service::AniDB),
             "anilist" => Some(Service::AniList),
+            "bookwalker" => Some(Service::Bookwalker),
+            "anime-planet" => Some(Service::AnimePlanet),
+            "kitsu" => Some(Service::Kitsu),
             "pixiv-user" | "pixiv-artist" | "pixiv-member" => Some(Service::PixivMember),
             "pixiv-artwork" | "pixiv" => Some(Service::PixivArtwork),
             "x-user" => Some(Service::XUser),
@@ -299,6 +322,9 @@ impl Service {
             }
             Service::AniDB => Some(format!("https://anidb.net/anime/{}", id)),
             Service::AniList => Some(format!("https://anilist.co/anime/{}", id)),
+            Service::Bookwalker => Some(format!("https://bookwalker.jp/{}", id)),
+            Service::AnimePlanet => Some(format!("https://www.anime-planet.com/manga/{}", id)),
+            Service::Kitsu => Some(format!("https://kitsu.app/manga/{}", id)),
             Service::PixivMember => Some(format!("https://www.pixiv.net/en/users/{}", id)),
             Service::PixivArtwork => Some(format!("https://www.pixiv.net/en/artworks/{}", id)),
             Service::XUser => Some(format!("https://x.com/{}", id)),
@@ -368,6 +394,18 @@ mod tests {
         assert_eq!(Service::from_string(key.as_str()), Some(Service::AniDB));
         key = Service::AniList.key();
         assert_eq!(Service::from_string(key.as_str()), Some(Service::AniList));
+        key = Service::Bookwalker.key();
+        assert_eq!(
+            Service::from_string(key.as_str()),
+            Some(Service::Bookwalker)
+        );
+        key = Service::AnimePlanet.key();
+        assert_eq!(
+            Service::from_string(key.as_str()),
+            Some(Service::AnimePlanet)
+        );
+        key = Service::Kitsu.key();
+        assert_eq!(Service::from_string(key.as_str()), Some(Service::Kitsu));
         key = Service::PixivMember.key();
         assert_eq!(
             Service::from_string(key.as_str()),
@@ -387,6 +425,99 @@ mod tests {
             Service::from_string(key.as_str()),
             Some(Service::Unknown("example.com".to_string()))
         );
+    }
+
+    #[test]
+    fn test_bookwalker_parsing() {
+        assert_eq!(
+            Service::from_url("https://bookwalker.jp/series/57901/list/"),
+            Service::Bookwalker
+        );
+    }
+
+    #[test]
+    fn test_bookwalker_id() {
+        assert_eq!(
+            Service::Bookwalker.get_id("https://bookwalker.jp/series/57901/list/"),
+            Some("series/57901/list".to_string())
+        );
+    }
+
+    #[test]
+    fn test_bookwalker_url_builder() {
+        assert_eq!(
+            Service::Bookwalker.build_url("series/57901/list"),
+            Some("https://bookwalker.jp/series/57901/list".to_string())
+        );
+    }
+
+    #[test]
+    fn test_bookwalker_from_id() {
+        assert_eq!(
+            Service::from_string("bookwalker"),
+            Some(Service::Bookwalker)
+        );
+    }
+
+    #[test]
+    fn test_animeplanet_parsing() {
+        assert_eq!(
+            Service::from_url("https://www.anime-planet.com/manga/1234"),
+            Service::AnimePlanet
+        );
+    }
+
+    #[test]
+    fn test_animeplanet_id() {
+        assert_eq!(
+            Service::AnimePlanet.get_id("https://www.anime-planet.com/manga/1234"),
+            Some("1234".to_string())
+        );
+    }
+
+    #[test]
+    fn test_animeplanet_url_builder() {
+        assert_eq!(
+            Service::AnimePlanet.build_url("1234"),
+            Some("https://www.anime-planet.com/manga/1234".to_string())
+        );
+    }
+
+    #[test]
+    fn test_animeplanet_from_id() {
+        assert_eq!(
+            Service::from_string("anime-planet"),
+            Some(Service::AnimePlanet)
+        );
+    }
+
+    #[test]
+    fn test_kitsu_parsing() {
+        assert_eq!(
+            Service::from_url("https://kitsu.app/manga/1234"),
+            Service::Kitsu
+        );
+    }
+
+    #[test]
+    fn test_kitsu_id() {
+        assert_eq!(
+            Service::Kitsu.get_id("https://kitsu.app/manga/1234"),
+            Some("1234".to_string())
+        );
+    }
+
+    #[test]
+    fn test_kitsu_url_builder() {
+        assert_eq!(
+            Service::Kitsu.build_url("1234"),
+            Some("https://kitsu.app/manga/1234".to_string())
+        );
+    }
+
+    #[test]
+    fn test_kitsu_from_id() {
+        assert_eq!(Service::from_string("kitsu"), Some(Service::Kitsu));
     }
 
     #[test]
