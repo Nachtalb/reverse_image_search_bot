@@ -241,6 +241,8 @@ impl MangaDex {
             tags: Some(tags),
             status: Some(status),
             thumbnail: hit.thumbnail.clone(),
+            enrichers: std::collections::HashSet::from([String::from(self.name())]),
+            priority: self.priority(),
             ..Default::default()
         })
     }
