@@ -143,6 +143,18 @@ impl MangaDex {
         }
     }
 
+    fn id_map(sn_id: &str) -> &str {
+        match sn_id {
+            "al" => "anilist",
+            "mal" => "myanimelist",
+            "mu" => "mangaupdates",
+            "kt" => "kitsu",
+            "ap" => "anime-planet",
+            "bw" => "bookwalker",
+            _ => sn_id,
+        }
+    }
+
     async fn enrich_manga(
         &self,
         hit: &SearchHit,
@@ -171,13 +183,25 @@ impl MangaDex {
             links.extend(official_links.clone());
         }
 
-        let urls: Vec<Url> = links
-            .iter()
-            .map(|url| Url {
-                url: Some(url.1.clone()),
-                name: Some(Service::from_url(url.1).name()),
-            })
-            .collect();
+        let mut urls: HashSet<Url> = HashSet::new();
+        let main_url: Option<Url> = Some(Url {
+            url: Service::MangaDex.build_url(&manga.id),
+        });
+
+        for link in links.iter() {
+            let service = Service::from_string(Self::id_map(link.0.as_str()))
+                .unwrap_or_else(|| Service::from_url(link.1));
+
+            if let Service::Unknown(_) = service
+                && !link.1.starts_with("http")
+            {
+                continue;
+            }
+
+            urls.insert(Url {
+                url: service.build_url(link.1),
+            });
+        }
 
         let chapters = chapter.map(|chapter| Chapters {
             total: manga
@@ -210,6 +234,7 @@ impl MangaDex {
 
         Some(Enrichment {
             title: Some(title),
+            main_url,
             urls: Some(urls),
             year: manga.attributes.year,
             chapters,
