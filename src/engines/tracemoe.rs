@@ -30,7 +30,7 @@ impl TraceMoe {
     }
 
     fn name(&self) -> &'static str {
-        "tracemoe"
+        "TraceMoe"
     }
 }
 

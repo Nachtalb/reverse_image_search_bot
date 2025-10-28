@@ -30,7 +30,7 @@ impl SauceNao {
     }
 
     fn name(&self) -> &'static str {
-        "saucenao"
+        "SauceNAO"
     }
 
     fn client(&self) -> Client {

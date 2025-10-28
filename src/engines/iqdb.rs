@@ -78,7 +78,7 @@ impl Iqdb {
 #[async_trait]
 impl ReverseEngine for Iqdb {
     fn name(&self) -> &'static str {
-        "iqdb"
+        "IQDB"
     }
 
     fn threshold(&self) -> Option<f32> {
