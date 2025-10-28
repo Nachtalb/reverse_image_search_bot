@@ -44,6 +44,7 @@ async fn process_enrichments(hit: Arc<SearchHit>, tx: mpsc::Sender<Result<Enrich
         let hit = Arc::clone(&hit);
         let name = provider.name().to_string();
 
+        log::info!("Enriching with {}", name);
         let handle = tokio::spawn(async move { provider.enrich(&hit).await });
 
         handles.insert(name, handle);
