@@ -159,7 +159,6 @@ impl DataProvider for Danbooru {
 
                         main_url: Some(Url {
                             url: Some(post.source),
-                            name: None,
                         }),
                         priority: self.priority(),
                         enrichers: std::collections::HashSet::from([self.name().to_string()]),
@@ -223,7 +222,6 @@ impl DataProvider for Gelbooru {
 
                         main_url: Some(Url {
                             url: Some(post.source),
-                            name: None,
                         }),
                         priority: self.priority(),
                         enrichers: std::collections::HashSet::from([self.name().to_string()]),
@@ -287,7 +285,6 @@ impl DataProvider for Safebooru {
 
                         main_url: Some(Url {
                             url: Service::Safebooru.build_url(&string_id),
-                            name: None,
                         }),
                         priority: self.priority(),
                         enrichers: std::collections::HashSet::from([self.name().to_string()]),

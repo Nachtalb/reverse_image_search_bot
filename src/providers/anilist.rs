@@ -89,7 +89,6 @@ impl DataProvider for Anilist {
 
                         main_url: Some(Url {
                             url: media.site_url,
-                            name: Some("AniList".to_string()),
                         }),
                         urls: Some(
                             media
@@ -97,10 +96,7 @@ impl DataProvider for Anilist {
                                 .unwrap_or_default()
                                 .into_iter()
                                 .filter(|x| x.url.is_some())
-                                .map(|link| Url {
-                                    url: link.url,
-                                    name: link.site,
-                                })
+                                .map(|link| Url { url: link.url })
                                 .collect(),
                         ),
                         year: media.season_year.and_then(|x| x.try_into().ok()),

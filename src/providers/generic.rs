@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::models::{Enrichment, SearchHit, Url};
 use crate::providers::DataProvider;
 use crate::transformers::Service;
@@ -33,15 +35,14 @@ impl DataProvider for Generic {
     async fn enrich(&self, hit: &SearchHit) -> anyhow::Result<Option<Enrichment>> {
         let mut urls = hit.metadata.iter().filter_map(|(k, v)| {
             Service::from_string(k.as_str()).map(|service| Url {
-                url: service.build_url(v.to_string().as_str()),
-                name: Some(service.name().to_string()),
+                url: service.build_url(v.to_string().trim_matches('"')),
             })
         });
 
         let main_url = urls.next();
 
         if hit.thumbnail.is_some() || main_url.is_some() {
-            let urls: Vec<Url> = urls.collect();
+            let urls: HashSet<Url> = urls.collect();
             Ok(Some(Enrichment {
                 thumbnail: hit.thumbnail.clone(),
                 main_url,

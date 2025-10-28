@@ -1,12 +1,14 @@
 pub mod enriched;
 
+use std::collections::HashSet;
+
 use teloxide::types::InlineKeyboardButton;
 
 use crate::models::enrichment::Url;
 
 pub(crate) fn telegram_buttons(
     main_url: &Option<Url>,
-    urls: &Option<Vec<Url>>,
+    urls: &Option<HashSet<Url>>,
 ) -> Vec<Vec<InlineKeyboardButton>> {
     let mut buttons: Vec<Vec<InlineKeyboardButton>> = vec![];
     if let Some(url) = main_url

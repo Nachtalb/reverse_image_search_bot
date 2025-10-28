@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     engines::ReverseEngine,
@@ -76,7 +76,7 @@ impl DataProvider for SauceNao {
             return Ok(None);
         }
 
-        let mut urls: Vec<Url> = Vec::new();
+        let mut urls: HashSet<Url> = HashSet::new();
         for (k, v) in &hit.metadata {
             let id = if let Some(id) = v.as_str() {
                 id
@@ -87,10 +87,7 @@ impl DataProvider for SauceNao {
                 Some(Service::Unknown(_)) => continue,
                 Some(serv) => {
                     if let Some(url) = serv.build_url(id) {
-                        urls.push(Url {
-                            url: Some(url),
-                            ..Default::default()
-                        });
+                        urls.insert(Url { url: Some(url) });
                     }
                 }
                 None => continue,

@@ -37,24 +37,19 @@ pub struct Title {
     pub native: Option<String>,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Hash, Eq, PartialEq, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Url {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
 }
 
 impl Url {
     pub fn name(&self, with_emoji: bool) -> String {
         let service = self.url.as_ref().map(|url| Service::from_url(url));
 
-        let name = if let Some(name) = &self.name {
-            name.clone()
-        } else if let Some(service) = &service {
-            service.name()
-        } else {
-            "Link".to_string()
+        let name = match &service {
+            Some(service) => service.name(),
+            _ => "Link".to_string(),
         };
 
         if with_emoji {
@@ -116,7 +111,7 @@ pub struct Enrichment {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub main_url: Option<Url>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub urls: Option<Vec<Url>>,
+    pub urls: Option<HashSet<Url>>,
 
     pub priority: u8,
     pub enrichers: HashSet<String>,
