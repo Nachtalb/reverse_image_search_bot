@@ -1,4 +1,5 @@
 use crate::transformers::titleize;
+use addr::parse_domain_name;
 use regex::Regex;
 use reqwest::Url;
 
@@ -60,9 +61,18 @@ impl Service {
             Service::PixivArtwork => "Pixiv Artwork".to_string(),
             Service::XUser => "X User".to_string(),
             Service::XStatus => "X Status".to_string(),
-            Service::Unknown(host) => {
-                titleize(&host.rsplit('.').next().unwrap_or(host).replace('-', " "))
-            }
+            Service::Unknown(host) => match parse_domain_name(host) {
+                Ok(parsed) => match parsed.root() {
+                    Some(root) => titleize(
+                        root.strip_suffix(&format!(".{}", parsed.suffix()))
+                            .unwrap_or(root)
+                            .replace("-", " ")
+                            .as_str(),
+                    ),
+                    None => host.to_string(),
+                },
+                Err(_) => host.to_string(),
+            },
         }
     }
 

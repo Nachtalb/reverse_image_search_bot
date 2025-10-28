@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+addr = "0.15.6"
 anilist_moe = { version = "0.2.1", git = "https://github.com/Nachtalb/anilist_moe.git", branch = "fix/set_external_link_fields_public" }
 anyhow = "1.0.100"
 async-trait = "0.1.89"

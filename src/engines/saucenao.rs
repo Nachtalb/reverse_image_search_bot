@@ -40,6 +40,17 @@ impl SauceNao {
             HandlerBuilder::default().build()
         }
     }
+
+    fn id_map(sn_id: &str) -> &str {
+        match sn_id {
+            "md_id" => "mangadex-chapter",
+            "mal_id" => "myanimelist",
+            "mu_id" => "mangaupdates",
+            "member_id" => "pixiv-member",
+            "pixiv_id" => "pixiv-artwork",
+            _ => sn_id,
+        }
+    }
 }
 
 #[async_trait]
@@ -134,7 +145,10 @@ impl ReverseEngine for SauceNao {
             .map(|item: &Sauce| {
                 let mut metadata = match item.additional_fields.clone() {
                     Some(fields) => match fields.as_object() {
-                        Some(obj) => obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+                        Some(obj) => obj
+                            .iter()
+                            .map(|(k, v)| (Self::id_map(k.as_str()).to_string(), v.clone()))
+                            .collect(),
                         None => HashMap::new(),
                     },
                     None => HashMap::new(),
@@ -153,7 +167,6 @@ impl ReverseEngine for SauceNao {
                     similarity: item.similarity,
                     thumbnail: Some(item.thumbnail.clone()),
                     metadata: metadata.to_owned(),
-                    ..Default::default()
                 }
             })
             .collect())
