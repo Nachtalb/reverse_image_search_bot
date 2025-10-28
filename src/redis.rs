@@ -207,6 +207,9 @@ impl Redis {
             Ok(result) => result,
             Err(e) => {
                 log::error!("Failed to search index: {}", e);
+                if format!("{e}").contains("such index phash_idx") {
+                    setup_redis_data(&mut connection).await?;
+                }
                 return Err(Error::msg(format!("Failed to search index: {}", e)));
             }
         };
