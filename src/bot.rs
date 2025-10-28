@@ -1,7 +1,10 @@
 use anyhow::Error;
 
-use crate::{config::Config, handlers};
-use teloxide::{dispatching::UpdateHandler, prelude::*};
+use crate::{
+    config::Config,
+    handlers::{self, command::Command},
+};
+use teloxide::{dispatching::UpdateHandler, prelude::*, utils::command::BotCommands};
 
 fn handler_tree() -> UpdateHandler<Error> {
     dptree::entry()
@@ -11,6 +14,10 @@ fn handler_tree() -> UpdateHandler<Error> {
 
 pub async fn run(config: &Config) {
     let bot = Bot::new(config.telegram.token.clone().unwrap());
+    match bot.set_my_commands(Command::bot_commands()).await {
+        Ok(_) => (),
+        Err(e) => log::error!("Failed to set bot commands: {}", e),
+    }
 
     log::info!("Dispatcher configured, starting dispatch...");
 

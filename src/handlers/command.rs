@@ -8,12 +8,12 @@ use crate::handlers::media;
     rename_rule = "lowercase",
     description = "These commands are supported"
 )]
-enum Command {
-    #[command()]
+pub(crate) enum Command {
+    #[command(description = "Startup message")]
     Start,
     #[command(description = "Show a help text")]
     Help,
-    #[command(description = "Search for a messages content")]
+    #[command(description = "Reply with this to an image / video to search")]
     Search,
 }
 
