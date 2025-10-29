@@ -13,12 +13,13 @@ use teloxide::dispatching::UpdateHandler;
 use teloxide::prelude::*;
 
 async fn send_not_supported(bot: &Bot, msg: &Message) -> Result<()> {
-    bot.send_message(msg.chat.id, "Not supported").await?;
+    bot.send_message(msg.chat.id, t!("media.not_supported"))
+        .await?;
     Ok(())
 }
 
 async fn send_error_message(bot: &Bot, msg: &Message) -> Result<()> {
-    bot.send_message(msg.chat.id, "An error occurred").await?;
+    bot.send_message(msg.chat.id, t!("media.error")).await?;
     Ok(())
 }
 

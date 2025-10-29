@@ -1,0 +1,16 @@
+_version: 2
+result.artist:
+  en: artist
+result.chapter.hit:
+  en: hit
+result.chapter.total:
+  en: total
+result.characters:
+  en: characters
+result.chatper.hit_total:
+  en: hit_total
+result.status:
+  en: status
+result.tags:
+  en: tags
+

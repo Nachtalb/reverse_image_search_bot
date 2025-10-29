@@ -1,0 +1,41 @@
+_version: 2
+media.error:
+  en: An error occurred
+media.not_supported:
+  en: Not supported
+search.keyboard:
+  en: Search for Image
+search.no_results:
+  en: I searched for you on SauceNAO, Trace & IQDB but didn't find anything.
+search.image_link:
+  en: Link to image
+result.from:
+  en: 'Data from: %{enrichers}'
+result.episode.hit:
+  en: 'Episode: <code>%{hit}</code>'
+result.episode.hit_total:
+  en: 'Episode: <code>%{hit}/%{total}</code>'
+result.episode.timestamp:
+  en: (at <code>%{timestamp}s</code>)
+result.episode.total:
+  en: 'Episodes: <code>%{total}</code>'
+result.title.en:
+  en: 'Title: <code>%{title}</code>'
+result.title.nativ:
+  en: 'Title [native]: <code>%{title}</code>'
+result.title.romaji:
+  en: 'Title [romaji]: <code>%{title}</code>'
+result.artist:
+  en: 'Artist: %{artist}'
+result.chapter.hit:
+  en: 'Chapter: <code>%{hit}</code>'
+result.chapter.total:
+  en: 'Chapters: <code>%{total}</code>'
+result.chapter.hit_total:
+  en: 'Chapter: <code>%{hit}/%{total}</code>'
+result.characters:
+  en: 'Characters: %{characters}'
+result.status:
+  en: 'Status: <code>%{status}</code>'
+result.tags:
+  en: 'Tags: %{tags}'

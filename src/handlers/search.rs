@@ -94,7 +94,7 @@ pub(crate) async fn cached_search(bot: &Bot, msg: &Message, image_id: String) ->
 async fn send_search_keyboard(bot: &Bot, msg: &Message, url: &str) -> Result<Message> {
     let keyboard = teloxide::types::InlineKeyboardMarkup::new(search_buttons(url));
 
-    bot.send_message(msg.chat.id, "Search for Image")
+    bot.send_message(msg.chat.id, t!("search.keyboard"))
         .reply_markup(keyboard)
         .await
         .map_err(anyhow::Error::from)
@@ -176,7 +176,7 @@ pub(crate) async fn search(
 }
 
 async fn send_no_results_message(bot: &Bot, chat_id: ChatId) -> Result<Message> {
-    let error = "🔴 I searched for you on SauceNAO, Trace, IQDB, 3D IQDB but didn't find anything.";
+    let error = t!("search.no_results");
     bot.send_message(chat_id, error)
         .disable_link_preview(true)
         .await
@@ -291,7 +291,7 @@ async fn send_text(
 
 fn search_buttons(url: &str) -> Vec<Vec<InlineKeyboardButton>> {
     vec![
-        vec![button("Link", "{}", url)],
+        vec![button(t!("search.image_link").as_ref(), "{}", url)],
         vec![
             button("SauceNao", "https://saucenao.com/search.php?url={}", url),
             button(

@@ -13,6 +13,10 @@ mod redis;
 mod transformers;
 mod utils;
 
+#[macro_use]
+extern crate rust_i18n;
+i18n!();
+
 #[tokio::main]
 async fn main() {
     pretty_env_logger::init();
