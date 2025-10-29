@@ -20,6 +20,10 @@ pub struct General {
     /// Path to store downloads
     #[serde(skip_serializing_if = "Option::is_none")]
     pub downloads_dir: Option<std::path::PathBuf>,
+
+    /// Worker Num (default: number of CPUs * 2)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub worker_num: Option<usize>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -171,6 +175,7 @@ impl Default for Config {
         Self {
             general: General {
                 downloads_dir: Some(PathBuf::from("./downloads")),
+                worker_num: None,
             },
             redis: Redis {
                 host: Some("127.0.0.1".to_string()),
@@ -328,7 +333,7 @@ fn load_config() -> Config {
     };
 
     let mut config: Config = match figment
-        .admerge(Serialized::defaults(args.to_config()))
+        .admerge(Serialized::defaults(args.as_config()))
         .extract()
     {
         Ok(config) => config,

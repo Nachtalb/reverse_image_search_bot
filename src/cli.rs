@@ -20,6 +20,11 @@ pub(crate) struct CliArgs {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) downloads: Option<String>,
 
+    /// Worker Num (default: number of CPUs * 2)
+    #[arg(short, long, env = "RIS_WORKER_NUM")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub worker_num: Option<usize>,
+
     /// Config file path (default: "config.toml")
     #[arg(short, long, env = "RIS_CONFIG")]
     #[serde(skip_serializing)]
@@ -162,10 +167,11 @@ pub(crate) struct CliArgs {
 }
 
 impl CliArgs {
-    pub fn to_config(self) -> Config {
+    pub fn as_config(self) -> Config {
         Config {
             general: General {
                 downloads_dir: self.downloads.map(PathBuf::from),
+                worker_num: self.worker_num,
             },
             redis: Redis {
                 host: self.redis_host,
