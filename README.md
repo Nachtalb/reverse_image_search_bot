@@ -40,6 +40,12 @@
 - [ ] Webhook mode
 - [ ] "Auto Search" preference
   - [ ] Automatic "Auto Search" shut off on spam
+- [x] 🆕 Multilanguage support
+  - [x] English
+  - [x] Russian
+  - [x] German
+  - [x] Chinese
+  - [x] Spanish
 - [ ] 🆕 ban functionality
 - [ ] 🆕 NECMEC support
 - [ ] 🆕 Proper "send message to admin" support
