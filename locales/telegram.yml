@@ -114,8 +114,8 @@ message.start:
     <i>❕ Check out /tips to see a few tricks on how to use this bot and search engines in general.</i>
 
     🖥️ <u>Commands</u>
-    - /help, /start: Show this help message
-    - /tips: Tips and tricks for better search results
+    - /start: Show startup message
+    - /help: Tips and tricks for better search results
     - /search: Reply to an image / video to search
 
     👨‍💻 <u>Admin</u>
@@ -131,11 +131,11 @@ message.start:
     🤔 <u>Как меня использовать?</u>
     Просто отправьте мне любое изображение / видео.
 
-    <i>❕ Посмотрите /tips, чтобы увидеть несколько хитростей по использованию этого бота и поисковых систем в целом.</i>
+    <i>❕ Посмотрите /help, чтобы увидеть несколько хитростей по использованию этого бота и поисковых систем в целом.</i>
 
     🖥️ <u>Команды</u>
-    - /help, /start: Показать это сообщение помощи
-    - /tips: Советы и хитрости для лучших результатов поиска
+    - /start: Показать сообщение при запуске
+    - /help: Советы и хитрости для лучших результатов поиска
     - /search: Ответить на изображение / видео для поиска
 
     👨‍💻 <u>Админ</u>
@@ -151,11 +151,11 @@ message.start:
     🤔 <u>Wie benutzt man mich?</u>
     Schick mir einfach ein Bild / Video.
 
-    <i>❕ Schau dir /tips an, um ein paar Tricks zum Einsatz dieses Bots und Suchmaschinen im Allgemeinen zu sehen.</i>
+    <i>❕ Schau dir /help an, um ein paar Tricks zum Einsatz dieses Bots und Suchmaschinen im Allgemeinen zu sehen.</i>
 
     🖥️ <u>Befehle</u>
-    - /help, /start: Zeige diese Hilfsnachricht
-    - /tips: Tipps und Tricks für bessere Suchergebnisse
+    - /start: Zeige die Startnachricht
+    - /help: Tipps und Tricks für bessere Suchergebnisse
     - /search: Antworte auf ein Bild / Video zum Suchen
 
     👨‍💻 <u>Admin</u>
@@ -171,11 +171,11 @@ message.start:
     🤔 <u>Wi chunzt mer mini?</u>
     Schick mer eifach Art Bilder / Videos.
 
-    <i>❕ Lueg dr /tips ah, für es paar Trick zum Bot und Suchmaschine im Allgmeine.</i>
+    <i>❕ Lueg dr /help ah, für es paar Trick zum Bot und Suchmaschine im Allgmeine.</i>
 
     🖥️ <u>Behfe</u>
-    - /help, /start: Zeig die Hilfsinfos
-    - /tips: Tipps und Trick zu bessre Suchresultat
+    - /start: Zeig d Startnachricht
+    - /help: Tipps und Trick zu bessre Suchresultat
     - /search: Antworte uf es Bild / Video zum Sueche
 
     👨‍💻 <u>Admin</u>
