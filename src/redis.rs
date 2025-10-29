@@ -121,6 +121,7 @@ impl Redis {
             connection.set(key, value).await
         }
     }
+
     pub(crate) async fn get_locale(&self, chat_id: i64) -> Result<Option<String>> {
         let key = format!("chat:{}", chat_id);
         self.connection()
@@ -133,6 +134,26 @@ impl Redis {
         let key = format!("chat:{}", chat_id);
         self.connection()
             .hset(&key, "lang", lang)
+            .await
+            .map_err(|e| e.into())
+    }
+
+    pub(crate) async fn get_no_result_count(&self, chat_id: i64) -> Result<i64> {
+        let key = format!("chat:{}", chat_id);
+        self.connection()
+            .hget(&key, "no_result_count")
+            .await
+            .map_err(|e| e.into())
+    }
+
+    pub(crate) async fn inc_no_result_count(&self, chat_id: i64) -> Result<i64> {
+        let key = format!("chat:{}", chat_id);
+        let mut con = self.connection();
+        redis::cmd("HINCRBY")
+            .arg(&key)
+            .arg("no_result_count")
+            .arg(1i64)
+            .query_async(&mut con)
             .await
             .map_err(|e| e.into())
     }

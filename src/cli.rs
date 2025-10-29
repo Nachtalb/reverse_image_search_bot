@@ -25,6 +25,11 @@ pub(crate) struct CliArgs {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) languages: Option<String>,
 
+    /// Stop auto searching after N empty results. Set to 0 to disable, max 255 (default: 5)
+    #[arg(long, env = "RIS_EMPTY_SEARCH_LIMIT")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub empty_search_limit: Option<u8>,
+
     /// Worker Num (default: number of CPUs * 2)
     #[arg(short, long, env = "RIS_WORKER_NUM")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -189,6 +194,7 @@ impl CliArgs {
                 downloads_dir: self.downloads.map(PathBuf::from),
                 worker_num: self.worker_num,
                 languages,
+                empty_search_limit: self.empty_search_limit,
             },
             redis: Redis {
                 host: self.redis_host,

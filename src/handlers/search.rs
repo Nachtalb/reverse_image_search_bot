@@ -5,6 +5,7 @@ use teloxide::sugar::request::RequestLinkPreviewExt;
 use teloxide::types::{InlineKeyboardButton, InputFile, ParseMode, ReplyMarkup};
 use tokio::task::JoinHandle;
 
+use crate::config::get_config;
 use crate::display;
 use crate::models::Enrichment;
 use crate::redis::get_redis;
@@ -114,6 +115,24 @@ pub(crate) async fn search(
     } else {
         &None
     };
+    let config = get_config();
+
+    if config.general.empty_search_limit.unwrap() > 0
+        && let Some(redis) = redis
+    {
+        match redis.get_no_result_count(msg.chat.id.0).await {
+            Ok(num) => {
+                if num > config.general.empty_search_limit.unwrap() as i64 {
+                    log::debug!(
+                        "Won't search, as no result count {} is higher than threshold",
+                        num
+                    );
+                    return Ok(());
+                }
+            }
+            Err(e) => log::error!("Failed to get no result count: {}", e),
+        }
+    }
 
     log::debug!("Sent search for image to chat {}", msg.chat.id);
     let mut rx = crate::core::orchestrator::reverse_search(url.to_string()).await;
@@ -142,6 +161,32 @@ pub(crate) async fn search(
 
     if handles.is_empty() {
         log::debug!("No enrichments found");
+        if let Some(redis) = redis {
+            match redis.inc_no_result_count(msg.chat.id.0).await {
+                Ok(num) => {
+                    log::debug!("Incremented no result count to {}", num);
+
+                    if num > config.general.empty_search_limit.unwrap() as i64 {
+                        let chat_lang = get_chat_lang(LangSource::Message(msg)).await;
+                        if let Err(e) = bot
+                            .send_message(
+                                msg.chat.id,
+                                t!(
+                                    "message.auto_search_disabled",
+                                    locale = chat_lang,
+                                    limit = config.general.empty_search_limit.unwrap()
+                                )
+                                .as_ref(),
+                            )
+                            .await
+                        {
+                            log::error!("Failed to send limit reached message: {}", e);
+                        }
+                    }
+                }
+                Err(e) => log::error!("Failed to increment no result count: {}", e),
+            }
+        }
         send_no_results_message(bot, msg).await.unwrap();
     }
 

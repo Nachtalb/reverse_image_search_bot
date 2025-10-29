@@ -442,3 +442,12 @@ message.language.set:
   es: 'Idioma configurado en %{lang}'
   weeb: 'Lingo locked to %{lang}!'
   archaic: 'The speech is set unto %{lang}, as the law given at Sinai.'
+message.auto_search_disabled:
+  en: '%{limit} consecutive searches with no results reached. Auto search disabled.'
+  ru: 'Достигнут лимит в %{limit} последовательных поисков без результатов. Автоматический поиск отключен.'
+  de: '%{limit} aufeinanderfolgende Suchen ohne Ergebnisse erreicht. Automatische Suche deaktiviert.'
+  ch: '%{limit} aufenangfougendi Suechine ohni Ergäbniss erreicht. Auto-Suechi usgschalte.'
+  cn: '已达到 %{limit} 次连续无结果搜索。自动搜索已禁用。'
+  es: 'Se han alcanzado %{limit} búsquedas consecutivas sin resultados. Búsqueda automática desactivada.'
+  we: "%{limit} straight-up blank searches, senpai—auto-hunt's on cooldown like a busted Sharingan!"
+  archaic: 'Thou hast reached %{limit} successive inquiries void of yield. The questing by itself is now withholden.'

@@ -34,6 +34,10 @@ pub struct General {
     /// Available Languages
     #[serde(skip_serializing_if = "Option::is_none")]
     pub languages: Option<Vec<Language>>,
+
+    /// Stop auto searching after N empty results. Set to 0 to disable, max 255 (default: 5)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub empty_search_limit: Option<u8>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -220,6 +224,7 @@ impl Default for Config {
                         name: "📖 Old Testament".to_string(),
                     },
                 ]),
+                empty_search_limit: Some(5),
             },
             redis: Redis {
                 host: Some("127.0.0.1".to_string()),
