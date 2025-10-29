@@ -22,6 +22,8 @@ pub async fn run(config: &Config) {
     log::info!("Dispatcher configured, starting dispatch...");
 
     Dispatcher::builder(bot, handler_tree())
+        .distribution_function(|upd| upd.from().map(|user| user.id)) // Per user
+        // rather than per Chat
         .default_handler(|upd| async move {
             log::warn!("Unhandled update: {:?}", upd);
         })

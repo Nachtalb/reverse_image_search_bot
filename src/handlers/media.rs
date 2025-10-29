@@ -3,6 +3,7 @@ use crate::files::image::get_image_hash;
 use crate::redis::{Redis, get_redis};
 use crate::utils::get_timestamp;
 use std::path::PathBuf;
+use std::thread;
 use teloxide::types::FileId;
 
 use crate::handlers::search::{cached_search, search};
@@ -139,6 +140,11 @@ async fn get_or_store_similar_image(
 
 pub(crate) async fn handle_media_message(bot: Bot, msg: Message) -> Result<()> {
     log::info!("Received media in chat {}", msg.chat.id);
+
+    let current_thread = thread::current();
+    log::debug!("Thread ID: {:?}", current_thread.id());
+    log::debug!("Thread name: {:?}", current_thread.name().unwrap());
+
     let (media_type, file_id, extension) = get_media_type(&msg).await?;
 
     let downloaded_file = match media_type {
