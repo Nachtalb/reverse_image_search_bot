@@ -135,7 +135,7 @@ pub fn format(data: &Enrichment, lang: String) -> String {
             t!(
                 "result.artist",
                 locale = lang,
-                artist = tagify(artist, false)
+                artist = tagify(artist.iter(), false)
             )
             .as_ref(),
         );
@@ -143,7 +143,15 @@ pub fn format(data: &Enrichment, lang: String) -> String {
     }
 
     if let Some(tags) = &data.tags {
-        ret.push_str(t!("result.tags", locale = lang, tags = tagify(tags, false)).as_ref());
+        let tags: &[String] = &tags.iter().cloned().collect::<Vec<_>>()[..8];
+        ret.push_str(
+            t!(
+                "result.tags",
+                locale = lang,
+                tags = tagify(tags.iter(), false)
+            )
+            .as_ref(),
+        );
         ret.push('\n');
     }
 
@@ -152,7 +160,7 @@ pub fn format(data: &Enrichment, lang: String) -> String {
             t!(
                 "result.characters",
                 locale = lang,
-                characters = tagify(characters, false)
+                characters = tagify(characters.iter(), false)
             )
             .as_ref(),
         );

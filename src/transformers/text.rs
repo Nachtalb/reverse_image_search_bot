@@ -1,11 +1,11 @@
-use std::collections::HashSet;
-
-pub(crate) fn tagify(tags: &HashSet<String>, escape: bool) -> String {
+/// Converts a list of tags to a string
+/// Test_!_Tag => test_tag
+pub(crate) fn tagify<'a>(tags: impl Iterator<Item = &'a String>, escape: bool) -> String {
     let prefix = if escape { "\\#" } else { "#" };
     let tags: String = tags
-        .iter()
         .map(|tag| {
             let normalized: String = tag
+                .to_lowercase()
                 .chars()
                 .map(|c| if c.is_alphanumeric() { c } else { '_' })
                 .collect();
