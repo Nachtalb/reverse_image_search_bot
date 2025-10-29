@@ -38,7 +38,7 @@ impl Anilist {
 #[async_trait]
 impl DataProvider for Anilist {
     fn name(&self) -> &'static str {
-        "anilist"
+        "AniList"
     }
 
     fn priority(&self) -> u8 {

@@ -158,7 +158,7 @@ impl ReverseEngine for TraceMoe {
                 SearchHit {
                     similarity: result.similarity as f32,
                     thumbnail: Some(result.image.clone()),
-                    engine: "tracemoe".to_string(),
+                    engine: self.name().to_string(),
                     metadata,
                 }
             })
