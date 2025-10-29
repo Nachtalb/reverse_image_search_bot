@@ -170,7 +170,7 @@ pub(crate) async fn search(
             }
         }
     }
-    log::debug!("Reverse search done");
+    log::info!("Reverse search done");
 
     Ok(())
 }
