@@ -65,8 +65,8 @@ impl Service {
             Service::Bookwalker => "Bookwalker".to_string(),
             Service::AnimePlanet => "AnimePlanet".to_string(),
             Service::Kitsu => "Kitsu".to_string(),
-            Service::XUser => "X User".to_string(),
-            Service::XStatus => "X Status".to_string(),
+            Service::XUser => "Account".to_string(),
+            Service::XStatus => "Post".to_string(),
             Service::Unknown(host) => match parse_domain_name(host) {
                 Ok(parsed) => match parsed.root() {
                     Some(root) => titleize(
