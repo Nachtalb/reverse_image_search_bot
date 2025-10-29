@@ -121,6 +121,21 @@ impl Redis {
             connection.set(key, value).await
         }
     }
+    pub(crate) async fn get_locale(&self, chat_id: i64) -> Result<Option<String>> {
+        let key = format!("chat:{}", chat_id);
+        self.connection()
+            .hget(&key, "lang")
+            .await
+            .map_err(|e| e.into())
+    }
+
+    pub(crate) async fn set_locale(&self, chat_id: i64, lang: &str) -> Result<()> {
+        let key = format!("chat:{}", chat_id);
+        self.connection()
+            .hset(&key, "lang", lang)
+            .await
+            .map_err(|e| e.into())
+    }
 
     pub(crate) async fn store_struct(&self, key: &str, value: impl Serialize) -> Result<()> {
         let value = match serde_json::to_string(&value) {

@@ -8,8 +8,8 @@ use tokio::task::JoinHandle;
 use crate::display;
 use crate::models::Enrichment;
 use crate::redis::get_redis;
-use crate::utils::get_timestamp;
 use crate::utils::keyboard::button;
+use crate::utils::{LangSource, get_chat_lang, get_timestamp};
 use anyhow::{Error, Result};
 
 use teloxide::prelude::*;
@@ -92,9 +92,11 @@ pub(crate) async fn cached_search(bot: &Bot, msg: &Message, image_id: String) ->
 }
 
 async fn send_search_keyboard(bot: &Bot, msg: &Message, url: &str) -> Result<Message> {
-    let keyboard = teloxide::types::InlineKeyboardMarkup::new(search_buttons(url));
+    let chat_lang = get_chat_lang(LangSource::Message(msg)).await;
+    let keyboard =
+        teloxide::types::InlineKeyboardMarkup::new(search_buttons(url, chat_lang.as_str()));
 
-    bot.send_message(msg.chat.id, t!("search.keyboard"))
+    bot.send_message(msg.chat.id, t!("search.keyboard", locale = chat_lang))
         .reply_markup(keyboard)
         .await
         .map_err(anyhow::Error::from)
@@ -140,7 +142,7 @@ pub(crate) async fn search(
 
     if handles.is_empty() {
         log::debug!("No enrichments found");
-        send_no_results_message(bot, msg.chat.id).await.unwrap();
+        send_no_results_message(bot, msg).await.unwrap();
     }
 
     for (handle, enrichment) in handles {
@@ -175,9 +177,11 @@ pub(crate) async fn search(
     Ok(())
 }
 
-async fn send_no_results_message(bot: &Bot, chat_id: ChatId) -> Result<Message> {
-    let error = t!("search.no_results");
-    bot.send_message(chat_id, error)
+async fn send_no_results_message(bot: &Bot, msg: &Message) -> Result<Message> {
+    let chat_lang = get_chat_lang(LangSource::Message(msg)).await;
+
+    let error = t!("search.no_results", locale = chat_lang);
+    bot.send_message(msg.chat.id, error)
         .disable_link_preview(true)
         .await
         .map_err(anyhow::Error::from)
@@ -185,7 +189,8 @@ async fn send_no_results_message(bot: &Bot, chat_id: ChatId) -> Result<Message> 
 
 async fn send_search_result(bot: Bot, msg: Message, result: Arc<Enrichment>) -> Result<Message> {
     log::debug!("Send search result to: {}", msg.chat.id);
-    let text = display::enriched::format(&result);
+    let chat_lang = get_chat_lang(LangSource::Message(&msg)).await;
+    let text = display::enriched::format(&result, chat_lang);
 
     let video = result
         .episodes
@@ -289,9 +294,13 @@ async fn send_text(
         .map_err(anyhow::Error::from)
 }
 
-fn search_buttons(url: &str) -> Vec<Vec<InlineKeyboardButton>> {
+fn search_buttons(url: &str, lang: &str) -> Vec<Vec<InlineKeyboardButton>> {
     vec![
-        vec![button(t!("search.image_link").as_ref(), "{}", url)],
+        vec![button(
+            t!("search.image_link", locale = lang).as_ref(),
+            "{}",
+            url,
+        )],
         vec![
             button("SauceNao", "https://saucenao.com/search.php?url={}", url),
             button(
@@ -340,7 +349,7 @@ mod tests {
     #[tokio::test]
     async fn test_buttons() {
         let expected_url = "https://domain.com";
-        let buttons = search_buttons(expected_url);
+        let buttons = search_buttons(expected_url, "en");
         for button_row in buttons {
             for button in button_row {
                 match button.kind {

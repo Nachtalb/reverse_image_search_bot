@@ -117,6 +117,7 @@ message.start:
     - /start: Show startup message
     - /help: Tips and tricks for better search results
     - /search: Reply to an image / video to search
+    - /lang: Change language
 
     👨‍💻 <u>Admin</u>
     Nachtalb: <a href="https://github.com/Nachtalb">Github</a> | <a href="https://t.me/Nachtalb">Telegram</a>
@@ -137,6 +138,7 @@ message.start:
     - /start: Показать сообщение при запуске
     - /help: Советы и хитрости для лучших результатов поиска
     - /search: Ответить на изображение / видео для поиска
+    - /lang: Сменить язык
 
     👨‍💻 <u>Админ</u>
     Nachtalb: <a href="https://github.com/Nachtalb">Github</a> | <a href="https://t.me/Nachtalb">Telegram</a>
@@ -157,6 +159,7 @@ message.start:
     - /start: Zeige die Startnachricht
     - /help: Tipps und Tricks für bessere Suchergebnisse
     - /search: Antworte auf ein Bild / Video zum Suchen
+    - /lang: Sprache wechseln
 
     👨‍💻 <u>Admin</u>
     Nachtalb: <a href="https://github.com/Nachtalb">Github</a> | <a href="https://t.me/Nachtalb">Telegram</a>
@@ -177,6 +180,7 @@ message.start:
     - /start: Zeig d Startnachricht
     - /help: Tipps und Trick zu bessre Suchresultat
     - /search: Antworte uf es Bild / Video zum Sueche
+    - /lang: Sprache ändere
 
     👨‍💻 <u>Admin</u>
     Nachtalb: <a href="https://github.com/Nachtalb">Github</a> | <a href="https://t.me/Nachtalb">Telegram</a>
@@ -221,3 +225,18 @@ message.reply_to_media:
   ru: Пожалуйста, ответьте на сообщение, содержащее фото или видео.
   de: Bitte antworte auf eine Nachricht mit einem Foto oder Video.
   ch: Bitte antworte uf e Nachricht mit nem Photo odr Video.
+message.language.choose:
+  en: 'Current language: %{current_lang}'
+  ru: 'Текущий язык: %{current_lang}'
+  de: 'Aktuelle Sprache: %{current_lang}'
+  ch: 'Aktuelli Sprach: %{current_lang}'
+message.language.not_available:
+  en: 'Chosen language <code>%{lang}</code> is not available.'
+  ru: 'Выбранный язык <code>%{lang}</code> недоступен.'
+  de: 'Die gewählte Sprache <code>%{lang}</code> ist nicht verfügbar.'
+  ch: 'Di gewählti Sprache <code>%{lang}</code> isch ne verfügbar.'
+message.language.set:
+  en: 'Language set to %{lang}'
+  ru: 'Язык установлен на %{lang}'
+  de: 'Sprache auf %{lang} gesetzt'
+  ch: 'Sprach uf %{lang} gsetzt'

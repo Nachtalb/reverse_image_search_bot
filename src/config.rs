@@ -16,6 +16,12 @@ const DEFAULT_CONFIG_PATH: &str = "config.toml";
 static CONFIG: OnceCell<Config> = OnceCell::const_new();
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct Language {
+    pub code: String,
+    pub name: String,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct General {
     /// Path to store downloads
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -24,6 +30,10 @@ pub struct General {
     /// Worker Num (default: number of CPUs * 2)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub worker_num: Option<usize>,
+
+    /// Available Languages
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub languages: Option<Vec<Language>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -176,6 +186,24 @@ impl Default for Config {
             general: General {
                 downloads_dir: Some(PathBuf::from("./downloads")),
                 worker_num: None,
+                languages: Some(vec![
+                    Language {
+                        code: "en".to_string(),
+                        name: "🇬🇧 English".to_string(),
+                    },
+                    Language {
+                        code: "ru".to_string(),
+                        name: "🇷🇺 Русский".to_string(),
+                    },
+                    Language {
+                        code: "de".to_string(),
+                        name: "🇩🇪 Deutsch".to_string(),
+                    },
+                    Language {
+                        code: "ch".to_string(),
+                        name: "🇨🇭 Schwizerdütsche".to_string(),
+                    },
+                ]),
             },
             redis: Redis {
                 host: Some("127.0.0.1".to_string()),

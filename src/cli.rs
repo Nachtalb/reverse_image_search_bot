@@ -20,6 +20,11 @@ pub(crate) struct CliArgs {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) downloads: Option<String>,
 
+    /// Available Languages
+    #[arg(long, env = "RIS_LANGUAGES")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) languages: Option<String>,
+
     /// Worker Num (default: number of CPUs * 2)
     #[arg(short, long, env = "RIS_WORKER_NUM")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -168,10 +173,22 @@ pub(crate) struct CliArgs {
 
 impl CliArgs {
     pub fn as_config(self) -> Config {
+        let languages = match self.languages {
+            None => None,
+            Some(languages) => match serde_json::from_str(&languages) {
+                Ok(languages) => languages,
+                Err(e) => {
+                    log::error!("Failed to parse languages: {}", e);
+                    None
+                }
+            },
+        };
+
         Config {
             general: General {
                 downloads_dir: self.downloads.map(PathBuf::from),
                 worker_num: self.worker_num,
+                languages,
             },
             redis: Redis {
                 host: self.redis_host,

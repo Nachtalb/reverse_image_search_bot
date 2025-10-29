@@ -1,7 +1,7 @@
 use crate::error::Errors;
 use crate::files::image::get_image_hash;
 use crate::redis::{Redis, get_redis};
-use crate::utils::get_timestamp;
+use crate::utils::{LangSource, get_chat_lang, get_timestamp};
 use std::path::PathBuf;
 use std::thread;
 use teloxide::types::FileId;
@@ -14,13 +14,18 @@ use teloxide::dispatching::UpdateHandler;
 use teloxide::prelude::*;
 
 async fn send_not_supported(bot: &Bot, msg: &Message) -> Result<()> {
-    bot.send_message(msg.chat.id, t!("media.not_supported"))
+    let chat_lang = get_chat_lang(LangSource::Message(msg)).await;
+
+    bot.send_message(msg.chat.id, t!("media.not_supported", locale = chat_lang))
         .await?;
     Ok(())
 }
 
 async fn send_error_message(bot: &Bot, msg: &Message) -> Result<()> {
-    bot.send_message(msg.chat.id, t!("media.error")).await?;
+    let chat_lang = get_chat_lang(LangSource::Message(msg)).await;
+
+    bot.send_message(msg.chat.id, t!("media.error", locale = chat_lang))
+        .await?;
     Ok(())
 }
 
