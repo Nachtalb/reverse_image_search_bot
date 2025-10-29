@@ -1,5 +1,10 @@
 use anyhow::{Error, Result};
-use teloxide::{dispatching::UpdateHandler, prelude::*, utils::command::BotCommands};
+use teloxide::{
+    dispatching::UpdateHandler,
+    prelude::*,
+    types::{InputFile, LinkPreviewOptions},
+    utils::command::BotCommands,
+};
 
 use crate::handlers::media;
 
@@ -11,9 +16,9 @@ use crate::handlers::media;
 pub(crate) enum Command {
     #[command(description = "Startup message")]
     Start,
-    #[command(description = "Show a help text")]
+    #[command(description = "How to search?")]
     Help,
-    #[command(description = "Reply with this to an image / video to search")]
+    #[command(description = "Reply with /search to an image or video.")]
     Search,
 }
 
@@ -24,34 +29,40 @@ async fn handle_search_message(bot: Bot, msg: Message) -> Result<()> {
         if media::filter_for_media_message(reply_to_msg.clone()) {
             media::handle_media_message(bot, reply_to_msg.clone()).await?
         } else {
-            bot.send_message(
-                chat_id,
-                "Please reply to a message that contains media content.",
-            )
-            .await?;
+            bot.send_message(chat_id, t!("message.reply_to_media").as_ref())
+                .await?;
         }
     } else {
-        bot.send_message(
-            chat_id,
-            "Please reply to a message to search for its content.",
-        )
-        .await?;
+        bot.send_message(chat_id, t!("message.reply_to_media").as_ref())
+            .await?;
     }
 
     Ok(())
 }
 
 async fn handle_start_message(bot: Bot, msg: Message) -> Result<()> {
-    bot.send_message(
-        msg.chat.id,
-        "Send me a video or image you want to search for!",
-    )
-    .await?;
+    let preview_options = LinkPreviewOptions {
+        url: Some(t!("message.start.preview_url").to_string()),
+        is_disabled: false,
+        prefer_small_media: true,
+        prefer_large_media: false,
+        show_above_text: false,
+    };
+    bot.send_message(msg.chat.id, t!("message.start").as_ref())
+        .link_preview_options(preview_options)
+        .parse_mode(teloxide::types::ParseMode::Html)
+        .await?;
     Ok(())
 }
 
 async fn handle_help_message(bot: Bot, msg: Message) -> Result<()> {
-    bot.send_message(msg.chat.id, "Coming Soon ™").await?;
+    let image = include_bytes!("../../images/help.jpg");
+    let photo = InputFile::memory(image.as_slice());
+    bot.send_photo(msg.chat.id, photo)
+        .caption(t!("message.help").as_ref())
+        .show_caption_above_media(true)
+        .parse_mode(teloxide::types::ParseMode::Html)
+        .await?;
     Ok(())
 }
 

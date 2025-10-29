@@ -13,7 +13,7 @@ search.keyboard:
   en: Search for Image
   ru: Поиск изображения
   de: Bild suchen
-  ch: Biud suechä
+  ch: Bild suechä
 search.no_results:
   en: I searched for you on SauceNAO, Trace & IQDB but didn't find anything.
   ru: Я поискал для вас на SauceNAO, Trace и IQDB, но ничего не нашел.
@@ -23,7 +23,7 @@ search.image_link:
   en: Link to image
   ru: Ссылка на изображение
   de: Link zum Bild
-  ch: Link zum Biud
+  ch: Link zum Bild
 result.from:
   en: 'Data from: %{enrichers}'
   ru: 'Данные из: %{enrichers}'
@@ -99,3 +99,125 @@ result.tags:
   ru: 'Теги: %{tags}'
   de: 'Tags: %{tags}'
   ch: 'Tags: %{tags}'
+
+message.start.preview_url:
+  en: https://github.com/Nachtalb/reverse_image_search_bot
+message.start:
+  en: |
+    🔎 <u>Reverse Image Search Bot</u>
+
+    ⚠️ This is a BETA version!
+
+    🤔 <u>How to use me?</u>
+    Just send me any kind of image / video.
+
+    <i>❕ Check out /tips to see a few tricks on how to use this bot and search engines in general.</i>
+
+    🖥️ <u>Commands</u>
+    - /help, /start: Show this help message
+    - /tips: Tips and tricks for better search results
+    - /search: Reply to an image / video to search
+
+    👨‍💻 <u>Admin</u>
+    Nachtalb: <a href="https://github.com/Nachtalb">Github</a> | <a href="https://t.me/Nachtalb">Telegram</a>
+
+    🔥 <u>Source Code</u>
+    <a href="https://github.com/Nachtalb/reverse_image_search_bot">Nachtalb/reverse_image_search_bot</a>
+  ru: |
+    🔎 <u>Бот обратного поиска изображений</u>
+
+    ⚠️ Это BETA версия!
+
+    🤔 <u>Как меня использовать?</u>
+    Просто отправьте мне любое изображение / видео.
+
+    <i>❕ Посмотрите /tips, чтобы увидеть несколько хитростей по использованию этого бота и поисковых систем в целом.</i>
+
+    🖥️ <u>Команды</u>
+    - /help, /start: Показать это сообщение помощи
+    - /tips: Советы и хитрости для лучших результатов поиска
+    - /search: Ответить на изображение / видео для поиска
+
+    👨‍💻 <u>Админ</u>
+    Nachtalb: <a href="https://github.com/Nachtalb">Github</a> | <a href="https://t.me/Nachtalb">Telegram</a>
+
+    🔥 <u>Исходный код</u>
+    <a href="https://github.com/Nachtalb/reverse_image_search_bot">Nachtalb/reverse_image_search_bot</a>
+  de: |
+    🔎 <u>Reverse Image Search Bot</u>
+
+    ⚠️ Dies ist eine BETA-Version!
+
+    🤔 <u>Wie benutzt man mich?</u>
+    Schick mir einfach ein Bild / Video.
+
+    <i>❕ Schau dir /tips an, um ein paar Tricks zum Einsatz dieses Bots und Suchmaschinen im Allgemeinen zu sehen.</i>
+
+    🖥️ <u>Befehle</u>
+    - /help, /start: Zeige diese Hilfsnachricht
+    - /tips: Tipps und Tricks für bessere Suchergebnisse
+    - /search: Antworte auf ein Bild / Video zum Suchen
+
+    👨‍💻 <u>Admin</u>
+    Nachtalb: <a href="https://github.com/Nachtalb">Github</a> | <a href="https://t.me/Nachtalb">Telegram</a>
+
+    🔥 <u>Quellcode</u>
+    <a href="https://github.com/Nachtalb/reverse_image_search_bot">Nachtalb/reverse_image_search_bot</a>
+  ch: |
+    🔎 <u>Reverse Image Search Bot</u>
+
+    ⚠️ Das isch e BETA-Version!
+
+    🤔 <u>Wi chunzt mer mini?</u>
+    Schick mer eifach Art Bilder / Videos.
+
+    <i>❕ Lueg dr /tips ah, für es paar Trick zum Bot und Suchmaschine im Allgmeine.</i>
+
+    🖥️ <u>Behfe</u>
+    - /help, /start: Zeig die Hilfsinfos
+    - /tips: Tipps und Trick zu bessre Suchresultat
+    - /search: Antworte uf es Bild / Video zum Sueche
+
+    👨‍💻 <u>Admin</u>
+    Nachtalb: <a href="https://github.com/Nachtalb">Github</a> | <a href="https://t.me/Nachtalb">Telegram</a>
+
+    🔥 <u>Quellcode</u>
+    <a href="https://github.com/Nachtalb/reverse_image_search_bot">Nachtalb/reverse_image_search_bot</a>
+message.help:
+  en: |
+    ✨ Tips & Tricks
+
+    <u>Use the whole picture, but crop out extras:</u> Keep the full image uncropped, but remove any surrounding junk like phone layouts, UI elements, or black bars. Tools get confused by irrelevant borders around the main content—focus on just the image you're searching for.
+
+    <u>Fix the tilt:</u> Make sure your image isn't sideways or upside down. Some tools get confused by rotated pics.
+
+    <u>Videos & GIFs:</u> Tools only look at the first frame. If it starts black or blank, take a screenshot from a clear spot.
+  ru: |
+    ✨ Советы и хитрости
+
+    <u>Используйте всю картинку, но обрежьте лишнее:</u> Сохраняйте полное изображение без обрезки, но удаляйте окружающий мусор, такой как макеты телефона, элементы UI или черные полосы. Инструменты путаются от нерелевантных границ вокруг основного контента — сосредоточьтесь только на изображении, которое вы ищете.
+
+    <u>Исправьте наклон:</u> Убедитесь, что ваше изображение не повернуто боком или вверх ногами.
+
+    <u>Видео и GIF:</u> Инструменты смотрят только на первый кадр. Если он начинается черным или пустым, сделайте скриншот из четкого места.
+  de: |
+    ✨ Tipps & Tricks
+
+    <u>Verwenden Sie das gesamte Bild, aber schneiden Sie Extras weg:</u> Behalten Sie das volle Bild unbeschnitten, aber entfernen Sie umliegenden Müll wie Telefonlayouts, UI-Elemente oder schwarze Balken. Tools werden von irrelevanten Rändern um den Hauptinhalt verwirrt – konzentrieren Sie sich nur auf das Bild, das Sie suchen.
+
+    <u>Korrigieren Sie die Neigung:</u> Stellen Sie sicher, dass Ihr Bild nicht seitlich oder auf dem Kopf steht.
+
+    <u>Videos & GIFs:</u> Tools schauen nur auf den ersten Frame. Wenn es schwarz oder leer beginnt, machen Sie einen Screenshot von einem klaren Punkt.
+  ch: |
+    ✨ Tipps & Tricks
+
+    <u>Bruch's Ganze Bild und schnid Extras us:</u> Bhaut's volle Bild, abr nimm aui umliegende Schmutz wi Handy-Layouts, UI-Elemänt oder schwarzi Balke weg. Tools werded dür irrelevanti Ränder um dr Hauptinhalt verwirrt – konzentrier di nume uf's Bild, wo du suechsch.
+
+    <u>Reparier d'Schrägläge:</u> Mach sicher, dass d's Bild ne schief oder uf em Chopf isch.
+
+    <u>Videos & GIFs:</u> Tools luege nur uf's erschte Bild im Video. Wes schwarz oder läär anfangt, nimm e Screenshot vum ne klare Stück.
+message.reply_to_media:
+  en: Please reply to a message that contains a photo or video.
+  ru: Пожалуйста, ответьте на сообщение, содержащее фото или видео.
+  de: Bitte antworte auf eine Nachricht mit einem Foto oder Video.
+  ch: Bitte antworte uf e Nachricht mit nem Photo odr Video.

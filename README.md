@@ -1,24 +1,26 @@
 # RIS
 
+> ⚠️ This is a rewrite of the original and still in development - expect bugs.
+
 ## Feature Parity
 
-- [ ] /start message
-- [ ] /help message
-- [ ] /tips message
-- [ ] /credits message
+- [x] /start message
+- [x] /help message **/help now shows tips and tricks**
+- [x] ~/tips message~ **Replaced with /help**
+- [x] ~/credits message~ **Removed**
 - [ ] Prevent duplicate uploads
 - [x] Auto Search
   - [x] Trace Moe
   - [x] IQDB
-  - [-] ~3dIQDB~ **Not worth it - is not updated anymore**
+  - [x] ~3dIQDB~ **Not worth it - is not updated anymore**
   - [x] SauceNao
 - [-] Data Parser
   - [x] Generic SauceNao
   - [x] Generic TraceMoe
   - [x] Generic IQDB
-  - [-] ~Generic 3dIQDB~ **Dropped 3D IQDB support**
+  - [x] ~Generic 3dIQDB~ **Dropped 3D IQDB support**
   - [x] AniList
-  - [-] Boorus
+  - [x] Boorus
     - [x] Danbooru
     - [-] Gelbooru **API crate broken**
     - [-] Safebooru **API crate broken**
