@@ -22,6 +22,12 @@ pub(crate) fn telegram_buttons(
         let mut raw_buttons: Vec<InlineKeyboardButton> = vec![];
 
         for url in more_urls {
+            if let Some(ref main) = *main_url
+                && url == main
+            {
+                continue;
+            }
+
             if let Some(url_string) = url.clean_url()
                 && let Ok(parsed) = reqwest::Url::parse(url_string.as_str())
             {
