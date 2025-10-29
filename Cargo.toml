@@ -52,3 +52,8 @@ tokio = { version = "^1.47.1", features = [
 ] }
 toml = "^0.9.7"
 trace-moe = "^1.0.1"
+
+[profile.release]
+lto = "fat"
+opt-level = "s"
+strip = true
