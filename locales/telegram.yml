@@ -1,41 +1,101 @@
 _version: 2
 media.error:
   en: An error occurred
+  ru: Произошла ошибка
+  de: Ein Fehler ist aufgetreten
+  ch: Ä Fehler isch ufträte
 media.not_supported:
   en: Not supported
+  ru: Не поддерживается
+  de: Nicht unterstützt
+  ch: Ne unterstützt
 search.keyboard:
   en: Search for Image
+  ru: Поиск изображения
+  de: Bild suchen
+  ch: Biud suechä
 search.no_results:
   en: I searched for you on SauceNAO, Trace & IQDB but didn't find anything.
+  ru: Я поискал для вас на SauceNAO, Trace и IQDB, но ничего не нашел.
+  de: Ich habe für dich auf SauceNAO, Trace & IQDB gesucht, aber nichts gefunden.
+  ch: I ha für di uf SauceNAO, Trace & IQDB gsuecht, abr nüt gfunge.
 search.image_link:
   en: Link to image
+  ru: Ссылка на изображение
+  de: Link zum Bild
+  ch: Link zum Biud
 result.from:
   en: 'Data from: %{enrichers}'
+  ru: 'Данные из: %{enrichers}'
+  de: 'Daten von: %{enrichers}'
+  ch: 'Date vo: %{enrichers}'
 result.episode.hit:
   en: 'Episode: <code>%{hit}</code>'
+  ru: 'Эпизод: <code>%{hit}</code>'
+  de: 'Folge: <code>%{hit}</code>'
+  ch: 'Episodä: <code>%{hit}</code>'
 result.episode.hit_total:
   en: 'Episode: <code>%{hit}/%{total}</code>'
+  ru: 'Эпизод: <code>%{hit}/%{total}</code>'
+  de: 'Folge: <code>%{hit}/%{total}</code>'
+  ch: 'Episodä: <code>%{hit}/%{total}</code>'
 result.episode.timestamp:
   en: (at <code>%{timestamp}s</code>)
+  ru: (в <code>%{timestamp}с</code>)
+  de: (bei <code>%{timestamp}s</code>)
+  ch: (um <code>%{timestamp}s</code>)
 result.episode.total:
   en: 'Episodes: <code>%{total}</code>'
+  ru: 'Эпизоды: <code>%{total}</code>'
+  de: 'Folgen: <code>%{total}</code>'
+  ch: 'Episodä: <code>%{total}</code>'
 result.title.en:
   en: 'Title: <code>%{title}</code>'
+  ru: 'Название: <code>%{title}</code>'
+  de: 'Titel: <code>%{title}</code>'
+  ch: 'Titu: <code>%{title}</code>'
 result.title.nativ:
   en: 'Title [native]: <code>%{title}</code>'
+  ru: 'Название [оригинал]: <code>%{title}</code>'
+  de: 'Titel [Original]: <code>%{title}</code>'
+  ch: 'Titu [Original]: <code>%{title}</code>'
 result.title.romaji:
   en: 'Title [romaji]: <code>%{title}</code>'
+  ru: 'Название [ромадзи]: <code>%{title}</code>'
+  de: 'Titel [Romaji]: <code>%{title}</code>'
+  ch: 'Titu [Romaji]: <code>%{title}</code>'
 result.artist:
   en: 'Artist: %{artist}'
+  ru: 'Художник: %{artist}'
+  de: 'Künstler: %{artist}'
+  ch: 'Künstler: %{artist}'
 result.chapter.hit:
   en: 'Chapter: <code>%{hit}</code>'
+  ru: 'Глава: <code>%{hit}</code>'
+  de: 'Kapitel: <code>%{hit}</code>'
+  ch: 'Kapitu: <code>%{hit}</code>'
 result.chapter.total:
   en: 'Chapters: <code>%{total}</code>'
+  ru: 'Главы: <code>%{total}</code>'
+  de: 'Kapitel: <code>%{total}</code>'
+  ch: 'Kapitu: <code>%{total}</code>'
 result.chapter.hit_total:
   en: 'Chapter: <code>%{hit}/%{total}</code>'
+  ru: 'Глава: <code>%{hit}/%{total}</code>'
+  de: 'Kapitel: <code>%{hit}/%{total}</code>'
+  ch: 'Kapitu: <code>%{hit}/%{total}</code>'
 result.characters:
   en: 'Characters: %{characters}'
+  ru: 'Персонажи: %{characters}'
+  de: 'Charaktere: %{characters}'
+  ch: 'Charakter: %{characters}'
 result.status:
   en: 'Status: <code>%{status}</code>'
+  ru: 'Статус: <code>%{status}</code>'
+  de: 'Status: <code>%{status}</code>'
+  ch: 'Status: <code>%{status}</code>'
 result.tags:
   en: 'Tags: %{tags}'
+  ru: 'Теги: %{tags}'
+  de: 'Tags: %{tags}'
+  ch: 'Tags: %{tags}'
