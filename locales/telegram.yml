@@ -4,101 +4,181 @@ media.error:
   ru: Произошла ошибка
   de: Ein Fehler ist aufgetreten
   ch: Ä Fehler isch ufträte
+  cn: 发生错误
+  es: Ocurrió un error
+  weeb: "Kuso! An error dropped like a plot twist in Evangelion, senpai~"
+  archaic: "Alas, an error hath befallen, as the serpent's curse in Eden's garden."
 media.not_supported:
   en: Not supported
   ru: Не поддерживается
   de: Nicht unterstützt
   ch: Ne unterstützt
+  cn: 不支持
+  es: No compatible
+  weeb: "Nani?! Not supported? Like trying to waifu a background NPC in Persona 5."
+  archaic: "It is not borne, as the ark upon the waves of Noah's flood."
 search.keyboard:
   en: Search for Image
   ru: Поиск изображения
   de: Bild suchen
   ch: Bild suechä
+  cn: 搜索图像
+  es: Buscar imagen
+  weeb: "Image Hunt: Reverse Saiyan Style!"
+  archaic: "Seek ye the visage, as David sought Goliath's helm."
 search.no_results:
   en: I searched for you on SauceNAO, Trace & IQDB but didn't find anything.
   ru: Я поискал для вас на SauceNAO, Trace и IQDB, но ничего не нашел.
   de: Ich habe für dich auf SauceNAO, Trace & IQDB gesucht, aber nichts gefunden.
   ch: I ha für di uf SauceNAO, Trace & IQDB gsuecht, abr nüt gfunge.
+  cn: 我在 SauceNAO、Trace 和 IQDB 上为你搜索了，但什么也没找到。
+  es: Busqué por ti en SauceNAO, Trace e IQDB pero no encontré nada.
+  weeb: "Gomen, senpai! Scoured SauceNAO, Trace, & IQDB like Luffy hunting the One Piece, but nada."
+  archaic: "I have sought for thee in the scrolls of SauceNAO, Trace, and IQDB, yet found naught, as manna withheld in the wilderness."
 search.image_link:
   en: Link to image
   ru: Ссылка на изображение
   de: Link zum Bild
   ch: Link zum Bild
+  cn: 图像链接
+  es: Enlace a la imagen
+  weeb: "Image Shrine Link: Click for that forbidden ecchi relic~"
+  archaic: "The bond to the likeness, as the rod of Aaron to the budding almond."
 result.from:
   en: 'Data from: %{enrichers}'
   ru: 'Данные из: %{enrichers}'
   de: 'Daten von: %{enrichers}'
   ch: 'Date vo: %{enrichers}'
+  cn: '数据来源：%{enrichers}'
+  es: 'Datos de: %{enrichers}'
+  weeb: 'Lore Dump from: %{enrichers}'
+  archaic: 'Tidings from: %{enrichers}, as prophecies from the prophets of old.'
 result.episode.hit:
   en: 'Episode: <code>%{hit}</code>'
   ru: 'Эпизод: <code>%{hit}</code>'
   de: 'Folge: <code>%{hit}</code>'
   ch: 'Episodä: <code>%{hit}</code>'
+  cn: '剧集： <code>%{hit}</code>'
+  es: 'Episodio: <code>%{hit}</code>'
+  weeb: 'Ep: <code>%{hit}</code>'
+  archaic: 'The chapter of vision: <code>%{hit}</code>, as the visions of Daniel.'
 result.episode.hit_total:
   en: 'Episode: <code>%{hit}/%{total}</code>'
   ru: 'Эпизод: <code>%{hit}/%{total}</code>'
   de: 'Folge: <code>%{hit}/%{total}</code>'
   ch: 'Episodä: <code>%{hit}/%{total}</code>'
+  cn: '剧集： <code>%{hit}/%{total}</code>'
+  es: 'Episodio: <code>%{hit}/%{total}</code>'
+  weeb: 'Ep: <code>%{hit}/%{total}</code>'
+  archaic: 'The vision: <code>%{hit}/%{total}</code>, as the books of the chronicles.'
 result.episode.timestamp:
   en: (at <code>%{timestamp}s</code>)
   ru: (в <code>%{timestamp}с</code>)
   de: (bei <code>%{timestamp}s</code>)
   ch: (um <code>%{timestamp}s</code>)
+  cn: （在 <code>%{timestamp}秒</code>）
+  es: (en <code>%{timestamp}s</code>)
+  weeb: (at <code>%{timestamp}s</code>)
+  archaic: (in the hour of <code>%{timestamp}s</code>, as the cock's crow at dawn.)
 result.episode.total:
   en: 'Episodes: <code>%{total}</code>'
   ru: 'Эпизоды: <code>%{total}</code>'
   de: 'Folgen: <code>%{total}</code>'
   ch: 'Episodä: <code>%{total}</code>'
+  cn: '剧集： <code>%{total}</code>'
+  es: 'Episodios: <code>%{total}</code>'
+  weeb: 'Eps Total: <code>%{total}</code>'
+  archaic: 'Visions in number: <code>%{total}</code>, as the generations from Adam.'
 result.title.en:
   en: 'Title: <code>%{title}</code>'
   ru: 'Название: <code>%{title}</code>'
   de: 'Titel: <code>%{title}</code>'
   ch: 'Titu: <code>%{title}</code>'
+  cn: '标题： <code>%{title}</code>'
+  es: 'Título: <code>%{title}</code>'
+  weeb: 'Eng Title: <code>%{title}</code>'
+  archaic: "The name in the tongue of the West: <code>%{title}</code>, as Babel's confusion."
 result.title.nativ:
   en: 'Title [native]: <code>%{title}</code>'
   ru: 'Название [оригинал]: <code>%{title}</code>'
   de: 'Titel [Original]: <code>%{title}</code>'
   ch: 'Titu [Original]: <code>%{title}</code>'
+  cn: '标题 [原生]： <code>%{title}</code>'
+  es: 'Título [nativo]: <code>%{title}</code>'
+  weeb: 'Native Title: <code>%{title}</code>'
+  archaic: 'The name in its birth-tongue: <code>%{title}</code>, as the word of the Lord in Hebrew.'
 result.title.romaji:
   en: 'Title [romaji]: <code>%{title}</code>'
   ru: 'Название [ромадзи]: <code>%{title}</code>'
   de: 'Titel [Romaji]: <code>%{title}</code>'
   ch: 'Titu [Romaji]: <code>%{title}</code>'
+  cn: '标题 [罗马音]： <code>%{title}</code>'
+  es: 'Título [romaji]: <code>%{title}</code>'
+  weeb: 'Romaji Title: <code>%{title}</code>'
+  archaic: "The name in Roman letters: <code>%{title}</code>, as the scribes' transliteration."
 result.artist:
   en: 'Artist: %{artist}'
   ru: 'Художник: %{artist}'
   de: 'Künstler: %{artist}'
   ch: 'Künstler: %{artist}'
+  cn: '艺术家：%{artist}'
+  es: 'Artista: %{artist}'
+  weeb: 'Mangaka God: %{artist}'
+  archaic: 'The craftsman: %{artist}, as Bezalel who wrought the tabernacle.'
 result.chapter.hit:
   en: 'Chapter: <code>%{hit}</code>'
   ru: 'Глава: <code>%{hit}</code>'
   de: 'Kapitel: <code>%{hit}</code>'
   ch: 'Kapitu: <code>%{hit}</code>'
+  cn: '章节： <code>%{hit}</code>'
+  es: 'Capítulo: <code>%{hit}</code>'
+  weeb: 'Ch: <code>%{hit}</code>'
+  archaic: 'The leaf: <code>%{hit}</code>, as the pages of the psalms of David.'
 result.chapter.total:
   en: 'Chapters: <code>%{total}</code>'
   ru: 'Главы: <code>%{total}</code>'
   de: 'Kapitel: <code>%{total}</code>'
   ch: 'Kapitu: <code>%{total}</code>'
+  cn: '章节： <code>%{total}</code>'
+  es: 'Capítulos: <code>%{total}</code>'
+  weeb: 'Chs Total: <code>%{total}</code>'
+  archaic: 'Leaves in sum: <code>%{total}</code>, as the commandments graven in stone.'
 result.chapter.hit_total:
   en: 'Chapter: <code>%{hit}/%{total}</code>'
   ru: 'Глава: <code>%{hit}/%{total}</code>'
   de: 'Kapitel: <code>%{hit}/%{total}</code>'
   ch: 'Kapitu: <code>%{hit}/%{total}</code>'
+  cn: '章节： <code>%{hit}/%{total}</code>'
+  es: 'Capítulo: <code>%{hit}/%{total}</code>'
+  weeb: 'Ch: <code>%{hit}/%{total}</code>'
+  archaic: 'The leaf amid the scroll: <code>%{hit}/%{total}</code>, as the tribes of Israel numbered.'
 result.characters:
   en: 'Characters: %{characters}'
   ru: 'Персонажи: %{characters}'
   de: 'Charaktere: %{characters}'
   ch: 'Charakter: %{characters}'
+  cn: '角色：%{characters}'
+  es: 'Personajes: %{characters}'
+  weeb: 'Waifus/Husbandos: %{characters}'
+  archaic: 'The figures: %{characters}, as the patriarchs Abraham, Isaac, and Jacob.'
 result.status:
   en: 'Status: <code>%{status}</code>'
   ru: 'Статус: <code>%{status}</code>'
   de: 'Status: <code>%{status}</code>'
   ch: 'Status: <code>%{status}</code>'
+  cn: '状态： <code>%{status}</code>'
+  es: 'Estado: <code>%{status}</code>'
+  weeb: 'Status: <code>%{status}</code>'
+  archaic: 'The estate: <code>%{status}</code>, as the state of the kingdom under Solomon.'
 result.tags:
   en: 'Tags: %{tags}'
   ru: 'Теги: %{tags}'
   de: 'Tags: %{tags}'
   ch: 'Tags: %{tags}'
+  cn: '标签：%{tags}'
+  es: 'Etiquetas: %{tags}'
+  weeb: 'Tags: %{tags}'
+  archaic: 'The marks: %{tags}, as the seals upon the scroll in the Revelation.'
 
 message.start.preview_url:
   en: https://github.com/Nachtalb/reverse_image_search_bot
@@ -110,8 +190,6 @@ message.start:
 
     🤔 <u>How to use me?</u>
     Just send me any kind of image / video.
-
-    <i>❕ Check out /tips to see a few tricks on how to use this bot and search engines in general.</i>
 
     🖥️ <u>Commands</u>
     - /start: Show startup message
@@ -171,8 +249,8 @@ message.start:
 
     ⚠️ Das isch e BETA-Version!
 
-    🤔 <u>Wi chunzt mer mini?</u>
-    Schick mer eifach Art Bilder / Videos.
+    🤔 <u>Wie brucht me mi?</u>
+    Schick mer eifach Bilder / Videos.
 
     <i>❕ Lueg dr /help ah, für es paar Trick zum Bot und Suchmaschine im Allgmeine.</i>
 
@@ -186,6 +264,82 @@ message.start:
     Nachtalb: <a href="https://github.com/Nachtalb">Github</a> | <a href="https://t.me/Nachtalb">Telegram</a>
 
     🔥 <u>Quellcode</u>
+    <a href="https://github.com/Nachtalb/reverse_image_search_bot">Nachtalb/reverse_image_search_bot</a>
+  cn: |
+    🔎 <u>反向图像搜索机器人</u>
+
+    ⚠️ 这是 BETA 版本！
+
+    🤔 <u>如何使用我？</u>
+    只需发送任何图像 / 视频给我。
+
+    🖥️ <u>命令</u>
+    - /start: 显示启动消息
+    - /help: 更好的搜索结果的提示和技巧
+    - /search: 回复图像 / 视频进行搜索
+    - /lang: 更改语言
+
+    👨‍💻 <u>管理员</u>
+    Nachtalb: <a href="https://github.com/Nachtalb">Github</a> | <a href="https://t.me/Nachtalb">Telegram</a>
+
+    🔥 <u>源代码</u>
+    <a href="https://github.com/Nachtalb/reverse_image_search_bot">Nachtalb/reverse_image_search_bot</a>
+  es: |
+    🔎 <u>Bot de Búsqueda Inversa de Imágenes</u>
+
+    ⚠️ ¡Esta es una versión BETA!
+
+    🤔 <u>¿Cómo usarme?</u>
+    Solo envíame cualquier tipo de imagen / video.
+
+    🖥️ <u>Comandos</u>
+    - /start: Mostrar mensaje de inicio
+    - /help: Consejos y trucos para mejores resultados de búsqueda
+    - /search: Responder a una imagen / video para buscar
+    - /lang: Cambiar idioma
+
+    👨‍💻 <u>Admin</u>
+    Nachtalb: <a href="https://github.com/Nachtalb">Github</a> | <a href="https://t.me/Nachtalb">Telegram</a>
+
+    🔥 <u>Código Fuente</u>
+    <a href="https://github.com/Nachtalb/reverse_image_search_bot">Nachtalb/reverse_image_search_bot</a>
+  weeb: |
+    🔎 <u>Onii-chan's Reverse Image Search Bot</u>
+
+    ⚠️ Beta af, like a raw LN translation!
+
+    🤔 <u>How to Use This Moe Bot?</u>
+    Spam me pics/vids, kthx~ Just yeet that screenshot from your fave isekai.
+
+    🖥️ <u>Commands, Kawaii Edition</u>
+    - /start: Boot up the waifu welcome
+    - /help: Hacks for max similarity scores
+    - /search: Reply to media for that deep dive
+    - /lang: Switch to your native tongue (or loli-speak?)
+
+    👨‍💻 <u>Creator Senpai</u>
+    Nachtalb: <a href="https://github.com/Nachtalb">GitHub</a> | <a href="https://t.me/Nachtalb">Telegram</a>
+
+    🔥 <u>Source, Open like a Hentai Plot</u>
+    <a href="https://github.com/Nachtalb/reverse_image_search_bot">Nachtalb/reverse_image_search_bot</a>
+  archaic: |
+    🔎 <u>The Seeker of Hidden Visages</u>
+
+    ⚠️ This be a trial of beta, as the first fruits unripe.
+
+    🤔 <u>How shalt thou employ me?</u>
+    Send forth any graven image or moving vision unto me.
+
+    🖥️ <u>Commands of the Scroll</u>
+    - /start: Reveal the opening oracle
+    - /help: Counsels and wiles for truer findings
+    - /search: Reply to an image or vision to pursue
+    - /lang: Alter the tongue of utterance
+
+    👨‍💻 <u>The Scribe</u>
+    Nachtalb: <a href="https://github.com/Nachtalb">Github</a> | <a href="https://t.me/Nachtalb">Telegram</a>
+
+    🔥 <u>The Sacred Writ</u>
     <a href="https://github.com/Nachtalb/reverse_image_search_bot">Nachtalb/reverse_image_search_bot</a>
 message.help:
   en: |
@@ -217,26 +371,74 @@ message.help:
 
     <u>Bruch's Ganze Bild und schnid Extras us:</u> Bhaut's volle Bild, abr nimm aui umliegende Schmutz wi Handy-Layouts, UI-Elemänt oder schwarzi Balke weg. Tools werded dür irrelevanti Ränder um dr Hauptinhalt verwirrt – konzentrier di nume uf's Bild, wo du suechsch.
 
-    <u>Reparier d'Schrägläge:</u> Mach sicher, dass d's Bild ne schief oder uf em Chopf isch.
+    <u>Reparier d'Schräglag:</u> Mach sicher, dass d's Bild ne schief oder uf em Chopf isch.
 
     <u>Videos & GIFs:</u> Tools luege nur uf's erschte Bild im Video. Wes schwarz oder läär anfangt, nimm e Screenshot vum ne klare Stück.
+  cn: |
+    ✨ 提示与技巧
+
+    <u>使用整张图片，但裁剪掉多余部分：</u> 保持完整图像未裁剪，但移除周围的垃圾，如手机布局、UI 元素或黑边。工具会被主要内容周围无关边框迷惑——专注于你要搜索的图像。
+
+    <u>修正倾斜：</u> 确保你的图像没有侧倾或倒置。有些工具会被旋转的图片迷惑。
+
+    <u>视频 & GIF：</u> 工具只查看第一帧。如果它以黑色或空白开始，从清晰位置截取屏幕截图。
+  es: |
+    ✨ Consejos & Trucos
+
+    <u>Usa toda la imagen, pero recorta lo extra:</u> Mantén la imagen completa sin recortar, pero elimina cualquier basura circundante como diseños de teléfono, elementos de UI o barras negras. Las herramientas se confunden con bordes irrelevantes alrededor del contenido principal—enfócate solo en la imagen que estás buscando.
+
+    <u>Arregla la inclinación:</u> Asegúrate de que tu imagen no esté de lado o al revés. Algunas herramientas se confunden con imágenes rotadas.
+
+    <u>Videos & GIFs:</u> Las herramientas solo miran el primer fotograma. Si comienza en negro o en blanco, toma una captura de pantalla de un punto claro.
+  weeb: |
+    ✨ Pro Tips for Ultimate Reverse Search (Weeb Edition)
+
+    <u>Full Panel, No Crop Fails:</u> Keep the whole doujin spread, but slice off phone bezels or ED black bars. Engines glitch like a bad fansub sync—zero in on that keyframe from your JoJo pose!
+
+    <u>Straighten the Tilt:</u> No sideways suffering; rotate it right or tools flip out like a mecha in Gundam. 90 degrees off = instant L.
+
+    <u>Vids & GIFs OP:</u> They scan frame 1 only. Black intro? Snip a mid-epic shot, like Ichigo's Bankai reveal. No blanks, or it's game over! 🗡️
+  archaic: |
+    ✨ Counsels and Wiles of Seeking
+
+    <u>Employ the full likeness, yet shear the dross:</u> Preserve the entire graving uncropped, but cast out the chaff roundabout, such as the frame of thy tablet, the marks of the artificer, or the void bars of shadow. The engines of search are confounded by vain borders encircling the chief matter—fix thine eye upon the very image thou seekest.
+
+    <u>Mend the slant:</u> Ensure thy likeness standeth not askew or inverted. Certain engines are bemused by turned forms, as the tower of Babel's confusion.
+
+    <u>Moving visions and spirits' dances:</u> The engines behold but the first glimpse. If it dawneth in blackness or void, seize a token from a lucid hour, as the ram caught in the thicket for Abraham.
 message.reply_to_media:
   en: Please reply to a message that contains a photo or video.
   ru: Пожалуйста, ответьте на сообщение, содержащее фото или видео.
   de: Bitte antworte auf eine Nachricht mit einem Foto oder Video.
   ch: Bitte antworte uf e Nachricht mit nem Photo odr Video.
+  cn: 请回复包含照片或视频的消息。
+  es: Por favor, responde a un mensaje que contenga una foto o video.
+  weeb: "Reply to a pic/vid plz, senpai! Can't search air like a ghost type in Pokémon~"
+  archaic: "Reply, I beseech thee, to a missive bearing a portrait or moving sight."
 message.language.choose:
   en: 'Current language: %{current_lang}'
   ru: 'Текущий язык: %{current_lang}'
   de: 'Aktuelle Sprache: %{current_lang}'
   ch: 'Aktuelli Sprach: %{current_lang}'
+  cn: '当前语言：%{current_lang}'
+  es: 'Idioma actual: %{current_lang}'
+  weeb: 'Current Lingo: %{current_lang}'
+  archaic: 'The tongue now spoken: %{current_lang}, as the language of thy fathers.'
 message.language.not_available:
   en: 'Chosen language <code>%{lang}</code> is not available.'
   ru: 'Выбранный язык <code>%{lang}</code> недоступен.'
   de: 'Die gewählte Sprache <code>%{lang}</code> ist nicht verfügbar.'
   ch: 'Di gewählti Sprache <code>%{lang}</code> isch ne verfügbar.'
+  cn: '选择的语言 <code>%{lang}</code> 不可用。'
+  es: 'El idioma elegido <code>%{lang}</code> no está disponible.'
+  weeb: "Picked tongue <code>%{lang}</code> ain't loaded yet—beta woes."
+  archaic: 'The chosen speech <code>%{lang}</code> is not granted, as tongues withheld at Pentecost.'
 message.language.set:
   en: 'Language set to %{lang}'
   ru: 'Язык установлен на %{lang}'
   de: 'Sprache auf %{lang} gesetzt'
   ch: 'Sprach uf %{lang} gsetzt'
+  cn: '语言设置为 %{lang}'
+  es: 'Idioma configurado en %{lang}'
+  weeb: 'Lingo locked to %{lang}!'
+  archaic: 'The speech is set unto %{lang}, as the law given at Sinai.'

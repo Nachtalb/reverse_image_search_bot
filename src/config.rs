@@ -203,6 +203,22 @@ impl Default for Config {
                         code: "ch".to_string(),
                         name: "🇨🇭 Schwizerdütsche".to_string(),
                     },
+                    Language {
+                        code: "es".to_string(),
+                        name: "🇪🇸 Español".to_string(),
+                    },
+                    Language {
+                        code: "cn".to_string(),
+                        name: "🇨🇳 中文".to_string(),
+                    },
+                    Language {
+                        code: "weeb".to_string(),
+                        name: "🌸 Weeb'ish".to_string(),
+                    },
+                    Language {
+                        code: "archaic".to_string(),
+                        name: "📖 Old Testament".to_string(),
+                    },
                 ]),
             },
             redis: Redis {

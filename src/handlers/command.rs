@@ -199,7 +199,7 @@ async fn command_dispatcher(bot: Bot, msg: Message, cmd: Command) -> Result<()> 
 
 async fn handle_callbacks(bot: Bot, query: CallbackQuery) -> Result<()> {
     let data = query.data.clone().unwrap_or_default();
-    let re_lang = Regex::new(r"^lang:(-?\d+):([a-z]{2})$").unwrap();
+    let re_lang = Regex::new(r"^lang:(-?\d+):([a-z]+)$").unwrap();
 
     if let Some(captures) = re_lang.captures(&data) {
         language_handle_set(bot, query, captures[1].parse()?, captures[2].to_string()).await?;
