@@ -28,7 +28,7 @@ async fn image_from_video(bot: &Bot, file_id: FileId, _: Option<String>) -> Resu
     let file_url = files::telegram::file_url(bot.get_file(file_id).await?.path.as_str()).await?;
     let download_path = files::local::download_path(filename);
 
-    transformers::get_first_frame(file_url.as_str(), download_path)
+    transformers::get_first_frame(file_url.to_string(), download_path).await
 }
 
 async fn download_tg_file(
@@ -157,7 +157,8 @@ pub(crate) async fn handle_media_message(bot: Bot, msg: Message) -> Result<()> {
     log::debug!("Redis initialized");
 
     let new_image_id = get_timestamp().to_string();
-    let image_hash: Option<Vec<u8>> = match get_image_hash(downloaded_file.to_str().unwrap()) {
+    let image_hash: Option<Vec<u8>> = match get_image_hash(downloaded_file.to_str().unwrap()).await
+    {
         Ok(hash) => Some(hash),
         Err(e) => {
             log::warn!("Failed to get image hash for {:?}: {}", downloaded_file, e);
