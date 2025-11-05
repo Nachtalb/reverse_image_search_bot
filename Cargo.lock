@@ -831,9 +831,9 @@ dependencies = [
 
 [[package]]
 name = "booru"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a820abc7a40b2a99438e1d573cd661336c42ba535b6a890f598993cc98fe32e"
+checksum = "c6c829760c53aa8d59a335845d050dff10e7f52b7d46ec9ee9f4b3bb3fd03cd9"
 dependencies = [
  "itoa",
  "reqwest",
