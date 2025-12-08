@@ -20,7 +20,7 @@ figment = { version = "^0.10.19", features = [
 futures = "^0.3.31"
 image = { version = "^0.25", features = ["jpeg"] }
 img_hash = { version = "^3.2.0", git = "https://github.com/Nachtalb/img_hash.git", branch = "chore/support-image-0.25.x" }
-log = "^0.4.28"
+log = "^0.4.29"
 mime = "^0.3.17"
 mime_guess = "^2.0.5"
 normalize-path = "^0.2.1"
