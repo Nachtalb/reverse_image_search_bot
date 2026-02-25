@@ -3,6 +3,7 @@ from time import time
 from urllib.parse import quote_plus
 
 from cachetools import cached
+import requests
 from requests import Session
 from telegram import InlineKeyboardButton
 import validators
@@ -40,6 +41,8 @@ class SauceNaoEngine(GenericRISEngine):
 
     def _21_provider(self, data: ResponseData) -> InternalProviderData:
         """Anime"""
+        if not "anilist_id" in data:
+            return None, None
         return anilist.provide(data["anilist_id"], data.get("part"))  # type: ignore
 
     def _booru_provider(self, data: ResponseData, api: str) -> InternalProviderData:
@@ -148,8 +151,13 @@ class SauceNaoEngine(GenericRISEngine):
         api_link = "https://saucenao.com/search.php?db=999&output_type=2&testmode=1&numres=8&url={}{}".format(
             quote_plus(str(url)), f"&api_key={SAUCENAO_API}" if SAUCENAO_API else ""
         )
-        with self.lock:
-            response = self.session.get(api_link, timeout=5)
+        try:
+            with self.lock:
+                response = self.session.get(api_link)
+        except requests.exceptions.ConnectionError:
+            meta["errors"] = ["Error connecting to SauceNAO API"]
+            self.logger.debug("Error connecting to SauceNAO API")
+            return {}, meta
 
         if response.status_code == 429:
             self.limit_reached = time()
