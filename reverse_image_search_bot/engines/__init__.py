@@ -37,7 +37,7 @@ engines: list[GenericRISEngine] = [
         ["General"],
         ["Anything SFW and NSFW", "Image to Text (ORC)", "Anything Russian"],
     ),
-    BaiduEngine(),
+    # BaiduEngine(),
     # ShutterStockEngine(),
     GenericRISEngine(
         "Bing",
