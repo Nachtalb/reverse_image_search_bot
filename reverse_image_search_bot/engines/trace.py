@@ -54,12 +54,12 @@ class TraceEngine(GenericRISEngine):
 
         result = None
         if not self.use_api_key:
-            result = self.session.get(api_link, params=params)
+            result = self.session.get(api_link, params=params, timeout=5)
 
         if self.use_api_key or (result is not None and result.status_code == 402):
             self.use_api_key = True
             headers = {"x-trace-key": settings.TRACE_API}
-            result = self.session.get(api_link, params=params, headers=headers)
+            result = self.session.get(api_link, params=params, headers=headers, timeout=5)
 
         if result and result.status_code != 200:
             return result.status_code

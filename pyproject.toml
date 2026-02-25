@@ -21,7 +21,7 @@ gppt = "1.6"
 cleverdict = "1.9.1"
 paramiko = {version = "2.9.2", extras = ["all"]}
 pixiv-api = "1.0.0"
-moviepy = "1.0.3"
+moviepy = "^2.2.1"
 pyopenssl = "21.0.0"
 emoji = "^2.2.0"
 user-agent = "^0.1.10"

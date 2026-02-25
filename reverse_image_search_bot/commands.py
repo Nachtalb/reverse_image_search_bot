@@ -1,4 +1,4 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeoutError
 import io
 import json
 from logging import getLogger
@@ -259,16 +259,19 @@ def general_image_search(update: Update, image_url: URL, lock: Lock):
             )
             lock.release()
 
-            for future in as_completed(futures):
-                engine = futures[future]
-                new_button = future.result()
-                for button in buttons[:]:
-                    if button.text.endswith(engine.name):
-                        if not new_button:
-                            buttons.remove(button)
-                        else:
-                            buttons[buttons.index(button)] = new_button
-                message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(default_buttons + list(chunks(buttons, 2))))
+            try:
+                for future in as_completed(futures, timeout=15):
+                    engine = futures[future]
+                    new_button = future.result()
+                    for button in buttons[:]:
+                        if button.text.endswith(engine.name):
+                            if not new_button:
+                                buttons.remove(button)
+                            else:
+                                buttons[buttons.index(button)] = new_button
+                    message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(default_buttons + list(chunks(buttons, 2))))
+            except FuturesTimeoutError:
+                pass
     finally:
         if lock.locked:
             try:
@@ -313,7 +316,7 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, lock: L
     finally:
         best_match_lock.release()
 
-    match_found = thread.join()
+    match_found = thread.join(timeout=20)
 
     engines_used_html = ", ".join([b(en.name) for en in searchable_engines])
     if not match_found:
@@ -355,60 +358,63 @@ def _best_match_search(update: Update, context: CallbackContext, engines: list[G
 
     with ThreadPoolExecutor(max_workers=5) as executor:
         futures = {executor.submit(en.best_match, url): en for en in engines}
-        for future in as_completed(futures):
-            engine = futures[future]
-            try:
-                logger.debug("%s Searching for %s", engine.name, url)
-                result, meta = future.result()
+        try:
+            for future in as_completed(futures, timeout=15):
+                engine = futures[future]
+                try:
+                    logger.debug("%s Searching for %s", engine.name, url)
+                    result, meta = future.result()
 
-                if meta:
-                    logger.debug("Found something UmU")
+                    if meta:
+                        logger.debug("Found something UmU")
 
-                    button_list = []
-                    more_button = engine(str(url), "More")
-                    if more_button := engine(str(url), "More"):
-                        button_list.append(more_button)
+                        button_list = []
+                        more_button = engine(str(url), "More")
+                        if more_button := engine(str(url), "More"):
+                            button_list.append(more_button)
 
-                    if buttons := meta.get("buttons"):
-                        button_list.extend(buttons)
+                        if buttons := meta.get("buttons"):
+                            button_list.extend(buttons)
 
-                    button_list = list(chunks(button_list, 3))
+                        button_list = list(chunks(button_list, 3))
 
-                    identifier = meta.get("identifier")
-                    thumbnail_identifier = meta.get("thumbnail_identifier")
-                    if identifier in identifiers and thumbnail_identifier not in thumbnail_identifiers:
-                        result = {}
-                        result["Duplicate search result omitted"] = ""
-                    elif identifier not in identifiers and thumbnail_identifier in thumbnail_identifiers:
-                        result["Duplicate thumbnail omitted"] = ""
-                        del meta["thumbnail"]
-                    elif identifier in identifiers and thumbnail_identifier in thumbnail_identifiers:
-                        continue
+                        identifier = meta.get("identifier")
+                        thumbnail_identifier = meta.get("thumbnail_identifier")
+                        if identifier in identifiers and thumbnail_identifier not in thumbnail_identifiers:
+                            result = {}
+                            result["Duplicate search result omitted"] = ""
+                        elif identifier not in identifiers and thumbnail_identifier in thumbnail_identifiers:
+                            result["Duplicate thumbnail omitted"] = ""
+                            del meta["thumbnail"]
+                        elif identifier in identifiers and thumbnail_identifier in thumbnail_identifiers:
+                            continue
 
-                    wait_for(lock)
+                        wait_for(lock)
 
-                    reply, media_group = build_reply(result, meta)
-                    provider_msg = message.reply_html(
-                        reply,
-                        reply_markup=InlineKeyboardMarkup(button_list),
-                        reply_to_message_id=message.message_id,
-                        disable_web_page_preview=bool(media_group) or "errors" in meta,
-                    )
-                    if media_group:
-                        message.reply_media_group(
-                            media_group,  # type: ignore
-                            reply_to_message_id=provider_msg.message_id,
+                        reply, media_group = build_reply(result, meta)
+                        provider_msg = message.reply_html(
+                            reply,
+                            reply_markup=InlineKeyboardMarkup(button_list),
+                            reply_to_message_id=message.message_id,
+                            disable_web_page_preview=bool(media_group) or "errors" in meta,
                         )
-                    if "errors" not in meta and result:
-                        match_found = True
-                    if identifier:
-                        identifiers.append(identifier)
-                    if thumbnail_identifier:
-                        thumbnail_identifiers.append(thumbnail_identifier)
-            except Exception as error:
-                error_to_admin(update, context, message=f"Best match error: {error}", image_url=url)
-                logger.error("Engine failure: %s", engine)
-                logger.exception(error)
+                        if media_group:
+                            message.reply_media_group(
+                                media_group,  # type: ignore
+                                reply_to_message_id=provider_msg.message_id,
+                            )
+                        if "errors" not in meta and result:
+                            match_found = True
+                        if identifier:
+                            identifiers.append(identifier)
+                        if thumbnail_identifier:
+                            thumbnail_identifiers.append(thumbnail_identifier)
+                except Exception as error:
+                    error_to_admin(update, context, message=f"Best match error: {error}", image_url=url)
+                    logger.error("Engine failure: %s", engine)
+                    logger.exception(error)
+        except FuturesTimeoutError:
+            pass
 
     return match_found
 

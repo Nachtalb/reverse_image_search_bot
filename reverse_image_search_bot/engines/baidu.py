@@ -18,6 +18,6 @@ class BaiduEngine(PreWorkEngine):
     def get_search_link_by_url(self, url: URL) -> str | None:
         pre_url = self.pre_url.format(query_url=quote_plus(str(url)))
 
-        response = self.session.get(pre_url)
+        response = self.session.get(pre_url, timeout=5)
         if response.status_code == 200 and (search_url := response.json().get("data", {}).get("url")):
             return search_url
