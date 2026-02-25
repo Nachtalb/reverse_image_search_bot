@@ -1,8 +1,8 @@
-from pathlib import Path
+from cleverdict import CleverDict
 
-from cleverdict import CleverDict, get_app_dir
+from reverse_image_search_bot.settings import CONFIG_DIR
 
-app_path = Path(get_app_dir("reverse_image_search_bot"))
+app_path = CONFIG_DIR
 app_path.mkdir(parents=True, exist_ok=True)
 
 
