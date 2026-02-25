@@ -1,11 +1,11 @@
-from pathlib import Path
 from time import time
 from typing import Type
 
-from cleverdict import CleverDict, get_app_dir
+from cleverdict import CleverDict
+from reverse_image_search_bot.settings import CONFIG_DIR
 from telegram import User
 
-app_path = Path(get_app_dir("reverse_image_search_bot"))
+app_path = CONFIG_DIR
 app_path.mkdir(parents=True, exist_ok=True)
 
 
