@@ -19,6 +19,10 @@ def single(cls: Type["UserConfig"]):
             return cls.__loaded_users[id]
         else:
             new_user = cls(id)
+            # Evict oldest entry if cache exceeds 500 users to prevent unbounded growth
+            if len(cls.__loaded_users) >= 500:
+                oldest_id = next(iter(cls.__loaded_users))
+                del cls.__loaded_users[oldest_id]
             cls.__loaded_users[id] = new_user
             return new_user
 

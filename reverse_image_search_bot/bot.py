@@ -20,6 +20,7 @@ from telegram.parsemode import ParseMode
 
 from . import settings
 from .commands import (
+    auto_search_command,
     callback_query_handler,
     credits_command,
     file_handler,

@@ -26,7 +26,7 @@ class IQDBEngine(GenericRISEngine):
     @cached(GenericRISEngine._best_match_cache)
     def best_match(self, url: str | URL) -> ProviderData:
         self.logger.debug("Started looking for %s", url)
-        response: HTMLResponse = self.html_session.get(self.get_search_link_by_url(url))  # type: ignore
+        response: HTMLResponse = self.html_session.get(self.get_search_link_by_url(url), timeout=5)  # type: ignore
 
         if response.status_code != 200:
             self.logger.debug("Done with search: found nothing")

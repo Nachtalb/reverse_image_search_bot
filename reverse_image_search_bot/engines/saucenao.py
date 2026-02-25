@@ -149,7 +149,7 @@ class SauceNaoEngine(GenericRISEngine):
             quote_plus(str(url)), f"&api_key={SAUCENAO_API}" if SAUCENAO_API else ""
         )
         with self.lock:
-            response = self.session.get(api_link)
+            response = self.session.get(api_link, timeout=5)
 
         if response.status_code == 429:
             self.limit_reached = time()
