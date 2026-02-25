@@ -170,7 +170,7 @@ class BooruProvider(BaseProvider):
                 kind = kinds.get(tag['type'])
                 if kind:
                     tags.setdefault(kind, [])
-                    tags[kind].append(tag)
+                    tags[kind].append(tag['tagName'])
 
             chartags = set(tags.get('character', []))
             authortags = set(tags.get('artist', []))
