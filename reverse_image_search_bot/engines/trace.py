@@ -121,13 +121,14 @@ class TraceEngine(GenericRISEngine):
                 }
             )
 
-        from_t = datetime.fromtimestamp(data["from"]).strftime("%H:%M:%S")
-        to_t = datetime.fromtimestamp(data["to"]).strftime("%H:%M:%S")
-        result.update(
-            {
-                "Est. Time": f"{from_t} / {to_t}",
-            }
-        )
+        if "from" in data and "to" in data:
+            from_t = datetime.fromtimestamp(data["from"]).strftime("%H:%M:%S")
+            to_t = datetime.fromtimestamp(data["to"]).strftime("%H:%M:%S")
+            result.update(
+                {
+                    "Est. Time": f"{from_t} / {to_t}",
+                }
+            )
 
         meta.update(
             {
