@@ -54,7 +54,7 @@ class PixivProvider(BaseProvider):
             if "Error Message: invalid_grant" in data.error.message:
                 self.api.auth()  # Refresh token which dies after 1h
                 return self.request(illust_id)
-            self.logger.warning("Could not retrieve data: {data.error.user_message or data.error.message}")
+            self.logger.warning(f"Could not retrieve data: {data.error.user_message or data.error.message}")
             return
         return data.illust
 
