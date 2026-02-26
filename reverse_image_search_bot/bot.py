@@ -80,9 +80,9 @@ def error_logger(update: Update, context: CallbackContext, *_, **__):
 
 def main():
     global job_queue
-    _request = Request(con_pool_size=64)
+    _request = Request(con_pool_size=settings.CON_POOL_SIZE)
     bot = RISBot(settings.TELEGRAM_API_TOKEN, request=_request, arbitrary_callback_data=False)
-    updater = Updater(bot=bot, workers=16)
+    updater = Updater(bot=bot, workers=settings.WORKERS)
     dispatcher: Dispatcher = updater.dispatcher
     job_queue = updater.job_queue
 
