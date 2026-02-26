@@ -5,20 +5,19 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends gcc libkrb5-dev \
     && rm -rf /var/lib/apt/lists/*
 
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
 WORKDIR /app
 
-RUN pip install --no-cache-dir poetry \
-    && poetry config virtualenvs.create false
-
 # Copy dependency files first for better layer caching
-COPY pyproject.toml poetry.lock ./
-RUN poetry install --no-root --no-interaction --no-ansi --without dev
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
 
 
 FROM python:3.11-slim
 
 # Runtime deps only:
-#   ffmpeg          — required by moviepy for video frame extraction
+#   ffmpeg           — required by moviepy for video frame extraction
 #   libgssapi-krb5-2 — runtime .so that the compiled gssapi extension links against
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg libgssapi-krb5-2 \
@@ -26,8 +25,9 @@ RUN apt-get update \
 
 WORKDIR /app
 
-# Pull installed packages from builder — no build tools in the final image
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+# Pull the venv from builder — no build tools in the final image
+COPY --from=builder /app/.venv /app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Copy application source
 COPY run_bot.py ./
