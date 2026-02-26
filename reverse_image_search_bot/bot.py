@@ -1,4 +1,5 @@
 import html
+import io
 import json
 import logging
 import os
@@ -54,9 +55,19 @@ class TelegramLogHandler(logging.Handler):
 
     def emit(self, record: logging.LogRecord):
         try:
-            msg = self.prefixes.get(record.levelno, "") + " " + self.format(record)
+            prefix = self.prefixes.get(record.levelno, "")
+            msg = f"{prefix} {self.format(record)}"
             for admin in settings.ADMIN_IDS:
-                self.bot.send_message(admin, msg, parse_mode=ParseMode.HTML)
+                if len(msg) <= 4096:
+                    self.bot.send_message(admin, msg, parse_mode=ParseMode.HTML)
+                else:
+                    raw_text = super().format(record)  # plain text, no HTML
+                    filename = f"error_{int(record.created)}_{record.levelname.lower()}.log"
+                    log_data = io.BytesIO(raw_text.encode("utf-8"))
+                    log_data.name = filename
+                    suffix = "\n... [truncated]"
+                    caption = msg[:1024 - len(suffix)] + suffix if len(msg) > 1024 else msg
+                    self.bot.send_document(admin, log_data, filename=filename, caption=caption, parse_mode=ParseMode.HTML)
         except Exception:
             pass
 
@@ -66,9 +77,6 @@ class TelegramLogHandler(logging.Handler):
             parts = result.split("\n", 1)
             first_line = parts[0]
             rest = parts[1] if len(parts) > 1 else ""
-            max_rest = 3800 - len(first_line)
-            if len(rest) > max_rest:
-                rest = rest[:max_rest] + "\n... [truncated]"
             return f"{first_line}\n<pre>{rest}</pre>"
         return result
 
