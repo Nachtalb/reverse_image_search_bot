@@ -198,12 +198,12 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
                     raise error
                 return
 
-        lock = Lock()
-        lock.acquire()
-        Thread(target=general_image_search, args=(update, image_url, lock)).start()
+        general_search_lock = Lock()
+        general_search_lock.acquire()
+        Thread(target=general_image_search, args=(update, image_url, general_search_lock)).start()
         config = UserConfig(update.effective_user)  # type: ignore
         if config.auto_search_enabled:
-            best_match(update, context, image_url, lock)
+            best_match(update, context, image_url, general_search_lock)
     except Exception as error:
         wait_message.edit_text(
             "An error occurred, try again. If you need any more help, please contact @Nachtalb."
@@ -213,12 +213,12 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
 
 
 def callback_query_handler(update: Update, context: CallbackContext):
-    data = update.callback_query.data.split(" ")
+    query_parts = update.callback_query.data.split(" ")
 
-    if len(data) == 1:
-        command, values = data, []
+    if len(query_parts) == 1:
+        command, values = query_parts, []
     else:
-        command, values = data[0], data[1:]
+        command, values = query_parts[0], query_parts[1:]
 
     match command:
         case "best_match":
@@ -238,54 +238,54 @@ def send_wait_for(update: Update, context: CallbackContext, engine_name: str):
     update.callback_query.answer(f"Creating {engine_name} search url...")
 
 
-def general_image_search(update: Update, image_url: URL, lock: Lock):
+def general_image_search(update: Update, image_url: URL, reply_sent_lock: Lock):
     """Send a reverse image search link for the image sent to us"""
     try:
         default_buttons = [
             [InlineKeyboardButton(text="Best Match", callback_data="best_match " + str(image_url))],
             [InlineKeyboardButton(text="Go To Image", url=str(image_url))],
         ]
-        buttons = []
+        engine_buttons = []
 
         with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = {}
+            prework_futures = {}
 
             for engine in engines:
                 if isinstance(engine, PreWorkEngine) and (button := engine.empty_button()):
-                    futures[executor.submit(engine, image_url)] = engine
-                    buttons.append(button)
+                    prework_futures[executor.submit(engine, image_url)] = engine
+                    engine_buttons.append(button)
                 elif button := engine(image_url):
-                    buttons.append(button)
+                    engine_buttons.append(button)
 
-            button_list = list(chunks(buttons, 2))
+            button_list = list(chunks(engine_buttons, 2))
 
             reply = "Use /credits to get a overview of supprted engines and what they are good at."
             reply_markup = InlineKeyboardMarkup(default_buttons + button_list)
-            message: Message = update.message.reply_text(
+            reply_message: Message = update.message.reply_text(
                 text=reply,
                 reply_markup=reply_markup,
                 parse_mode=ParseMode.MARKDOWN,
                 reply_to_message_id=update.message.message_id,
             )
-            lock.release()
+            reply_sent_lock.release()
 
             try:
-                for future in as_completed(futures, timeout=15):
-                    engine = futures[future]
-                    new_button = future.result()
-                    for button in buttons[:]:
+                for future in as_completed(prework_futures, timeout=15):
+                    engine = prework_futures[future]
+                    updated_button = future.result()
+                    for button in engine_buttons[:]:
                         if button.text.endswith(engine.name):
-                            if not new_button:
-                                buttons.remove(button)
+                            if not updated_button:
+                                engine_buttons.remove(button)
                             else:
-                                buttons[buttons.index(button)] = new_button
-                    message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(default_buttons + list(chunks(buttons, 2))))
+                                engine_buttons[engine_buttons.index(button)] = updated_button
+                    reply_message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(default_buttons + list(chunks(engine_buttons, 2))))
             except FuturesTimeoutError:
                 pass
     finally:
-        if lock.locked:
+        if reply_sent_lock.locked:
             try:
-                lock.release()
+                reply_sent_lock.release()
             except RuntimeError:
                 pass
 
@@ -313,8 +313,8 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, lock: L
     best_match_lock = Lock()
     best_match_lock.acquire()
     try:
-        thread = ReturnableThread(_best_match_search, args=(update, context, searchable_engines, url, best_match_lock))
-        thread.start()
+        search_thread = ReturnableThread(_best_match_search, args=(update, context, searchable_engines, url, best_match_lock))
+        search_thread.start()
 
         if lock:
             wait_for(lock)
@@ -326,7 +326,7 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, lock: L
     finally:
         best_match_lock.release()
 
-    match_found = thread.join(timeout=20)
+    match_found = search_thread.join(timeout=20)
 
     engines_used_html = ", ".join([b(en.name) for en in searchable_engines])
     if not match_found:
@@ -366,11 +366,11 @@ def _best_match_search(update: Update, context: CallbackContext, engines: list[G
     thumbnail_identifiers = []
     match_found = False
 
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        futures = {executor.submit(en.best_match, url): en for en in engines}
+    with ThreadPoolExecutor(max_workers=5) as engine_executor:
+        engine_futures = {engine_executor.submit(en.best_match, url): en for en in engines}
         try:
-            for future in as_completed(futures, timeout=15):
-                engine = futures[future]
+            for future in as_completed(engine_futures, timeout=15):
+                engine = engine_futures[future]
                 try:
                     logger.debug("%s Searching for %s", engine.name, url)
                     result, meta = future.result()
