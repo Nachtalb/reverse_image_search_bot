@@ -1,5 +1,6 @@
 from .baidu import BaiduEngine
 from .generic import GenericRISEngine
+from .pic_image_search import AnimeTraceEngine, YandexEngine
 from .saucenao import SauceNaoEngine
 from .shutterstock import ShutterStockEngine
 from .trace import TraceEngine
@@ -8,6 +9,7 @@ __all__ = ["engines"]
 
 engines: list[GenericRISEngine] = [
     SauceNaoEngine(),
+    AnimeTraceEngine(),
     GenericRISEngine(
         "Google",
         "https://www.google.com/searchbyimage?safe=off&sbisrc=tg&image_url={query_url}",
@@ -26,15 +28,7 @@ engines: list[GenericRISEngine] = [
         ["Cosplayers"],
         ["Cosplayers"],
     ),
-    GenericRISEngine(
-        "Yandex",
-        "https://yandex.com/images/search?url={query_url}&rpt=imageview",
-        "Yandex N.V. is a multinational corporation primarily for Russian and Russian-language users, providing 70"
-        " Internet-related products and services",
-        "https://yandex.ru/",
-        ["General"],
-        ["Anything SFW and NSFW", "Image to Text (ORC)", "Anything Russian"],
-    ),
+    YandexEngine(),
     # BaiduEngine(),
     # ShutterStockEngine(),
     GenericRISEngine(
