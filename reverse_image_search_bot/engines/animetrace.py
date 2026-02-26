@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import re
+import time
 from functools import lru_cache
 
+import httpx
 from yarl import URL
 
 from .pic_image_search import PicImageSearchEngine
@@ -9,7 +12,6 @@ from .types import InternalProviderData, MetaData
 
 __all__ = ["AnimeTraceEngine"]
 
-# Single query: character English name + their media list (for work title)
 _ANILIST_QUERY = """
 query ($name: String) {
   Character(search: $name) {
@@ -29,18 +31,15 @@ def _clean_name(name: str) -> str:
     "ヤシロ・モモカ, Momo"      → "ヤシロ・モモカ"
     "シリカ (Scilica)  綾野珪子" → "シリカ"
     """
-    return name.split("（")[0].split("(")[0].split(",")[0].strip()
+    return re.split(r"[（(,]", name)[0].strip()
 
 
 def _anilist_post(payload: dict) -> dict | None:
     """POST to AniList GraphQL with one retry on 429."""
-    import time
-    import httpx
-    for attempt in range(2):
+    for _ in range(2):
         r = httpx.post("https://graphql.anilist.co", json=payload, timeout=5)
         if r.status_code == 429:
-            retry_after = int(r.headers.get("Retry-After", "1"))
-            time.sleep(retry_after + 0.1)
+            time.sleep(int(r.headers.get("Retry-After", "1")) + 0.1)
             continue
         r.raise_for_status()
         return r.json()
@@ -48,15 +47,10 @@ def _anilist_post(payload: dict) -> dict | None:
 
 
 def _best_work_title(media_nodes: list, original_work: str) -> str:
-    """Find the best English work title from a character's media list.
-
-    First tries to match the original work string against native/romaji titles.
-    Falls back to the most popular media's English/romaji title.
-    """
+    """Find the best English work title from a character's media list."""
     if not media_nodes:
         return original_work
 
-    # Try to match AnimeTrace's work against native or romaji titles
     orig_lower = original_work.lower()
     for node in media_nodes:
         t = node["title"]
@@ -65,7 +59,6 @@ def _best_work_title(media_nodes: list, original_work: str) -> str:
         if orig_lower in (native, romaji) or native in orig_lower or romaji in orig_lower:
             return t.get("english") or t.get("romaji") or original_work
 
-    # No match — use the most popular entry (first after POPULARITY_DESC sort)
     t = media_nodes[0]["title"]
     return t.get("english") or t.get("romaji") or original_work
 
@@ -107,12 +100,10 @@ class AnimeTraceEngine(PicImageSearchEngine):
     async def _search(self, url: str):
         from PicImageSearch import AnimeTrace, Network
         async with Network() as client:
-            # is_multi=1: detect all characters in the image, not just the dominant one
             engine = AnimeTrace(client=client, is_multi=1)
             return await engine.search(url=url)
 
     def _extract(self, raw: list) -> InternalProviderData:
-        # Discard low-confidence detections entirely
         confident = [item for item in raw if not item.origin.get("not_confident", False)]
         if not confident:
             return {}, {}
@@ -121,7 +112,6 @@ class AnimeTraceEngine(PicImageSearchEngine):
         meta: MetaData = {}
 
         if len(confident) == 1:
-            # Single character — full detail format
             item = confident[0]
             characters = getattr(item, "characters", [])
             if not characters:
@@ -133,7 +123,6 @@ class AnimeTraceEngine(PicImageSearchEngine):
             result["Character"] = en_name
             result["Work"] = en_work
 
-            # Alternate candidates with works for disambiguation
             seen_names: set[str] = {en_name}
             alts = []
             for c in characters[1:4]:
@@ -147,7 +136,6 @@ class AnimeTraceEngine(PicImageSearchEngine):
                 result["Also possible"] = ", ".join(alts)
 
         else:
-            # Multiple characters — compact list
             entries = []
             for item in confident:
                 characters = getattr(item, "characters", [])
