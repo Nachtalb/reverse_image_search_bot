@@ -84,13 +84,17 @@ class PicImageSearchEngine(GenericRISEngine):
 
         if not getattr(result_obj, "raw", None):
             self.logger.debug("Done: no results")
-            return {}, meta
+            return {}, {}
 
         try:
             r, m = self._extract(result_obj.raw)
         except Exception as e:
             self.logger.warning("Extraction failed: %s", e)
-            return {}, meta
+            return {}, {}
+
+        if not r:
+            self.logger.debug("Done: extraction yielded nothing")
+            return {}, {}
 
         meta.update(m)
         self.logger.debug("Done: found something")
