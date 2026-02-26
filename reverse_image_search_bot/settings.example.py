@@ -18,8 +18,8 @@ UPLOADER = {
 
 ADMIN_IDS = []
 
-CON_POOL_SIZE = 1  # Size of the connection pool (default: 1)
 WORKERS = 4  # Number of worker threads for the bot (default: 4)
+CON_POOL_SIZE = WORKERS + 4  # Recommended by PTB: workers + 4 (one per worker + polling/misc)
 
 SAUCENAO_API = ""  # SauceNAO api key https://saucenao.com/user.php?page=search-api
 TRACE_API = ""  # Trace.moe api key https://soruly.github.io/trace.moe-api/#/limits?id=http-rate-limits
