@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from functools import lru_cache
 
 from yarl import URL
@@ -28,10 +27,12 @@ query ($title: String) {
 
 
 def _clean_name(name: str) -> str:
-    """Strip parenthetical readings, nicknames after comma, etc."""
-    # "矢澤 にこ（やざわ にこ）"  → "矢澤 にこ"
-    # "ヤシロ・モモカ, Momo"      → "ヤシロ・モモカ"
-    # "シリカ (Scilica)  綾野珪子" → "シリカ"
+    """Strip parenthetical readings, nicknames after comma, etc.
+
+    "矢澤 にこ（やざわ にこ）"  → "矢澤 にこ"
+    "ヤシロ・モモカ, Momo"      → "ヤシロ・モモカ"
+    "シリカ (Scilica)  綾野珪子" → "シリカ"
+    """
     return name.split("（")[0].split("(")[0].split(",")[0].strip()
 
 
@@ -70,6 +71,11 @@ def _anilist_english_work(work: str) -> str:
         return work
 
 
+def _resolve_character(name: str, work: str) -> tuple[str, str]:
+    """Resolve a character name and series to English. Returns (en_name, en_work)."""
+    return _anilist_english_name(name), _anilist_english_work(work)
+
+
 class AnimeTraceEngine(PicImageSearchEngine):
     name = "AnimeTrace"
     description = (
@@ -86,38 +92,69 @@ class AnimeTraceEngine(PicImageSearchEngine):
         self.pic_engine_class = AnimeTrace
         super().__init__(*args, **kwargs)
 
+    async def _search(self, url: str):
+        from PicImageSearch import AnimeTrace, Network
+        async with Network() as client:
+            # is_multi=1: detect all characters in the image, not just the dominant one
+            engine = AnimeTrace(client=client, is_multi=1)
+            return await engine.search(url=url)
+
     def _extract(self, raw: list) -> InternalProviderData:
-        item = raw[0]
-        characters = getattr(item, "characters", [])
-        if not characters:
-            return {}, {}
+        # Filter out low-confidence detections
+        confident = [item for item in raw if not item.origin.get("not_confident", False)]
+        if not confident:
+            # Fall back to all results with a warning if everything is low confidence
+            confident = raw
 
-        top = characters[0]
-        en_name = _anilist_english_name(top.name)
-
-        result = {
-            "Character": en_name,
-            "Work": _anilist_english_work(top.work),
-        }
-
-        others = [
-            _anilist_english_name(c.name)
-            for c in characters[1:4]
-            if c.name != top.name
-        ]
-        # Deduplicate while preserving order
-        seen: set[str] = {en_name}
-        unique_others = []
-        for n in others:
-            if n not in seen:
-                seen.add(n)
-                unique_others.append(n)
-
-        if unique_others:
-            result["Also possible"] = ", ".join(unique_others)
-
+        result: dict = {}
         meta: MetaData = {}
-        if thumb := getattr(item, "thumbnail", None):
+
+        if len(confident) == 1:
+            # Single character detected — full detail format
+            item = confident[0]
+            characters = getattr(item, "characters", [])
+            if not characters:
+                return {}, {}
+
+            top = characters[0]
+            en_name, en_work = _resolve_character(top.name, top.work)
+
+            result["Character"] = en_name
+            result["Work"] = en_work
+
+            if item.origin.get("not_confident"):
+                result["Note"] = "Low confidence match"
+
+            # Alternate candidates (name + work for disambiguation)
+            seen_names: set[str] = {en_name}
+            alts = []
+            for c in characters[1:4]:
+                if c.name == top.name:
+                    continue
+                alt_name, alt_work = _resolve_character(c.name, c.work)
+                if alt_name not in seen_names:
+                    seen_names.add(alt_name)
+                    alts.append(f"{alt_name} ({alt_work})")
+            if alts:
+                result["Also possible"] = ", ".join(alts)
+
+        else:
+            # Multiple characters detected — compact list format
+            entries = []
+            for item in confident:
+                characters = getattr(item, "characters", [])
+                if not characters:
+                    continue
+                top = characters[0]
+                en_name, en_work = _resolve_character(top.name, top.work)
+                confidence = " (?)" if item.origin.get("not_confident") else ""
+                entries.append(f"{en_name}{confidence} ({en_work})")
+
+            if not entries:
+                return {}, {}
+            result["Characters"] = ", ".join(entries)
+
+        if thumb := getattr(confident[0], "thumbnail", None):
             meta["thumbnail"] = URL(thumb)
 
         return result, meta
