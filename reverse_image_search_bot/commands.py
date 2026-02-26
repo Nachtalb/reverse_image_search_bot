@@ -290,7 +290,7 @@ def general_image_search(update: Update, image_url: URL, reply_sent_lock: Lock):
                 pass
 
 
-def best_match(update: Update, context: CallbackContext, url: str | URL, lock: Lock = None):
+def best_match(update: Update, context: CallbackContext, url: str | URL, general_search_lock: Lock = None):
     """Find best matches for an image."""
     if update.callback_query:
         update.callback_query.answer(show_alert=False)
@@ -300,8 +300,8 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, lock: L
     config = UserConfig(user)
 
     if user.id not in ADMIN_IDS and (last_time := config.last_auto_search) and time() - last_time < 10:
-        if lock:
-            wait_for(lock)
+        if general_search_lock:
+            wait_for(general_search_lock)
         context.bot.send_message(
             text="Slow down a bit please....", chat_id=message.chat_id, reply_to_message_id=message.message_id
         )
@@ -310,21 +310,22 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, lock: L
 
     searchable_engines = [engine for engine in engines if engine.best_match_implemented]
 
-    best_match_lock = Lock()
-    best_match_lock.acquire()
+    # Held until "⏳ searching..." is sent — prevents results arriving before the status message
+    results_gate = Lock()
+    results_gate.acquire()
     try:
-        search_thread = ReturnableThread(_best_match_search, args=(update, context, searchable_engines, url, best_match_lock))
+        search_thread = ReturnableThread(_best_match_search, args=(update, context, searchable_engines, url, results_gate))
         search_thread.start()
 
-        if lock:
-            wait_for(lock)
-            # We only have to wait for the other thread to release the lock, we don't need it any further than that
+        if general_search_lock:
+            # Wait for general_image_search to send its buttons message before we send "⏳ searching..."
+            wait_for(general_search_lock)
 
         search_message = context.bot.send_message(
             text="⏳ searching...", chat_id=message.chat_id, reply_to_message_id=message.message_id
         )
     finally:
-        best_match_lock.release()
+        results_gate.release()
 
     match_found = search_thread.join(timeout=20)
 
@@ -360,7 +361,7 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, lock: L
         )
 
 
-def _best_match_search(update: Update, context: CallbackContext, engines: list[GenericRISEngine], url: URL, lock: Lock):
+def _best_match_search(update: Update, context: CallbackContext, engines: list[GenericRISEngine], url: URL, results_gate: Lock):
     message: Message = update.effective_message  # type: ignore
     identifiers = []
     thumbnail_identifiers = []
@@ -399,7 +400,7 @@ def _best_match_search(update: Update, context: CallbackContext, engines: list[G
                         elif identifier in identifiers and thumbnail_identifier in thumbnail_identifiers:
                             continue
 
-                        wait_for(lock)
+                        wait_for(results_gate)
 
                         reply, media_group = build_reply(result, meta)
                         provider_msg = message.reply_html(
