@@ -1,6 +1,7 @@
 from .baidu import BaiduEngine
 from .generic import GenericRISEngine
-from .pic_image_search import AnimeTraceEngine, YandexEngine
+from .animetrace import AnimeTraceEngine
+from .yandex import YandexEngine
 from .saucenao import SauceNaoEngine
 from .shutterstock import ShutterStockEngine
 from .trace import TraceEngine
