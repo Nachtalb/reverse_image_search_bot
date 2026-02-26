@@ -11,12 +11,15 @@ from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler,
     CommandHandler,
+    Dispatcher,
+    ExtBot,
     Filters,
     JobQueue,
     MessageHandler,
     Updater,
 )
 from telegram.parsemode import ParseMode
+from telegram.utils.request import Request
 
 from . import settings
 from .commands import (
@@ -65,6 +68,10 @@ logger = logging.getLogger(__name__)
 ADMIN_FILTER = Filters.user(user_id=settings.ADMIN_IDS)
 
 
+class RISBot(ExtBot):
+    pass
+
+
 def error(update: Update, context: CallbackContext):
     """Log all errors from the telegram bot api"""
     logger.exception(context.error)
@@ -73,9 +80,11 @@ def error(update: Update, context: CallbackContext):
 
 def main():
     global job_queue
-    updater = Updater(settings.TELEGRAM_API_TOKEN)
-    dispatcher = updater.dispatcher
-    job_queue = dispatcher.job_queue
+    _request = Request(con_pool_size=64)
+    bot = RISBot(settings.TELEGRAM_API_TOKEN, request=_request, arbitrary_callback_data=False)
+    updater = Updater(bot=bot, workers=16)
+    dispatcher: Dispatcher = updater.dispatcher
+    job_queue = updater.job_queue
 
     def stop_and_restart(chat_id: int):
         """Gracefully stop the Updater and replace the current process with a new one."""
