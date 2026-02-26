@@ -72,10 +72,10 @@ class RISBot(ExtBot):
     pass
 
 
-def error(update: Update, context: CallbackContext):
+def error_logger(update: Update, context: CallbackContext, *_, **__):
     """Log all errors from the telegram bot api"""
     logger.exception(context.error)
-    logger.warning("Error caused by this update: %s" % (update))
+    logger.warning(f"An exception occurred: {context}\n{vars(context)}")
 
 
 def main():
@@ -119,15 +119,16 @@ def main():
     )
 
     # log all errors
-    dispatcher.add_error_handler(error)
+    dispatcher.add_error_handler(error_logger)
 
-    print(sys.argv[-1])
     if match := re.match(r"restart=(\d+)", sys.argv[-1]):
         updater.bot.send_message(int(match.groups()[0]), "Restart successful!")
 
     if settings.MODE["active"] == "webhook":
+        logger.info("Starting webhook")
         updater.start_webhook(**settings.MODE["configuration"])
     else:
+        logger.info("Start polling")
         updater.start_polling()
     logger.info("Started bot. Waiting for requests...")
     updater.idle()
