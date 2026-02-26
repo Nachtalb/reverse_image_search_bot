@@ -153,7 +153,7 @@ class SauceNaoEngine(GenericRISEngine):
         )
         try:
             with self.lock:
-                response = self.session.get(api_link)
+                response = self.session.get(api_link, timeout=5)
         except requests.exceptions.ConnectionError:
             meta["errors"] = ["Error connecting to SauceNAO API"]
             self.logger.debug("Error connecting to SauceNAO API")

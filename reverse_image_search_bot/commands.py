@@ -327,7 +327,7 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, general
     finally:
         results_gate.release()
 
-    match_found = search_thread.join(timeout=20)
+    match_found = search_thread.join(timeout=65)
 
     engines_used_html = ", ".join([b(en.name) for en in searchable_engines])
     if not match_found:
@@ -367,69 +367,71 @@ def _best_match_search(update: Update, context: CallbackContext, engines: list[G
     thumbnail_identifiers = []
     match_found = False
 
-    with ThreadPoolExecutor(max_workers=5) as engine_executor:
-        engine_futures = {engine_executor.submit(en.best_match, url): en for en in engines}
-        try:
-            for future in as_completed(engine_futures, timeout=15):
-                engine = engine_futures[future]
-                try:
-                    logger.debug("%s Searching for %s", engine.name, url)
-                    result, meta = future.result()
+    engine_executor = ThreadPoolExecutor(max_workers=5)
+    engine_futures = {engine_executor.submit(en.best_match, url): en for en in engines}
+    try:
+        for future in as_completed(engine_futures, timeout=60):
+            engine = engine_futures[future]
+            try:
+                logger.debug("%s Searching for %s", engine.name, url)
+                result, meta = future.result()
 
-                    if meta:
-                        logger.debug("Found something UmU")
+                if meta:
+                    logger.debug("Found something UmU")
 
-                        button_list = []
-                        more_button = engine(str(url), "More")
-                        if more_button := engine(str(url), "More"):
-                            button_list.append(more_button)
+                    button_list = []
+                    more_button = engine(str(url), "More")
+                    if more_button := engine(str(url), "More"):
+                        button_list.append(more_button)
 
-                        if buttons := meta.get("buttons"):
-                            button_list.extend(buttons)
+                    if buttons := meta.get("buttons"):
+                        button_list.extend(buttons)
 
-                        button_list = list(chunks(button_list, 3))
+                    button_list = list(chunks(button_list, 3))
 
-                        identifier = meta.get("identifier")
-                        thumbnail_identifier = meta.get("thumbnail_identifier")
-                        if identifier in identifiers and thumbnail_identifier not in thumbnail_identifiers:
-                            result = {}
-                            result["Duplicate search result omitted"] = ""
-                        elif identifier not in identifiers and thumbnail_identifier in thumbnail_identifiers:
-                            result["Duplicate thumbnail omitted"] = ""
-                            del meta["thumbnail"]
-                        elif identifier in identifiers and thumbnail_identifier in thumbnail_identifiers:
-                            continue
+                    identifier = meta.get("identifier")
+                    thumbnail_identifier = meta.get("thumbnail_identifier")
+                    if identifier in identifiers and thumbnail_identifier not in thumbnail_identifiers:
+                        result = {}
+                        result["Duplicate search result omitted"] = ""
+                    elif identifier not in identifiers and thumbnail_identifier in thumbnail_identifiers:
+                        result["Duplicate thumbnail omitted"] = ""
+                        del meta["thumbnail"]
+                    elif identifier in identifiers and thumbnail_identifier in thumbnail_identifiers:
+                        continue
 
-                        wait_for(results_gate)
+                    wait_for(results_gate)
 
-                        reply, media_group = build_reply(result, meta)
-                        provider_msg = message.reply_html(
-                            reply,
-                            reply_markup=InlineKeyboardMarkup(button_list),
-                            reply_to_message_id=message.message_id,
-                            disable_web_page_preview=bool(media_group) or "errors" in meta,
-                        )
-                        if media_group:
-                            try:
-                                message.reply_media_group(
-                                    media_group,  # type: ignore
-                                    reply_to_message_id=provider_msg.message_id,
-                                )
-                            except BadRequest as er:
-                                if "webpage_media_empty" not in er.message:
-                                    raise
-                        if "errors" not in meta and result:
-                            match_found = True
-                        if identifier:
-                            identifiers.append(identifier)
-                        if thumbnail_identifier:
-                            thumbnail_identifiers.append(thumbnail_identifier)
-                except Exception as error:
-                    error_to_admin(update, context, message=f"Best match error: {error}", image_url=url)
-                    logger.error("Engine failure: %s", engine)
-                    logger.exception(error)
-        except FuturesTimeoutError:
-            pass
+                    reply, media_group = build_reply(result, meta)
+                    provider_msg = message.reply_html(
+                        reply,
+                        reply_markup=InlineKeyboardMarkup(button_list),
+                        reply_to_message_id=message.message_id,
+                        disable_web_page_preview=bool(media_group) or "errors" in meta,
+                    )
+                    if media_group:
+                        try:
+                            message.reply_media_group(
+                                media_group,  # type: ignore
+                                reply_to_message_id=provider_msg.message_id,
+                            )
+                        except BadRequest as er:
+                            if "webpage_media_empty" not in er.message:
+                                raise
+                    if "errors" not in meta and result:
+                        match_found = True
+                    if identifier:
+                        identifiers.append(identifier)
+                    if thumbnail_identifier:
+                        thumbnail_identifiers.append(thumbnail_identifier)
+            except Exception as error:
+                error_to_admin(update, context, message=f"Best match error: {error}", image_url=url)
+                logger.error("Engine failure: %s", engine)
+                logger.exception(error)
+    except FuturesTimeoutError:
+        pass
+    finally:
+        engine_executor.shutdown(wait=False, cancel_futures=True)
 
     return match_found
 
