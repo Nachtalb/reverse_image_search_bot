@@ -22,8 +22,11 @@ query ($name: String) {
 @lru_cache(maxsize=256)
 def _anilist_english_name(japanese_name: str) -> str:
     """Look up English name via AniList. Returns original if not found."""
-    # Strip parenthetical readings, e.g. "矢澤 にこ（やざわ にこ）" → "矢澤 にこ"
-    clean = japanese_name.split("（")[0].split("(")[0].strip()
+    # Strip parenthetical readings and nicknames after comma:
+    #   "矢澤 にこ（やざわ にこ）"  → "矢澤 にこ"
+    #   "ヤシロ・モモカ, Momo"      → "ヤシロ・モモカ"
+    #   "シリカ (Scilica)  綾野珪子" → "シリカ"
+    clean = japanese_name.split("（")[0].split("(")[0].split(",")[0].strip()
     try:
         import httpx
         r = httpx.post(
