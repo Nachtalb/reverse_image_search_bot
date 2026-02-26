@@ -1,8 +1,10 @@
 import html
+import json
 import logging
 import os
 import re
 import sys
+from pathlib import Path
 from threading import Thread
 
 from emoji import emojize
@@ -69,7 +71,29 @@ ADMIN_FILTER = Filters.user(user_id=settings.ADMIN_IDS)
 
 
 class RISBot(ExtBot):
-    pass
+    _banned_users: list[int] = []
+    _banned_users_file: Path = Path("banned_users.json")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self._banned_users_file.is_file():
+            self._banned_users = json.loads(self._banned_users_file.read_text())
+
+    def _ban_user(self, update: Update, _: CallbackContext):
+        args = update.message.text.strip("/").split(" ")
+        if len(args) != 2:
+            update.message.reply_text("Usage: /ban <user_id>")
+            return
+        user_id = int(args[1])
+
+        if user_id in self._banned_users:
+            self._banned_users.remove(user_id)
+            text = f"Removed user {user_id=} from banned users"
+        else:
+            self._banned_users.append(user_id)
+            text = f"banned user {user_id=}"
+        self._banned_users_file.write_text(json.dumps(self._banned_users))
+        update.message.reply_text(text)
 
 
 def error_logger(update: Update, context: CallbackContext, *_, **__):
@@ -103,6 +127,9 @@ def main():
     dispatcher.add_handler(CommandHandler("id", id_command))
     dispatcher.add_handler(CommandHandler("tips", tips_command))
     dispatcher.add_handler(CommandHandler("restart", restart_command, filters=ADMIN_FILTER))
+    dispatcher.add_handler(
+        CommandHandler("ban", bot._ban_user, filters=ADMIN_FILTER), group=1
+    )
     dispatcher.add_handler(CommandHandler(("credits", "credit"), credits_command, run_async=True))
     dispatcher.add_handler(CommandHandler("search", search_command, run_async=True))
     dispatcher.add_handler(CommandHandler("auto_search", auto_search_command, filters=Filters.chat_type.private, run_async=True))

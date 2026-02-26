@@ -157,6 +157,13 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
     if not message:
         return
 
+    user = message.from_user
+    if user.id in context.bot._banned_users:
+        message.reply_text(
+            "🔴 You are banned from using this bot due to uploading illegal content."
+        )
+        return
+
     wait_message = update.message.reply_text("⌛ Give me a sec...")
     context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
 
