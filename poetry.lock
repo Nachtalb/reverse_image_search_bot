@@ -1049,6 +1049,21 @@ html5 = ["html5lib"]
 htmlsoup = ["BeautifulSoup4"]
 
 [[package]]
+name = "lxml-html-clean"
+version = "0.4.3"
+description = "HTML cleaner from lxml project"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "lxml_html_clean-0.4.3-py3-none-any.whl", hash = "sha256:63fd7b0b9c3a2e4176611c2ca5d61c4c07ffca2de76c14059a81a2825833731e"},
+    {file = "lxml_html_clean-0.4.3.tar.gz", hash = "sha256:c9df91925b00f836c807beab127aac82575110eacff54d0a75187914f1bd9d8c"},
+]
+
+[package.dependencies]
+lxml = "*"
+
+[[package]]
 name = "matplotlib-inline"
 version = "0.2.1"
 description = "Inline Matplotlib backend for Jupyter"
@@ -2926,4 +2941,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "53286d1bbcaad89abf4d844fd66b95970f140d3995cd06b568d5040b7f36f02c"
+content-hash = "d586b80e8aeba9cac7de09585de2e75e6c91db408a29704b56f65d71e5d979aa"
