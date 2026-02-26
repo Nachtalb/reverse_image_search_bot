@@ -9,11 +9,16 @@ I recommend SauceNao, for other images I recommend to use Google, Yandex.
 Supported engines:
 
 - All-in-one: Google, Yandex, Baidu, Shutterstock, Bing, TinEye, Sogou
-- Artworks & Anime: SauceNAO, IQDB, Trace, ascii2d
+- Artworks & Anime: SauceNAO, Trace, ascii2d
+- Cosplayers: 3D IQDB *(button only — indexes not updated in 2+ years)*
+
+> **Note:** IQDB was removed as SauceNAO is a full superset and indexes all the
+> same sources. 3D IQDB is kept as a search button but has no auto-search
+> support since its indexes have not been updated in over 2 years.
 
 Inline results support:
 
-SauceNAO, IQDB, Trace
+SauceNAO, Trace
 
 ## Commands
 

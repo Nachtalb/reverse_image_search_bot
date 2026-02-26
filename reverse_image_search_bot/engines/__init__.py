@@ -1,6 +1,5 @@
 from .baidu import BaiduEngine
 from .generic import GenericRISEngine
-from .iqdb import IQDBEngine
 from .saucenao import SauceNaoEngine
 from .shutterstock import ShutterStockEngine
 from .trace import TraceEngine
@@ -19,8 +18,7 @@ engines: list[GenericRISEngine] = [
         ["Anything SFW", "People and Characters"],
     ),
     TraceEngine(),
-    IQDBEngine(),
-    IQDBEngine(
+    GenericRISEngine(
         "3D IQDB",
         "https://3d.iqdb.org/?url={query_url}",
         "3D IQDB is a reverse search engine that scrubs ImageBoards for cosplayer photos.",
