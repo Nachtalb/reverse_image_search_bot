@@ -112,10 +112,10 @@ class AnimeTraceEngine(PicImageSearchEngine):
             return await engine.search(url=url)
 
     def _extract(self, raw: list) -> InternalProviderData:
-        # Filter out low-confidence detections
+        # Discard low-confidence detections entirely
         confident = [item for item in raw if not item.origin.get("not_confident", False)]
         if not confident:
-            confident = raw  # fall back to all if everything is uncertain
+            return {}, {}
 
         result: dict = {}
         meta: MetaData = {}
@@ -132,9 +132,6 @@ class AnimeTraceEngine(PicImageSearchEngine):
 
             result["Character"] = en_name
             result["Work"] = en_work
-
-            if item.origin.get("not_confident"):
-                result["Note"] = "Low confidence match"
 
             # Alternate candidates with works for disambiguation
             seen_names: set[str] = {en_name}
@@ -158,8 +155,7 @@ class AnimeTraceEngine(PicImageSearchEngine):
                     continue
                 top = characters[0]
                 en_name, en_work = _anilist_resolve(top.name, top.work)
-                confidence = " (?)" if item.origin.get("not_confident") else ""
-                entries.append(f"{en_name}{confidence} ({en_work})")
+                entries.append(f"{en_name} ({en_work})")
 
             if not entries:
                 return {}, {}
