@@ -27,6 +27,11 @@ class PicImageSearchEngine(GenericRISEngine):
 
     pic_engine_class = None  # e.g. PicImageSearch.Yandex
 
+    @classmethod
+    @property
+    def best_match_implemented(cls):
+        return True
+
     async def _search(self, url: str):
         from PicImageSearch import Network
         async with Network() as client:
