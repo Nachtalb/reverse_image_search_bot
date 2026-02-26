@@ -52,16 +52,23 @@ class TelegramLogHandler(logging.Handler):
         self.bot = bot
 
     def emit(self, record: logging.LogRecord):
-        msg = self.prefixes.get(record.levelno, "") + " " + self.format(record)
-
-        for admin in settings.ADMIN_IDS:
-            self.bot.send_message(admin, msg, parse_mode=ParseMode.HTML)
+        try:
+            msg = self.prefixes.get(record.levelno, "") + " " + self.format(record)
+            for admin in settings.ADMIN_IDS:
+                self.bot.send_message(admin, msg, parse_mode=ParseMode.HTML)
+        except Exception:
+            pass
 
     def format(self, record: logging.LogRecord):
         result = html.escape(super().format(record))
         if record.exc_info:
             parts = result.split("\n", 1)
-            return f"{parts[0]}\n<pre>{parts[1]}</pre>"
+            first_line = parts[0]
+            rest = parts[1] if len(parts) > 1 else ""
+            max_rest = 3800 - len(first_line)
+            if len(rest) > max_rest:
+                rest = rest[:max_rest] + "\n... [truncated]"
+            return f"{first_line}\n<pre>{rest}</pre>"
         return result
 
 
@@ -98,8 +105,7 @@ class RISBot(ExtBot):
 
 def error_logger(update: Update, context: CallbackContext, *_, **__):
     """Log all errors from the telegram bot api"""
-    logger.exception(context.error)
-    logger.warning(f"An exception occurred: {context}\n{vars(context)}")
+    logger.error("Uncaught exception in handler:", exc_info=context.error)
 
 
 def main():
