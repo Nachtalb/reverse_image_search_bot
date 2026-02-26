@@ -9,18 +9,14 @@ from .types import InternalProviderData, MetaData
 
 __all__ = ["AnimeTraceEngine"]
 
-_ANILIST_CHAR_QUERY = """
+# Single query: character English name + their media list (for work title)
+_ANILIST_QUERY = """
 query ($name: String) {
   Character(search: $name) {
     name { full }
-  }
-}
-"""
-
-_ANILIST_MEDIA_QUERY = """
-query ($title: String) {
-  Media(search: $title) {
-    title { english romaji }
+    media(perPage: 10, sort: POPULARITY_DESC) {
+      nodes { title { english romaji native } }
+    }
   }
 }
 """
@@ -51,32 +47,45 @@ def _anilist_post(payload: dict) -> dict | None:
     return None
 
 
-@lru_cache(maxsize=256)
-def _anilist_english_name(japanese_name: str) -> str:
-    """Look up English character name via AniList. Returns original if not found."""
-    clean = _clean_name(japanese_name)
-    try:
-        data = _anilist_post({"query": _ANILIST_CHAR_QUERY, "variables": {"name": clean}})
-        full = data["data"]["Character"]["name"]["full"]
-        return full or japanese_name
-    except Exception:
-        return japanese_name
+def _best_work_title(media_nodes: list, original_work: str) -> str:
+    """Find the best English work title from a character's media list.
+
+    First tries to match the original work string against native/romaji titles.
+    Falls back to the most popular media's English/romaji title.
+    """
+    if not media_nodes:
+        return original_work
+
+    # Try to match AnimeTrace's work against native or romaji titles
+    orig_lower = original_work.lower()
+    for node in media_nodes:
+        t = node["title"]
+        native = (t.get("native") or "").lower()
+        romaji = (t.get("romaji") or "").lower()
+        if orig_lower in (native, romaji) or native in orig_lower or romaji in orig_lower:
+            return t.get("english") or t.get("romaji") or original_work
+
+    # No match — use the most popular entry (first after POPULARITY_DESC sort)
+    t = media_nodes[0]["title"]
+    return t.get("english") or t.get("romaji") or original_work
 
 
 @lru_cache(maxsize=256)
-def _anilist_english_work(work: str) -> str:
-    """Look up English series title via AniList. Returns original if not found."""
+def _anilist_resolve(char_name: str, work: str) -> tuple[str, str]:
+    """Resolve character name and work to English in a single AniList call.
+
+    Returns (english_char_name, english_work_title).
+    Falls back to originals on failure.
+    """
+    clean = _clean_name(char_name)
     try:
-        data = _anilist_post({"query": _ANILIST_MEDIA_QUERY, "variables": {"title": work}})
-        titles = data["data"]["Media"]["title"]
-        return titles.get("english") or titles.get("romaji") or work
+        data = _anilist_post({"query": _ANILIST_QUERY, "variables": {"name": clean}})
+        char = data["data"]["Character"]
+        en_name = char["name"]["full"] or char_name
+        en_work = _best_work_title(char["media"]["nodes"], work)
+        return en_name, en_work
     except Exception:
-        return work
-
-
-def _resolve_character(name: str, work: str) -> tuple[str, str]:
-    """Resolve a character name and series to English. Returns (en_name, en_work)."""
-    return _anilist_english_name(name), _anilist_english_work(work)
+        return char_name, work
 
 
 class AnimeTraceEngine(PicImageSearchEngine):
@@ -106,21 +115,20 @@ class AnimeTraceEngine(PicImageSearchEngine):
         # Filter out low-confidence detections
         confident = [item for item in raw if not item.origin.get("not_confident", False)]
         if not confident:
-            # Fall back to all results with a warning if everything is low confidence
-            confident = raw
+            confident = raw  # fall back to all if everything is uncertain
 
         result: dict = {}
         meta: MetaData = {}
 
         if len(confident) == 1:
-            # Single character detected — full detail format
+            # Single character — full detail format
             item = confident[0]
             characters = getattr(item, "characters", [])
             if not characters:
                 return {}, {}
 
             top = characters[0]
-            en_name, en_work = _resolve_character(top.name, top.work)
+            en_name, en_work = _anilist_resolve(top.name, top.work)
 
             result["Character"] = en_name
             result["Work"] = en_work
@@ -128,13 +136,13 @@ class AnimeTraceEngine(PicImageSearchEngine):
             if item.origin.get("not_confident"):
                 result["Note"] = "Low confidence match"
 
-            # Alternate candidates (name + work for disambiguation)
+            # Alternate candidates with works for disambiguation
             seen_names: set[str] = {en_name}
             alts = []
             for c in characters[1:4]:
                 if c.name == top.name:
                     continue
-                alt_name, alt_work = _resolve_character(c.name, c.work)
+                alt_name, alt_work = _anilist_resolve(c.name, c.work)
                 if alt_name not in seen_names:
                     seen_names.add(alt_name)
                     alts.append(f"{alt_name} ({alt_work})")
@@ -142,14 +150,14 @@ class AnimeTraceEngine(PicImageSearchEngine):
                 result["Also possible"] = ", ".join(alts)
 
         else:
-            # Multiple characters detected — compact list format
+            # Multiple characters — compact list
             entries = []
             for item in confident:
                 characters = getattr(item, "characters", [])
                 if not characters:
                     continue
                 top = characters[0]
-                en_name, en_work = _resolve_character(top.name, top.work)
+                en_name, en_work = _anilist_resolve(top.name, top.work)
                 confidence = " (?)" if item.origin.get("not_confident") else ""
                 entries.append(f"{en_name}{confidence} ({en_work})")
 
