@@ -9,6 +9,7 @@ from threading import Thread
 
 from emoji import emojize
 from telegram import Bot, Update
+from telegram.error import Unauthorized
 from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler,
@@ -105,6 +106,8 @@ class RISBot(ExtBot):
 
 def error_logger(update: Update, context: CallbackContext, *_, **__):
     """Log all errors from the telegram bot api"""
+    if isinstance(context.error, Unauthorized):
+        return
     logger.error("Uncaught exception in handler:", exc_info=context.error)
 
 
