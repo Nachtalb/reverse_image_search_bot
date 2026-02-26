@@ -36,19 +36,28 @@ def _clean_name(name: str) -> str:
     return name.split("（")[0].split("(")[0].split(",")[0].strip()
 
 
+def _anilist_post(payload: dict) -> dict | None:
+    """POST to AniList GraphQL with one retry on 429."""
+    import time
+    import httpx
+    for attempt in range(2):
+        r = httpx.post("https://graphql.anilist.co", json=payload, timeout=5)
+        if r.status_code == 429:
+            retry_after = int(r.headers.get("Retry-After", "1"))
+            time.sleep(retry_after + 0.1)
+            continue
+        r.raise_for_status()
+        return r.json()
+    return None
+
+
 @lru_cache(maxsize=256)
 def _anilist_english_name(japanese_name: str) -> str:
     """Look up English character name via AniList. Returns original if not found."""
     clean = _clean_name(japanese_name)
     try:
-        import httpx
-        r = httpx.post(
-            "https://graphql.anilist.co",
-            json={"query": _ANILIST_CHAR_QUERY, "variables": {"name": clean}},
-            timeout=5,
-        )
-        r.raise_for_status()
-        full = r.json()["data"]["Character"]["name"]["full"]
+        data = _anilist_post({"query": _ANILIST_CHAR_QUERY, "variables": {"name": clean}})
+        full = data["data"]["Character"]["name"]["full"]
         return full or japanese_name
     except Exception:
         return japanese_name
@@ -58,14 +67,8 @@ def _anilist_english_name(japanese_name: str) -> str:
 def _anilist_english_work(work: str) -> str:
     """Look up English series title via AniList. Returns original if not found."""
     try:
-        import httpx
-        r = httpx.post(
-            "https://graphql.anilist.co",
-            json={"query": _ANILIST_MEDIA_QUERY, "variables": {"title": work}},
-            timeout=5,
-        )
-        r.raise_for_status()
-        titles = r.json()["data"]["Media"]["title"]
+        data = _anilist_post({"query": _ANILIST_MEDIA_QUERY, "variables": {"title": work}})
+        titles = data["data"]["Media"]["title"]
         return titles.get("english") or titles.get("romaji") or work
     except Exception:
         return work
