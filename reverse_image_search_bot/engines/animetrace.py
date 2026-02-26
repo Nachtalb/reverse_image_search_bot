@@ -10,7 +10,7 @@ from .types import InternalProviderData, MetaData
 
 __all__ = ["AnimeTraceEngine"]
 
-_ANILIST_QUERY = """
+_ANILIST_CHAR_QUERY = """
 query ($name: String) {
   Character(search: $name) {
     name { full }
@@ -18,20 +18,32 @@ query ($name: String) {
 }
 """
 
+_ANILIST_MEDIA_QUERY = """
+query ($title: String) {
+  Media(search: $title) {
+    title { english romaji }
+  }
+}
+"""
+
+
+def _clean_name(name: str) -> str:
+    """Strip parenthetical readings, nicknames after comma, etc."""
+    # "矢澤 にこ（やざわ にこ）"  → "矢澤 にこ"
+    # "ヤシロ・モモカ, Momo"      → "ヤシロ・モモカ"
+    # "シリカ (Scilica)  綾野珪子" → "シリカ"
+    return name.split("（")[0].split("(")[0].split(",")[0].strip()
+
 
 @lru_cache(maxsize=256)
 def _anilist_english_name(japanese_name: str) -> str:
-    """Look up English name via AniList. Returns original if not found."""
-    # Strip parenthetical readings and nicknames after comma:
-    #   "矢澤 にこ（やざわ にこ）"  → "矢澤 にこ"
-    #   "ヤシロ・モモカ, Momo"      → "ヤシロ・モモカ"
-    #   "シリカ (Scilica)  綾野珪子" → "シリカ"
-    clean = japanese_name.split("（")[0].split("(")[0].split(",")[0].strip()
+    """Look up English character name via AniList. Returns original if not found."""
+    clean = _clean_name(japanese_name)
     try:
         import httpx
         r = httpx.post(
             "https://graphql.anilist.co",
-            json={"query": _ANILIST_QUERY, "variables": {"name": clean}},
+            json={"query": _ANILIST_CHAR_QUERY, "variables": {"name": clean}},
             timeout=5,
         )
         r.raise_for_status()
@@ -39,6 +51,23 @@ def _anilist_english_name(japanese_name: str) -> str:
         return full or japanese_name
     except Exception:
         return japanese_name
+
+
+@lru_cache(maxsize=256)
+def _anilist_english_work(work: str) -> str:
+    """Look up English series title via AniList. Returns original if not found."""
+    try:
+        import httpx
+        r = httpx.post(
+            "https://graphql.anilist.co",
+            json={"query": _ANILIST_MEDIA_QUERY, "variables": {"title": work}},
+            timeout=5,
+        )
+        r.raise_for_status()
+        titles = r.json()["data"]["Media"]["title"]
+        return titles.get("english") or titles.get("romaji") or work
+    except Exception:
+        return work
 
 
 class AnimeTraceEngine(PicImageSearchEngine):
@@ -68,7 +97,7 @@ class AnimeTraceEngine(PicImageSearchEngine):
 
         result = {
             "Character": en_name,
-            "Work": top.work,
+            "Work": _anilist_english_work(top.work),
         }
 
         others = [
