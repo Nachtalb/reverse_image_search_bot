@@ -27,6 +27,7 @@ from telegram import (
     Sticker,
     Video,
 )
+from telegram.error import BadRequest
 from telegram.ext import CallbackContext
 from telegram.parsemode import ParseMode
 from yarl import URL
@@ -157,6 +158,13 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
     if not message:
         return
 
+    user = message.from_user
+    if user.id in context.bot._banned_users:
+        message.reply_text(
+            "🔴 You are banned from using this bot due to uploading illegal content."
+        )
+        return
+
     wait_message = update.message.reply_text("⌛ Give me a sec...")
     context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
 
@@ -197,7 +205,9 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
         if config.auto_search_enabled:
             best_match(update, context, image_url, lock)
     except Exception as error:
-        wait_message.edit_text("An error occurred please contact the @Nachtalb for help.")
+        wait_message.edit_text(
+            "An error occurred, try again. If you need any more help, please contact @Nachtalb."
+        )
         raise
     wait_message.delete()
 
@@ -399,10 +409,14 @@ def _best_match_search(update: Update, context: CallbackContext, engines: list[G
                             disable_web_page_preview=bool(media_group) or "errors" in meta,
                         )
                         if media_group:
-                            message.reply_media_group(
-                                media_group,  # type: ignore
-                                reply_to_message_id=provider_msg.message_id,
-                            )
+                            try:
+                                message.reply_media_group(
+                                    media_group,  # type: ignore
+                                    reply_to_message_id=provider_msg.message_id,
+                                )
+                            except BadRequest as er:
+                                if "webpage_media_empty" not in er.message:
+                                    raise
                         if "errors" not in meta and result:
                             match_found = True
                         if identifier:
