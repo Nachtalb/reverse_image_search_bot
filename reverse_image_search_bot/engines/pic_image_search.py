@@ -68,7 +68,17 @@ class PicImageSearchEngine(GenericRISEngine):
 
         try:
             result_obj = asyncio.run(self._search(str(url)))
+        except KeyError as e:
+            # Library parsing failures (e.g. AnimeTrace omits 'trace_id' on
+            # non-image inputs or error responses) — treat as no results.
+            self.logger.debug("Parsing key missing, treating as no results: %s", e)
+            return {}, meta
         except Exception as e:
+            from PicImageSearch.exceptions import ParsingError
+            if isinstance(e, ParsingError):
+                # Page structure changed or unsupported input type — no results.
+                self.logger.debug("ParsingError, treating as no results: %s", e)
+                return {}, meta
             self.logger.warning("Search failed: %s", e)
             return {}, {**meta, "errors": [str(e)]}
 
