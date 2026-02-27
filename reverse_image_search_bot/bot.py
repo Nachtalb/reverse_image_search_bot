@@ -36,6 +36,7 @@ from .commands import (
     search_command,
     settings_callback_handler,
     settings_command,
+    start_command,
     tips_command,
 )
 
@@ -142,7 +143,8 @@ def main():
         logger.info("User requested restart")
         Thread(target=stop_and_restart, args=(update.effective_chat.id,)).start()  # type: ignore
 
-    dispatcher.add_handler(CommandHandler(("start", "help"), help_command))
+    dispatcher.add_handler(CommandHandler("start", start_command))
+    dispatcher.add_handler(CommandHandler("help", help_command))
     dispatcher.add_handler(CommandHandler("id", id_command))
     dispatcher.add_handler(CommandHandler("tips", tips_command))
     dispatcher.add_handler(CommandHandler("restart", restart_command, filters=ADMIN_FILTER))

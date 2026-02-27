@@ -295,6 +295,7 @@ def _send_template_command(update: Update, context: CallbackContext, reply_file:
 
 
 tips_command = send_template_command("tips")
+start_command = send_template_command("start")
 help_command = send_template_command("help")
 
 
