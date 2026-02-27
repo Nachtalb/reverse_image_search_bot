@@ -198,7 +198,19 @@ def settings_callback_handler(update: Update, context: CallbackContext):
                 current = relevant[:]
             if engine_name in current:
                 if len(current) == 1:
-                    query.answer("⚠️ At least one auto-search engine must remain enabled.", show_alert=True)
+                    # Last engine — disable auto-search entirely and reset all engines so
+                    # re-enabling from the main menu brings back a full list.
+                    chat_config.auto_search_enabled = False
+                    chat_config.auto_search_engines = None
+                    query.answer("Auto-search disabled.", show_alert=False)
+                    try:
+                        query.edit_message_text(
+                            _settings_main_text(chat_config),
+                            parse_mode="HTML",
+                            reply_markup=_settings_main_keyboard(chat_config),
+                        )
+                    except Exception:
+                        pass
                     return
                 current.remove(engine_name)
             else:
