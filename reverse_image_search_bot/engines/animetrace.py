@@ -5,12 +5,12 @@ import time
 from functools import lru_cache
 
 import httpx
-from telegram import InlineKeyboardButton
 from yarl import URL
 
 from .data_providers import anilist as anilist_provider
 from .pic_image_search import PicImageSearchEngine
 from .types import InternalProviderData, MetaData
+from reverse_image_search_bot.utils.url import url_button
 
 __all__ = ["AnimeTraceEngine"]
 
@@ -152,14 +152,12 @@ class AnimeTraceEngine(PicImageSearchEngine):
                         meta["thumbnail"] = al_meta.get("thumbnail")
 
             # Build buttons: character page + media page
-            buttons: list[InlineKeyboardButton] = []
+            buttons = []
             if char_id:
-                buttons.append(
-                    InlineKeyboardButton(
-                        text=f"👤 {en_name}",
-                        url=f"https://anilist.co/character/{char_id}",
-                    )
-                )
+                buttons.append(url_button(
+                    f"https://anilist.co/character/{char_id}",
+                    text=en_name,
+                ))
             if media_id and al_meta and al_meta.get("buttons"):
                 buttons.extend(al_meta["buttons"])
             if buttons:
