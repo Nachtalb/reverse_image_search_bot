@@ -103,7 +103,6 @@ def _settings_main_keyboard(chat_config: ChatConfig) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton(f"🔍 Auto-search: {auto}", callback_data="settings:toggle:auto_search")],
         [InlineKeyboardButton(f"🔘 Show buttons: {buttons}", callback_data="settings:toggle:show_buttons")],
-        [InlineKeyboardButton("━━━━━━━━━━━━━━", callback_data="settings:noop")],
         [InlineKeyboardButton("🔍 Auto-search engines →", callback_data="settings:menu:auto_search_engines")],
         [InlineKeyboardButton("🔘 Engine buttons →", callback_data="settings:menu:button_engines")],
     ])
@@ -125,13 +124,15 @@ def _settings_engines_keyboard(chat_config: ChatConfig, menu: str) -> InlineKeyb
         # Extra toggle at top: show/hide the "Go To Image" link button
         link = "✅" if chat_config.show_link else "❌"
         rows.append([InlineKeyboardButton(f"🔗 Show link: {link}", callback_data="settings:toggle:show_link")])
-        rows.append([InlineKeyboardButton("━━━━━━━━━━━━━━", callback_data="settings:noop")])
 
-    for engine in relevant:
-        is_on = enabled is None or engine.name in enabled
-        mark = "✅" if is_on else "❌"
-        rows.append([InlineKeyboardButton(f"{mark} {engine.name}", callback_data=f"{cb_prefix}:{engine.name}")])
-
+    engine_btns = [
+        InlineKeyboardButton(
+            f"{'✅' if (enabled is None or e.name in enabled) else '❌'} {e.name}",
+            callback_data=f"{cb_prefix}:{e.name}",
+        )
+        for e in relevant
+    ]
+    rows.extend(chunks(engine_btns, 2))
     rows.append([InlineKeyboardButton("← Back", callback_data="settings:back")])
     return InlineKeyboardMarkup(rows)
 
@@ -438,10 +439,7 @@ def general_image_search(update: Update, image_url: URL, reply_sent_lock: Lock):
                     engine_buttons.append(button)
 
             def _build_markup(eng_buttons):
-                rows = list(top_buttons)
-                if eng_buttons:
-                    rows.append([InlineKeyboardButton(text="━━━━━━━━━━━━━━", callback_data="noop")])
-                    rows.extend(chunks(eng_buttons, 2))
+                rows = list(top_buttons) + list(chunks(eng_buttons, 2))
                 return InlineKeyboardMarkup(rows)
 
             reply = "Use /credits to get a overview of supprted engines and what they are good at."
