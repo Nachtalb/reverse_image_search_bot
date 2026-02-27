@@ -111,6 +111,8 @@ def _settings_main_keyboard(chat_config: ChatConfig) -> InlineKeyboardMarkup:
 
 def _settings_engines_keyboard(chat_config: ChatConfig, menu: str) -> InlineKeyboardMarkup:
     """Build a per-engine toggle keyboard for either 'auto_search_engines' or 'button_engines'."""
+    rows = []
+
     if menu == "auto_search_engines":
         enabled = chat_config.auto_search_engines  # None = all enabled
         cb_prefix = "settings:toggle:auto_search_engine"
@@ -120,8 +122,11 @@ def _settings_engines_keyboard(chat_config: ChatConfig, menu: str) -> InlineKeyb
         enabled = chat_config.button_engines  # None = all enabled
         cb_prefix = "settings:toggle:button_engine"
         relevant = list(engines)
+        # Extra toggle at top: show/hide the "Go To Image" link button
+        link = "✅" if chat_config.show_link else "❌"
+        rows.append([InlineKeyboardButton(f"🔗 Show link: {link}", callback_data="settings:toggle:show_link")])
+        rows.append([InlineKeyboardButton("━━━━━━━━━━━━━━", callback_data="settings:noop")])
 
-    rows = []
     for engine in relevant:
         is_on = enabled is None or engine.name in enabled
         mark = "✅" if is_on else "❌"
@@ -162,6 +167,8 @@ def settings_callback_handler(update: Update, context: CallbackContext):
             chat_config.auto_search_enabled = not chat_config.auto_search_enabled
         elif value == "show_buttons":
             chat_config.show_buttons = not chat_config.show_buttons
+        elif value == "show_link":
+            chat_config.show_link = not chat_config.show_link
         elif value.startswith("auto_search_engine:"):
             engine_name = value[len("auto_search_engine:"):]
             relevant = [e.name for e in engines if e.best_match_implemented]
@@ -194,7 +201,7 @@ def settings_callback_handler(update: Update, context: CallbackContext):
                 )
             except Exception:
                 pass
-        elif value.startswith("button_engine:"):
+        elif value.startswith("button_engine:") or value == "show_link":
             try:
                 query.edit_message_reply_markup(
                     reply_markup=_settings_engines_keyboard(chat_config, "button_engines")
@@ -384,6 +391,8 @@ def callback_query_handler(update: Update, context: CallbackContext):
             best_match(update, context, values[0])
         case "wait_for":
             send_wait_for(update, context, values[0])
+        case "noop":
+            update.callback_query.answer()
         case _:
             update.callback_query.answer("Something went wrong")
 
@@ -410,10 +419,12 @@ def general_image_search(update: Update, image_url: URL, reply_sent_lock: Lock):
         if chat_config.button_engines is not None:
             active_engines = [e for e in engines if e.name in chat_config.button_engines]
 
-        default_buttons = [
+        top_buttons = [
             [InlineKeyboardButton(text="Best Match", callback_data="best_match " + str(image_url))],
-            [InlineKeyboardButton(text="Go To Image", url=str(image_url))],
         ]
+        if chat_config.show_link:
+            top_buttons.append([InlineKeyboardButton(text="🔗 Go To Image", url=str(image_url))])
+
         engine_buttons = []
 
         with ThreadPoolExecutor(max_workers=5) as executor:
@@ -426,10 +437,15 @@ def general_image_search(update: Update, image_url: URL, reply_sent_lock: Lock):
                 elif button := engine(image_url):
                     engine_buttons.append(button)
 
-            button_list = list(chunks(engine_buttons, 2))
+            def _build_markup(eng_buttons):
+                rows = list(top_buttons)
+                if eng_buttons:
+                    rows.append([InlineKeyboardButton(text="━━━━━━━━━━━━━━", callback_data="noop")])
+                    rows.extend(chunks(eng_buttons, 2))
+                return InlineKeyboardMarkup(rows)
 
             reply = "Use /credits to get a overview of supprted engines and what they are good at."
-            reply_markup = InlineKeyboardMarkup(default_buttons + button_list)
+            reply_markup = _build_markup(engine_buttons)
             reply_message: Message = update.message.reply_text(
                 text=reply,
                 reply_markup=reply_markup,
@@ -448,7 +464,7 @@ def general_image_search(update: Update, image_url: URL, reply_sent_lock: Lock):
                                 engine_buttons.remove(button)
                             else:
                                 engine_buttons[engine_buttons.index(button)] = updated_button
-                    reply_message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(default_buttons + list(chunks(engine_buttons, 2))))
+                    reply_message.edit_reply_markup(reply_markup=_build_markup(engine_buttons))
             except FuturesTimeoutError:
                 pass
     finally:

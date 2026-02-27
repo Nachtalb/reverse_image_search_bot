@@ -35,6 +35,7 @@ class ChatConfig:
 
     _default_config: dict = {
         "show_buttons": True,         # show engine result buttons at all
+        "show_link": True,            # show the "Go To Image" link button
         "auto_search_enabled": True,  # master autosearch toggle for this chat
         "auto_search_engines": None,  # None = all; list[str] = enabled engine names for autosearch
         "button_engines": None,       # None = all; list[str] = engine names shown as buttons
@@ -42,6 +43,7 @@ class ChatConfig:
     _loaded_chats: dict = {}
 
     show_buttons: bool
+    show_link: bool
     auto_search_enabled: bool
     auto_search_engines: list | None
     button_engines: list | None
