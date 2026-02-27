@@ -100,11 +100,16 @@ def _settings_main_text(chat_config: ChatConfig) -> str:
 def _settings_main_keyboard(chat_config: ChatConfig) -> InlineKeyboardMarkup:
     auto = "✅" if chat_config.auto_search_enabled else "❌"
     buttons = "✅" if chat_config.show_buttons else "❌"
+    as_engines_label = "🔍 Auto-search engines →" if chat_config.auto_search_enabled else "🔍 Auto-search engines 🔒"
+    as_engines_cb = "settings:menu:auto_search_engines" if chat_config.auto_search_enabled else "settings:disabled"
+    btn_engines_label = "🔘 Engine buttons →" if chat_config.show_buttons else "🔘 Engine buttons 🔒"
+    btn_engines_cb = "settings:menu:button_engines" if chat_config.show_buttons else "settings:disabled"
+
     return InlineKeyboardMarkup([
         [InlineKeyboardButton(f"🔍 Auto-search: {auto}", callback_data="settings:toggle:auto_search")],
         [InlineKeyboardButton(f"🔘 Show buttons: {buttons}", callback_data="settings:toggle:show_buttons")],
-        [InlineKeyboardButton("🔍 Auto-search engines →", callback_data="settings:menu:auto_search_engines")],
-        [InlineKeyboardButton("🔘 Engine buttons →", callback_data="settings:menu:button_engines")],
+        [InlineKeyboardButton(as_engines_label, callback_data=as_engines_cb)],
+        [InlineKeyboardButton(btn_engines_label, callback_data=btn_engines_cb)],
     ])
 
 
@@ -153,9 +158,12 @@ def settings_callback_handler(update: Update, context: CallbackContext):
     query = update.callback_query
     data = query.data  # e.g. "settings:toggle:auto_search"
 
-    # Noop separator button
+    # Noop / disabled buttons
     if data == "settings:noop":
         query.answer()
+        return
+    if data == "settings:disabled":
+        query.answer("Enable the master toggle first.", show_alert=False)
         return
 
     if not _is_settings_allowed(update, context):
