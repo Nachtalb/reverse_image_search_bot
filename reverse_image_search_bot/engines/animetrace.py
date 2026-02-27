@@ -87,10 +87,10 @@ class AnimeTraceEngine(PicImageSearchEngine):
         "AnimeTrace identifies anime characters in images, returning the "
         "character name and source work."
     )
-    provider_url = URL("https://animetrace.moe/")
+    provider_url = URL("https://www.animetrace.com/")
     types = ["Anime/Manga"]
     recommendation = ["Anime characters", "Fan art"]
-    url = "https://animetrace.moe/"
+    url = "https://www.animetrace.com/"
 
     def __init__(self, *args, **kwargs):
         from PicImageSearch import AnimeTrace
