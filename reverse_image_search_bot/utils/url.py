@@ -60,6 +60,17 @@ def url_icon(url: URL | str, with_icon: bool = True, with_text: bool = True, cus
             icon = ":package:"
         case "yande.re":
             text = "Yandere"
+        case "anilist.co":
+            path = str(url.path)
+            if "/character/" in path:
+                text = "AniList Character"
+                icon = ":bust_in_silhouette:"
+            elif "/manga/" in path:
+                text = "AniList Manga"
+                icon = ":books:"
+            else:
+                text = "AniList"
+                icon = ":tv:"
         case "myanimelist.net":
             text = "MyAnimeList"
         case "www.mangaupdates.com" | "mangaupdates.com":
