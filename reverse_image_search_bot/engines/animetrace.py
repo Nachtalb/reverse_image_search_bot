@@ -39,10 +39,18 @@ def _clean_name(name: str) -> str:
     return re.split(r"[（(,]", name)[0].strip()
 
 
+def _anilist_headers() -> dict:
+    from reverse_image_search_bot import settings
+    headers = {}
+    if settings.ANILIST_TOKEN:
+        headers["Authorization"] = f"Bearer {settings.ANILIST_TOKEN}"
+    return headers
+
+
 def _anilist_post(payload: dict) -> dict | None:
     """POST to AniList GraphQL with one retry on 429."""
     for _ in range(2):
-        r = httpx.post("https://graphql.anilist.co", json=payload, timeout=5)
+        r = httpx.post("https://graphql.anilist.co", json=payload, headers=_anilist_headers(), timeout=5)
         if r.status_code == 429:
             time.sleep(int(r.headers.get("Retry-After", "1")) + 0.1)
             continue
