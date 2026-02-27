@@ -616,7 +616,7 @@ def _best_match_search(update: Update, context: CallbackContext, engines: list[G
                         reply,
                         reply_markup=InlineKeyboardMarkup(button_list),
                         reply_to_message_id=message.message_id,
-                        disable_web_page_preview=bool(media_group) or "errors" in meta,
+                        disable_web_page_preview=not meta.get("thumbnail") or bool(media_group) or "errors" in meta,
                     )
                     if media_group:
                         try:
