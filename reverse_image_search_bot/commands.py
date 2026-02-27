@@ -197,6 +197,9 @@ def settings_callback_handler(update: Update, context: CallbackContext):
             if current is None:
                 current = relevant[:]
             if engine_name in current:
+                if len(current) == 1:
+                    query.answer("⚠️ At least one auto-search engine must remain enabled.", show_alert=True)
+                    return
                 current.remove(engine_name)
             else:
                 current.append(engine_name)
