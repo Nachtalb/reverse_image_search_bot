@@ -203,6 +203,7 @@ def settings_callback_handler(update: Update, context: CallbackContext):
                 current.remove(engine_name)
             else:
                 current.append(engine_name)
+                chat_config.reset_engine_counter(engine_name)  # fresh start after manual re-enable
             # If all enabled, store None (= all)
             chat_config.auto_search_engines = None if set(current) >= set(relevant) else current
         elif value.startswith("button_engine:"):
@@ -570,6 +571,38 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, general
         )
 
 
+_AUTO_DISABLE_THRESHOLD = 5
+
+
+def _track_engine_result(chat_id: int, engine_name: str, found: bool) -> bool:
+    """Track consecutive empty results per engine. Returns True if the engine was just auto-disabled."""
+    chat_config = ChatConfig(chat_id)
+    counts = dict(chat_config.engine_empty_counts)
+
+    if found:
+        counts.pop(engine_name, None)
+        chat_config.engine_empty_counts = counts
+        return False
+
+    counts[engine_name] = counts.get(engine_name, 0) + 1
+    chat_config.engine_empty_counts = counts
+
+    if counts[engine_name] < _AUTO_DISABLE_THRESHOLD:
+        return False
+
+    # Threshold hit — disable if there's at least one other engine still active
+    relevant = [e.name for e in engines if e.best_match_implemented]
+    current = list(chat_config.auto_search_engines or relevant)
+    if engine_name not in current or len(current) <= 1:
+        return False  # already disabled or last engine — don't disable
+
+    current.remove(engine_name)
+    chat_config.auto_search_engines = current
+    counts[engine_name] = 0  # reset so it doesn't re-trigger if re-enabled
+    chat_config.engine_empty_counts = counts
+    return True
+
+
 def _best_match_search(update: Update, context: CallbackContext, engines: list[GenericRISEngine], url: URL, results_gate: Lock):
     message: Message = update.effective_message  # type: ignore
     identifiers = []
@@ -587,6 +620,8 @@ def _best_match_search(update: Update, context: CallbackContext, engines: list[G
 
                 if meta:
                     logger.debug("Found something UmU")
+                    # Success — reset empty counter for this engine
+                    _track_engine_result(message.chat_id, engine.name, found=True)
 
                     button_list = []
                     more_button = engine(str(url), "More")
@@ -633,6 +668,18 @@ def _best_match_search(update: Update, context: CallbackContext, engines: list[G
                         identifiers.append(identifier)
                     if thumbnail_identifier:
                         thumbnail_identifiers.append(thumbnail_identifier)
+                else:
+                    # Empty result — track and potentially auto-disable
+                    disabled = _track_engine_result(message.chat_id, engine.name, found=False)
+                    if disabled:
+                        context.bot.send_message(
+                            chat_id=message.chat_id,
+                            text=(
+                                f"🔕 <b>{engine.name}</b> was automatically disabled for this chat after "
+                                f"5 consecutive empty results. Use /settings to re-enable it."
+                            ),
+                            parse_mode=ParseMode.HTML,
+                        )
             except Exception as error:
                 error_to_admin(update, context, message=f"Best match error: {error}", image_url=url)
                 logger.error("Engine failure: %s", engine)

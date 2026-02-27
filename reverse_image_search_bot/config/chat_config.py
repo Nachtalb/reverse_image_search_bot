@@ -40,6 +40,7 @@ class ChatConfig:
         "auto_search_enabled": True,  # master autosearch toggle for this chat
         "auto_search_engines": None,  # None = all; list[str] = enabled engine names for autosearch
         "button_engines": None,       # None = all; list[str] = engine names shown as buttons
+        "engine_empty_counts": {},    # dict[str, int] consecutive empty result counts per engine
     }
     _loaded_chats: dict = {}
 
@@ -49,6 +50,13 @@ class ChatConfig:
     auto_search_enabled: bool
     auto_search_engines: list | None
     button_engines: list | None
+    engine_empty_counts: dict
+
+    def reset_engine_counter(self, engine_name: str):
+        """Reset the consecutive-empty counter for an engine (e.g. after re-enabling it)."""
+        counts = dict(self.engine_empty_counts)
+        counts.pop(engine_name, None)
+        self.engine_empty_counts = counts
 
     def __init__(self, chat_id: int):
         self.chat_id: int = chat_id
