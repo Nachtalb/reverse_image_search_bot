@@ -55,8 +55,11 @@ class ChatConfig:
 
         config_file = app_path / f"{chat_id}_chat.json"
         self._config = CleverDict(self._default_config)
-        if config_file.is_file():
-            self._config.update(CleverDict.from_json(file_path=config_file))
+        if config_file.is_file() and config_file.stat().st_size > 0:
+            try:
+                self._config.update(CleverDict.from_json(file_path=config_file))
+            except Exception:
+                config_file.unlink(missing_ok=True)  # corrupt file — reset
         self._config.save_path = config_file
         self._config.autosave(fullcopy=True)
 
