@@ -5,8 +5,10 @@ import time
 from functools import lru_cache
 
 import httpx
+from telegram import InlineKeyboardButton
 from yarl import URL
 
+from .data_providers import anilist as anilist_provider
 from .pic_image_search import PicImageSearchEngine
 from .types import InternalProviderData, MetaData
 
@@ -15,9 +17,11 @@ __all__ = ["AnimeTraceEngine"]
 _ANILIST_QUERY = """
 query ($name: String) {
   Character(search: $name) {
+    id
     name { full }
+    siteUrl
     media(perPage: 10, sort: POPULARITY_DESC) {
-      nodes { title { english romaji native } }
+      nodes { id type siteUrl title { english romaji native } }
     }
   }
 }
@@ -46,10 +50,13 @@ def _anilist_post(payload: dict) -> dict | None:
     return None
 
 
-def _best_work_title(media_nodes: list, original_work: str) -> str:
-    """Find the best English work title from a character's media list."""
+def _best_work_node(media_nodes: list, original_work: str) -> tuple[str, int | None]:
+    """Find the best matching work node and return (english_title, anilist_id).
+
+    Returns (original_work, None) if no match found.
+    """
     if not media_nodes:
-        return original_work
+        return original_work, None
 
     orig_lower = original_work.lower()
     for node in media_nodes:
@@ -57,28 +64,33 @@ def _best_work_title(media_nodes: list, original_work: str) -> str:
         native = (t.get("native") or "").lower()
         romaji = (t.get("romaji") or "").lower()
         if orig_lower in (native, romaji) or native in orig_lower or romaji in orig_lower:
-            return t.get("english") or t.get("romaji") or original_work
+            title = t.get("english") or t.get("romaji") or original_work
+            return title, node.get("id")
 
-    t = media_nodes[0]["title"]
-    return t.get("english") or t.get("romaji") or original_work
+    # Fallback to most popular node
+    node = media_nodes[0]
+    t = node["title"]
+    title = t.get("english") or t.get("romaji") or original_work
+    return title, node.get("id")
 
 
 @lru_cache(maxsize=256)
-def _anilist_resolve(char_name: str, work: str) -> tuple[str, str]:
-    """Resolve character name and work to English in a single AniList call.
+def _anilist_resolve(char_name: str, work: str) -> tuple[str, str, int | None, int | None]:
+    """Resolve character name and work to English via AniList.
 
-    Returns (english_char_name, english_work_title).
-    Falls back to originals on failure.
+    Returns (english_char_name, english_work_title, anilist_char_id, anilist_media_id).
+    Falls back to originals on failure; IDs are None on failure.
     """
     clean = _clean_name(char_name)
     try:
         data = _anilist_post({"query": _ANILIST_QUERY, "variables": {"name": clean}})
         char = data["data"]["Character"]
         en_name = char["name"]["full"] or char_name
-        en_work = _best_work_title(char["media"]["nodes"], work)
-        return en_name, en_work
+        char_id = char.get("id")
+        en_work, media_id = _best_work_node(char["media"]["nodes"], work)
+        return en_name, en_work, char_id, media_id
     except Exception:
-        return char_name, work
+        return char_name, work, None, None
 
 
 class AnimeTraceEngine(PicImageSearchEngine):
@@ -118,17 +130,47 @@ class AnimeTraceEngine(PicImageSearchEngine):
                 return {}, {}
 
             top = characters[0]
-            en_name, en_work = _anilist_resolve(top.name, top.work)
+            en_name, en_work, char_id, media_id = _anilist_resolve(top.name, top.work)
 
             result["Character"] = en_name
             result["Work"] = en_work
+
+            # Enrich with AniList media data (status, year, genres, etc.)
+            al_meta: MetaData = {}
+            if media_id:
+                al_result, al_meta = anilist_provider.provide(media_id)
+                if al_result:
+                    # Skip Title/Title[romaji] (we have Work) and Episode (unknown)
+                    for key in ("Title", "Title [romaji]", "Episode"):
+                        al_result.pop(key, None)
+                    result.update(al_result)
+                if al_meta:
+                    meta["provided_via"] = al_meta.get("provided_via")
+                    meta["provided_via_url"] = al_meta.get("provided_via_url")
+                    # Use AniList cover as thumbnail fallback
+                    if not getattr(confident[0], "thumbnail", None):
+                        meta["thumbnail"] = al_meta.get("thumbnail")
+
+            # Build buttons: character page + media page
+            buttons: list[InlineKeyboardButton] = []
+            if char_id:
+                buttons.append(
+                    InlineKeyboardButton(
+                        text=f"👤 {en_name}",
+                        url=f"https://anilist.co/character/{char_id}",
+                    )
+                )
+            if media_id and al_meta and al_meta.get("buttons"):
+                buttons.extend(al_meta["buttons"])
+            if buttons:
+                meta["buttons"] = buttons
 
             seen_names: set[str] = {en_name}
             alts = []
             for c in characters[1:4]:
                 if c.name == top.name:
                     continue
-                alt_name, alt_work = _anilist_resolve(c.name, c.work)
+                alt_name, alt_work, _, _ = _anilist_resolve(c.name, c.work)
                 if alt_name not in seen_names:
                     seen_names.add(alt_name)
                     alts.append(f"{alt_name} ({alt_work})")
@@ -142,7 +184,7 @@ class AnimeTraceEngine(PicImageSearchEngine):
                 if not characters:
                     continue
                 top = characters[0]
-                en_name, en_work = _anilist_resolve(top.name, top.work)
+                en_name, en_work, _, _ = _anilist_resolve(top.name, top.work)
                 entries.append(f"{en_name} ({en_work})")
 
             if not entries:
