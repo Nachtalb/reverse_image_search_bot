@@ -9,7 +9,7 @@ requires-python = ">=3.11"
 dependencies = [
     "python-magic==0.4.24",
     "validators==0.18.2",
-    "python-telegram-bot[json,socks]==13.11",
+    "python-telegram-bot[json,socks]==13.15",
     "gppt==1.6",
     "cleverdict==1.9.1",
     "paramiko[all]==2.9.2",
