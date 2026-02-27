@@ -121,9 +121,13 @@ def _settings_engines_keyboard(chat_config: ChatConfig, menu: str) -> InlineKeyb
         enabled = chat_config.button_engines  # None = all enabled
         cb_prefix = "settings:toggle:button_engine"
         relevant = list(engines)
-        # Extra toggle at top: show/hide the "Go To Image" link button
+        # Extra toggles at top for the button_engines submenu
+        bm = "✅" if chat_config.show_best_match else "❌"
         link = "✅" if chat_config.show_link else "❌"
-        rows.append([InlineKeyboardButton(f"🔗 Show link: {link}", callback_data="settings:toggle:show_link")])
+        rows.append([
+            InlineKeyboardButton(f"🎯 Best match: {bm}", callback_data="settings:toggle:show_best_match"),
+            InlineKeyboardButton(f"🔗 Link: {link}", callback_data="settings:toggle:show_link"),
+        ])
 
     engine_btns = [
         InlineKeyboardButton(
@@ -168,6 +172,8 @@ def settings_callback_handler(update: Update, context: CallbackContext):
             chat_config.auto_search_enabled = not chat_config.auto_search_enabled
         elif value == "show_buttons":
             chat_config.show_buttons = not chat_config.show_buttons
+        elif value == "show_best_match":
+            chat_config.show_best_match = not chat_config.show_best_match
         elif value == "show_link":
             chat_config.show_link = not chat_config.show_link
         elif value.startswith("auto_search_engine:"):
@@ -202,7 +208,7 @@ def settings_callback_handler(update: Update, context: CallbackContext):
                 )
             except Exception:
                 pass
-        elif value.startswith("button_engine:") or value == "show_link":
+        elif value.startswith("button_engine:") or value in ("show_link", "show_best_match"):
             try:
                 query.edit_message_reply_markup(
                     reply_markup=_settings_engines_keyboard(chat_config, "button_engines")
@@ -420,9 +426,9 @@ def general_image_search(update: Update, image_url: URL, reply_sent_lock: Lock):
         if chat_config.button_engines is not None:
             active_engines = [e for e in engines if e.name in chat_config.button_engines]
 
-        top_buttons = [
-            [InlineKeyboardButton(text="Best Match", callback_data="best_match " + str(image_url))],
-        ]
+        top_buttons = []
+        if chat_config.show_best_match:
+            top_buttons.append([InlineKeyboardButton(text="Best Match", callback_data="best_match " + str(image_url))])
         if chat_config.show_link:
             top_buttons.append([InlineKeyboardButton(text="🔗 Go To Image", url=str(image_url))])
 
