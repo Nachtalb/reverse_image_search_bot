@@ -1,0 +1,70 @@
+import json
+import logging
+import os
+from pathlib import Path
+from typing import Any, Dict, List
+
+logging.basicConfig(
+    format=os.getenv(
+        "LOG_FORMAT", "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    ),
+    level=logging.INFO,
+)
+
+
+def get_env_list(name: str) -> List[int]:
+    raw = os.getenv(name, "")
+    return [int(x.strip()) for x in raw.split(",") if x.strip().isdigit()]
+
+
+def required_env(name: str) -> str:
+    value = os.getenv(name)
+    if not value:
+        raise ValueError(f"Missing required environment variable: {name}")
+    return value
+
+
+TELEGRAM_API_TOKEN = required_env("TELEGRAM_API_TOKEN")
+
+UPLOADER: Dict[str, Any] = {
+    "uploader": os.getenv("UPLOADER_TYPE", "local"),
+    "url": required_env("UPLOADER_URL"),
+    "configuration": {
+        "path": required_env("UPLOADER_PATH"),
+    },
+}
+
+
+ADMIN_IDS = get_env_list("ADMIN_IDS")
+
+SAUCENAO_API = required_env("SAUCENAO_API")
+TRACE_API = required_env("TRACE_API")
+ANILIST_TOKEN = os.getenv("ANILIST_TOKEN")
+
+MODE_ACTIVE = os.getenv("MODE_ACTIVE", "polling")
+
+MODE: Dict[str, Any] = {
+    "active": MODE_ACTIVE,
+}
+
+if MODE_ACTIVE == "webhook":
+    MODE["configuration"] = {
+        "listen": required_env("MODE_LISTEN"),
+        "port": int(required_env("MODE_PORT")),
+        "url_path": required_env("MODE_URL_PATH"),
+        "webhook_url": required_env("MODE_WEBHOOK_URL"),
+    }
+
+WORKERS = int(os.getenv("WORKERS", 4))
+CON_POOL_SIZE = int(os.getenv("CON_POOL_SIZE", WORKERS + 4))
+
+CONFIG_DIR = (
+    Path(os.getenv("CONFIG_DIR", "~/.config/reverse_image_search_bot"))
+    .expanduser()
+    .absolute()
+)
+
+
+log = logging.getLogger("config")
+log.info(f"UPLOADER: {json.dumps(UPLOADER, indent=2)}")
+log.info(f"MODE: {json.dumps(MODE, indent=2)}")
