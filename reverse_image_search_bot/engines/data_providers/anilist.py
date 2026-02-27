@@ -1,5 +1,6 @@
 from yarl import URL
 
+from reverse_image_search_bot import settings
 from reverse_image_search_bot.engines.types import InternalProviderData, MetaData
 from reverse_image_search_bot.utils import tagify, url_button
 
@@ -46,8 +47,12 @@ query ($id: Int) {
 }
         """.strip()
 
+        headers = {}
+        if settings.ANILIST_TOKEN:
+            headers["Authorization"] = f"Bearer {settings.ANILIST_TOKEN}"
+
         payload = {"query": query, "variables": {"id": anilist_id}}
-        response = self.session.post(str(self.api_base), json=payload)
+        response = self.session.post(str(self.api_base), json=payload, headers=headers)
         if response.status_code != 200:
             return
 

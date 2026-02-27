@@ -7,10 +7,11 @@ from functools import lru_cache
 import httpx
 from yarl import URL
 
+from reverse_image_search_bot import settings
+from reverse_image_search_bot.utils.url import url_button
 from .data_providers import anilist as anilist_provider
 from .pic_image_search import PicImageSearchEngine
 from .types import InternalProviderData, MetaData
-from reverse_image_search_bot.utils.url import url_button
 
 __all__ = ["AnimeTraceEngine"]
 
@@ -20,6 +21,7 @@ query ($name: String) {
     id
     name { full }
     siteUrl
+    image { large }
     media(perPage: 10, sort: POPULARITY_DESC) {
       nodes { id type siteUrl title { english romaji native } }
     }
@@ -38,10 +40,17 @@ def _clean_name(name: str) -> str:
     return re.split(r"[（(,]", name)[0].strip()
 
 
+def _anilist_headers() -> dict:
+    headers = {}
+    if settings.ANILIST_TOKEN:
+        headers["Authorization"] = f"Bearer {settings.ANILIST_TOKEN}"
+    return headers
+
+
 def _anilist_post(payload: dict) -> dict | None:
     """POST to AniList GraphQL with one retry on 429."""
     for _ in range(2):
-        r = httpx.post("https://graphql.anilist.co", json=payload, timeout=5)
+        r = httpx.post("https://graphql.anilist.co", json=payload, headers=_anilist_headers(), timeout=5)
         if r.status_code == 429:
             time.sleep(int(r.headers.get("Retry-After", "1")) + 0.1)
             continue
@@ -75,11 +84,11 @@ def _best_work_node(media_nodes: list, original_work: str) -> tuple[str, int | N
 
 
 @lru_cache(maxsize=256)
-def _anilist_resolve(char_name: str, work: str) -> tuple[str, str, int | None, int | None]:
+def _anilist_resolve(char_name: str, work: str) -> tuple[str, str, int | None, int | None, str | None]:
     """Resolve character name and work to English via AniList.
 
-    Returns (english_char_name, english_work_title, anilist_char_id, anilist_media_id).
-    Falls back to originals on failure; IDs are None on failure.
+    Returns (english_char_name, english_work_title, anilist_char_id, anilist_media_id, char_image_url).
+    Falls back to originals on failure; IDs and image are None on failure.
     """
     clean = _clean_name(char_name)
     try:
@@ -87,10 +96,11 @@ def _anilist_resolve(char_name: str, work: str) -> tuple[str, str, int | None, i
         char = data["data"]["Character"]
         en_name = char["name"]["full"] or char_name
         char_id = char.get("id")
+        char_image = (char.get("image") or {}).get("large")
         en_work, media_id = _best_work_node(char["media"]["nodes"], work)
-        return en_name, en_work, char_id, media_id
+        return en_name, en_work, char_id, media_id, char_image
     except Exception:
-        return char_name, work, None, None
+        return char_name, work, None, None, None
 
 
 class AnimeTraceEngine(PicImageSearchEngine):
@@ -130,7 +140,7 @@ class AnimeTraceEngine(PicImageSearchEngine):
                 return {}, {}
 
             top = characters[0]
-            en_name, en_work, char_id, media_id = _anilist_resolve(top.name, top.work)
+            en_name, en_work, char_id, media_id, char_image = _anilist_resolve(top.name, top.work)
 
             result["Character"] = en_name
             result["Work"] = en_work
@@ -147,9 +157,13 @@ class AnimeTraceEngine(PicImageSearchEngine):
                 if al_meta:
                     meta["provided_via"] = al_meta.get("provided_via")
                     meta["provided_via_url"] = al_meta.get("provided_via_url")
-                    # Use AniList cover as thumbnail fallback
-                    if not getattr(confident[0], "thumbnail", None):
-                        meta["thumbnail"] = al_meta.get("thumbnail")
+
+            # Thumbnail fallback: prefer character portrait over anime cover
+            if not getattr(confident[0], "thumbnail", None):
+                if char_image:
+                    meta["thumbnail"] = URL(char_image)
+                elif al_meta and al_meta.get("thumbnail"):
+                    meta["thumbnail"] = al_meta.get("thumbnail")
 
             # Build buttons: character page + media page
             buttons = []
@@ -168,7 +182,7 @@ class AnimeTraceEngine(PicImageSearchEngine):
             for c in characters[1:4]:
                 if c.name == top.name:
                     continue
-                alt_name, alt_work, _, _ = _anilist_resolve(c.name, c.work)
+                alt_name, alt_work, *_ = _anilist_resolve(c.name, c.work)
                 if alt_name not in seen_names:
                     seen_names.add(alt_name)
                     alts.append(f"{alt_name} ({alt_work})")
@@ -182,7 +196,7 @@ class AnimeTraceEngine(PicImageSearchEngine):
                 if not characters:
                     continue
                 top = characters[0]
-                en_name, en_work, _, _ = _anilist_resolve(top.name, top.work)
+                en_name, en_work, *_ = _anilist_resolve(top.name, top.work)
                 entries.append(f"{en_name} ({en_work})")
 
             if not entries:
