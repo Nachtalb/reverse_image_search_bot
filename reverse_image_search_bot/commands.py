@@ -169,8 +169,14 @@ def settings_callback_handler(update: Update, context: CallbackContext):
 
     if action == "toggle":
         if value == "auto_search":
+            if chat_config.auto_search_enabled and not chat_config.show_buttons:
+                query.answer("⚠️ Enable engine buttons first — at least one must be active.", show_alert=True)
+                return
             chat_config.auto_search_enabled = not chat_config.auto_search_enabled
         elif value == "show_buttons":
+            if chat_config.show_buttons and not chat_config.auto_search_enabled:
+                query.answer("⚠️ Enable auto-search first — at least one must be active.", show_alert=True)
+                return
             chat_config.show_buttons = not chat_config.show_buttons
         elif value == "show_best_match":
             chat_config.show_best_match = not chat_config.show_best_match
