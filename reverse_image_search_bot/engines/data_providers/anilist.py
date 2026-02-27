@@ -1,5 +1,6 @@
 from yarl import URL
 
+from reverse_image_search_bot import settings
 from reverse_image_search_bot.engines.types import InternalProviderData, MetaData
 from reverse_image_search_bot.utils import tagify, url_button
 
@@ -46,7 +47,6 @@ query ($id: Int) {
 }
         """.strip()
 
-        from reverse_image_search_bot import settings
         headers = {}
         if settings.ANILIST_TOKEN:
             headers["Authorization"] = f"Bearer {settings.ANILIST_TOKEN}"

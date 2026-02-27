@@ -61,21 +61,39 @@ Thank you for using [@reverse_image_search_bot](https://t.me/reverse_image_searc
 
 Requires at least **Python 3.10**.
 
-Best if you create a python virtualenv.
-
-Install all dependencies with:
+Install all dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-After this is complete, you have to get an API Token from Telegram. You can
-easily get one via [@BotFather](https://t.me/BotFather).
+Configuration is done entirely via environment variables:
 
-Now that you have your API Token copy the `settings.example.py` to `settings.py`
-and paste in your API Token and so on.
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `TELEGRAM_API_TOKEN` | ✅ | — | Telegram bot token from [@BotFather](https://t.me/BotFather) |
+| `SAUCENAO_API` | ✅ | — | [SauceNAO API key](https://saucenao.com/user.php?page=search-api) |
+| `TRACE_API` | ✅ | — | [Trace.moe API key](https://soruly.github.io/trace.moe-api/#/limits) |
+| `ANILIST_TOKEN` | ❌ | — | AniList OAuth access token (raises rate limit from 90 to 120 req/min) |
+| `UPLOADER_TYPE` | ❌ | `local` | Uploader backend: `local` or `ssh` |
+| `UPLOADER_URL` | ✅ | — | Public base URL for uploaded files |
+| `UPLOADER_PATH` | ✅ (local) | — | Local directory to store uploads |
+| `UPLOADER_HOST` | ✅ (ssh) | — | SSH host |
+| `UPLOADER_USER` | ✅ (ssh) | — | SSH username |
+| `UPLOADER_PASSWORD` | ✅ (ssh) | — | SSH password |
+| `UPLOADER_UPLOAD_DIR` | ✅ (ssh) | — | Remote upload directory |
+| `UPLOADER_KEY_FILENAME` | ❌ (ssh) | — | Path to SSH private key |
+| `ADMIN_IDS` | ❌ | — | Comma-separated Telegram user IDs with admin access |
+| `MODE_ACTIVE` | ❌ | `polling` | `polling` or `webhook` |
+| `MODE_LISTEN` | ✅ (webhook) | — | Listen address |
+| `MODE_PORT` | ✅ (webhook) | — | Listen port |
+| `MODE_URL_PATH` | ✅ (webhook) | — | URL path for webhook |
+| `MODE_WEBHOOK_URL` | ✅ (webhook) | — | Full public webhook URL |
+| `WORKERS` | ❌ | `4` | Number of worker threads |
+| `CON_POOL_SIZE` | ❌ | `WORKERS+4` | Connection pool size |
+| `CONFIG_DIR` | ❌ | `~/.config/reverse_image_search_bot` | Config directory |
 
-Finally you can use this to start your bot.
+Start the bot:
 
 ```bash
 python run_bot.py

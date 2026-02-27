@@ -7,10 +7,11 @@ from functools import lru_cache
 import httpx
 from yarl import URL
 
+from reverse_image_search_bot import settings
+from reverse_image_search_bot.utils.url import url_button
 from .data_providers import anilist as anilist_provider
 from .pic_image_search import PicImageSearchEngine
 from .types import InternalProviderData, MetaData
-from reverse_image_search_bot.utils.url import url_button
 
 __all__ = ["AnimeTraceEngine"]
 
@@ -40,7 +41,6 @@ def _clean_name(name: str) -> str:
 
 
 def _anilist_headers() -> dict:
-    from reverse_image_search_bot import settings
     headers = {}
     if settings.ANILIST_TOKEN:
         headers["Authorization"] = f"Bearer {settings.ANILIST_TOKEN}"

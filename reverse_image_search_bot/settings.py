@@ -26,12 +26,23 @@ def required_env(name: str) -> str:
 
 TELEGRAM_API_TOKEN = required_env("TELEGRAM_API_TOKEN")
 
+_uploader_type = os.getenv("UPLOADER_TYPE", "local")
+_uploader_config: Dict[str, Any]
+if _uploader_type == "ssh":
+    _uploader_config = {
+        "host": required_env("UPLOADER_HOST"),
+        "user": required_env("UPLOADER_USER"),
+        "password": required_env("UPLOADER_PASSWORD"),
+        "upload_dir": required_env("UPLOADER_UPLOAD_DIR"),
+        "key_filename": os.getenv("UPLOADER_KEY_FILENAME"),
+    }
+else:
+    _uploader_config = {"path": required_env("UPLOADER_PATH")}
+
 UPLOADER: Dict[str, Any] = {
-    "uploader": os.getenv("UPLOADER_TYPE", "local"),
+    "uploader": _uploader_type,
     "url": required_env("UPLOADER_URL"),
-    "configuration": {
-        "path": required_env("UPLOADER_PATH"),
-    },
+    "configuration": _uploader_config,
 }
 
 
