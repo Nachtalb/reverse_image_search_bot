@@ -28,6 +28,32 @@ SauceNAO, Trace
 - `/tips`: Various tips and tricks for better search results
 - `/search`: Reply to a message with an image or video to start a search
 - `/auto_search`: Toggle auto search on and off
+- `/settings` (`/conf`, `/pref`): Per-chat settings via inline keyboard
+
+## Per-Chat Settings
+
+Use `/settings` to configure the bot per chat via an interactive inline
+keyboard. In group chats only admins (creator/administrator) can change
+settings.
+
+**Main toggles:**
+
+- **Auto-search** — automatically search when an image is sent
+- **Show buttons** — show engine buttons below results
+- At least one of these must remain enabled
+
+**Sub-menus (unlocked when the parent toggle is on):**
+
+- **Auto-search engines** — choose which engines run automatically (only
+  engines with inline/best-match support). Disabling the last engine turns off
+  auto-search entirely and resets the list so all engines are available when
+  re-enabled.
+- **Engine buttons** — choose which engine buttons appear, plus toggle the
+  "Best match" and "Go to image" link buttons.
+
+Settings are stored per `chat_id`, so each group gets its own configuration.
+Engines that return 5 consecutive empty results are automatically disabled for
+that chat (with a notification); re-enable them from `/settings`.
 
 ![example](https://raw.githubusercontent.com/Nachtalb/reverse_image_search_bot/master/reverse_image_search_bot/images/help.jpg)
 

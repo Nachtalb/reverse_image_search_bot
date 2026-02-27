@@ -1,0 +1,13 @@
+# Dev/test data
+config_data/
+redis_data/
+*.session
+
+# Git & CI
+.git
+.github
+.gitignore
+
+# Docs & misc
+README.md
+*.md

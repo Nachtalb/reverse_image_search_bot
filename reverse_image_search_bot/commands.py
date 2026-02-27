@@ -32,7 +32,7 @@ from telegram.ext import CallbackContext
 from telegram.parsemode import ParseMode
 from yarl import URL
 
-from reverse_image_search_bot.config import UserConfig
+from reverse_image_search_bot.config import ChatConfig, UserConfig
 from reverse_image_search_bot.engines import engines
 from reverse_image_search_bot.engines.data_providers import provides
 from reverse_image_search_bot.engines.generic import GenericRISEngine, PreWorkEngine
@@ -68,6 +68,208 @@ def auto_search_command(update: Update, _: CallbackContext):
         config.auto_search_enabled = True
         config.failures_in_a_row = 0
         update.message.reply_text("You have enabled auto search")
+
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# Settings (per-chat inline keyboard UI)
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+
+def _is_settings_allowed(update: Update, context: CallbackContext) -> bool:
+    """Allow settings changes in private chats always; in groups only for admins."""
+    chat = update.effective_chat
+    user = update.effective_user
+    if not chat or not user:
+        return False
+    if chat.type == "private":
+        return True
+    try:
+        member = context.bot.get_chat_member(chat.id, user.id)
+        return member.status in ("creator", "administrator")
+    except Exception:
+        return False
+
+
+def _settings_main_text(chat_config: ChatConfig) -> str:
+    return (
+        "⚙️ <b>Chat Settings</b>\n"
+        "Configure how the bot behaves in this chat."
+    )
+
+
+def _settings_main_keyboard(chat_config: ChatConfig) -> InlineKeyboardMarkup:
+    auto = "✅" if chat_config.auto_search_enabled else "❌"
+    buttons = "✅" if chat_config.show_buttons else "❌"
+    as_engines_label = "🔍 Auto-search engines →" if chat_config.auto_search_enabled else "🔍 Auto-search engines 🔒"
+    as_engines_cb = "settings:menu:auto_search_engines" if chat_config.auto_search_enabled else "settings:disabled"
+    btn_engines_label = "🔘 Engine buttons →" if chat_config.show_buttons else "🔘 Engine buttons 🔒"
+    btn_engines_cb = "settings:menu:button_engines" if chat_config.show_buttons else "settings:disabled"
+
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(f"🔍 Auto-search: {auto}", callback_data="settings:toggle:auto_search")],
+        [InlineKeyboardButton(f"🔘 Show buttons: {buttons}", callback_data="settings:toggle:show_buttons")],
+        [InlineKeyboardButton(as_engines_label, callback_data=as_engines_cb)],
+        [InlineKeyboardButton(btn_engines_label, callback_data=btn_engines_cb)],
+    ])
+
+
+def _settings_engines_keyboard(chat_config: ChatConfig, menu: str) -> InlineKeyboardMarkup:
+    """Build a per-engine toggle keyboard for either 'auto_search_engines' or 'button_engines'."""
+    rows = []
+
+    if menu == "auto_search_engines":
+        enabled = chat_config.auto_search_engines  # None = all enabled
+        cb_prefix = "settings:toggle:auto_search_engine"
+        # Only show engines that support best_match for autosearch
+        relevant = [e for e in engines if e.best_match_implemented]
+    else:
+        enabled = chat_config.button_engines  # None = all enabled
+        cb_prefix = "settings:toggle:button_engine"
+        relevant = list(engines)
+        # Extra toggles at top for the button_engines submenu
+        bm = "✅" if chat_config.show_best_match else "❌"
+        link = "✅" if chat_config.show_link else "❌"
+        rows.append([
+            InlineKeyboardButton(f"🎯 Best match: {bm}", callback_data="settings:toggle:show_best_match"),
+            InlineKeyboardButton(f"🔗 Link: {link}", callback_data="settings:toggle:show_link"),
+        ])
+
+    engine_btns = [
+        InlineKeyboardButton(
+            f"{'✅' if (enabled is None or e.name in enabled) else '❌'} {e.name}",
+            callback_data=f"{cb_prefix}:{e.name}",
+        )
+        for e in relevant
+    ]
+    rows.extend(chunks(engine_btns, 2))
+    rows.append([InlineKeyboardButton("← Back", callback_data="settings:back")])
+    return InlineKeyboardMarkup(rows)
+
+
+def settings_command(update: Update, context: CallbackContext):
+    chat_config = ChatConfig(update.effective_chat.id)  # type: ignore
+    update.message.reply_html(
+        _settings_main_text(chat_config),
+        reply_markup=_settings_main_keyboard(chat_config),
+    )
+
+
+def settings_callback_handler(update: Update, context: CallbackContext):
+    query = update.callback_query
+    data = query.data  # e.g. "settings:toggle:auto_search"
+
+    # Noop / disabled buttons
+    if data == "settings:noop":
+        query.answer()
+        return
+    if data == "settings:disabled":
+        query.answer("Enable the master toggle first.", show_alert=False)
+        return
+
+    if not _is_settings_allowed(update, context):
+        query.answer("Only group admins can change settings.", show_alert=True)
+        return
+
+    chat_config = ChatConfig(update.effective_chat.id)  # type: ignore
+    parts = data.split(":", 2)  # ["settings", action, value]
+    action = parts[1] if len(parts) > 1 else ""
+    value = parts[2] if len(parts) > 2 else ""
+
+    if action == "toggle":
+        if value == "auto_search":
+            if chat_config.auto_search_enabled and not chat_config.show_buttons:
+                query.answer("⚠️ Enable engine buttons first — at least one must be active.", show_alert=True)
+                return
+            chat_config.auto_search_enabled = not chat_config.auto_search_enabled
+        elif value == "show_buttons":
+            if chat_config.show_buttons and not chat_config.auto_search_enabled:
+                query.answer("⚠️ Enable auto-search first — at least one must be active.", show_alert=True)
+                return
+            chat_config.show_buttons = not chat_config.show_buttons
+        elif value == "show_best_match":
+            chat_config.show_best_match = not chat_config.show_best_match
+        elif value == "show_link":
+            chat_config.show_link = not chat_config.show_link
+        elif value.startswith("auto_search_engine:"):
+            engine_name = value[len("auto_search_engine:"):]
+            relevant = [e.name for e in engines if e.best_match_implemented]
+            current = chat_config.auto_search_engines
+            if current is None:
+                current = relevant[:]
+            if engine_name in current:
+                if len(current) == 1:
+                    # Last engine — disable auto-search entirely and reset all engines so
+                    # re-enabling from the main menu brings back a full list.
+                    chat_config.auto_search_enabled = False
+                    chat_config.auto_search_engines = None
+                    query.answer("Auto-search disabled.", show_alert=False)
+                    try:
+                        query.edit_message_text(
+                            _settings_main_text(chat_config),
+                            parse_mode="HTML",
+                            reply_markup=_settings_main_keyboard(chat_config),
+                        )
+                    except Exception:
+                        pass
+                    return
+                current.remove(engine_name)
+            else:
+                current.append(engine_name)
+                chat_config.reset_engine_counter(engine_name)  # fresh start after manual re-enable
+            # If all enabled, store None (= all)
+            chat_config.auto_search_engines = None if set(current) >= set(relevant) else current
+        elif value.startswith("button_engine:"):
+            engine_name = value[len("button_engine:"):]
+            all_names = [e.name for e in engines]
+            current = chat_config.button_engines
+            if current is None:
+                current = all_names[:]
+            if engine_name in current:
+                current.remove(engine_name)
+            else:
+                current.append(engine_name)
+            chat_config.button_engines = None if set(current) >= set(all_names) else current
+
+        # Re-render appropriate menu
+        if value.startswith("auto_search_engine:"):
+            try:
+                query.edit_message_reply_markup(
+                    reply_markup=_settings_engines_keyboard(chat_config, "auto_search_engines")
+                )
+            except Exception:
+                pass
+        elif value.startswith("button_engine:") or value in ("show_link", "show_best_match"):
+            try:
+                query.edit_message_reply_markup(
+                    reply_markup=_settings_engines_keyboard(chat_config, "button_engines")
+                )
+            except Exception:
+                pass
+        else:
+            try:
+                query.edit_message_reply_markup(reply_markup=_settings_main_keyboard(chat_config))
+            except Exception:
+                pass
+
+    elif action == "menu":
+        try:
+            query.edit_message_reply_markup(
+                reply_markup=_settings_engines_keyboard(chat_config, value)
+            )
+        except Exception:
+            pass
+
+    elif action == "back":
+        try:
+            query.edit_message_text(
+                _settings_main_text(chat_config),
+                parse_mode="HTML",
+                reply_markup=_settings_main_keyboard(chat_config),
+            )
+        except Exception:
+            pass
+
+    query.answer()
 
 
 def send_template_command(name: str) -> Callable:
@@ -202,7 +404,8 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
         general_search_lock.acquire()
         Thread(target=general_image_search, args=(update, image_url, general_search_lock)).start()
         config = UserConfig(update.effective_user)  # type: ignore
-        if config.auto_search_enabled:
+        chat_config = ChatConfig(update.effective_chat.id)  # type: ignore
+        if config.auto_search_enabled and chat_config.auto_search_enabled:
             best_match(update, context, image_url, general_search_lock)
     except Exception as error:
         wait_message.edit_text(
@@ -225,6 +428,8 @@ def callback_query_handler(update: Update, context: CallbackContext):
             best_match(update, context, values[0])
         case "wait_for":
             send_wait_for(update, context, values[0])
+        case "noop":
+            update.callback_query.answer()
         case _:
             update.callback_query.answer("Something went wrong")
 
@@ -241,26 +446,40 @@ def send_wait_for(update: Update, context: CallbackContext, engine_name: str):
 def general_image_search(update: Update, image_url: URL, reply_sent_lock: Lock):
     """Send a reverse image search link for the image sent to us"""
     try:
-        default_buttons = [
-            [InlineKeyboardButton(text="Best Match", callback_data="best_match " + str(image_url))],
-            [InlineKeyboardButton(text="Go To Image", url=str(image_url))],
-        ]
+        chat_config = ChatConfig(update.message.chat_id)
+
+        if not chat_config.show_buttons:
+            reply_sent_lock.release()
+            return
+
+        active_engines = engines
+        if chat_config.button_engines is not None:
+            active_engines = [e for e in engines if e.name in chat_config.button_engines]
+
+        top_buttons = []
+        if chat_config.show_best_match:
+            top_buttons.append([InlineKeyboardButton(text="Best Match", callback_data="best_match " + str(image_url))])
+        if chat_config.show_link:
+            top_buttons.append([InlineKeyboardButton(text="🔗 Go To Image", url=str(image_url))])
+
         engine_buttons = []
 
         with ThreadPoolExecutor(max_workers=5) as executor:
             prework_futures = {}
 
-            for engine in engines:
+            for engine in active_engines:
                 if isinstance(engine, PreWorkEngine) and (button := engine.empty_button()):
                     prework_futures[executor.submit(engine, image_url)] = engine
                     engine_buttons.append(button)
                 elif button := engine(image_url):
                     engine_buttons.append(button)
 
-            button_list = list(chunks(engine_buttons, 2))
+            def _build_markup(eng_buttons):
+                rows = list(top_buttons) + list(chunks(eng_buttons, 2))
+                return InlineKeyboardMarkup(rows)
 
             reply = "Use /credits to get a overview of supprted engines and what they are good at."
-            reply_markup = InlineKeyboardMarkup(default_buttons + button_list)
+            reply_markup = _build_markup(engine_buttons)
             reply_message: Message = update.message.reply_text(
                 text=reply,
                 reply_markup=reply_markup,
@@ -279,7 +498,7 @@ def general_image_search(update: Update, image_url: URL, reply_sent_lock: Lock):
                                 engine_buttons.remove(button)
                             else:
                                 engine_buttons[engine_buttons.index(button)] = updated_button
-                    reply_message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(default_buttons + list(chunks(engine_buttons, 2))))
+                    reply_message.edit_reply_markup(reply_markup=_build_markup(engine_buttons))
             except FuturesTimeoutError:
                 pass
     finally:
@@ -308,7 +527,10 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, general
         return
     config.used_auto_search()
 
+    chat_config = ChatConfig(message.chat_id)
     searchable_engines = [engine for engine in engines if engine.best_match_implemented]
+    if chat_config.auto_search_engines is not None:
+        searchable_engines = [e for e in searchable_engines if e.name in chat_config.auto_search_engines]
 
     # Held until "⏳ searching..." is sent — prevents results arriving before the status message
     results_gate = Lock()
@@ -361,6 +583,38 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, general
         )
 
 
+_AUTO_DISABLE_THRESHOLD = 5
+
+
+def _track_engine_result(chat_id: int, engine_name: str, found: bool) -> bool:
+    """Track consecutive empty results per engine. Returns True if the engine was just auto-disabled."""
+    chat_config = ChatConfig(chat_id)
+    counts = dict(chat_config.engine_empty_counts)
+
+    if found:
+        counts.pop(engine_name, None)
+        chat_config.engine_empty_counts = counts
+        return False
+
+    counts[engine_name] = counts.get(engine_name, 0) + 1
+    chat_config.engine_empty_counts = counts
+
+    if counts[engine_name] < _AUTO_DISABLE_THRESHOLD:
+        return False
+
+    # Threshold hit — disable if there's at least one other engine still active
+    relevant = [e.name for e in engines if e.best_match_implemented]
+    current = list(chat_config.auto_search_engines or relevant)
+    if engine_name not in current or len(current) <= 1:
+        return False  # already disabled or last engine — don't disable
+
+    current.remove(engine_name)
+    chat_config.auto_search_engines = current
+    counts[engine_name] = 0  # reset so it doesn't re-trigger if re-enabled
+    chat_config.engine_empty_counts = counts
+    return True
+
+
 def _best_match_search(update: Update, context: CallbackContext, engines: list[GenericRISEngine], url: URL, results_gate: Lock):
     message: Message = update.effective_message  # type: ignore
     identifiers = []
@@ -378,6 +632,8 @@ def _best_match_search(update: Update, context: CallbackContext, engines: list[G
 
                 if meta:
                     logger.debug("Found something UmU")
+                    # Success — reset empty counter for this engine
+                    _track_engine_result(message.chat_id, engine.name, found=True)
 
                     button_list = []
                     more_button = engine(str(url), "More")
@@ -407,7 +663,7 @@ def _best_match_search(update: Update, context: CallbackContext, engines: list[G
                         reply,
                         reply_markup=InlineKeyboardMarkup(button_list),
                         reply_to_message_id=message.message_id,
-                        disable_web_page_preview=bool(media_group) or "errors" in meta,
+                        disable_web_page_preview=not meta.get("thumbnail") or bool(media_group) or "errors" in meta,
                     )
                     if media_group:
                         try:
@@ -424,6 +680,18 @@ def _best_match_search(update: Update, context: CallbackContext, engines: list[G
                         identifiers.append(identifier)
                     if thumbnail_identifier:
                         thumbnail_identifiers.append(thumbnail_identifier)
+                else:
+                    # Empty result — track and potentially auto-disable
+                    disabled = _track_engine_result(message.chat_id, engine.name, found=False)
+                    if disabled:
+                        context.bot.send_message(
+                            chat_id=message.chat_id,
+                            text=(
+                                f"🔕 <b>{engine.name}</b> was automatically disabled for this chat after "
+                                f"5 consecutive empty results. Use /settings to re-enable it."
+                            ),
+                            parse_mode=ParseMode.HTML,
+                        )
             except Exception as error:
                 error_to_admin(update, context, message=f"Best match error: {error}", image_url=url)
                 logger.error("Engine failure: %s", engine)
