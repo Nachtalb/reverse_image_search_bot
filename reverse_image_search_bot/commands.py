@@ -87,9 +87,9 @@ def _settings_main_keyboard(chat_config: ChatConfig) -> InlineKeyboardMarkup:
     auto = "✅" if chat_config.auto_search_enabled else "❌"
     buttons = "✅" if chat_config.show_buttons else "❌"
     as_engines_label = "🔍 Auto-search engines →" if chat_config.auto_search_enabled else "🔍 Auto-search engines 🔒"
-    as_engines_cb = "settings:menu:auto_search_engines" if chat_config.auto_search_enabled else "settings:disabled"
+    as_engines_cb = "settings:menu:auto_search_engines" if chat_config.auto_search_enabled else "settings:disabled:auto_search_engines"
     btn_engines_label = "🔘 Engine buttons →" if chat_config.show_buttons else "🔘 Engine buttons 🔒"
-    btn_engines_cb = "settings:menu:button_engines" if chat_config.show_buttons else "settings:disabled"
+    btn_engines_cb = "settings:menu:button_engines" if chat_config.show_buttons else "settings:disabled:button_engines"
 
     return InlineKeyboardMarkup([
         [InlineKeyboardButton(f"🔍 Auto-search: {auto}", callback_data="settings:toggle:auto_search")],
@@ -112,13 +112,11 @@ def _settings_engines_keyboard(chat_config: ChatConfig, menu: str) -> InlineKeyb
         enabled = chat_config.button_engines  # None = all enabled
         cb_prefix = "settings:toggle:button_engine"
         relevant = list(engines)
-        # Extra toggles at top for the button_engines submenu
+        # Mirror the final button layout: Best Match alone, Link alone, then engines in pairs
         bm = "✅" if chat_config.show_best_match else "❌"
         link = "✅" if chat_config.show_link else "❌"
-        rows.append([
-            InlineKeyboardButton(f"🎯 Best match: {bm}", callback_data="settings:toggle:show_best_match"),
-            InlineKeyboardButton(f"🔗 Link: {link}", callback_data="settings:toggle:show_link"),
-        ])
+        rows.append([InlineKeyboardButton(f"{bm} Best Match", callback_data="settings:toggle:show_best_match")])
+        rows.append([InlineKeyboardButton(f"{link} 🔗 Go To Image", callback_data="settings:toggle:show_link")])
 
     engine_btns = [
         InlineKeyboardButton(
@@ -130,6 +128,17 @@ def _settings_engines_keyboard(chat_config: ChatConfig, menu: str) -> InlineKeyb
     rows.extend(chunks(engine_btns, 2))
     rows.append([InlineKeyboardButton("← Back", callback_data="settings:back")])
     return InlineKeyboardMarkup(rows)
+
+
+def _button_count(chat_config: ChatConfig, excluding_engine: str | None = None) -> int:
+    """Count active buttons (best match + link + engine buttons). Used to enforce minimum of 1."""
+    count = int(chat_config.show_best_match) + int(chat_config.show_link)
+    all_names = [e.name for e in engines]
+    active = chat_config.button_engines if chat_config.button_engines is not None else all_names
+    for name in active:
+        if name != excluding_engine:
+            count += 1
+    return count
 
 
 def settings_command(update: Update, context: CallbackContext):
@@ -148,8 +157,12 @@ def settings_callback_handler(update: Update, context: CallbackContext):
     if data == "settings:noop":
         query.answer()
         return
-    if data == "settings:disabled":
-        query.answer("Enable the master toggle first.", show_alert=False)
+    if data.startswith("settings:disabled:"):
+        reason = {
+            "auto_search_engines": "Enable auto-search first to configure its engines.",
+            "button_engines": "Enable \"Show buttons\" first to configure engine buttons.",
+        }.get(data.split(":", 2)[2], "Enable the master toggle first.")
+        query.answer(reason, show_alert=False)
         return
 
     if not _is_settings_allowed(update, context):
@@ -173,8 +186,14 @@ def settings_callback_handler(update: Update, context: CallbackContext):
                 return
             chat_config.show_buttons = not chat_config.show_buttons
         elif value == "show_best_match":
+            if chat_config.show_best_match and _button_count(chat_config) <= 1:
+                query.answer("⚠️ At least one button must stay enabled.", show_alert=True)
+                return
             chat_config.show_best_match = not chat_config.show_best_match
         elif value == "show_link":
+            if chat_config.show_link and _button_count(chat_config) <= 1:
+                query.answer("⚠️ At least one button must stay enabled.", show_alert=True)
+                return
             chat_config.show_link = not chat_config.show_link
         elif value.startswith("auto_search_engine:"):
             engine_name = value[len("auto_search_engine:"):]
@@ -184,19 +203,7 @@ def settings_callback_handler(update: Update, context: CallbackContext):
                 current = relevant[:]
             if engine_name in current:
                 if len(current) == 1:
-                    # Last engine — disable auto-search entirely and reset all engines so
-                    # re-enabling from the main menu brings back a full list.
-                    chat_config.auto_search_enabled = False
-                    chat_config.auto_search_engines = None
-                    query.answer("Auto-search disabled.", show_alert=False)
-                    try:
-                        query.edit_message_text(
-                            _settings_main_text(chat_config),
-                            parse_mode="HTML",
-                            reply_markup=_settings_main_keyboard(chat_config),
-                        )
-                    except Exception:
-                        pass
+                    query.answer("⚠️ At least one engine must stay enabled.", show_alert=True)
                     return
                 current.remove(engine_name)
             else:
@@ -211,6 +218,9 @@ def settings_callback_handler(update: Update, context: CallbackContext):
             if current is None:
                 current = all_names[:]
             if engine_name in current:
+                if _button_count(chat_config, excluding_engine=engine_name) < 1:
+                    query.answer("⚠️ At least one button must stay enabled.", show_alert=True)
+                    return
                 current.remove(engine_name)
             else:
                 current.append(engine_name)
