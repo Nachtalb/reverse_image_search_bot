@@ -53,6 +53,7 @@ last_used: dict[int, float] = {}
 
 
 def id_command(update: Update, context: CallbackContext):
+    metrics.commands_total.labels(command="id").inc()
     if update.effective_chat:
         update.message.reply_html(pre(json.dumps(update.effective_chat.to_dict(), sort_keys=True, indent=4)))
 
@@ -143,6 +144,7 @@ def _button_count(chat_config: ChatConfig, excluding_engine: str | None = None) 
 
 
 def settings_command(update: Update, context: CallbackContext):
+    metrics.commands_total.labels(command="settings").inc()
     chat_config = ChatConfig(update.effective_chat.id)  # type: ignore
     update.message.reply_html(
         _settings_main_text(chat_config),
@@ -281,6 +283,7 @@ _HELP_IMAGE = _LOCAL / "images/help.jpg"
 
 
 def start_command(update: Update, context: CallbackContext):
+    metrics.commands_total.labels(command="start").inc()
     chat = update.effective_chat
     if chat and chat.type != "private":
         update.message.reply_text(
@@ -314,6 +317,7 @@ def on_added_to_group(update: Update, context: CallbackContext):
 
 
 def help_command(update: Update, context: CallbackContext):
+    metrics.commands_total.labels(command="help").inc()
     with _HELP_IMAGE.open("rb") as photo:
         update.message.reply_photo(
             photo,
@@ -324,6 +328,7 @@ def help_command(update: Update, context: CallbackContext):
 
 
 def search_command(update: Update, context: CallbackContext):
+    metrics.commands_total.labels(command="search").inc()
     orig_message: Message | None = update.message.reply_to_message  # type: ignore
     if not orig_message:
         update.message.reply_text("When using /search you have to reply to a message with an image or video")

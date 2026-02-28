@@ -43,6 +43,12 @@ engine_manual_toggle_total = Counter(
     ["engine", "menu", "action"],  # menu: auto_search/button, action: enabled/disabled
 )
 
+commands_total = Counter(
+    "ris_commands_total",
+    "Total bot command invocations",
+    ["command"],  # start/help/search/settings/id/restart/ban
+)
+
 button_toggle_total = Counter(
     "ris_button_toggle_total",
     "Manual button toggle actions by users (best_match, show_link)",

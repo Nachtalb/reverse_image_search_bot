@@ -99,6 +99,7 @@ class RISBot(ExtBot):
             self._banned_users = json.loads(self._banned_users_file.read_text())
 
     def _ban_user(self, update: Update, _: CallbackContext):
+        metrics.commands_total.labels(command="ban").inc()
         args = update.message.text.strip("/").split(" ")
         if len(args) != 2:
             update.message.reply_text("Usage: /ban <user_id>")
@@ -141,6 +142,7 @@ def main():
 
     def restart_command(update: Update, context: CallbackContext):
         """Start the restarting process"""
+        metrics.commands_total.labels(command="restart").inc()
         update.message.reply_text("Bot is restarting...")
         logger.info("User requested restart")
         Thread(target=stop_and_restart, args=(update.effective_chat.id,)).start()  # type: ignore
