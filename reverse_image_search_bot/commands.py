@@ -282,7 +282,6 @@ def _send_template_command(update: Update, context: CallbackContext, reply_file:
         update.message.reply_text(reply, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
 
 
-tips_command = send_template_command("tips")
 start_command = send_template_command("start")
 help_command = send_template_command("help")
 
@@ -557,7 +556,7 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, general
         search_message.edit_text(
             emojize(
                 f":red_circle: I searched for you on {engines_used_html} but didn't find anything. Please try another"
-                " engine above and take a look at /tips."
+                " engine above."
             ),
             ParseMode.HTML,
         )

@@ -36,7 +36,6 @@ from .commands import (
     settings_callback_handler,
     settings_command,
     start_command,
-    tips_command,
 )
 
 
@@ -145,7 +144,6 @@ def main():
     dispatcher.add_handler(CommandHandler("start", start_command))
     dispatcher.add_handler(CommandHandler("help", help_command))
     dispatcher.add_handler(CommandHandler("id", id_command))
-    dispatcher.add_handler(CommandHandler("tips", tips_command))
     dispatcher.add_handler(CommandHandler("restart", restart_command, filters=ADMIN_FILTER))
     dispatcher.add_handler(
         CommandHandler("ban", bot._ban_user, filters=ADMIN_FILTER), group=1
