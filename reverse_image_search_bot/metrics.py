@@ -5,6 +5,8 @@ Disable with PROMETHEUS_ENABLED=false.
 """
 
 import logging
+import os
+import threading
 import time
 
 from prometheus_client import Counter, Gauge, Histogram, start_http_server
@@ -75,11 +77,35 @@ bot_start_time = Gauge(
     "Unix timestamp when the bot started",
 )
 
+active_threads = Gauge(
+    "ris_active_threads",
+    "Current number of active threads",
+)
+
+memory_bytes = Gauge(
+    "ris_memory_bytes",
+    "Process RSS memory usage in bytes",
+)
+
 errors_total = Counter(
     "ris_errors_total",
     "Total uncaught errors",
     ["type"],  # exception class name
 )
+
+
+def _collect_process_metrics():
+    """Periodically update thread count and memory usage."""
+    while True:
+        active_threads.set(threading.active_count())
+        try:
+            # Read RSS from /proc/self/statm (Linux)
+            with open("/proc/self/statm") as f:
+                pages = int(f.read().split()[1])  # resident pages
+                memory_bytes.set(pages * os.sysconf("SC_PAGE_SIZE"))
+        except (OSError, ValueError):
+            pass
+        time.sleep(15)
 
 
 def start_metrics_server():
@@ -91,4 +117,9 @@ def start_metrics_server():
     port = settings.PROMETHEUS_PORT
     start_http_server(port)
     bot_start_time.set(time.time())
+
+    # Start background thread for process metrics collection
+    collector = threading.Thread(target=_collect_process_metrics, daemon=True)
+    collector.start()
+
     logger.info(f"Prometheus metrics server started on port {port}")
