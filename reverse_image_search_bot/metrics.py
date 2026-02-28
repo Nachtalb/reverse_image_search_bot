@@ -116,6 +116,20 @@ bot_start_time = Gauge(
     "Unix timestamp when the bot started",
 )
 
+# ── Provider Status ───────────────────────────────────────────────────────────
+# 1 = healthy, 0.5 = degraded, 0 = inactive
+engine_status = Gauge(
+    "ris_engine_status",
+    "Search engine status (1=ok, 0.5=degraded, 0=inactive)",
+    ["engine"],
+)
+
+data_provider_status = Gauge(
+    "ris_data_provider_status",
+    "Data provider status (1=ok, 0.5=degraded, 0=inactive)",
+    ["provider"],
+)
+
 active_threads = Gauge(
     "ris_active_threads",
     "Current number of active threads",
@@ -134,17 +148,64 @@ errors_total = Counter(
 
 
 def _collect_process_metrics():
-    """Periodically update thread count and memory usage."""
+    """Periodically update thread count, memory usage, and provider status."""
+    # Wait for imports to settle before first provider status check
+    _first_run = True
     while True:
         active_threads.set(threading.active_count())
         try:
-            # Read RSS from /proc/self/statm (Linux)
             with open("/proc/self/statm") as f:
-                pages = int(f.read().split()[1])  # resident pages
+                pages = int(f.read().split()[1])
                 memory_bytes.set(pages * os.sysconf("SC_PAGE_SIZE"))
         except (OSError, ValueError):
             pass
+        if _first_run:
+            time.sleep(5)  # let engines/providers initialize
+            _first_run = False
+        try:
+            update_provider_status()
+        except Exception:
+            pass
         time.sleep(15)
+
+
+def update_provider_status():
+    """Evaluate and set status gauges for all engines and data providers."""
+    from .engines import engines as engine_list
+    from .engines.data_providers import provides as provider_list
+    from . import settings
+
+    for engine in engine_list:
+        name = engine.name
+        # Check for recent errors
+        try:
+            error_count = provider_results_total.labels(provider=name, status="error")._value.get()
+        except Exception:
+            error_count = 0
+
+        if name == "SauceNAO" and not settings.SAUCENAO_API:
+            engine_status.labels(engine=name).set(0.5)  # works but rate-limited without key
+        elif error_count > 0:
+            engine_status.labels(engine=name).set(0.5)
+        else:
+            engine_status.labels(engine=name).set(1)
+
+    for provider in provider_list:
+        name = provider.info.get("name", type(provider).__name__).lower()
+
+        # Check provider-specific conditions
+        if hasattr(provider, "authenticated") and not provider.authenticated:
+            data_provider_status.labels(provider=name).set(0)  # e.g. pixiv without creds
+        else:
+            try:
+                error_count = data_provider_total.labels(provider=name, status="error")._value.get()
+            except Exception:
+                error_count = 0
+
+            if error_count > 0:
+                data_provider_status.labels(provider=name).set(0.5)
+            else:
+                data_provider_status.labels(provider=name).set(1)
 
 
 def start_metrics_server():
