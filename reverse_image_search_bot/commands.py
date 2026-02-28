@@ -265,12 +265,13 @@ _HELP_IMAGE = _LOCAL / "images/help.jpg"
 
 def _send_photo_with_caption(update: Update, text: str):
     """Send the help image with caption above."""
-    update.message.reply_photo(
-        _HELP_IMAGE,
-        caption=text,
-        parse_mode=ParseMode.HTML,
-        api_kwargs={"show_caption_above_media": True},
-    )
+    with _HELP_IMAGE.open("rb") as photo:
+        update.message.reply_photo(
+            photo,
+            caption=text,
+            parse_mode=ParseMode.HTML,
+            api_kwargs={"show_caption_above_media": True},
+        )
 
 
 def start_command(update: Update, context: CallbackContext):
