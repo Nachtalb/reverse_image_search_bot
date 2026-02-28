@@ -70,6 +70,19 @@ provider_results_total = Counter(
     ["provider", "status"],  # status: hit/miss/timeout/error
 )
 
+data_provider_total = Counter(
+    "ris_data_provider_total",
+    "Data provider calls and outcomes",
+    ["provider", "status"],  # provider: pixiv/anilist/booru/mangadex, status: hit/miss/error
+)
+
+data_provider_duration_seconds = Histogram(
+    "ris_data_provider_duration_seconds",
+    "Data provider call duration in seconds",
+    ["provider"],
+    buckets=(0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0),
+)
+
 concurrent_searches = Gauge(
     "ris_concurrent_searches",
     "Number of currently running searches",
