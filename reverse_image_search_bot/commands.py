@@ -349,8 +349,8 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
         )
         return
 
-    wait_message = update.message.reply_text("⌛ Give me a sec...")
-    context.bot.send_chat_action(chat_id=update.message.chat_id, action=ChatAction.TYPING)
+    wait_message = message.reply_text("⌛ Give me a sec...")
+    context.bot.send_chat_action(chat_id=message.chat_id, action=ChatAction.TYPING)
 
     attachment = message.effective_attachment
     if isinstance(attachment, list):
