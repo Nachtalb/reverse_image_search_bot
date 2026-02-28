@@ -1,7 +1,7 @@
 """Prometheus metrics for the Reverse Image Search Bot.
 
 Metrics are exposed on a separate HTTP port (default 9100) and scraped by Prometheus.
-Disable with PROMETHEUS_ENABLED=false.
+Disable with METRICS_ENABLED=false.
 """
 
 import logging
@@ -212,11 +212,11 @@ def update_provider_status():
 
 def start_metrics_server():
     """Start the Prometheus metrics HTTP server if enabled."""
-    if not settings.PROMETHEUS_ENABLED:
+    if not settings.METRICS_ENABLED:
         logger.info("Prometheus metrics disabled")
         return
 
-    port = settings.PROMETHEUS_PORT
+    port = settings.METRICS_PORT
     start_http_server(port)
     bot_start_time.set(time.time())
 
