@@ -288,12 +288,25 @@ def _send_template_command(update: Update, context: CallbackContext, reply_file:
 def start_command(update: Update, context: CallbackContext):
     chat = update.effective_chat
     if chat and chat.type != "private":
-        # Group chat: show commands as text, no keyboard
-        update.message.reply_text(
-            "🔎 Send me an image, sticker, or video and I'll find its source.\n\n/search · /settings",
-            parse_mode=ParseMode.HTML,
-            disable_web_page_preview=True,
-        )
+        # Group chat: show commands as text with guide image
+        local = Path(__file__).parent
+        image_file = local / "images/help.jpg"
+        if not image_file.is_file():
+            image_file = local / "images/help.png"
+        if image_file.is_file():
+            with image_file.open("br") as image_obj:
+                update.message.reply_photo(
+                    image_obj,
+                    caption="🔎 Send me an image, sticker, or video and I'll find its source.\n\n/search · /settings",
+                    parse_mode=ParseMode.HTML,
+                    api_kwargs={"show_caption_above_media": True},
+                )
+        else:
+            update.message.reply_text(
+                "🔎 Send me an image, sticker, or video and I'll find its source.\n\n/search · /settings",
+                parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True,
+            )
     else:
         # Private chat: show reply keyboard
         from telegram import KeyboardButton, ReplyKeyboardMarkup
