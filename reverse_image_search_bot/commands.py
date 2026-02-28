@@ -34,7 +34,6 @@ from yarl import URL
 
 from reverse_image_search_bot.config import ChatConfig, UserConfig
 from reverse_image_search_bot.engines import engines
-from reverse_image_search_bot.engines.data_providers import provides
 from reverse_image_search_bot.engines.generic import GenericRISEngine, PreWorkEngine
 from reverse_image_search_bot.engines.types import MetaData, ResultData
 from reverse_image_search_bot.settings import ADMIN_IDS
@@ -280,54 +279,6 @@ def _send_template_command(update: Update, context: CallbackContext, reply_file:
 
 start_command = send_template_command("start")
 help_command = send_template_command("help")
-
-
-def credits_command(
-    update: Update,
-    context: CallbackContext,
-):
-    data_providers = []
-    for provider in provides:
-        infos = provider.infos.values() if provider.infos else [provider.info]
-
-        for info in infos:
-            data_providers.append(
-                "{name_title}{info[url]}\n{provides_title}{provides}\n{site_type_title}{info[site_type]}".format(
-                    name_title=title(info["name"]),
-                    provides_title=title("Provides"),
-                    site_type_title=title("Site Type"),
-                    provides=", ".join(map(code, info["types"])),
-                    info=info,
-                )
-            )
-
-    search_engines = ""
-    for engine in engines:
-        parts = [title(engine.name) + str(engine.provider_url)]
-        parts.append(title("Description") + engine.description)
-        if engine.recommendation:
-            parts.append(
-                title("Recommended for")
-                + "\n- "
-                + "\n- ".join([code(recommend) for recommend in engine.recommendation])
-            )
-        if engine.types:
-            parts.append(title("Used for") + ", ".join([code(type) for type in engine.types]))
-
-        parts.append(
-            title("Supports inline search")
-            + emojize(":green_circle:" if engine.best_match_implemented else ":red_circle:")
-        )
-
-        search_engines += "\n".join(parts) + "\n\n"
-
-    reply_1 = (
-        (Path(__file__).parent / "texts/credits_1.html").read_text().format(data_providers="\n\n".join(data_providers))
-    )
-    reply_2 = (Path(__file__).parent / "texts/credits_2.html").read_text().format(search_engines=search_engines)
-
-    update.message.reply_html(reply_1, reply_to_message_id=update.message.message_id, disable_web_page_preview=True)
-    update.message.reply_html(reply_2, reply_to_message_id=update.message.message_id, disable_web_page_preview=True)
 
 
 def search_command(update: Update, context: CallbackContext):

@@ -28,7 +28,6 @@ from telegram.utils.request import Request
 from . import settings
 from .commands import (
     callback_query_handler,
-    credits_command,
     file_handler,
     help_command,
     id_command,
@@ -148,7 +147,6 @@ def main():
     dispatcher.add_handler(
         CommandHandler("ban", bot._ban_user, filters=ADMIN_FILTER), group=1
     )
-    dispatcher.add_handler(CommandHandler(("credits", "credit"), credits_command, run_async=True))
     dispatcher.add_handler(CommandHandler("search", search_command, run_async=True))
     dispatcher.add_handler(CommandHandler(("settings", "conf", "pref"), settings_command, run_async=True))
     dispatcher.add_handler(CallbackQueryHandler(settings_callback_handler, pattern=r"^settings:", run_async=True))
