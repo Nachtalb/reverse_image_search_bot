@@ -7,6 +7,8 @@ from cachetools import TTLCache, cachedmethod
 from cachetools.keys import hashkey
 from requests import Session
 
+from reverse_image_search_bot import metrics
+
 
 def provider_cache(func):
     return wraps(func)(cachedmethod(lambda self: self._cache, key=partial(hashkey, func.__qualname__))(func))
@@ -16,7 +18,6 @@ def _instrumented_provide(original_provide):
     """Wrap a data provider's provide() method with metrics tracking."""
     @wraps(original_provide)
     def wrapper(self, *args, **kwargs):
-        from reverse_image_search_bot import metrics
         provider_name = self.info.get("name", type(self).__name__).lower()
         start = time.time()
         try:
