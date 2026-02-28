@@ -271,15 +271,11 @@ def send_template_command(name: str) -> Callable:
 
 def _send_template_command(update: Update, context: CallbackContext, reply_file: Path, image_file: Path):
     reply = reply_file.read_text()
-    if len(reply) > 1000:
-        update.message.reply_text(reply, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
-        reply = None
+    update.message.reply_text(reply, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
 
     if image_file.is_file():
         with image_file.open("br") as image_obj:
-            update.message.reply_photo(image_obj, caption=reply, parse_mode=ParseMode.HTML)
-    elif reply:
-        update.message.reply_text(reply, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+            update.message.reply_photo(image_obj)
 
 
 start_command = send_template_command("start")
