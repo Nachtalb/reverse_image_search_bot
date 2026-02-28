@@ -285,7 +285,32 @@ def _send_template_command(update: Update, context: CallbackContext, reply_file:
         update.message.reply_text(reply, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
 
 
-start_command = send_template_command("start")
+def start_command(update: Update, context: CallbackContext):
+    chat = update.effective_chat
+    if chat and chat.type != "private":
+        # Group chat: show commands as text, no keyboard
+        update.message.reply_text(
+            "🔎 Send me an image, sticker, or video and I'll find its source.\n\n/search · /settings",
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True,
+        )
+    else:
+        # Private chat: show reply keyboard
+        from telegram import KeyboardButton, ReplyKeyboardMarkup
+
+        keyboard = ReplyKeyboardMarkup(
+            [[KeyboardButton("/help"), KeyboardButton("/settings")]],
+            resize_keyboard=True,
+            one_time_keyboard=True,
+        )
+        update.message.reply_text(
+            "🔎 Send me an image, sticker, or video and I'll find its source.",
+            reply_markup=keyboard,
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True,
+        )
+
+
 help_command = send_template_command("help")
 
 
