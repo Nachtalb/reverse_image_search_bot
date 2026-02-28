@@ -176,6 +176,8 @@ def update_provider_status():
     from . import settings
 
     for engine in engine_list:
+        if not engine.best_match_implemented:
+            continue  # skip link-only engines (Google, Bing, etc.)
         name = engine.name
         # Check for recent errors
         try:
