@@ -6,7 +6,6 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from threading import Lock, Thread
 from time import time
-from typing import Callable
 
 from PIL import Image
 from emoji import emojize
@@ -15,6 +14,8 @@ from telegram import (
     ChatAction,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
     Update,
     User,
 )
@@ -257,60 +258,35 @@ def settings_callback_handler(update: Update, context: CallbackContext):
     query.answer()
 
 
-def send_template_command(name: str) -> Callable:
-    local = Path(__file__).parent
-    reply_file = local / f"texts/{name}.html"
-    image_file = local / f"images/{name}.jpg"
-    if not image_file.is_file():
-        image_file = local / f"images/{name}.png"
-
-    def wrapper(update, context):
-        return _send_template_command(update, context, reply_file, image_file)
-
-    return wrapper
+_LOCAL = Path(__file__).parent
+_HELP_TEXT = _LOCAL / "texts/help.html"
+_HELP_IMAGE = _LOCAL / "images/help.jpg"
+if not _HELP_IMAGE.is_file():
+    _HELP_IMAGE = _LOCAL / "images/help.png"
 
 
-def _send_template_command(update: Update, context: CallbackContext, reply_file: Path, image_file: Path):
-    reply = reply_file.read_text()
-
-    if image_file.is_file():
-        with image_file.open("br") as image_obj:
+def _send_photo_with_caption(update: Update, text: str):
+    """Send a photo with caption above, or plain text if no image exists."""
+    if _HELP_IMAGE.is_file():
+        with _HELP_IMAGE.open("br") as image_obj:
             update.message.reply_photo(
                 image_obj,
-                caption=reply,
+                caption=text,
                 parse_mode=ParseMode.HTML,
                 api_kwargs={"show_caption_above_media": True},
             )
     else:
-        update.message.reply_text(reply, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+        update.message.reply_text(text, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
 
 
 def start_command(update: Update, context: CallbackContext):
     chat = update.effective_chat
     if chat and chat.type != "private":
-        # Group chat: show commands as text with guide image
-        local = Path(__file__).parent
-        image_file = local / "images/help.jpg"
-        if not image_file.is_file():
-            image_file = local / "images/help.png"
-        if image_file.is_file():
-            with image_file.open("br") as image_obj:
-                update.message.reply_photo(
-                    image_obj,
-                    caption="🔎 Send me an image, sticker, or video and I'll find its source.\n\n/search · /settings",
-                    parse_mode=ParseMode.HTML,
-                    api_kwargs={"show_caption_above_media": True},
-                )
-        else:
-            update.message.reply_text(
-                "🔎 Send me an image, sticker, or video and I'll find its source.\n\n/search · /settings",
-                parse_mode=ParseMode.HTML,
-                disable_web_page_preview=True,
-            )
+        _send_photo_with_caption(
+            update,
+            "🔎 Send me an image, sticker, or video and I'll find its source.\n\n/search · /settings",
+        )
     else:
-        # Private chat: show reply keyboard
-        from telegram import KeyboardButton, ReplyKeyboardMarkup
-
         keyboard = ReplyKeyboardMarkup(
             [[KeyboardButton("/help"), KeyboardButton("/settings")]],
             resize_keyboard=True,
@@ -324,7 +300,20 @@ def start_command(update: Update, context: CallbackContext):
         )
 
 
-help_command = send_template_command("help")
+def on_added_to_group(update: Update, context: CallbackContext):
+    """Send start message when bot is added to a group."""
+    message = update.message
+    if not message or not message.new_chat_members:
+        return
+    for member in message.new_chat_members:
+        if member.id == context.bot.id:
+            start_command(update, context)
+            break
+
+
+def help_command(update: Update, context: CallbackContext):
+    reply = _HELP_TEXT.read_text()
+    _send_photo_with_caption(update, reply)
 
 
 def search_command(update: Update, context: CallbackContext):

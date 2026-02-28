@@ -22,12 +22,9 @@ SauceNAO, Trace
 
 ## Commands
 
-- `/help`, `/start`: Show this help message
-- `/credits`: Show all available engines (and what they are best for), data
-  providers and other credits.
-- `/tips`: Various tips and tricks for better search results
+- `/start`: Welcome message with quick-access keyboard (private) or guide image (groups)
+- `/help`: Commands overview with multilingual help links
 - `/search`: Reply to a message with an image or video to start a search
-- `/auto_search`: Toggle auto search on and off
 - `/settings` (`/conf`, `/pref`): Per-chat settings via inline keyboard
 
 ## Per-Chat Settings
