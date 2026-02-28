@@ -27,7 +27,6 @@ from telegram.utils.request import Request
 
 from . import settings
 from .commands import (
-    auto_search_command,
     callback_query_handler,
     credits_command,
     file_handler,
@@ -153,7 +152,6 @@ def main():
     )
     dispatcher.add_handler(CommandHandler(("credits", "credit"), credits_command, run_async=True))
     dispatcher.add_handler(CommandHandler("search", search_command, run_async=True))
-    dispatcher.add_handler(CommandHandler("auto_search", auto_search_command, filters=Filters.chat_type.private, run_async=True))
     dispatcher.add_handler(CommandHandler(("settings", "conf", "pref"), settings_command, run_async=True))
     dispatcher.add_handler(CallbackQueryHandler(settings_callback_handler, pattern=r"^settings:", run_async=True))
     dispatcher.add_handler(CallbackQueryHandler(callback_query_handler, run_async=True))

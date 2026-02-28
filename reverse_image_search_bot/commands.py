@@ -56,20 +56,6 @@ def id_command(update: Update, context: CallbackContext):
         update.message.reply_html(pre(json.dumps(update.effective_chat.to_dict(), sort_keys=True, indent=4)))
 
 
-def auto_search_command(update: Update, _: CallbackContext):
-    user = update.effective_user
-    if not user:
-        return
-    config = UserConfig(user)
-    if config.auto_search_enabled:
-        config.auto_search_enabled = False
-        update.message.reply_html("You have disabled auto search")
-    else:
-        config.auto_search_enabled = True
-        config.failures_in_a_row = 0
-        update.message.reply_text("You have enabled auto search")
-
-
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Settings (per-chat inline keyboard UI)
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -565,7 +551,7 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, general
                     " you. This helps to prevent hitting rate limits of the search engines making the bot more useful"
                     " for everyone. At the moment the auto search compatible engines are for anime & manga related"
                     " content. If you mainly search for other material please keep auto search disabled. You can use"
-                    " /auto_search to reenable it."
+                    " /settings to reenable it."
                 )
             )
         search_message.edit_text(
@@ -581,7 +567,7 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, general
             emojize(
                 f":blue_circle: I searched for you on {engines_used_html}. You can try others above for more results."
             )
-            + (" You may reenable /auto_search if you want." if not config.auto_search_enabled else ""),
+            + (" You may reenable auto-search via /settings if you want." if not config.auto_search_enabled else ""),
             ParseMode.HTML,
         )
 
