@@ -191,11 +191,13 @@ def settings_callback_handler(update: Update, context: CallbackContext):
                 query.answer("⚠️ At least one button must stay enabled.", show_alert=True)
                 return
             chat_config.show_best_match = not chat_config.show_best_match
+            metrics.button_toggle_total.labels(button="best_match", action="disabled" if not chat_config.show_best_match else "enabled").inc()
         elif value == "show_link":
             if chat_config.show_link and _button_count(chat_config) <= 1:
                 query.answer("⚠️ At least one button must stay enabled.", show_alert=True)
                 return
             chat_config.show_link = not chat_config.show_link
+            metrics.button_toggle_total.labels(button="show_link", action="disabled" if not chat_config.show_link else "enabled").inc()
         elif value.startswith("auto_search_engine:"):
             engine_name = value[len("auto_search_engine:"):]
             relevant = [e.name for e in engines if e.best_match_implemented]
@@ -207,9 +209,11 @@ def settings_callback_handler(update: Update, context: CallbackContext):
                     query.answer("⚠️ At least one engine must stay enabled.", show_alert=True)
                     return
                 current.remove(engine_name)
+                metrics.engine_manual_toggle_total.labels(engine=engine_name, menu="auto_search", action="disabled").inc()
             else:
                 current.append(engine_name)
                 chat_config.reset_engine_counter(engine_name)  # fresh start after manual re-enable
+                metrics.engine_manual_toggle_total.labels(engine=engine_name, menu="auto_search", action="enabled").inc()
             # If all enabled, store None (= all)
             chat_config.auto_search_engines = None if set(current) >= set(relevant) else current
         elif value.startswith("button_engine:"):
@@ -223,8 +227,10 @@ def settings_callback_handler(update: Update, context: CallbackContext):
                     query.answer("⚠️ At least one button must stay enabled.", show_alert=True)
                     return
                 current.remove(engine_name)
+                metrics.engine_manual_toggle_total.labels(engine=engine_name, menu="button", action="disabled").inc()
             else:
                 current.append(engine_name)
+                metrics.engine_manual_toggle_total.labels(engine=engine_name, menu="button", action="enabled").inc()
             chat_config.button_engines = None if set(current) >= set(all_names) else current
 
         # Re-render appropriate menu
@@ -363,8 +369,7 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
     if hasattr(attachment, "file_size") and attachment.file_size:
         metrics.file_size_bytes.labels(file_type=file_type).observe(attachment.file_size)
 
-    is_inline = update.callback_query is not None
-    search_mode = "inline" if is_inline else "direct"
+    language = getattr(user, "language_code", None) or "unknown"
 
     try:
         image_url = None
@@ -395,7 +400,7 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
                 return
 
         # Track usage metrics
-        metrics.searches_total.labels(type=search_type, mode=search_mode).inc()
+        metrics.searches_total.labels(type=search_type, language=language).inc()
         metrics.searches_by_user_total.labels(user_id=str(user.id)).inc()
 
         general_search_lock = Lock()
@@ -610,6 +615,7 @@ def _track_engine_result(chat_id: int, engine_name: str, found: bool) -> bool:
     chat_config.auto_search_engines = current
     counts[engine_name] = 0  # reset so it doesn't re-trigger if re-enabled
     chat_config.engine_empty_counts = counts
+    metrics.engine_auto_disabled_total.labels(engine=engine_name).inc()
     return True
 
 

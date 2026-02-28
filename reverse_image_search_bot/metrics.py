@@ -20,13 +20,33 @@ logger = logging.getLogger(__name__)
 searches_total = Counter(
     "ris_searches_total",
     "Total reverse image searches",
-    ["type", "mode"],  # type: image/sticker/gif/video_frame, mode: inline/direct
+    ["type", "language"],  # type: image/sticker/gif/video_frame, language: user language_code
 )
 
 searches_by_user_total = Counter(
     "ris_searches_by_user_total",
     "Total searches per user",
     ["user_id"],
+)
+
+# ── Settings / Engine Stats ──────────────────────────────────────────────────
+
+engine_auto_disabled_total = Counter(
+    "ris_engine_auto_disabled_total",
+    "Times an engine was auto-disabled due to consecutive empty results",
+    ["engine"],
+)
+
+engine_manual_toggle_total = Counter(
+    "ris_engine_manual_toggle_total",
+    "Manual engine toggle actions by users",
+    ["engine", "menu", "action"],  # menu: auto_search/button, action: enabled/disabled
+)
+
+button_toggle_total = Counter(
+    "ris_button_toggle_total",
+    "Manual button toggle actions by users (best_match, show_link)",
+    ["button", "action"],  # action: enabled/disabled
 )
 
 # ── Performance Stats ────────────────────────────────────────────────────────
