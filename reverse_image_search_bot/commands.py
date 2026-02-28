@@ -33,6 +33,7 @@ from telegram.ext import CallbackContext
 from telegram.parsemode import ParseMode
 from yarl import URL
 
+from reverse_image_search_bot import metrics
 from reverse_image_search_bot.config import ChatConfig, UserConfig
 from reverse_image_search_bot.engines import engines
 from reverse_image_search_bot.engines.generic import GenericRISEngine, PreWorkEngine
@@ -344,6 +345,27 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
     if isinstance(attachment, list):
         attachment = attachment[-1]
 
+    # Determine file type for metrics
+    if isinstance(attachment, Sticker):
+        file_type = "sticker"
+    elif isinstance(attachment, Animation):
+        file_type = "gif"
+    elif isinstance(attachment, Video):
+        file_type = "video"
+    elif isinstance(attachment, PhotoSize):
+        file_type = "photo"
+    elif isinstance(attachment, Document):
+        file_type = "document"
+    else:
+        file_type = "unknown"
+
+    metrics.files_received_total.labels(file_type=file_type).inc()
+    if hasattr(attachment, "file_size") and attachment.file_size:
+        metrics.file_size_bytes.labels(file_type=file_type).observe(attachment.file_size)
+
+    is_inline = update.callback_query is not None
+    search_mode = "inline" if is_inline else "direct"
+
     try:
         image_url = None
         error = None
@@ -353,6 +375,7 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
                 or isinstance(attachment, (Video, Animation))
                 or (isinstance(attachment, Sticker) and attachment.is_video)
             ):
+                search_type = "video_frame" if isinstance(attachment, Video) else file_type
                 image_url = video_to_url(attachment)  # type: ignore
             elif (
                 isinstance(attachment, Document) and attachment.mime_type.endswith(("jpeg", "png", "webp"))
@@ -360,6 +383,7 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
                 if isinstance(attachment, Sticker) and attachment.is_animated:
                     wait_message.edit_text("Animated stickers are not supported.")
                     return
+                search_type = file_type
                 image_url = image_to_url(attachment)
         except Exception as e:
             error = e
@@ -369,6 +393,10 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
                 if error is not None:
                     raise error
                 return
+
+        # Track usage metrics
+        metrics.searches_total.labels(type=search_type, mode=search_mode).inc()
+        metrics.searches_by_user_total.labels(user_id=str(user.id)).inc()
 
         general_search_lock = Lock()
         general_search_lock.acquire()
