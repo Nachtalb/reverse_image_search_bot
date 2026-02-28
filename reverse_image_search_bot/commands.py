@@ -261,22 +261,16 @@ def settings_callback_handler(update: Update, context: CallbackContext):
 _LOCAL = Path(__file__).parent
 _HELP_TEXT = _LOCAL / "texts/help.html"
 _HELP_IMAGE = _LOCAL / "images/help.jpg"
-if not _HELP_IMAGE.is_file():
-    _HELP_IMAGE = _LOCAL / "images/help.png"
 
 
 def _send_photo_with_caption(update: Update, text: str):
-    """Send a photo with caption above, or plain text if no image exists."""
-    if _HELP_IMAGE.is_file():
-        with _HELP_IMAGE.open("br") as image_obj:
-            update.message.reply_photo(
-                image_obj,
-                caption=text,
-                parse_mode=ParseMode.HTML,
-                api_kwargs={"show_caption_above_media": True},
-            )
-    else:
-        update.message.reply_text(text, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+    """Send the help image with caption above."""
+    update.message.reply_photo(
+        _HELP_IMAGE,
+        caption=text,
+        parse_mode=ParseMode.HTML,
+        api_kwargs={"show_caption_above_media": True},
+    )
 
 
 def start_command(update: Update, context: CallbackContext):
