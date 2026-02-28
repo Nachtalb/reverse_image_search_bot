@@ -260,9 +260,9 @@ def settings_callback_handler(update: Update, context: CallbackContext):
 def send_template_command(name: str) -> Callable:
     local = Path(__file__).parent
     reply_file = local / f"texts/{name}.html"
-    image_file = local / f"images/{name}.png"
+    image_file = local / f"images/{name}.jpg"
     if not image_file.is_file():
-        image_file = local / f"images/{name}.jpg"
+        image_file = local / f"images/{name}.png"
 
     def wrapper(update, context):
         return _send_template_command(update, context, reply_file, image_file)
@@ -272,11 +272,17 @@ def send_template_command(name: str) -> Callable:
 
 def _send_template_command(update: Update, context: CallbackContext, reply_file: Path, image_file: Path):
     reply = reply_file.read_text()
-    update.message.reply_text(reply, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
 
     if image_file.is_file():
         with image_file.open("br") as image_obj:
-            update.message.reply_photo(image_obj)
+            update.message.reply_photo(
+                image_obj,
+                caption=reply,
+                parse_mode=ParseMode.HTML,
+                api_kwargs={"show_caption_above_media": True},
+            )
+    else:
+        update.message.reply_text(reply, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
 
 
 start_command = send_template_command("start")
