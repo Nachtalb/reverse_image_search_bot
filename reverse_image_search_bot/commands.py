@@ -263,24 +263,16 @@ _HELP_TEXT = _LOCAL / "texts/help.html"
 _HELP_IMAGE = _LOCAL / "images/help.jpg"
 
 
-def _send_photo_with_caption(update: Update, text: str):
-    """Send the help image with caption above."""
-    with _HELP_IMAGE.open("rb") as photo:
-        update.message.reply_photo(
-            photo,
-            caption=text,
-            parse_mode=ParseMode.HTML,
-            api_kwargs={"show_caption_above_media": True},
-        )
-
-
 def start_command(update: Update, context: CallbackContext):
     chat = update.effective_chat
     if chat and chat.type != "private":
-        _send_photo_with_caption(
-            update,
-            "🔎 Send me an image, sticker, or video and I'll find its source.\n\n/search · /settings",
-        )
+        with _HELP_IMAGE.open("rb") as photo:
+            update.message.reply_photo(
+                photo,
+                caption="🔎 Send me an image, sticker, or video and I'll find its source.\n\n/search · /settings",
+                parse_mode=ParseMode.HTML,
+                api_kwargs={"show_caption_above_media": True},
+            )
     else:
         keyboard = ReplyKeyboardMarkup(
             [[KeyboardButton("/help"), KeyboardButton("/settings")]],
@@ -307,8 +299,13 @@ def on_added_to_group(update: Update, context: CallbackContext):
 
 
 def help_command(update: Update, context: CallbackContext):
-    reply = _HELP_TEXT.read_text()
-    _send_photo_with_caption(update, reply)
+    with _HELP_IMAGE.open("rb") as photo:
+        update.message.reply_photo(
+            photo,
+            caption=_HELP_TEXT.read_text(),
+            parse_mode=ParseMode.HTML,
+            api_kwargs={"show_caption_above_media": True},
+        )
 
 
 def search_command(update: Update, context: CallbackContext):
