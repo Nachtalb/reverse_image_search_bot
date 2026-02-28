@@ -140,6 +140,17 @@ def main():
         logger.info("User requested restart")
         Thread(target=stop_and_restart, args=(update.effective_chat.id,)).start()  # type: ignore
 
+    def _on_added_to_group(update: Update, context: CallbackContext):
+        """Send start message when bot is added to a group."""
+        message = update.message
+        if not message or not message.new_chat_members:
+            return
+        for member in message.new_chat_members:
+            if member.id == context.bot.id:
+                start_command(update, context)
+                break
+
+    dispatcher.add_handler(MessageHandler(Filters.status_update.new_chat_members, _on_added_to_group))
     dispatcher.add_handler(CommandHandler("start", start_command))
     dispatcher.add_handler(CommandHandler("help", help_command))
     dispatcher.add_handler(CommandHandler("id", id_command))
