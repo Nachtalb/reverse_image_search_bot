@@ -619,17 +619,26 @@ def _best_match_search(update: Update, context: CallbackContext, engines: list[G
     thumbnail_identifiers = []
     match_found = False
 
+    metrics.concurrent_searches.inc()
     engine_executor = ThreadPoolExecutor(max_workers=5)
-    engine_futures = {engine_executor.submit(en.best_match, url): en for en in engines}
+    engine_start_times = {}
+    engine_futures = {}
+    for en in engines:
+        future = engine_executor.submit(en.best_match, url)
+        engine_futures[future] = en
+        engine_start_times[future] = time()
     try:
         for future in as_completed(engine_futures, timeout=60):
             engine = engine_futures[future]
+            duration = time() - engine_start_times[future]
+            metrics.search_duration_seconds.labels(provider=engine.name).observe(duration)
             try:
                 logger.debug("%s Searching for %s", engine.name, url)
                 result, meta = future.result()
 
                 if meta:
                     logger.debug("Found something UmU")
+                    metrics.provider_results_total.labels(provider=engine.name, status="hit").inc()
                     # Success — reset empty counter for this engine
                     _track_engine_result(message.chat_id, engine.name, found=True)
 
@@ -679,6 +688,7 @@ def _best_match_search(update: Update, context: CallbackContext, engines: list[G
                     if thumbnail_identifier:
                         thumbnail_identifiers.append(thumbnail_identifier)
                 else:
+                    metrics.provider_results_total.labels(provider=engine.name, status="miss").inc()
                     # Empty result — track and potentially auto-disable
                     disabled = _track_engine_result(message.chat_id, engine.name, found=False)
                     if disabled:
@@ -691,6 +701,7 @@ def _best_match_search(update: Update, context: CallbackContext, engines: list[G
                             parse_mode=ParseMode.HTML,
                         )
             except Exception as error:
+                metrics.provider_results_total.labels(provider=engine.name, status="error").inc()
                 error_to_admin(update, context, message=f"Best match error: {error}", image_url=url)
                 logger.error("Engine failure: %s", engine)
                 logger.exception(error)
@@ -698,7 +709,9 @@ def _best_match_search(update: Update, context: CallbackContext, engines: list[G
         pass
     finally:
         engine_executor.shutdown(wait=False, cancel_futures=True)
+        metrics.concurrent_searches.dec()
 
+    metrics.search_results_total.labels(has_results=str(match_found).lower()).inc()
     return match_found
 
 
