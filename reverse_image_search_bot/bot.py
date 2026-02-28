@@ -26,6 +26,8 @@ from telegram.parsemode import ParseMode
 from telegram.utils.request import Request
 
 from . import settings
+from . import metrics
+from .metrics import start_metrics_server
 from .commands import (
     callback_query_handler,
     file_handler,
@@ -117,11 +119,13 @@ def error_logger(update: Update, context: CallbackContext, *_, **__):
     """Log all errors from the telegram bot api"""
     if isinstance(context.error, Unauthorized):
         return
+    metrics.errors_total.labels(type=type(context.error).__name__).inc()
     logger.error("Uncaught exception in handler:", exc_info=context.error)
 
 
 def main():
     global job_queue
+    start_metrics_server()
     _request = Request(con_pool_size=settings.CON_POOL_SIZE)
     bot = RISBot(settings.TELEGRAM_API_TOKEN, request=_request, arbitrary_callback_data=False)
     updater = Updater(bot=bot, workers=settings.WORKERS)

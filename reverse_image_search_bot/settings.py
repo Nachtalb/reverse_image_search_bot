@@ -76,6 +76,10 @@ CONFIG_DIR = (
 )
 
 
+# Prometheus metrics
+PROMETHEUS_ENABLED = os.getenv("PROMETHEUS_ENABLED", "true").lower() in ("true", "1", "yes")
+PROMETHEUS_PORT = int(os.getenv("PROMETHEUS_PORT", "9100"))
+
 log = logging.getLogger("config")
 log.info(f"UPLOADER: {json.dumps(UPLOADER, indent=2)}")
 log.info(f"MODE: {json.dumps(MODE, indent=2)}")

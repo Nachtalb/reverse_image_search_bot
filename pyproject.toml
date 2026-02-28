@@ -23,6 +23,7 @@ dependencies = [
     "PicImageSearch>=3.12.0",
     "yarl>=1.8.2",
     "setuptools>=65.0.0,<82",
+    "prometheus-client>=0.21.0",
 ]
 
 [dependency-groups]
