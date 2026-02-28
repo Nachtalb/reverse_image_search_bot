@@ -54,32 +54,6 @@ that chat (with a notification); re-enable them from `/settings`.
 
 ![example](https://raw.githubusercontent.com/Nachtalb/reverse_image_search_bot/master/reverse_image_search_bot/images/help.jpg)
 
-## Author
-
-- [Nachtalb on Github](https://github.com/Nachtalb)
-- [@Nachtalb on Telegram](https://t.me/Nachtalb)
-
-## Donations
-
-- [PayPal](https://paypal.me/Espig)
-- BTC: `3E6Pw8gwLJSyfumpjuJ6CWNKjZJLCmXZ2G`
-- BTC/BSC: `0x3c5211340Db470A31F1a37E343E326db69FF2F5C`
-- ETH: `0x3c5211340Db470A31F1a37E343E326db69FF2F5C`
-- USDC: `0x3c5211340Db470A31F1a37E343E326db69FF2F5C`
-- PayString: `nachtalb$paystring.crypto.com`
-
-## Other Bots
-
-- [@XenianBot](https://t.me/XenianBot) All general purpose but with tons of functionality
-
-## Issues / Contributions
-
-- [Code repository](https://github.com/Nachtalb/reverse_image_search_bot)
-- [@Nachtalb](https://t.me/Nachtalb)
-- via /support at [@XenianBot](https://t.me/Nachtalb)
-
-Thank you for using [@reverse_image_search_bot](https://t.me/reverse_image_search_bot).
-
 ### Installation
 
 Requires at least **Python 3.10**.
@@ -122,4 +96,3 @@ Start the bot:
 python run_bot.py
 ```
 
-Thank you for using [@reverse_image_search_bot](https://t.me/reverse_image_search_bot).
