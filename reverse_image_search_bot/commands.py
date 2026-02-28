@@ -33,6 +33,7 @@ from telegram.ext import CallbackContext
 from telegram.parsemode import ParseMode
 from yarl import URL
 
+from reverse_image_search_bot import metrics
 from reverse_image_search_bot.config import ChatConfig, UserConfig
 from reverse_image_search_bot.engines import engines
 from reverse_image_search_bot.engines.generic import GenericRISEngine, PreWorkEngine
@@ -52,6 +53,7 @@ last_used: dict[int, float] = {}
 
 
 def id_command(update: Update, context: CallbackContext):
+    metrics.commands_total.labels(command="id").inc()
     if update.effective_chat:
         update.message.reply_html(pre(json.dumps(update.effective_chat.to_dict(), sort_keys=True, indent=4)))
 
@@ -142,6 +144,7 @@ def _button_count(chat_config: ChatConfig, excluding_engine: str | None = None) 
 
 
 def settings_command(update: Update, context: CallbackContext):
+    metrics.commands_total.labels(command="settings").inc()
     chat_config = ChatConfig(update.effective_chat.id)  # type: ignore
     update.message.reply_html(
         _settings_main_text(chat_config),
@@ -190,11 +193,13 @@ def settings_callback_handler(update: Update, context: CallbackContext):
                 query.answer("⚠️ At least one button must stay enabled.", show_alert=True)
                 return
             chat_config.show_best_match = not chat_config.show_best_match
+            metrics.button_toggle_total.labels(button="best_match", action="disabled" if not chat_config.show_best_match else "enabled").inc()
         elif value == "show_link":
             if chat_config.show_link and _button_count(chat_config) <= 1:
                 query.answer("⚠️ At least one button must stay enabled.", show_alert=True)
                 return
             chat_config.show_link = not chat_config.show_link
+            metrics.button_toggle_total.labels(button="show_link", action="disabled" if not chat_config.show_link else "enabled").inc()
         elif value.startswith("auto_search_engine:"):
             engine_name = value[len("auto_search_engine:"):]
             relevant = [e.name for e in engines if e.best_match_implemented]
@@ -206,9 +211,11 @@ def settings_callback_handler(update: Update, context: CallbackContext):
                     query.answer("⚠️ At least one engine must stay enabled.", show_alert=True)
                     return
                 current.remove(engine_name)
+                metrics.engine_manual_toggle_total.labels(engine=engine_name, menu="auto_search", action="disabled").inc()
             else:
                 current.append(engine_name)
                 chat_config.reset_engine_counter(engine_name)  # fresh start after manual re-enable
+                metrics.engine_manual_toggle_total.labels(engine=engine_name, menu="auto_search", action="enabled").inc()
             # If all enabled, store None (= all)
             chat_config.auto_search_engines = None if set(current) >= set(relevant) else current
         elif value.startswith("button_engine:"):
@@ -222,8 +229,10 @@ def settings_callback_handler(update: Update, context: CallbackContext):
                     query.answer("⚠️ At least one button must stay enabled.", show_alert=True)
                     return
                 current.remove(engine_name)
+                metrics.engine_manual_toggle_total.labels(engine=engine_name, menu="button", action="disabled").inc()
             else:
                 current.append(engine_name)
+                metrics.engine_manual_toggle_total.labels(engine=engine_name, menu="button", action="enabled").inc()
             chat_config.button_engines = None if set(current) >= set(all_names) else current
 
         # Re-render appropriate menu
@@ -274,6 +283,7 @@ _HELP_IMAGE = _LOCAL / "images/help.jpg"
 
 
 def start_command(update: Update, context: CallbackContext):
+    metrics.commands_total.labels(command="start").inc()
     chat = update.effective_chat
     if chat and chat.type != "private":
         update.message.reply_text(
@@ -307,6 +317,7 @@ def on_added_to_group(update: Update, context: CallbackContext):
 
 
 def help_command(update: Update, context: CallbackContext):
+    metrics.commands_total.labels(command="help").inc()
     with _HELP_IMAGE.open("rb") as photo:
         update.message.reply_photo(
             photo,
@@ -317,6 +328,7 @@ def help_command(update: Update, context: CallbackContext):
 
 
 def search_command(update: Update, context: CallbackContext):
+    metrics.commands_total.labels(command="search").inc()
     orig_message: Message | None = update.message.reply_to_message  # type: ignore
     if not orig_message:
         update.message.reply_text("When using /search you have to reply to a message with an image or video")
@@ -344,6 +356,26 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
     if isinstance(attachment, list):
         attachment = attachment[-1]
 
+    # Determine file type for metrics
+    if isinstance(attachment, Sticker):
+        file_type = "sticker"
+    elif isinstance(attachment, Animation):
+        file_type = "gif"
+    elif isinstance(attachment, Video):
+        file_type = "video"
+    elif isinstance(attachment, PhotoSize):
+        file_type = "photo"
+    elif isinstance(attachment, Document):
+        file_type = "document"
+    else:
+        file_type = "unknown"
+
+    metrics.files_received_total.labels(file_type=file_type).inc()
+    if hasattr(attachment, "file_size") and attachment.file_size:
+        metrics.file_size_bytes.labels(file_type=file_type).observe(attachment.file_size)
+
+    language = getattr(user, "language_code", None) or "unknown"
+
     try:
         image_url = None
         error = None
@@ -353,6 +385,7 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
                 or isinstance(attachment, (Video, Animation))
                 or (isinstance(attachment, Sticker) and attachment.is_video)
             ):
+                search_type = "video_frame" if isinstance(attachment, Video) else file_type
                 image_url = video_to_url(attachment)  # type: ignore
             elif (
                 isinstance(attachment, Document) and attachment.mime_type.endswith(("jpeg", "png", "webp"))
@@ -360,6 +393,7 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
                 if isinstance(attachment, Sticker) and attachment.is_animated:
                     wait_message.edit_text("Animated stickers are not supported.")
                     return
+                search_type = file_type
                 image_url = image_to_url(attachment)
         except Exception as e:
             error = e
@@ -369,6 +403,10 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
                 if error is not None:
                     raise error
                 return
+
+        # Track usage metrics
+        metrics.searches_total.labels(type=search_type, language=language).inc()
+        metrics.searches_by_user_total.labels(user_id=str(user.id)).inc()
 
         general_search_lock = Lock()
         general_search_lock.acquire()
@@ -582,6 +620,7 @@ def _track_engine_result(chat_id: int, engine_name: str, found: bool) -> bool:
     chat_config.auto_search_engines = current
     counts[engine_name] = 0  # reset so it doesn't re-trigger if re-enabled
     chat_config.engine_empty_counts = counts
+    metrics.engine_auto_disabled_total.labels(engine=engine_name).inc()
     return True
 
 
@@ -591,17 +630,26 @@ def _best_match_search(update: Update, context: CallbackContext, engines: list[G
     thumbnail_identifiers = []
     match_found = False
 
+    metrics.concurrent_searches.inc()
     engine_executor = ThreadPoolExecutor(max_workers=5)
-    engine_futures = {engine_executor.submit(en.best_match, url): en for en in engines}
+    engine_start_times = {}
+    engine_futures = {}
+    for en in engines:
+        future = engine_executor.submit(en.best_match, url)
+        engine_futures[future] = en
+        engine_start_times[future] = time()
     try:
         for future in as_completed(engine_futures, timeout=60):
             engine = engine_futures[future]
+            duration = time() - engine_start_times[future]
+            metrics.search_duration_seconds.labels(provider=engine.name).observe(duration)
             try:
                 logger.debug("%s Searching for %s", engine.name, url)
                 result, meta = future.result()
 
                 if meta:
                     logger.debug("Found something UmU")
+                    metrics.provider_results_total.labels(provider=engine.name, status="hit").inc()
                     # Success — reset empty counter for this engine
                     _track_engine_result(message.chat_id, engine.name, found=True)
 
@@ -651,6 +699,7 @@ def _best_match_search(update: Update, context: CallbackContext, engines: list[G
                     if thumbnail_identifier:
                         thumbnail_identifiers.append(thumbnail_identifier)
                 else:
+                    metrics.provider_results_total.labels(provider=engine.name, status="miss").inc()
                     # Empty result — track and potentially auto-disable
                     disabled = _track_engine_result(message.chat_id, engine.name, found=False)
                     if disabled:
@@ -663,6 +712,7 @@ def _best_match_search(update: Update, context: CallbackContext, engines: list[G
                             parse_mode=ParseMode.HTML,
                         )
             except Exception as error:
+                metrics.provider_results_total.labels(provider=engine.name, status="error").inc()
                 error_to_admin(update, context, message=f"Best match error: {error}", image_url=url)
                 logger.error("Engine failure: %s", engine)
                 logger.exception(error)
@@ -670,7 +720,9 @@ def _best_match_search(update: Update, context: CallbackContext, engines: list[G
         pass
     finally:
         engine_executor.shutdown(wait=False, cancel_futures=True)
+        metrics.concurrent_searches.dec()
 
+    metrics.search_results_total.labels(has_results=str(match_found).lower()).inc()
     return match_found
 
 

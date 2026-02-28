@@ -26,6 +26,8 @@ from telegram.parsemode import ParseMode
 from telegram.utils.request import Request
 
 from . import settings
+from . import metrics
+from .metrics import start_metrics_server
 from .commands import (
     callback_query_handler,
     file_handler,
@@ -97,6 +99,7 @@ class RISBot(ExtBot):
             self._banned_users = json.loads(self._banned_users_file.read_text())
 
     def _ban_user(self, update: Update, _: CallbackContext):
+        metrics.commands_total.labels(command="ban").inc()
         args = update.message.text.strip("/").split(" ")
         if len(args) != 2:
             update.message.reply_text("Usage: /ban <user_id>")
@@ -117,11 +120,13 @@ def error_logger(update: Update, context: CallbackContext, *_, **__):
     """Log all errors from the telegram bot api"""
     if isinstance(context.error, Unauthorized):
         return
+    metrics.errors_total.labels(type=type(context.error).__name__).inc()
     logger.error("Uncaught exception in handler:", exc_info=context.error)
 
 
 def main():
     global job_queue
+    start_metrics_server()
     _request = Request(con_pool_size=settings.CON_POOL_SIZE)
     bot = RISBot(settings.TELEGRAM_API_TOKEN, request=_request, arbitrary_callback_data=False)
     updater = Updater(bot=bot, workers=settings.WORKERS)
@@ -137,6 +142,7 @@ def main():
 
     def restart_command(update: Update, context: CallbackContext):
         """Start the restarting process"""
+        metrics.commands_total.labels(command="restart").inc()
         update.message.reply_text("Bot is restarting...")
         logger.info("User requested restart")
         Thread(target=stop_and_restart, args=(update.effective_chat.id,)).start()  # type: ignore
