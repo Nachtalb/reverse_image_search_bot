@@ -6,7 +6,6 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from threading import Lock, Thread
 from time import time
-from typing import Callable
 
 from PIL import Image
 from emoji import emojize
@@ -15,6 +14,8 @@ from telegram import (
     ChatAction,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
     Update,
     User,
 )
@@ -34,7 +35,6 @@ from yarl import URL
 
 from reverse_image_search_bot.config import ChatConfig, UserConfig
 from reverse_image_search_bot.engines import engines
-from reverse_image_search_bot.engines.data_providers import provides
 from reverse_image_search_bot.engines.generic import GenericRISEngine, PreWorkEngine
 from reverse_image_search_bot.engines.types import MetaData, ResultData
 from reverse_image_search_bot.settings import ADMIN_IDS
@@ -54,20 +54,6 @@ last_used: dict[int, float] = {}
 def id_command(update: Update, context: CallbackContext):
     if update.effective_chat:
         update.message.reply_html(pre(json.dumps(update.effective_chat.to_dict(), sort_keys=True, indent=4)))
-
-
-def auto_search_command(update: Update, _: CallbackContext):
-    user = update.effective_user
-    if not user:
-        return
-    config = UserConfig(user)
-    if config.auto_search_enabled:
-        config.auto_search_enabled = False
-        update.message.reply_html("You have disabled auto search")
-    else:
-        config.auto_search_enabled = True
-        config.failures_in_a_row = 0
-        update.message.reply_text("You have enabled auto search")
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -272,78 +258,52 @@ def settings_callback_handler(update: Update, context: CallbackContext):
     query.answer()
 
 
-def send_template_command(name: str) -> Callable:
-    local = Path(__file__).parent
-    reply_file = local / f"texts/{name}.html"
-    image_file = local / f"images/{name}.jpg"
-
-    def wrapper(update, context):
-        return _send_template_command(update, context, reply_file, image_file)
-
-    return wrapper
+_LOCAL = Path(__file__).parent
+_HELP_TEXT = _LOCAL / "texts/help.html"
+_HELP_IMAGE = _LOCAL / "images/help.jpg"
 
 
-def _send_template_command(update: Update, context: CallbackContext, reply_file: Path, image_file: Path):
-    reply = reply_file.read_text()
-    if len(reply) > 1000:
-        update.message.reply_text(reply, parse_mode=ParseMode.HTML)
-        reply = None
-
-    if image_file.is_file():
-        with image_file.open("br") as image_obj:
-            update.message.reply_photo(image_obj, caption=reply, parse_mode=ParseMode.HTML)
-
-
-tips_command = send_template_command("tips")
-help_command = send_template_command("help")
-
-
-def credits_command(
-    update: Update,
-    context: CallbackContext,
-):
-    data_providers = []
-    for provider in provides:
-        infos = provider.infos.values() if provider.infos else [provider.info]
-
-        for info in infos:
-            data_providers.append(
-                "{name_title}{info[url]}\n{provides_title}{provides}\n{site_type_title}{info[site_type]}".format(
-                    name_title=title(info["name"]),
-                    provides_title=title("Provides"),
-                    site_type_title=title("Site Type"),
-                    provides=", ".join(map(code, info["types"])),
-                    info=info,
-                )
-            )
-
-    search_engines = ""
-    for engine in engines:
-        parts = [title(engine.name) + str(engine.provider_url)]
-        parts.append(title("Description") + engine.description)
-        if engine.recommendation:
-            parts.append(
-                title("Recommended for")
-                + "\n- "
-                + "\n- ".join([code(recommend) for recommend in engine.recommendation])
-            )
-        if engine.types:
-            parts.append(title("Used for") + ", ".join([code(type) for type in engine.types]))
-
-        parts.append(
-            title("Supports inline search")
-            + emojize(":green_circle:" if engine.best_match_implemented else ":red_circle:")
+def start_command(update: Update, context: CallbackContext):
+    chat = update.effective_chat
+    if chat and chat.type != "private":
+        update.message.reply_text(
+            "🔎 Send me an image, sticker, or video and I'll find its source.\n\n/search · /settings",
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True,
+        )
+    else:
+        keyboard = ReplyKeyboardMarkup(
+            [[KeyboardButton("/help"), KeyboardButton("/settings")]],
+            resize_keyboard=True,
+            one_time_keyboard=True,
+        )
+        update.message.reply_text(
+            "🔎 Send me an image, sticker, or video and I'll find its source.",
+            reply_markup=keyboard,
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True,
         )
 
-        search_engines += "\n".join(parts) + "\n\n"
 
-    reply_1 = (
-        (Path(__file__).parent / "texts/credits_1.html").read_text().format(data_providers="\n\n".join(data_providers))
-    )
-    reply_2 = (Path(__file__).parent / "texts/credits_2.html").read_text().format(search_engines=search_engines)
+def on_added_to_group(update: Update, context: CallbackContext):
+    """Send start message when bot is added to a group."""
+    message = update.message
+    if not message or not message.new_chat_members:
+        return
+    for member in message.new_chat_members:
+        if member.id == context.bot.id:
+            start_command(update, context)
+            break
 
-    update.message.reply_html(reply_1, reply_to_message_id=update.message.message_id, disable_web_page_preview=True)
-    update.message.reply_html(reply_2, reply_to_message_id=update.message.message_id, disable_web_page_preview=True)
+
+def help_command(update: Update, context: CallbackContext):
+    with _HELP_IMAGE.open("rb") as photo:
+        update.message.reply_photo(
+            photo,
+            caption=_HELP_TEXT.read_text(),
+            parse_mode=ParseMode.HTML,
+            api_kwargs={"show_caption_above_media": True},
+        )
 
 
 def search_command(update: Update, context: CallbackContext):
@@ -562,13 +522,13 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, general
                     " you. This helps to prevent hitting rate limits of the search engines making the bot more useful"
                     " for everyone. At the moment the auto search compatible engines are for anime & manga related"
                     " content. If you mainly search for other material please keep auto search disabled. You can use"
-                    " /auto_search to reenable it."
+                    " /settings to reenable it."
                 )
             )
         search_message.edit_text(
             emojize(
                 f":red_circle: I searched for you on {engines_used_html} but didn't find anything. Please try another"
-                " engine above and take a look at /tips."
+                " engine above."
             ),
             ParseMode.HTML,
         )
@@ -578,7 +538,7 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, general
             emojize(
                 f":blue_circle: I searched for you on {engines_used_html}. You can try others above for more results."
             )
-            + (" You may reenable /auto_search if you want." if not config.auto_search_enabled else ""),
+            + (" You may reenable auto-search via /settings if you want." if not config.auto_search_enabled else ""),
             ParseMode.HTML,
         )
 

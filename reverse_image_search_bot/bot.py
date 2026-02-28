@@ -27,16 +27,15 @@ from telegram.utils.request import Request
 
 from . import settings
 from .commands import (
-    auto_search_command,
     callback_query_handler,
-    credits_command,
     file_handler,
     help_command,
     id_command,
+    on_added_to_group,
     search_command,
     settings_callback_handler,
     settings_command,
-    tips_command,
+    start_command,
 )
 
 
@@ -142,16 +141,15 @@ def main():
         logger.info("User requested restart")
         Thread(target=stop_and_restart, args=(update.effective_chat.id,)).start()  # type: ignore
 
-    dispatcher.add_handler(CommandHandler(("start", "help"), help_command))
+    dispatcher.add_handler(MessageHandler(Filters.status_update.new_chat_members, on_added_to_group))
+    dispatcher.add_handler(CommandHandler("start", start_command))
+    dispatcher.add_handler(CommandHandler("help", help_command))
     dispatcher.add_handler(CommandHandler("id", id_command))
-    dispatcher.add_handler(CommandHandler("tips", tips_command))
     dispatcher.add_handler(CommandHandler("restart", restart_command, filters=ADMIN_FILTER))
     dispatcher.add_handler(
         CommandHandler("ban", bot._ban_user, filters=ADMIN_FILTER), group=1
     )
-    dispatcher.add_handler(CommandHandler(("credits", "credit"), credits_command, run_async=True))
     dispatcher.add_handler(CommandHandler("search", search_command, run_async=True))
-    dispatcher.add_handler(CommandHandler("auto_search", auto_search_command, filters=Filters.chat_type.private, run_async=True))
     dispatcher.add_handler(CommandHandler(("settings", "conf", "pref"), settings_command, run_async=True))
     dispatcher.add_handler(CallbackQueryHandler(settings_callback_handler, pattern=r"^settings:", run_async=True))
     dispatcher.add_handler(CallbackQueryHandler(callback_query_handler, run_async=True))
