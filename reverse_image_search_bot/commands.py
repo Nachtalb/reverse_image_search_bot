@@ -266,13 +266,11 @@ _HELP_IMAGE = _LOCAL / "images/help.jpg"
 def start_command(update: Update, context: CallbackContext):
     chat = update.effective_chat
     if chat and chat.type != "private":
-        with _HELP_IMAGE.open("rb") as photo:
-            update.message.reply_photo(
-                photo,
-                caption="🔎 Send me an image, sticker, or video and I'll find its source.\n\n/search · /settings",
-                parse_mode=ParseMode.HTML,
-                api_kwargs={"show_caption_above_media": True},
-            )
+        update.message.reply_text(
+            "🔎 Send me an image, sticker, or video and I'll find its source.\n\n/search · /settings",
+            parse_mode=ParseMode.HTML,
+            disable_web_page_preview=True,
+        )
     else:
         keyboard = ReplyKeyboardMarkup(
             [[KeyboardButton("/help"), KeyboardButton("/settings")]],
