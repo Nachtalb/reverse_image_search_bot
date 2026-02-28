@@ -173,14 +173,8 @@ def settings_callback_handler(update: Update, context: CallbackContext):
                 return
             chat_config.show_buttons = not chat_config.show_buttons
         elif value == "show_best_match":
-            if chat_config.show_best_match and not chat_config.show_link:
-                query.answer("⚠️ At least one of Best Match or Link must stay enabled.", show_alert=True)
-                return
             chat_config.show_best_match = not chat_config.show_best_match
         elif value == "show_link":
-            if chat_config.show_link and not chat_config.show_best_match:
-                query.answer("⚠️ At least one of Best Match or Link must stay enabled.", show_alert=True)
-                return
             chat_config.show_link = not chat_config.show_link
         elif value.startswith("auto_search_engine:"):
             engine_name = value[len("auto_search_engine:"):]
@@ -217,9 +211,6 @@ def settings_callback_handler(update: Update, context: CallbackContext):
             if current is None:
                 current = all_names[:]
             if engine_name in current:
-                if len(current) == 1:
-                    query.answer("⚠️ At least one engine must stay enabled.", show_alert=True)
-                    return
                 current.remove(engine_name)
             else:
                 current.append(engine_name)
