@@ -260,7 +260,9 @@ def settings_callback_handler(update: Update, context: CallbackContext):
 def send_template_command(name: str) -> Callable:
     local = Path(__file__).parent
     reply_file = local / f"texts/{name}.html"
-    image_file = local / f"images/{name}.jpg"
+    image_file = local / f"images/{name}.png"
+    if not image_file.is_file():
+        image_file = local / f"images/{name}.jpg"
 
     def wrapper(update, context):
         return _send_template_command(update, context, reply_file, image_file)
