@@ -3,10 +3,10 @@ def tag(tagname: str, content: str, attrs: dict = {}) -> str:
     return f"<{tagname} {attrs_str}>{content}</{tagname}>"
 
 
-b = lambda text: tag("b", text)
-i = lambda text: tag("i", text)
-pre = lambda text: tag("pre", text)
-code = lambda text: tag("code", text)
-a = lambda text, href: tag("a", text, {"href": href})
-hidden_a = lambda src: a("​", src)
-title = lambda text: b(text + ":") + " "
+def b(text): return tag("b", text)
+def i(text): return tag("i", text)
+def pre(text): return tag("pre", text)
+def code(text): return tag("code", text)
+def a(text, href): return tag("a", text, {"href": href})
+def hidden_a(src): return a("​", src)
+def title(text): return b(text + ":") + " "

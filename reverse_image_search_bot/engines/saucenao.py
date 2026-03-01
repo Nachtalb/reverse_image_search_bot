@@ -48,9 +48,9 @@ class SauceNaoEngine(GenericRISEngine):
     def _booru_provider(self, data: ResponseData, api: str) -> InternalProviderData:
         return booru.provide(api, data[api + "_id"])  # type: ignore
 
-    _9_provider = lambda self, data: self._booru_provider(data, "danbooru")
-    _12_provider = lambda self, data: self._booru_provider(data, "yandere")
-    _25_provider = lambda self, data: self._booru_provider(data, "gelbooru")
+    def _9_provider(self, data): return self._booru_provider(data, "danbooru")
+    def _12_provider(self, data): return self._booru_provider(data, "yandere")
+    def _25_provider(self, data): return self._booru_provider(data, "gelbooru")
 
     def _5_provider(self, data: ResponseData) -> InternalProviderData:
         """Pixiv"""
