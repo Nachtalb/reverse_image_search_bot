@@ -56,12 +56,12 @@ class MangadexProvider(BaseProvider):
         if not url and not chapter_id and not manga_id:
             return {}, {}
         elif url and (url := URL(url)):
-            if len(url.parts) != 3:  # ('/', 'chapter' | 'manga', '...')
+            if len(url.parts) != 3:  # ('/', 'chapter' | 'manga', '...') # type: ignore[union-attr]
                 return {}, {}
-            elif url.parts[0] == "manga":
-                manga_id = url.parts[-1]
-            elif url.parts[0] == "chapter":
-                chapter_id = url.parts[-1]
+            elif url.parts[0] == "manga": # type: ignore[union-attr]
+                manga_id = url.parts[-1] # type: ignore[union-attr]
+            elif url.parts[0] == "chapter": # type: ignore[union-attr]
+                chapter_id = url.parts[-1] # type: ignore[union-attr]
         if not chapter_id and not manga_id:
             return {}, {}
 
