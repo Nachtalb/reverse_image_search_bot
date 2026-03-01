@@ -349,7 +349,6 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
         )
         return
 
-    wait_message = message.reply_text("⌛ Give me a sec...")
     context.bot.send_chat_action(chat_id=message.chat_id, action=ChatAction.TYPING)
 
     attachment = message.effective_attachment
@@ -391,7 +390,7 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
                 isinstance(attachment, Document) and attachment.mime_type.endswith(("jpeg", "png", "webp"))
             ) or isinstance(attachment, (PhotoSize, Sticker)):
                 if isinstance(attachment, Sticker) and attachment.is_animated:
-                    wait_message.edit_text("Animated stickers are not supported.")
+                    message.reply_text("Animated stickers are not supported.")
                     return
                 search_type = file_type
                 image_url = image_to_url(attachment)
@@ -399,7 +398,7 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
             error = e
         finally:
             if not image_url:
-                wait_message.edit_text("Format is not supported")
+                message.reply_text("Format is not supported")
                 if error is not None:
                     raise error
                 return
@@ -416,11 +415,8 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
         if config.auto_search_enabled and chat_config.auto_search_enabled:
             best_match(update, context, image_url, general_search_lock)
     except Exception as error:
-        wait_message.edit_text(
-            "An error occurred, try again. If you need any more help, please contact @Nachtalb."
-        )
+        message.reply_text("An error occurred, try again.")
         raise
-    wait_message.delete()
 
 
 def callback_query_handler(update: Update, context: CallbackContext):
