@@ -427,7 +427,7 @@ def search_command(update: Update, context: CallbackContext):
     file_handler(update, context, orig_message)
 
 
-def file_handler(update: Update, context: CallbackContext, message: Message = None):
+def file_handler(update: Update, context: CallbackContext, message: Message | None = None):
     message = message or update.effective_message
     if not message:
         return
