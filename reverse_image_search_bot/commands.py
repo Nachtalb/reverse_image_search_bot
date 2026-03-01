@@ -1,3 +1,4 @@
+import contextlib
 import io
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -243,42 +244,32 @@ def settings_callback_handler(update: Update, context: CallbackContext):
 
         # Re-render appropriate menu
         if value.startswith("auto_search_engine:"):
-            try:
+            with contextlib.suppress(Exception):
                 query.edit_message_reply_markup(
                     reply_markup=_settings_engines_keyboard(chat_config, "auto_search_engines")
                 )
-            except Exception:
-                pass
         elif value.startswith("button_engine:") or value in ("show_link", "show_best_match"):
-            try:
+            with contextlib.suppress(Exception):
                 query.edit_message_reply_markup(
                     reply_markup=_settings_engines_keyboard(chat_config, "button_engines")
                 )
-            except Exception:
-                pass
         else:
-            try:
+            with contextlib.suppress(Exception):
                 query.edit_message_reply_markup(reply_markup=_settings_main_keyboard(chat_config))
-            except Exception:
-                pass
 
     elif action == "menu":
-        try:
+        with contextlib.suppress(Exception):
             query.edit_message_reply_markup(
                 reply_markup=_settings_engines_keyboard(chat_config, value)
             )
-        except Exception:
-            pass
 
     elif action == "back":
-        try:
+        with contextlib.suppress(Exception):
             query.edit_message_text(
                 _settings_main_text(chat_config),
                 parse_mode="HTML",
                 reply_markup=_settings_main_keyboard(chat_config),
             )
-        except Exception:
-            pass
 
     query.answer()
 
@@ -593,10 +584,8 @@ def general_image_search(update: Update, image_url: URL, reply_sent_lock: Lock):
                 pass
     finally:
         if reply_sent_lock.locked:
-            try:
+            with contextlib.suppress(RuntimeError):
                 reply_sent_lock.release()
-            except RuntimeError:
-                pass
 
 
 def best_match(update: Update, context: CallbackContext, url: str | URL, general_search_lock: Lock = None):
