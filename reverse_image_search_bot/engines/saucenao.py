@@ -119,7 +119,7 @@ class SauceNaoEngine(GenericRISEngine):
                 continue
             match key:
                 case k if k in known:
-                    result[known[key][0]] = known[key][1](value)
+                    result[known[key][0]] = known[key][1](value) # type: ignore[arg-type]
                 case k if k.endswith(("_id", "_aid")):
                     continue
                 case k if k.endswith("_url"):  # author_name + author_url fields

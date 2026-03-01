@@ -77,8 +77,8 @@ query ($id: Int) {
         }
 
         meta: MetaData = {
-            "provided_via": self.info["name"],
-            "provided_via_url": URL(self.info["url"]),
+            "provided_via": str(self.info["name"]),
+            "provided_via_url": URL(str(self.info["url"])),
             "thumbnail": URL(ani_data["coverImage"]["large"]),
             "buttons": [url_button(ani_data["siteUrl"])],
             "identifier": ani_data["siteUrl"],

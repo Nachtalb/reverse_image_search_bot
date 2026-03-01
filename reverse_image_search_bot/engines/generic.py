@@ -54,7 +54,8 @@ class GenericRISEngine:
 
     def __call__(self, url: str | URL, text: str | None = None) -> InlineKeyboardButton:
         """Create the :obj:`InlineKeyboardButton` button for the telegram but to use"""
-        return InlineKeyboardButton(text=text or self.name, url=self.get_search_link_by_url(url))
+        search_url = self.get_search_link_by_url(url) or ""
+        return InlineKeyboardButton(text=text or self.name, url=search_url)
 
     def get_search_link_by_url(self, url: str | URL) -> str | None:
         """Get the reverse image search link for the given url"""

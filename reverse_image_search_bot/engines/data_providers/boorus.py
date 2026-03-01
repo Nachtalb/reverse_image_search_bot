@@ -223,8 +223,8 @@ class BooruProvider(BaseProvider):
         result.update(self._get_tags(data))
 
         meta: MetaData = {
-            "provided_via": self.infos[api]["name"],
-            "provided_via_url": URL(self.infos[api]["url"]),
+            "provided_via": str(self.infos[api]["name"]),
+            "provided_via_url": URL(str(self.infos[api]["url"])),
             "buttons": buttons,
             "identifier": post_url,
         }

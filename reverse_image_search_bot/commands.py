@@ -464,7 +464,7 @@ def file_handler(update: Update, context: CallbackContext, message: Message | No
 
     metrics.files_received_total.labels(file_type=file_type).inc()
     if hasattr(attachment, "file_size") and attachment.file_size:
-        metrics.file_size_bytes.labels(file_type=file_type).observe(attachment.file_size)
+        metrics.file_size_bytes.labels(file_type=file_type).observe(float(attachment.file_size))  # type: ignore[arg-type]
 
     language = getattr(user, "language_code", None) or "unknown"
 

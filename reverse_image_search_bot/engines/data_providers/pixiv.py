@@ -118,8 +118,8 @@ class PixivProvider(BaseProvider):
         art_url = URL(f"https://www.pixiv.net/artworks/{illust_id}")
 
         meta: MetaData = {
-            "provided_via": self.info["name"],
-            "provided_via_url": URL(self.info["url"]),
+            "provided_via": str(self.info["name"]),
+            "provided_via_url": URL(str(self.info["url"])),
             "thumbnail": images,
             "buttons": [
                 url_button(art_url, text="Source"),

@@ -122,8 +122,8 @@ class MangadexProvider(BaseProvider):
                 buttons.append(url_button(url))
 
         meta: MetaData = {
-            "provided_via": self.info["name"],
-            "provided_via_url": URL(self.info["url"]),
+            "provided_via": str(self.info["name"]),
+            "provided_via_url": URL(str(self.info["url"])),
             "buttons": buttons,
             "identifier": manga_id,
         }

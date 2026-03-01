@@ -37,6 +37,7 @@ class PicImageSearchEngine(GenericRISEngine):
         from PicImageSearch import Network
 
         async with Network() as client:
+            assert self.pic_engine_class, "pic_engine_class must be set on subclass"
             engine = self.pic_engine_class(client=client)
             return await engine.search(url=url)
 
