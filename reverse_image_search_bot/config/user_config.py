@@ -35,7 +35,7 @@ class UserConfig:
         "auto_search_enabled": True,
         "failures_in_a_row": 0,
     }
-    __loaded_users: dict[int, "UserConfig"] = {}  # type: ignore
+    __loaded_users: dict[int, "UserConfig"] = {}
 
     auto_search_enabled: bool
     failures_in_a_row: int

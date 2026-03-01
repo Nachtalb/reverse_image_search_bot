@@ -419,7 +419,7 @@ def help_command(update: Update, context: CallbackContext):
 
 def search_command(update: Update, context: CallbackContext):
     metrics.commands_total.labels(command="search").inc()
-    orig_message: Message | None = update.message.reply_to_message  # type: ignore
+    orig_message: Message | None = update.message.reply_to_message
     if not orig_message:
         update.message.reply_text("When using /search you have to reply to a message with an image or video")
         return
@@ -827,7 +827,7 @@ def _best_match_search(
 
 
 def build_reply(result: ResultData, meta: MetaData) -> tuple[str, list[InputMediaPhoto] | None]:
-    reply = f"Provided by: {a(b(meta['provider']), meta['provider_url'])}"  # type: ignore
+    reply = f"Provided by: {a(b(meta['provider']), meta['provider_url'])}"
 
     if via := meta.get("provided_via"):
         via = b(via)

@@ -118,7 +118,7 @@ class MangadexProvider(BaseProvider):
             self.logger.warning("Found a manga with link list", manga_id)
         if isinstance(links, dict):
             for key, url in safe_get(manga_data, "attributes.links", {}).items():
-                url = fix_url(f"{key}:manga:{url}") if not validators.url(url) else URL(url)  # type: ignore
+                url = fix_url(f"{key}:manga:{url}") if not validators.url(url) else URL(url)
                 buttons.append(url_button(url))
 
         meta: MetaData = {

@@ -46,7 +46,7 @@ class SauceNaoEngine(GenericRISEngine):
         return anilist.provide(data["anilist_id"], data.get("part"))  # type: ignore
 
     def _booru_provider(self, data: ResponseData, api: str) -> InternalProviderData:
-        return booru.provide(api, data[api + "_id"])  # type: ignore
+        return booru.provide(api, data[api + "_id"])
 
     def _9_provider(self, data):
         return self._booru_provider(data, "danbooru")
@@ -86,7 +86,7 @@ class SauceNaoEngine(GenericRISEngine):
         if chapter_id := data.get("md_id"):
             kwargs["chapter_id"] = chapter_id
         mangadex_urls = [url for url in data.get("ext_urls", []) if URL(url).host == "mangadex.org"]
-        if mangadex_url := next(iter(mangadex_urls), None):  # type: ignore
+        if mangadex_url := next(iter(mangadex_urls), None):
             kwargs["url"] = URL(mangadex_url.strip("/"))
 
         return mangadex.provide(**kwargs)
@@ -104,7 +104,7 @@ class SauceNaoEngine(GenericRISEngine):
         buttons: list[InlineKeyboardButton] = []
         for key, text in known_buttons.items():
             value = data.pop(key, None)
-            if isinstance(value, str) and validators.url(value):  # type: ignore
+            if isinstance(value, str) and validators.url(value):
                 buttons.append(url_button(value, text=text))
 
         for item in data.pop("ext_urls", []):  # type: ignore

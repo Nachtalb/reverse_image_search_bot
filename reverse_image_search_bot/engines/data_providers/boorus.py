@@ -191,7 +191,7 @@ class BooruProvider(BaseProvider):
 
     @provider_cache
     def provide(self, api_or_url: str | URL, post_id: int | None = None) -> InternalProviderData:
-        if isinstance(api_or_url, URL) or validators.url(api_or_url):  # type: ignore
+        if isinstance(api_or_url, URL) or validators.url(api_or_url):
             api, post_id = self.supports(api_or_url)
         else:
             api = str(api_or_url)

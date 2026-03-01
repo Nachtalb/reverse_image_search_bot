@@ -23,7 +23,7 @@ class FileSystemUploader(UploaderBase):
         """
         file_is_obj = not isinstance(file, Path)
 
-        destination = Path(self.configuration["path"]) / filename  # type: ignore
+        destination = Path(self.configuration["path"]) / filename
         if destination.is_file():
             self.logger.debug('File at "%s" already exists', destination)
             return

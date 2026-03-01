@@ -111,7 +111,7 @@ def safe_get(dct: dict | list, key_str: str, default: Any = None, none_to_defaul
                 if value.isdigit():
                     value = int(value)
                 for item in dct:
-                    if item[key] == value:  # type: ignore
+                    if item[key] == value:
                         dct = item
                         break
                 else:

@@ -7,7 +7,7 @@ from yarl import URL
 
 
 def fix_url(url: URL | str) -> URL:
-    if not validators.url(str(url)) and (match := re.match("((?!:).+):((?!:).*):(.*)", str(url))):  # type: ignore
+    if not validators.url(str(url)) and (match := re.match("((?!:).+):((?!:).*):(.*)", str(url))):
         short, category, id = match.groups()
         match short:
             case "al" | "anilist":

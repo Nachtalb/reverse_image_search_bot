@@ -70,7 +70,7 @@ class GenericRISEngine:
     def _clean_meta_data(self, data: MetaData) -> MetaData:
         for button in data.get("buttons", [])[:]:
             if button.url and not validators.url(button.url):
-                data["buttons"].remove(button)  # type: ignore
+                data["buttons"].remove(button)
         return data
 
     def _clean_best_match(self, result: InternalResultData, meta: MetaData) -> tuple[ResultData, MetaData]:
