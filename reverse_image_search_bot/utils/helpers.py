@@ -47,8 +47,8 @@ def tagify(tags: list[str] | set[str] | str) -> set[str]:
 
 
 class ReturnableThread(Thread):
-    def __init__(self, target, args=(), kwargs={}):
-        super().__init__(target=target, args=args, kwargs=kwargs)
+    def __init__(self, target, args=(), kwargs=None):
+        super().__init__(target=target, args=args, kwargs=kwargs or {})
         self._return = None
 
     def run(self):

@@ -34,8 +34,8 @@ class GenericRISEngine:
         url: str = None,
         description: str = "",
         provider_url: str | URL = "",
-        types: list[str] = [],
-        recommendation: list[str] = [],
+        types: list[str] | None = None,
+        recommendation: list[str] | None = None,
     ):
         self.name = name or self.name
         self.description = description or self.description

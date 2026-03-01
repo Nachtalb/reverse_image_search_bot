@@ -1,5 +1,5 @@
-def tag(tagname: str, content: str, attrs: dict = {}) -> str:
-    attrs_str = " ".join(map(lambda i: f'{i[0]}="{i[1]}"', attrs.items()))
+def tag(tagname: str, content: str, attrs: dict | None = None) -> str:
+    attrs_str = " ".join(map(lambda i: f'{i[0]}="{i[1]}"', (attrs or {}).items()))
     return f"<{tagname} {attrs_str}>{content}</{tagname}>"
 
 

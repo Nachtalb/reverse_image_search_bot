@@ -12,7 +12,7 @@ class MangadexProvider(BaseProvider):
     api_base = URL("https://api.mangadex.org/")
 
     def _request(
-        self, endpoint: str, params: dict = {}, json: dict = {}, method: str = "get", **kwargs
+        self, endpoint: str, params: dict | None = None, json: dict | None = None, method: str = "get", **kwargs
     ) -> dict | list | None:
         request_method = getattr(self.session, method.lower())
         if not request_method:
