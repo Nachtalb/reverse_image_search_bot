@@ -20,13 +20,13 @@ jobs:
         run: uv python install 3.11
 
       - name: Install lint tools
-        run: uv sync --only-group dev --no-install-project
+        run: uv tool install ruff
 
       - name: Ruff check
-        run: uv run ruff check reverse_image_search_bot/
+        run: ruff check reverse_image_search_bot/
 
       - name: Ruff format check
-        run: uv run ruff format --check reverse_image_search_bot/
+        run: ruff format --check reverse_image_search_bot/
 
   ty:
     name: ty
