@@ -488,7 +488,7 @@ def general_image_search(update: Update, image_url: URL, reply_sent_lock: Lock):
                 rows = list(top_buttons) + list(chunks(eng_buttons, 2))
                 return InlineKeyboardMarkup(rows)
 
-            reply = "Use /credits to get a overview of supprted engines and what they are good at."
+            reply = "Select a search engine:"
             reply_markup = _build_markup(engine_buttons)
             reply_message: Message = update.message.reply_text(
                 text=reply,
