@@ -1,7 +1,7 @@
+import re
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from pathlib import Path
-import re
 
 from emoji import emojize
 from pixivpy3 import AppPixivAPI
@@ -9,8 +9,7 @@ from yarl import URL
 
 from reverse_image_search_bot.config.pixiv_config import PixivConfig
 from reverse_image_search_bot.engines.types import InternalProviderData, MetaData
-from reverse_image_search_bot.utils import upload_file
-from reverse_image_search_bot.utils import tagify, url_button
+from reverse_image_search_bot.utils import tagify, upload_file, url_button
 
 from .base import BaseProvider, provider_cache
 

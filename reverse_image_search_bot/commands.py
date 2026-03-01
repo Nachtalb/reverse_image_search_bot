@@ -1,31 +1,30 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeoutError
 import io
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from logging import getLogger
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from threading import Lock, Thread
 from time import time
 
-from PIL import Image
 from emoji import emojize
 from moviepy.video.io.VideoFileClip import VideoFileClip
-from telegram import (
-    ChatAction,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    KeyboardButton,
-    ReplyKeyboardMarkup,
-    Update,
-    User,
-)
+from PIL import Image
 from telegram import (
     Animation,
+    ChatAction,
     Document,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
     InputMediaPhoto,
+    KeyboardButton,
     Message,
     PhotoSize,
+    ReplyKeyboardMarkup,
     Sticker,
+    Update,
+    User,
     Video,
 )
 from telegram.error import BadRequest

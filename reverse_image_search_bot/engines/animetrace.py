@@ -9,6 +9,7 @@ from yarl import URL
 
 from reverse_image_search_bot import settings
 from reverse_image_search_bot.utils.url import url_button
+
 from .data_providers import anilist as anilist_provider
 from .pic_image_search import PicImageSearchEngine
 from .types import InternalProviderData, MetaData

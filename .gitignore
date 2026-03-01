@@ -213,3 +213,4 @@ tags
 log/
 tmp/
 .pixiv_auth
+config_data/

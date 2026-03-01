@@ -1,13 +1,13 @@
-from typing import Type
 
 from cleverdict import CleverDict
+
 from reverse_image_search_bot.settings import CONFIG_DIR
 
 app_path = CONFIG_DIR
 app_path.mkdir(parents=True, exist_ok=True)
 
 
-def single_chat(cls: Type["ChatConfig"]):
+def single_chat(cls: type["ChatConfig"]):
     def get_instance(chat_id: int):
         if not hasattr(cls, "_loaded_chats"):
             cls._loaded_chats = {}

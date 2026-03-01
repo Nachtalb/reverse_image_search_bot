@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 logging.basicConfig(
     format=os.getenv(
@@ -12,7 +12,7 @@ logging.basicConfig(
 )
 
 
-def get_env_list(name: str) -> List[int]:
+def get_env_list(name: str) -> list[int]:
     raw = os.getenv(name, "")
     return [int(x.strip()) for x in raw.split(",") if x.strip().isdigit()]
 
@@ -27,7 +27,7 @@ def required_env(name: str) -> str:
 TELEGRAM_API_TOKEN = required_env("TELEGRAM_API_TOKEN")
 
 _uploader_type = os.getenv("UPLOADER_TYPE", "local")
-_uploader_config: Dict[str, Any]
+_uploader_config: dict[str, Any]
 if _uploader_type == "ssh":
     _uploader_config = {
         "host": required_env("UPLOADER_HOST"),
@@ -39,7 +39,7 @@ if _uploader_type == "ssh":
 else:
     _uploader_config = {"path": required_env("UPLOADER_PATH")}
 
-UPLOADER: Dict[str, Any] = {
+UPLOADER: dict[str, Any] = {
     "uploader": _uploader_type,
     "url": required_env("UPLOADER_URL"),
     "configuration": _uploader_config,
@@ -54,7 +54,7 @@ ANILIST_TOKEN = os.getenv("ANILIST_TOKEN")
 
 MODE_ACTIVE = os.getenv("MODE_ACTIVE", "polling")
 
-MODE: Dict[str, Any] = {
+MODE: dict[str, Any] = {
     "active": MODE_ACTIVE,
 }
 

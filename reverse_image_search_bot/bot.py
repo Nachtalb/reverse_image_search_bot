@@ -25,9 +25,7 @@ from telegram.ext import (
 from telegram.parsemode import ParseMode
 from telegram.utils.request import Request
 
-from . import settings
-from . import metrics
-from .metrics import start_metrics_server
+from . import metrics, settings
 from .commands import (
     callback_query_handler,
     file_handler,
@@ -41,7 +39,7 @@ from .commands import (
     settings_command,
     start_command,
 )
-
+from .metrics import start_metrics_server
 
 job_queue: JobQueue = None  # type: ignore
 

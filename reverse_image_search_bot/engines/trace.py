@@ -1,5 +1,4 @@
 from datetime import datetime
-from urllib.parse import quote_plus
 
 from cachetools import cached
 from requests import Session

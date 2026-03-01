@@ -1,10 +1,10 @@
+from .animetrace import AnimeTraceEngine
 from .baidu import BaiduEngine
 from .generic import GenericRISEngine
-from .animetrace import AnimeTraceEngine
-from .yandex import YandexEngine
 from .saucenao import SauceNaoEngine
 from .shutterstock import ShutterStockEngine
 from .trace import TraceEngine
+from .yandex import YandexEngine
 
 __all__ = ["engines"]
 

@@ -2,11 +2,11 @@ from threading import Lock
 from time import time
 from urllib.parse import quote_plus
 
-from cachetools import cached
 import requests
+import validators
+from cachetools import cached
 from requests import Session
 from telegram import InlineKeyboardButton
-import validators
 from yarl import URL
 
 from reverse_image_search_bot.settings import SAUCENAO_API
@@ -41,7 +41,7 @@ class SauceNaoEngine(GenericRISEngine):
 
     def _21_provider(self, data: ResponseData) -> InternalProviderData:
         """Anime"""
-        if not "anilist_id" in data:
+        if "anilist_id" not in data:
             return None, None
         return anilist.provide(data["anilist_id"], data.get("part"))  # type: ignore
 

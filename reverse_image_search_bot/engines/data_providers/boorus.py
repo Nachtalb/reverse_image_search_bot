@@ -1,11 +1,11 @@
-from pathlib import Path
 import random
 import re
+from pathlib import Path
 from tempfile import NamedTemporaryFile
 
+import validators
 from telegram import InlineKeyboardButton
 from user_agent import generate_user_agent
-import validators
 from yarl import URL
 
 from reverse_image_search_bot.engines.types import (

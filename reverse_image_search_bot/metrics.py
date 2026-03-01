@@ -171,9 +171,9 @@ def _collect_process_metrics():
 
 def update_provider_status():
     """Evaluate and set status gauges for all engines and data providers."""
+    from . import settings
     from .engines import engines as engine_list
     from .engines.data_providers import provides as provider_list
-    from . import settings
 
     for engine in engine_list:
         if not engine.best_match_implemented:

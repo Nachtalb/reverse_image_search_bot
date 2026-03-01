@@ -1,15 +1,14 @@
 import logging
 from urllib.parse import quote_plus
 
+import validators
 from cachetools import TTLCache, cached
 from requests import Session
 from requests_html import HTMLSession
 from telegram import InlineKeyboardButton
-import validators
 from yarl import URL
 
 from .types import InternalResultData, MetaData, ProviderData, ResultData
-
 
 __all__ = ["GenericRISEngine", "PreWorkEngine"]
 

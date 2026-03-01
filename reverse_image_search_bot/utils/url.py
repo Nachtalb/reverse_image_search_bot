@@ -1,8 +1,8 @@
 import re
 
+import validators
 from emoji import emojize
 from telegram import InlineKeyboardButton
-import validators
 from yarl import URL
 
 

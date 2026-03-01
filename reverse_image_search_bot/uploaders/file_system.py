@@ -39,7 +39,7 @@ class FileSystemUploader(UploaderBase):
 
         os.makedirs(destination.parent, exist_ok=True)
 
-        os.system("mv {src} {dst} && chmod 664 {dst}".format(src=real_file, dst=destination))
+        os.system(f"mv {real_file} {destination} && chmod 664 {destination}")
         self.logger.debug('Saved file to "%s"', destination)
 
     def file_exists(self, file_name: str | Path) -> bool:

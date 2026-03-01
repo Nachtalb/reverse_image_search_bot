@@ -1,6 +1,6 @@
-from functools import partial, wraps
 import logging
 import time
+from functools import partial, wraps
 from typing import TypedDict
 
 from cachetools import TTLCache, cachedmethod

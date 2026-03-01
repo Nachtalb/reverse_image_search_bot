@@ -1,5 +1,5 @@
-from pathlib import Path
 import re
+from pathlib import Path
 from threading import Thread
 from typing import Any, BinaryIO
 
