@@ -30,9 +30,9 @@ class UploaderBase:
         self.logger = getLogger(self.__class__.__name__)
         for key, type_ in self._mandatory_configuration.items():
             if key not in configuration:
-                raise KeyError('Configuration must contain key: "%s"' % key)
+                raise KeyError(f'Configuration must contain key: "{key}"')
             if not isinstance(configuration[key], type_):
-                raise TypeError('Configuration key "%s" must be instance of "%s"' % (key, type_))
+                raise TypeError(f'Configuration key "{key}" must be instance of "{type_}"')
 
         self.configuration = configuration
         if connect:

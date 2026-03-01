@@ -138,7 +138,7 @@ def main():
         logger.info("Restarting: stopping...")
         updater.stop()
         logger.info("Restarting: starting...")
-        os.execl(sys.executable, sys.executable, *sys.argv, "restart=%d" % chat_id)
+        os.execl(sys.executable, sys.executable, *sys.argv, f"restart={chat_id}")
 
     def restart_command(update: Update, context: CallbackContext):
         """Start the restarting process"""
