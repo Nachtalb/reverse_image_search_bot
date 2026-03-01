@@ -47,7 +47,11 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
-ignore = ["RUF001", "RUF002"]  # intentional fullwidth unicode in Japanese text handling
+ignore = [
+    "RUF001",   # intentional fullwidth unicode in Japanese text handling
+    "RUF002",   # same as above (docstrings)
+    "RUF012",   # mutable class defaults — used intentionally for engine config pattern
+]
 
 [tool.ruff.format]
 quote-style = "double"

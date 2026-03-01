@@ -110,16 +110,18 @@ def safe_get(dct: dict | list, key_str: str, default: Any = None, none_to_defaul
                 key, value = match.groups()
                 if value.isdigit():
                     value = int(value)
-                for dct in dct:
-                    if dct[key] == value:  # type: ignore
+                for item in dct:
+                    if item[key] == value:  # type: ignore
+                        dct = item
                         break
                 else:
                     return default
                 continue
             elif match := re.match(r"\[(.*)\]", key):
                 key = match.groups()[0]
-                for dct in dct:
-                    if key in dct:
+                for item in dct:
+                    if key in item:
+                        dct = item
                         break
                 else:
                     return default
