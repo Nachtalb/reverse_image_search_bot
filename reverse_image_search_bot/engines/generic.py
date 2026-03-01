@@ -101,8 +101,8 @@ class GenericRISEngine:
                     "provided_via": "Danbooru",                         # optional: Data provider (not search engine)
                                                                         # when additional API is used
                     "provided_via_url": "https://danbooru.donmai.us/"   # optional: URL to additional provider
-                    "identifier": "something"                           # optional: identifier to prevent search results from other engines (text only)
-                    "thumbnail_identifier": "something"                 # optional: identifier to prevent search results from other engines (thumbnail only)
+                    "identifier": "something"              # optional: dedup id (text)
+                    "thumbnail_identifier": "something"    # optional: dedup id (thumbnail)
                 }
             )
         """

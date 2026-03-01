@@ -70,7 +70,9 @@ class TelegramLogHandler(logging.Handler):
                     log_data.name = filename
                     suffix = "\n... [truncated]"
                     caption = msg[:1024 - len(suffix)] + suffix if len(msg) > 1024 else msg
-                    self.bot.send_document(admin, log_data, filename=filename, caption=caption, parse_mode=ParseMode.HTML)
+                    self.bot.send_document(
+                        admin, log_data, filename=filename, caption=caption, parse_mode=ParseMode.HTML
+                    )
         except Exception:
             pass
 

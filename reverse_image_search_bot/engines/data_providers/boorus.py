@@ -79,7 +79,8 @@ class BooruProvider(BaseProvider):
         "sankaku": {
             "check": "chan.sankakucomplex.com",
             "api_url": "https://capi-v2.sankakucomplex.com/posts/{post_id}",
-            "post_url": "https://chan.sankakucomplex.com/post/show/{post_id}",  # beta.sankakucomplex.com seems to have different post IDs
+            # beta.sankakucomplex.com seems to have different post IDs
+            "post_url": "https://chan.sankakucomplex.com/post/show/{post_id}",
         },
     }
 
@@ -160,8 +161,8 @@ class BooruProvider(BaseProvider):
                 3: 'copyright',
                 4: 'character',
                 5: 'general',  # Seems to be parrent tag, eg. bdsm > (bondage, dominance, ..)
-                8: 'meta',     # Meta information about the image not it's content directly, eg. high_resolution, large_filesize etc.
-                9: 'general',  # Some kind of descriptive of the kind of action, eg. extreme content, contentious content
+                8: 'meta',     # Meta info not about content directly, eg. high_resolution, large_filesize
+                9: 'general',  # Descriptive of action kind, eg. extreme content, contentious content
 
                 # Haven't seen any 6 & 7 so I can't determine what they are
             }

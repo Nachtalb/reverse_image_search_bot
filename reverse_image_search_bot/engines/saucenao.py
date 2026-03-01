@@ -80,7 +80,8 @@ class SauceNaoEngine(GenericRISEngine):
         kwargs = {}
         if chapter_id := data.get("md_id"):
             kwargs["chapter_id"] = chapter_id
-        if mangadex_url := next(iter([url for url in data.get("ext_urls", []) if URL(url).host == "mangadex.org"]), None):  # type: ignore
+        mangadex_urls = [url for url in data.get("ext_urls", []) if URL(url).host == "mangadex.org"]
+        if mangadex_url := next(iter(mangadex_urls), None):  # type: ignore
             kwargs["url"] = URL(mangadex_url.strip("/"))
 
         return mangadex.provide(**kwargs)

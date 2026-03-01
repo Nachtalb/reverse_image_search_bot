@@ -92,7 +92,10 @@ def _settings_main_keyboard(chat_config: ChatConfig) -> InlineKeyboardMarkup:
     auto = "✅" if chat_config.auto_search_enabled else "❌"
     buttons = "✅" if chat_config.show_buttons else "❌"
     as_engines_label = "🔍 Auto-search engines →" if chat_config.auto_search_enabled else "🔍 Auto-search engines 🔒"
-    as_engines_cb = "settings:menu:auto_search_engines" if chat_config.auto_search_enabled else "settings:disabled:auto_search_engines"
+    as_engines_cb = (
+        "settings:menu:auto_search_engines" if chat_config.auto_search_enabled
+        else "settings:disabled:auto_search_engines"
+    )
     btn_engines_label = "🔘 Engine buttons →" if chat_config.show_buttons else "🔘 Engine buttons 🔒"
     btn_engines_cb = "settings:menu:button_engines" if chat_config.show_buttons else "settings:disabled:button_engines"
 
@@ -200,13 +203,15 @@ def settings_callback_handler(update: Update, context: CallbackContext):
                 query.answer("⚠️ At least one button must stay enabled.", show_alert=True)
                 return
             chat_config.show_best_match = not chat_config.show_best_match
-            metrics.button_toggle_total.labels(button="best_match", action="disabled" if not chat_config.show_best_match else "enabled").inc()
+            action = "disabled" if not chat_config.show_best_match else "enabled"
+            metrics.button_toggle_total.labels(button="best_match", action=action).inc()
         elif value == "show_link":
             if chat_config.show_link and _button_count(chat_config) <= 1:
                 query.answer("⚠️ At least one button must stay enabled.", show_alert=True)
                 return
             chat_config.show_link = not chat_config.show_link
-            metrics.button_toggle_total.labels(button="show_link", action="disabled" if not chat_config.show_link else "enabled").inc()
+            action = "disabled" if not chat_config.show_link else "enabled"
+            metrics.button_toggle_total.labels(button="show_link", action=action).inc()
         elif value.startswith("auto_search_engine:"):
             engine_name = value[len("auto_search_engine:"):]
             relevant = [e.name for e in engines if e.best_match_implemented]
@@ -218,11 +223,15 @@ def settings_callback_handler(update: Update, context: CallbackContext):
                     query.answer("⚠️ At least one engine must stay enabled.", show_alert=True)
                     return
                 current.remove(engine_name)
-                metrics.engine_manual_toggle_total.labels(engine=engine_name, menu="auto_search", action="disabled").inc()
+                metrics.engine_manual_toggle_total.labels(
+                    engine=engine_name, menu="auto_search", action="disabled"
+                ).inc()
             else:
                 current.append(engine_name)
                 chat_config.reset_engine_counter(engine_name)  # fresh start after manual re-enable
-                metrics.engine_manual_toggle_total.labels(engine=engine_name, menu="auto_search", action="enabled").inc()
+                metrics.engine_manual_toggle_total.labels(
+                    engine=engine_name, menu="auto_search", action="enabled"
+                ).inc()
             # If all enabled, store None (= all)
             chat_config.auto_search_engines = None if set(current) >= set(relevant) else current
         elif value.startswith("button_engine:"):
@@ -355,15 +364,24 @@ def onboard_callback_handler(update: Update, context: CallbackContext):
     if choice == "search_only":
         chat_config.auto_search_enabled = True
         chat_config.show_buttons = False
-        query.edit_message_text("✅ Set to <b>search results only</b>. Change anytime with /settings.", parse_mode=ParseMode.HTML)
+        query.edit_message_text(
+            "✅ Set to <b>search results only</b>. Change anytime with /settings.",
+            parse_mode=ParseMode.HTML,
+        )
     elif choice == "full":
         chat_config.auto_search_enabled = True
         chat_config.show_buttons = True
-        query.edit_message_text("✅ Set to <b>full mode</b> (results + buttons). Change anytime with /settings.", parse_mode=ParseMode.HTML)
+        query.edit_message_text(
+            "✅ Set to <b>full mode</b> (results + buttons). Change anytime with /settings.",
+            parse_mode=ParseMode.HTML,
+        )
     elif choice == "manual":
         chat_config.auto_search_enabled = False
         chat_config.show_buttons = False
-        query.edit_message_text("✅ Set to <b>manual mode</b>. Use /search to search. Change anytime with /settings.", parse_mode=ParseMode.HTML)
+        query.edit_message_text(
+            "✅ Set to <b>manual mode</b>. Use /search to search. Change anytime with /settings.",
+            parse_mode=ParseMode.HTML,
+        )
     elif choice == "settings":
         query.edit_message_text("⚙️ Opening settings...")
         update.effective_message.reply_html(
@@ -615,7 +633,9 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, general
     results_gate = Lock()
     results_gate.acquire()
     try:
-        search_thread = ReturnableThread(_best_match_search, args=(update, context, searchable_engines, url, results_gate))
+        search_thread = ReturnableThread(
+            _best_match_search, args=(update, context, searchable_engines, url, results_gate)
+        )
         search_thread.start()
 
         if general_search_lock:
@@ -695,7 +715,9 @@ def _track_engine_result(chat_id: int, engine_name: str, found: bool) -> bool:
     return True
 
 
-def _best_match_search(update: Update, context: CallbackContext, engines: list[GenericRISEngine], url: URL, results_gate: Lock):
+def _best_match_search(
+    update: Update, context: CallbackContext, engines: list[GenericRISEngine], url: URL, results_gate: Lock
+):
     message: Message = update.effective_message  # type: ignore
     identifiers = []
     thumbnail_identifiers = []
