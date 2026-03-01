@@ -150,8 +150,9 @@ def _button_count(chat_config: ChatConfig, excluding_engine: str | None = None) 
 
 
 def settings_command(update: Update, context: CallbackContext):
+    assert update.effective_chat
     metrics.commands_total.labels(command="settings").inc()
-    chat_config = ChatConfig(update.effective_chat.id)  # type: ignore
+    chat_config = ChatConfig(update.effective_chat.id)
     if _is_group(update.effective_chat.id) and not chat_config.onboarded:
         chat_config.onboarded = True  # opening settings counts as onboarding
     update.message.reply_html(
@@ -180,7 +181,8 @@ def settings_callback_handler(update: Update, context: CallbackContext):
         query.answer("Only group admins can change settings.", show_alert=True)
         return
 
-    chat_config = ChatConfig(update.effective_chat.id)  # type: ignore
+    assert update.effective_chat
+    chat_config = ChatConfig(update.effective_chat.id)
     parts = data.split(":", 2)  # ["settings", action, value]
     action = parts[1] if len(parts) > 1 else ""
     value = parts[2] if len(parts) > 2 else ""
@@ -348,6 +350,7 @@ def _is_group(chat_id: int) -> bool:
 
 def onboard_callback_handler(update: Update, context: CallbackContext):
     """Handle onboarding button presses."""
+    assert update.effective_chat
     query = update.callback_query
     choice = query.data.split(":", 1)[1]
     chat_id = update.effective_chat.id
@@ -382,6 +385,7 @@ def onboard_callback_handler(update: Update, context: CallbackContext):
         )
     elif choice == "settings":
         query.edit_message_text("⚙️ Opening settings...")
+        assert update.effective_message
         update.effective_message.reply_html(
             _settings_main_text(chat_config),
             reply_markup=_settings_main_keyboard(chat_config),
@@ -392,6 +396,7 @@ def onboard_callback_handler(update: Update, context: CallbackContext):
 
 def group_file_handler(update: Update, context: CallbackContext):
     """Handle images in group chats — onboard first if needed."""
+    assert update.effective_chat
     chat_id = update.effective_chat.id
     chat_config = ChatConfig(chat_id)
 
@@ -433,7 +438,7 @@ def file_handler(update: Update, context: CallbackContext, message: Message | No
         return
 
     user = message.from_user
-    if user.id in context.bot._banned_users:
+    if user.id in context.bot._banned_users:  # type: ignore[union-attr]
         message.reply_text("🔴 You are banned from using this bot due to uploading illegal content.")
         return
 
