@@ -53,7 +53,7 @@ class UploaderBase:
         """Close connection to the server"""
         pass
 
-    def upload(self, file: IO | Path, file_name: str):
+    def upload(self, file: IO | Path, filename: str):
         """Upload a file to the server
 
         Args:
