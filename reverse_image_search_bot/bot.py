@@ -183,6 +183,13 @@ def main():
         logger.info("Start polling")
         updater.start_polling()
     logger.info("Started bot. Waiting for requests...")
+
+    # Notify admins of successful startup
+    for admin_id in settings.ADMIN_IDS:
+        try:
+            updater.bot.send_message(admin_id, emojize(":check_mark_button: Bot started successfully."))
+        except Exception:
+            logger.warning("Failed to notify admin %d of startup", admin_id)
     updater.idle()
 
 
