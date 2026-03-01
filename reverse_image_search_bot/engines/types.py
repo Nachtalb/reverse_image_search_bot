@@ -3,7 +3,7 @@ from typing import TypedDict
 from telegram import InlineKeyboardButton
 from yarl import URL
 
-__all__ = ["InternalResultData", "ResultData", "MetaData", "InternalProviderData", "ProviderData"]
+__all__ = ["InternalProviderData", "InternalResultData", "MetaData", "ProviderData", "ResultData"]
 
 InternalResultData = dict[str, str | int | URL | None | list[str] | set[str]]
 ResultData = dict[str, str | int | URL | list[str] | set[str]]
