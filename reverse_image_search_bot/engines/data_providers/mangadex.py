@@ -68,9 +68,8 @@ class MangadexProvider(BaseProvider):
         chapter_id = chapter_data.get("id", "")
 
         manga_data = {}
-        if chapter_data:
-            if manga_rel := next(iter(filter(lambda rel: rel["type"] == "manga", chapter_data["relationships"])), None):
-                manga_id = manga_rel["id"]
+        if chapter_data and (manga_rel := next(iter(filter(lambda rel: rel["type"] == "manga", chapter_data["relationships"])), None)):
+            manga_id = manga_rel["id"]
 
         if not manga_id:
             return {}, {}
@@ -115,10 +114,7 @@ class MangadexProvider(BaseProvider):
             self.logger.warning("Found a manga with link list", manga_id)
         if isinstance(links, dict):
             for key, url in safe_get(manga_data, "attributes.links", {}).items():
-                if not validators.url(url):  # type: ignore
-                    url = fix_url(f"{key}:manga:{url}")
-                else:
-                    url = URL(url)  # type: ignore
+                url = fix_url(f"{key}:manga:{url}") if not validators.url(url) else URL(url)  # type: ignore
                 buttons.append(url_button(url))
 
         meta: MetaData = {
