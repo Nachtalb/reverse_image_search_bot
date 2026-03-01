@@ -86,7 +86,7 @@ class BooruProvider(BaseProvider):
 
     def _request(self, api: str, post_id: int) -> dict | None:
         headers = {"User-Agent": generate_user_agent()}
-        response = self.session.get(self.urls[api]["api_url"].format(post_id=post_id), headers=headers) # type: ignore[union-attr]
+        response = self.session.get(self.urls[api]["api_url"].format(post_id=post_id), headers=headers)  # type: ignore[union-attr]
         if response.status_code != 200:
             return
         return response.json()
@@ -119,7 +119,7 @@ class BooruProvider(BaseProvider):
             return None, None
         post_id = None
         if matcher := self.urls[api].get("id_reg"):
-            if match := matcher.match(str(url)): # type: ignore[union-attr]
+            if match := matcher.match(str(url)):  # type: ignore[union-attr]
                 post_id = match.groups()[0]
         else:
             post_id = url.parts[-1]
@@ -136,7 +136,7 @@ class BooruProvider(BaseProvider):
         elif self.urls[api].get("download_thumbnail"):
             headers = {
                 "User-Agent": generate_user_agent(),
-                "Referer": self.urls[api]["post_url"].format(post_id=post_id), # type: ignore[union-attr]
+                "Referer": self.urls[api]["post_url"].format(post_id=post_id),  # type: ignore[union-attr]
             }
             response = self.session.get(thumbnail_url, headers=headers)
             if response.status_code != 200:
@@ -204,7 +204,7 @@ class BooruProvider(BaseProvider):
             return {}, {}
 
         buttons = self.source_button(data)
-        post_url = self.urls[api]["post_url"].format(post_id=post_id) # type: ignore[union-attr]
+        post_url = self.urls[api]["post_url"].format(post_id=post_id)  # type: ignore[union-attr]
         buttons.append(url_button(post_url))
 
         rating = data["rating"].title()

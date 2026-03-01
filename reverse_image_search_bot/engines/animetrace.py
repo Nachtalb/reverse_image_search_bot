@@ -94,7 +94,7 @@ def _anilist_resolve(char_name: str, work: str) -> tuple[str, str, int | None, i
     clean = _clean_name(char_name)
     try:
         data = _anilist_post({"query": _ANILIST_QUERY, "variables": {"name": clean}})
-        char = data["data"]["Character"] # type: ignore[index]
+        char = data["data"]["Character"]  # type: ignore[index]
         en_name = char["name"]["full"] or char_name
         char_id = char.get("id")
         char_image = (char.get("image") or {}).get("large")
