@@ -46,6 +46,9 @@ from reverse_image_search_bot.utils.tags import a, b, code, hidden_a, pre, title
 logger = getLogger("BEST MATCH")
 last_used: dict[int, float] = {}
 
+# Telegram Bot API file download limit (20 MB)
+MAX_TELEGRAM_FILE_SIZE = 20 * 1024 * 1024
+
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 # Commands
@@ -394,14 +397,17 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
                     return
                 search_type = file_type
                 image_url = image_to_url(attachment)
+        except ValueError as e:
+            message.reply_text(str(e))
+            return
         except Exception as e:
             error = e
-        finally:
-            if not image_url:
-                message.reply_text("Format is not supported")
-                if error is not None:
-                    raise error
-                return
+
+        if not image_url:
+            message.reply_text("Format is not supported")
+            if error is not None:
+                raise error
+            return
 
         # Track usage metrics
         metrics.searches_total.labels(type=search_type, language=language).inc()
@@ -777,8 +783,10 @@ def video_to_url(attachment: Document | Video | Sticker) -> URL:
     if uploader.file_exists(filename):
         return uploader.get_url(filename)
 
-    if attachment.file_size > 2e7:  # Bots are only allowed to download up to 20MB
-        return image_to_url(attachment.thumb)
+    if attachment.file_size and attachment.file_size > MAX_TELEGRAM_FILE_SIZE:
+        if attachment.thumb:
+            return image_to_url(attachment.thumb)
+        raise ValueError("This video is too large to download and has no thumbnail. Please send a smaller file.")
 
     video = attachment.get_file()
     with NamedTemporaryFile() as video_file:
