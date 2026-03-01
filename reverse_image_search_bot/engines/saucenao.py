@@ -39,7 +39,7 @@ class SauceNaoEngine(GenericRISEngine):
         self.session = Session()
         self.lock = Lock()
 
-    def _21_provider(self, data: ResponseData) -> InternalProviderData:
+    def _21_provider(self, data: ResponseData) -> InternalProviderData | tuple[None, None]:
         """Anime"""
         if "anilist_id" not in data:
             return None, None
@@ -85,7 +85,8 @@ class SauceNaoEngine(GenericRISEngine):
         kwargs = {}
         if chapter_id := data.get("md_id"):
             kwargs["chapter_id"] = chapter_id
-        mangadex_urls = [url for url in data.get("ext_urls", []) if URL(url).host == "mangadex.org"]
+        ext_urls: list[str] = data.get("ext_urls", [])  # type: ignore[assignment]
+        mangadex_urls = [url for url in ext_urls if URL(url).host == "mangadex.org"]
         if mangadex_url := next(iter(mangadex_urls), None):
             kwargs["url"] = URL(mangadex_url.strip("/"))
 
