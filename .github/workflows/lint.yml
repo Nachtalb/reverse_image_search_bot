@@ -1,0 +1,32 @@
+name: Lint
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Ruff & ty
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Ruff check
+        run: uv run ruff check reverse_image_search_bot/
+
+      - name: Ruff format check
+        run: uv run ruff format --check reverse_image_search_bot/
+
+      - name: ty check
+        run: uv run ty check reverse_image_search_bot/
