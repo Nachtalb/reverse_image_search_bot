@@ -709,9 +709,13 @@ def _best_match_search(update: Update, context: CallbackContext, engines: list[G
                         )
             except Exception as error:
                 metrics.provider_results_total.labels(provider=engine.name, status="error").inc()
-                error_to_admin(update, context, message=f"Best match error: {error}", image_url=url)
-                logger.error("Engine failure: %s", engine)
-                logger.exception(error)
+                user = update.effective_user
+                user_info = f"{user.full_name} (tg://user?id={user.id})" if user else "Unknown"
+                logger.error(
+                    "Best match error [%s]\nUser: %s\nImage: %s",
+                    engine.name, user_info, url,
+                    exc_info=error,
+                )
     except FuturesTimeoutError:
         pass
     finally:
@@ -814,33 +818,3 @@ def wait_for(lock: Lock):
         lock.acquire()
         lock.release()
 
-
-def error_to_admin(update: Update, context: CallbackContext, message: str, image_url: str | URL, attachment=None):
-    try:
-        user = update.effective_user
-        message += f"\nUser: {user.mention_html()}"  # type: ignore
-        buttons = None
-        if image_url:
-            buttons = InlineKeyboardMarkup(
-                [[InlineKeyboardButton("Best Match", callback_data=f"best_match {image_url}")]]
-            )
-
-        if not attachment:
-            message += f"\nImage: {image_url}"
-            for admin in ADMIN_IDS:
-                context.bot.send_message(admin, message, ParseMode.HTML, reply_markup=buttons)
-            return
-
-        send_method = getattr(
-            context.bot,
-            "send_%s" % (attachment.__class__.__name__.lower() if not isinstance(attachment, PhotoSize) else "photo"),
-        )
-        if user and send_method and user.id != 713276361:
-            for admin in ADMIN_IDS:
-                if isinstance(attachment, Sticker):
-                    send_method(admin, attachment)
-                    context.bot.send_message(admin, message, parse_mode=ParseMode.HTML, reply_markup=buttons)
-                else:
-                    send_method(admin, attachment, caption=message, parse_mode=ParseMode.HTML, reply_markup=buttons)
-    except Exception as error:
-        logger.exception(error)
