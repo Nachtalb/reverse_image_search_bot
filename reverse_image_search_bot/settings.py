@@ -69,6 +69,12 @@ CON_POOL_SIZE = int(os.getenv("CON_POOL_SIZE", WORKERS + 4))
 
 CONFIG_DIR = Path(os.getenv("CONFIG_DIR", "~/.config/reverse_image_search_bot")).expanduser().absolute()
 
+CONFIG_DB_PATH = (
+    Path(os.getenv("CONFIG_DB_PATH", str(CONFIG_DIR / "config.db")))
+    .expanduser()
+    .absolute()
+)
+
 
 # Prometheus metrics
 METRICS_ENABLED = os.getenv("METRICS_ENABLED", "true").lower() in ("true", "1", "yes")

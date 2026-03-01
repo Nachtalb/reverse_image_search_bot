@@ -128,6 +128,13 @@ def error_logger(update: Update, context: CallbackContext, *_, **__):
 
 def main():
     global job_queue
+
+    # Auto-migrate JSON config files to SQLite on first run
+    from .config.db import migrate_json_files
+    migrated = migrate_json_files(settings.CONFIG_DIR)
+    if migrated:
+        logger.info("Migrated %d JSON config files to SQLite", migrated)
+
     start_metrics_server()
     _request = Request(con_pool_size=settings.CON_POOL_SIZE)
     bot = RISBot(settings.TELEGRAM_API_TOKEN, request=_request, arbitrary_callback_data=False)
