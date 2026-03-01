@@ -106,10 +106,7 @@ def _anilist_resolve(char_name: str, work: str) -> tuple[str, str, int | None, i
 
 class AnimeTraceEngine(PicImageSearchEngine):
     name = "AnimeTrace"
-    description = (
-        "AnimeTrace identifies anime characters in images, returning the "
-        "character name and source work."
-    )
+    description = "AnimeTrace identifies anime characters in images, returning the character name and source work."
     provider_url = URL("https://www.animetrace.com/")
     types = ["Anime/Manga"]
     recommendation = ["Anime characters", "Fan art"]
@@ -117,11 +114,13 @@ class AnimeTraceEngine(PicImageSearchEngine):
 
     def __init__(self, *args, **kwargs):
         from PicImageSearch import AnimeTrace
+
         self.pic_engine_class = AnimeTrace
         super().__init__(*args, **kwargs)
 
     async def _search(self, url: str):
         from PicImageSearch import AnimeTrace, Network
+
         async with Network() as client:
             engine = AnimeTrace(client=client, is_multi=1)
             return await engine.search(url=url)
@@ -169,10 +168,12 @@ class AnimeTraceEngine(PicImageSearchEngine):
             # Build buttons: character page + media page
             buttons = []
             if char_id:
-                buttons.append(url_button(
-                    f"https://anilist.co/character/{char_id}",
-                    text=en_name,
-                ))
+                buttons.append(
+                    url_button(
+                        f"https://anilist.co/character/{char_id}",
+                        text=en_name,
+                    )
+                )
             if media_id and al_meta and al_meta.get("buttons"):
                 buttons.extend(al_meta["buttons"])
             if buttons:

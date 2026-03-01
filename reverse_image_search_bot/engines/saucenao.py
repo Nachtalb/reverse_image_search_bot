@@ -48,18 +48,23 @@ class SauceNaoEngine(GenericRISEngine):
     def _booru_provider(self, data: ResponseData, api: str) -> InternalProviderData:
         return booru.provide(api, data[api + "_id"])  # type: ignore
 
-    def _9_provider(self, data): return self._booru_provider(data, "danbooru")
-    def _12_provider(self, data): return self._booru_provider(data, "yandere")
-    def _25_provider(self, data): return self._booru_provider(data, "gelbooru")
+    def _9_provider(self, data):
+        return self._booru_provider(data, "danbooru")
+
+    def _12_provider(self, data):
+        return self._booru_provider(data, "yandere")
+
+    def _25_provider(self, data):
+        return self._booru_provider(data, "gelbooru")
 
     def _5_provider(self, data: ResponseData) -> InternalProviderData:
         """Pixiv"""
         # __import__('ipdb').set_trace()
         try:
-            result, meta = pixiv.provide(data['pixiv_id'])  # type: ignore
+            result, meta = pixiv.provide(data["pixiv_id"])  # type: ignore
         except Exception as e:
             self.logger.exception(e)
-            self.logger.warning('Error in pixiv provider')
+            self.logger.warning("Error in pixiv provider")
             result = meta = None
 
         if result and meta:
@@ -198,7 +203,7 @@ class SauceNaoEngine(GenericRISEngine):
             result, new_meta = self._default_provider(data["data"])
 
         meta.update(new_meta)
-        thumbnail = meta.get('thumbnail', data['header']['thumbnail'])
+        thumbnail = meta.get("thumbnail", data["header"]["thumbnail"])
         meta.update(
             {
                 "thumbnail": URL(thumbnail) if isinstance(thumbnail, str) else thumbnail,

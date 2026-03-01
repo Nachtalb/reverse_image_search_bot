@@ -69,7 +69,7 @@ class TelegramLogHandler(logging.Handler):
                     log_data = io.BytesIO(raw_text.encode("utf-8"))
                     log_data.name = filename
                     suffix = "\n... [truncated]"
-                    caption = msg[:1024 - len(suffix)] + suffix if len(msg) > 1024 else msg
+                    caption = msg[: 1024 - len(suffix)] + suffix if len(msg) > 1024 else msg
                     self.bot.send_document(
                         admin, log_data, filename=filename, caption=caption, parse_mode=ParseMode.HTML
                     )
@@ -154,9 +154,7 @@ def main():
     dispatcher.add_handler(CommandHandler("help", help_command))
     dispatcher.add_handler(CommandHandler("id", id_command))
     dispatcher.add_handler(CommandHandler("restart", restart_command, filters=ADMIN_FILTER))
-    dispatcher.add_handler(
-        CommandHandler("ban", bot._ban_user, filters=ADMIN_FILTER), group=1
-    )
+    dispatcher.add_handler(CommandHandler("ban", bot._ban_user, filters=ADMIN_FILTER), group=1)
     dispatcher.add_handler(CommandHandler("search", search_command, run_async=True))
     dispatcher.add_handler(CommandHandler(("settings", "conf", "pref"), settings_command, run_async=True))
     dispatcher.add_handler(CallbackQueryHandler(settings_callback_handler, pattern=r"^settings:", run_async=True))

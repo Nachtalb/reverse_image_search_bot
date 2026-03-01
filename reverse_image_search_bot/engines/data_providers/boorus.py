@@ -142,7 +142,7 @@ class BooruProvider(BaseProvider):
             if response.status_code != 200:
                 return {}
 
-            with NamedTemporaryFile('rb+', delete=False) as file:
+            with NamedTemporaryFile("rb+", delete=False) as file:
                 file.write(response.content)
                 file.seek(0)
                 thumbnail = upload_file(Path(file.name), URL(thumbnail_url).name)
@@ -152,42 +152,41 @@ class BooruProvider(BaseProvider):
         return {"thumbnail": thumbnail, "thumbnail_identifier": thumbnail_url}
 
     def _get_tags(self, data: dict) -> InternalResultData:
-        main_tags = data.get('tag_string_general', data.get('tags', ''))
+        main_tags = data.get("tag_string_general", data.get("tags", ""))
         if isinstance(main_tags, list):
             kinds = {
-                0: 'general',
-                1: 'artist',
-                2: 'general',  # Don't know exactly what kind of tags belong here but it seems to include loli
-                3: 'copyright',
-                4: 'character',
-                5: 'general',  # Seems to be parrent tag, eg. bdsm > (bondage, dominance, ..)
-                8: 'meta',     # Meta info not about content directly, eg. high_resolution, large_filesize
-                9: 'general',  # Descriptive of action kind, eg. extreme content, contentious content
-
+                0: "general",
+                1: "artist",
+                2: "general",  # Don't know exactly what kind of tags belong here but it seems to include loli
+                3: "copyright",
+                4: "character",
+                5: "general",  # Seems to be parrent tag, eg. bdsm > (bondage, dominance, ..)
+                8: "meta",  # Meta info not about content directly, eg. high_resolution, large_filesize
+                9: "general",  # Descriptive of action kind, eg. extreme content, contentious content
                 # Haven't seen any 6 & 7 so I can't determine what they are
             }
             tags = {}
             for tag in main_tags:
-                kind = kinds.get(tag['type'])
+                kind = kinds.get(tag["type"])
                 if kind:
                     tags.setdefault(kind, [])
-                    tags[kind].append(tag['tagName'])
+                    tags[kind].append(tag["tagName"])
 
-            chartags = set(tags.get('character', []))
-            authortags = set(tags.get('artist', []))
-            copyrighttags = set(tags.get('copyrighttags', []))
-            main_tags = set(tags.get('general', []) + tags.get('meta', []))
+            chartags = set(tags.get("character", []))
+            authortags = set(tags.get("artist", []))
+            copyrighttags = set(tags.get("copyrighttags", []))
+            main_tags = set(tags.get("general", []) + tags.get("meta", []))
         else:
-            chartags = set(data.get('tag_string_character', '').split(' '))
-            authortags = set(data.get('tag_string_artist', '').split(' '))
-            copyrighttags = set(data.get('tag_string_copyright', '').split(' '))
-            main_tags = set(main_tags.split(' ')) - copyrighttags - authortags - chartags
+            chartags = set(data.get("tag_string_character", "").split(" "))
+            authortags = set(data.get("tag_string_artist", "").split(" "))
+            copyrighttags = set(data.get("tag_string_copyright", "").split(" "))
+            main_tags = set(main_tags.split(" ")) - copyrighttags - authortags - chartags
 
         return {
-            'Character': tagify(chartags) or None,
-            'Tags': tagify(random.choices(list(main_tags), k=5)) or None,
-            'By': tagify(authortags) or None,
-            'Copyright': copyrighttags or None,
+            "Character": tagify(chartags) or None,
+            "Tags": tagify(random.choices(list(main_tags), k=5)) or None,
+            "By": tagify(authortags) or None,
+            "Copyright": copyrighttags or None,
         }
 
     @provider_cache
@@ -214,7 +213,7 @@ class BooruProvider(BaseProvider):
 
         result = {
             "Title": data.get("Title"),
-            'By': None,  # Placeholder to keep the order
+            "By": None,  # Placeholder to keep the order
             "Size": "{}x{}".format(
                 data["image_width" if api == "danbooru" else "width"],
                 data["image_height" if api == "danbooru" else "height"],

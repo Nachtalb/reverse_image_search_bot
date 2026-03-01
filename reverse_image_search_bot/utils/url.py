@@ -90,7 +90,7 @@ def url_icon(url: URL | str, with_icon: bool = True, with_text: bool = True, cus
         case "idol.sankakucomplex.com":
             text = "Idol Sankaku Complex"
         case _:
-            text = url.host.split(".")[-2].replace('_', ' ').replace('-', ' ').title()  # type: ignore
+            text = url.host.split(".")[-2].replace("_", " ").replace("-", " ").title()  # type: ignore
 
     if custom_text:
         text = custom_text

@@ -5,9 +5,7 @@ from pathlib import Path
 from typing import Any
 
 logging.basicConfig(
-    format=os.getenv(
-        "LOG_FORMAT", "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    ),
+    format=os.getenv("LOG_FORMAT", "%(asctime)s - %(name)s - %(levelname)s - %(message)s"),
     level=logging.INFO,
 )
 
@@ -69,11 +67,7 @@ if MODE_ACTIVE == "webhook":
 WORKERS = int(os.getenv("WORKERS", 4))
 CON_POOL_SIZE = int(os.getenv("CON_POOL_SIZE", WORKERS + 4))
 
-CONFIG_DIR = (
-    Path(os.getenv("CONFIG_DIR", "~/.config/reverse_image_search_bot"))
-    .expanduser()
-    .absolute()
-)
+CONFIG_DIR = Path(os.getenv("CONFIG_DIR", "~/.config/reverse_image_search_bot")).expanduser().absolute()
 
 
 # Prometheus metrics

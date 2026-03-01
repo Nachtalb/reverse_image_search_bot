@@ -68,7 +68,7 @@ query ($id: Int) {
         result = {
             "Title": ani_data["title"]["english"],
             "Title [romaji]": ani_data["title"]["romaji"],
-            "Episode": f'{episode_at}/{ani_data["episodes"]}',
+            "Episode": f"{episode_at}/{ani_data['episodes']}",
             "Status": ani_data["status"],
             "Type": ani_data["type"],
             "Year": f"{ani_data['startDate']['year']}-{ani_data['endDate']['year']}",

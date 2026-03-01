@@ -82,10 +82,7 @@ def _is_settings_allowed(update: Update, context: CallbackContext) -> bool:
 
 
 def _settings_main_text(chat_config: ChatConfig) -> str:
-    return (
-        "⚙️ <b>Chat Settings</b>\n"
-        "Configure how the bot behaves in this chat."
-    )
+    return "⚙️ <b>Chat Settings</b>\nConfigure how the bot behaves in this chat."
 
 
 def _settings_main_keyboard(chat_config: ChatConfig) -> InlineKeyboardMarkup:
@@ -93,18 +90,21 @@ def _settings_main_keyboard(chat_config: ChatConfig) -> InlineKeyboardMarkup:
     buttons = "✅" if chat_config.show_buttons else "❌"
     as_engines_label = "🔍 Auto-search engines →" if chat_config.auto_search_enabled else "🔍 Auto-search engines 🔒"
     as_engines_cb = (
-        "settings:menu:auto_search_engines" if chat_config.auto_search_enabled
+        "settings:menu:auto_search_engines"
+        if chat_config.auto_search_enabled
         else "settings:disabled:auto_search_engines"
     )
     btn_engines_label = "🔘 Engine buttons →" if chat_config.show_buttons else "🔘 Engine buttons 🔒"
     btn_engines_cb = "settings:menu:button_engines" if chat_config.show_buttons else "settings:disabled:button_engines"
 
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton(f"🔍 Auto-search: {auto}", callback_data="settings:toggle:auto_search")],
-        [InlineKeyboardButton(f"🔘 Show buttons: {buttons}", callback_data="settings:toggle:show_buttons")],
-        [InlineKeyboardButton(as_engines_label, callback_data=as_engines_cb)],
-        [InlineKeyboardButton(btn_engines_label, callback_data=btn_engines_cb)],
-    ])
+    return InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton(f"🔍 Auto-search: {auto}", callback_data="settings:toggle:auto_search")],
+            [InlineKeyboardButton(f"🔘 Show buttons: {buttons}", callback_data="settings:toggle:show_buttons")],
+            [InlineKeyboardButton(as_engines_label, callback_data=as_engines_cb)],
+            [InlineKeyboardButton(btn_engines_label, callback_data=btn_engines_cb)],
+        ]
+    )
 
 
 def _settings_engines_keyboard(chat_config: ChatConfig, menu: str) -> InlineKeyboardMarkup:
@@ -171,7 +171,7 @@ def settings_callback_handler(update: Update, context: CallbackContext):
     if data.startswith("settings:disabled:"):
         reason = {
             "auto_search_engines": "Enable auto-search first to configure its engines.",
-            "button_engines": "Enable \"Show buttons\" first to configure engine buttons.",
+            "button_engines": 'Enable "Show buttons" first to configure engine buttons.',
         }.get(data.split(":", 2)[2], "Enable the master toggle first.")
         query.answer(reason, show_alert=False)
         return
@@ -213,7 +213,7 @@ def settings_callback_handler(update: Update, context: CallbackContext):
             action = "disabled" if not chat_config.show_link else "enabled"
             metrics.button_toggle_total.labels(button="show_link", action=action).inc()
         elif value.startswith("auto_search_engine:"):
-            engine_name = value[len("auto_search_engine:"):]
+            engine_name = value[len("auto_search_engine:") :]
             relevant = [e.name for e in engines if e.best_match_implemented]
             current = chat_config.auto_search_engines
             if current is None:
@@ -235,7 +235,7 @@ def settings_callback_handler(update: Update, context: CallbackContext):
             # If all enabled, store None (= all)
             chat_config.auto_search_engines = None if set(current) >= set(relevant) else current
         elif value.startswith("button_engine:"):
-            engine_name = value[len("button_engine:"):]
+            engine_name = value[len("button_engine:") :]
             all_names = [e.name for e in engines]
             current = chat_config.button_engines
             if current is None:
@@ -259,18 +259,14 @@ def settings_callback_handler(update: Update, context: CallbackContext):
                 )
         elif value.startswith("button_engine:") or value in ("show_link", "show_best_match"):
             with contextlib.suppress(Exception):
-                query.edit_message_reply_markup(
-                    reply_markup=_settings_engines_keyboard(chat_config, "button_engines")
-                )
+                query.edit_message_reply_markup(reply_markup=_settings_engines_keyboard(chat_config, "button_engines"))
         else:
             with contextlib.suppress(Exception):
                 query.edit_message_reply_markup(reply_markup=_settings_main_keyboard(chat_config))
 
     elif action == "menu":
         with contextlib.suppress(Exception):
-            query.edit_message_reply_markup(
-                reply_markup=_settings_engines_keyboard(chat_config, value)
-            )
+            query.edit_message_reply_markup(reply_markup=_settings_engines_keyboard(chat_config, value))
 
     elif action == "back":
         with contextlib.suppress(Exception):
@@ -328,12 +324,14 @@ def on_added_to_group(update: Update, context: CallbackContext):
 
 def _send_onboarding(update: Update, context: CallbackContext):
     """Send the group onboarding prompt with preset choices."""
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔍 Search results only", callback_data="onboard:search_only")],
-        [InlineKeyboardButton("🔍 Full (results + buttons)", callback_data="onboard:full")],
-        [InlineKeyboardButton("❌ Manual only (/search)", callback_data="onboard:manual")],
-        [InlineKeyboardButton("⚙️ Open settings", callback_data="onboard:settings")],
-    ])
+    keyboard = InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("🔍 Search results only", callback_data="onboard:search_only")],
+            [InlineKeyboardButton("🔍 Full (results + buttons)", callback_data="onboard:full")],
+            [InlineKeyboardButton("❌ Manual only (/search)", callback_data="onboard:manual")],
+            [InlineKeyboardButton("⚙️ Open settings", callback_data="onboard:settings")],
+        ]
+    )
     text = (
         "👋 <b>How should I handle images in this group?</b>\n\n"
         "• <b>Search results only</b> — auto-search images, show results\n"
@@ -436,9 +434,7 @@ def file_handler(update: Update, context: CallbackContext, message: Message = No
 
     user = message.from_user
     if user.id in context.bot._banned_users:
-        message.reply_text(
-            "🔴 You are banned from using this bot due to uploading illegal content."
-        )
+        message.reply_text("🔴 You are banned from using this bot due to uploading illegal content.")
         return
 
     context.bot.send_chat_action(chat_id=message.chat_id, action=ChatAction.TYPING)
@@ -810,7 +806,9 @@ def _best_match_search(
                 user_info = f"{user.full_name} (tg://user?id={user.id})" if user else "Unknown"
                 logger.error(
                     "Best match error [%s]\nUser: %s\nImage: %s",
-                    engine.name, user_info, url,
+                    engine.name,
+                    user_info,
+                    url,
                     exc_info=error,
                 )
     except FuturesTimeoutError:
@@ -916,4 +914,3 @@ def wait_for(lock: Lock):
     if lock and lock.locked:
         lock.acquire()
         lock.release()
-
