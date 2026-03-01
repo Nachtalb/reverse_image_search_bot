@@ -155,15 +155,15 @@ class AnimeTraceEngine(PicImageSearchEngine):
                         al_result.pop(key, None)
                     result.update(al_result)
                 if al_meta:
-                    meta["provided_via"] = al_meta.get("provided_via")
-                    meta["provided_via_url"] = al_meta.get("provided_via_url")
+                    meta["provided_via"] = al_meta.get("provided_via", "")
+                    meta["provided_via_url"] = al_meta.get("provided_via_url", URL())
 
             # Thumbnail fallback: prefer character portrait over anime cover
             if not getattr(confident[0], "thumbnail", None):
                 if char_image:
                     meta["thumbnail"] = URL(char_image)
                 elif al_meta and al_meta.get("thumbnail"):
-                    meta["thumbnail"] = al_meta.get("thumbnail")
+                    meta["thumbnail"] = al_meta["thumbnail"]
 
             # Build buttons: character page + media page
             buttons = []
