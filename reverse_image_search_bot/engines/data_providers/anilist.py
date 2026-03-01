@@ -58,7 +58,7 @@ query ($id: Int) {
 
         return next(iter(response.json()["data"]["Page"]["media"]), None)
 
-    def provide(self, anilist_id: int, episode_at: int | str = None) -> InternalProviderData:
+    def provide(self, anilist_id: int, episode_at: int | str | None = None) -> InternalProviderData:
         ani_data = self.request(anilist_id)
         if not ani_data:
             return {}, {}

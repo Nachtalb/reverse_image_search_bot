@@ -44,7 +44,7 @@ def fix_url(url: URL | str) -> URL:
     return url
 
 
-def url_icon(url: URL | str, with_icon: bool = True, with_text: bool = True, custom_text: str = None) -> str:
+def url_icon(url: URL | str, with_icon: bool = True, with_text: bool = True, custom_text: str | None = None) -> str:
     url = URL(url)
 
     icon = ":globe_with_meridians:"
@@ -102,7 +102,7 @@ def url_icon(url: URL | str, with_icon: bool = True, with_text: bool = True, cus
 
 
 def url_button(
-    url: URL | str, with_icon: bool = True, with_text: bool = True, fix_url_: bool = True, text: str = None
+    url: URL | str, with_icon: bool = True, with_text: bool = True, fix_url_: bool = True, text: str | None = None
 ) -> InlineKeyboardButton:
     if fix_url_:
         url = fix_url(url)

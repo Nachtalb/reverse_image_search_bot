@@ -30,8 +30,8 @@ class GenericRISEngine:
 
     def __init__(
         self,
-        name: str = None,
-        url: str = None,
+        name: str | None = None,
+        url: str | None = None,
         description: str = "",
         provider_url: str | URL = "",
         types: list[str] | None = None,
@@ -52,7 +52,7 @@ class GenericRISEngine:
 
         self.logger = logging.getLogger(f"RISEngine [{self.name}]")
 
-    def __call__(self, url: str | URL, text: str = None) -> InlineKeyboardButton:
+    def __call__(self, url: str | URL, text: str | None = None) -> InlineKeyboardButton:
         """Create the :obj:`InlineKeyboardButton` button for the telegram but to use"""
         return InlineKeyboardButton(text=text or self.name, url=self.get_search_link_by_url(url))
 
@@ -118,7 +118,7 @@ class PreWorkEngine(GenericRISEngine):
         super().__init__(*args, **kwargs)
 
     @cached(_url_cache)
-    def __call__(self, url: str | URL, text: str = None) -> InlineKeyboardButton | None:
+    def __call__(self, url: str | URL, text: str | None = None) -> InlineKeyboardButton | None:
         search_url = self.get_search_link_by_url(url)
         if not search_url:
             return

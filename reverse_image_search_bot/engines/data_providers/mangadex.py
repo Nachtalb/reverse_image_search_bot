@@ -48,7 +48,7 @@ class MangadexProvider(BaseProvider):
     def manga(self, manga_id: str) -> dict | None:
         return self._request(f"manga/{manga_id}", {"includes[]": ["artist", "cover_art", "author"]})  # type: ignore
 
-    def provide(self, url: str | URL = None, chapter_id: str = None, manga_id: str = None) -> InternalProviderData:
+    def provide(self, url: str | URL = None, chapter_id: str | None = None, manga_id: str | None = None) -> InternalProviderData:
         chapter_id = str(chapter_id) if chapter_id else None
         manga_id = str(manga_id) if manga_id else None
         if not url and not chapter_id and not manga_id:

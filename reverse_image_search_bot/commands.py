@@ -588,7 +588,7 @@ def general_image_search(update: Update, image_url: URL, reply_sent_lock: Lock):
                 reply_sent_lock.release()
 
 
-def best_match(update: Update, context: CallbackContext, url: str | URL, general_search_lock: Lock = None):
+def best_match(update: Update, context: CallbackContext, url: str | URL, general_search_lock: Lock | None = None):
     """Find best matches for an image."""
     if update.callback_query:
         update.callback_query.answer(show_alert=False)
