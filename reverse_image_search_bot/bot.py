@@ -31,9 +31,11 @@ from .metrics import start_metrics_server
 from .commands import (
     callback_query_handler,
     file_handler,
+    group_file_handler,
     help_command,
     id_command,
     on_added_to_group,
+    onboard_callback_handler,
     search_command,
     settings_callback_handler,
     settings_command,
@@ -158,6 +160,7 @@ def main():
     dispatcher.add_handler(CommandHandler("search", search_command, run_async=True))
     dispatcher.add_handler(CommandHandler(("settings", "conf", "pref"), settings_command, run_async=True))
     dispatcher.add_handler(CallbackQueryHandler(settings_callback_handler, pattern=r"^settings:", run_async=True))
+    dispatcher.add_handler(CallbackQueryHandler(onboard_callback_handler, pattern=r"^onboard:", run_async=True))
     dispatcher.add_handler(CallbackQueryHandler(callback_query_handler, run_async=True))
 
     logging.getLogger("").addHandler(TelegramLogHandler(bot=updater.bot, level=logging.WARNING))
@@ -166,6 +169,13 @@ def main():
         MessageHandler(
             (Filters.sticker | Filters.photo | Filters.video | Filters.document) & Filters.chat_type.private,
             file_handler,
+            run_async=True,
+        )
+    )
+    dispatcher.add_handler(
+        MessageHandler(
+            (Filters.sticker | Filters.photo | Filters.video | Filters.document) & Filters.chat_type.groups,
+            group_file_handler,
             run_async=True,
         )
     )

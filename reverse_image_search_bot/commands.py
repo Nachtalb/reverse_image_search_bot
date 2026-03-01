@@ -149,6 +149,8 @@ def _button_count(chat_config: ChatConfig, excluding_engine: str | None = None) 
 def settings_command(update: Update, context: CallbackContext):
     metrics.commands_total.labels(command="settings").inc()
     chat_config = ChatConfig(update.effective_chat.id)  # type: ignore
+    if _is_group(update.effective_chat.id) and not chat_config.onboarded:
+        chat_config.onboarded = True  # opening settings counts as onboarding
     update.message.reply_html(
         _settings_main_text(chat_config),
         reply_markup=_settings_main_keyboard(chat_config),
@@ -180,14 +182,16 @@ def settings_callback_handler(update: Update, context: CallbackContext):
     action = parts[1] if len(parts) > 1 else ""
     value = parts[2] if len(parts) > 2 else ""
 
+    is_group = _is_group(update.effective_chat.id)
+
     if action == "toggle":
         if value == "auto_search":
-            if chat_config.auto_search_enabled and not chat_config.show_buttons:
+            if not is_group and chat_config.auto_search_enabled and not chat_config.show_buttons:
                 query.answer("⚠️ Enable engine buttons first — at least one must be active.", show_alert=True)
                 return
             chat_config.auto_search_enabled = not chat_config.auto_search_enabled
         elif value == "show_buttons":
-            if chat_config.show_buttons and not chat_config.auto_search_enabled:
+            if not is_group and chat_config.show_buttons and not chat_config.auto_search_enabled:
                 query.answer("⚠️ Enable auto-search first — at least one must be active.", show_alert=True)
                 return
             chat_config.show_buttons = not chat_config.show_buttons
@@ -289,6 +293,10 @@ def start_command(update: Update, context: CallbackContext):
     metrics.commands_total.labels(command="start").inc()
     chat = update.effective_chat
     if chat and chat.type != "private":
+        chat_config = ChatConfig(chat.id)
+        if not chat_config.onboarded:
+            _send_onboarding(update, context)
+            return
         update.message.reply_text(
             "🔎 Send me an image, sticker, or video and I'll find its source.\n\n/search · /settings",
             parse_mode=ParseMode.HTML,
@@ -315,8 +323,81 @@ def on_added_to_group(update: Update, context: CallbackContext):
         return
     for member in message.new_chat_members:
         if member.id == context.bot.id:
-            start_command(update, context)
+            _send_onboarding(update, context)
             break
+
+
+def _send_onboarding(update: Update, context: CallbackContext):
+    """Send the group onboarding prompt with preset choices."""
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔍 Search results only", callback_data="onboard:search_only")],
+        [InlineKeyboardButton("🔍 Full (results + buttons)", callback_data="onboard:full")],
+        [InlineKeyboardButton("❌ Manual only (/search)", callback_data="onboard:manual")],
+        [InlineKeyboardButton("⚙️ Open settings", callback_data="onboard:settings")],
+    ])
+    text = (
+        "👋 <b>How should I handle images in this group?</b>\n\n"
+        "• <b>Search results only</b> — auto-search images, show results\n"
+        "• <b>Full</b> — auto-search + show engine buttons\n"
+        "• <b>Manual</b> — only search when someone replies with /search\n"
+        "• <b>Settings</b> — configure everything yourself"
+    )
+    (update.effective_message or update.message).reply_html(text, reply_markup=keyboard)
+
+
+def _is_group(chat_id: int) -> bool:
+    return chat_id < 0
+
+
+def onboard_callback_handler(update: Update, context: CallbackContext):
+    """Handle onboarding button presses."""
+    query = update.callback_query
+    choice = query.data.split(":", 1)[1]
+    chat_id = update.effective_chat.id
+
+    if not _is_settings_allowed(update, context):
+        query.answer("Only group admins can configure the bot.", show_alert=True)
+        return
+
+    chat_config = ChatConfig(chat_id)
+    chat_config.onboarded = True
+
+    if choice == "search_only":
+        chat_config.auto_search_enabled = True
+        chat_config.show_buttons = False
+        query.edit_message_text("✅ Set to <b>search results only</b>. Change anytime with /settings.", parse_mode=ParseMode.HTML)
+    elif choice == "full":
+        chat_config.auto_search_enabled = True
+        chat_config.show_buttons = True
+        query.edit_message_text("✅ Set to <b>full mode</b> (results + buttons). Change anytime with /settings.", parse_mode=ParseMode.HTML)
+    elif choice == "manual":
+        chat_config.auto_search_enabled = False
+        chat_config.show_buttons = False
+        query.edit_message_text("✅ Set to <b>manual mode</b>. Use /search to search. Change anytime with /settings.", parse_mode=ParseMode.HTML)
+    elif choice == "settings":
+        query.edit_message_text("⚙️ Opening settings...")
+        update.effective_message.reply_html(
+            _settings_main_text(chat_config),
+            reply_markup=_settings_main_keyboard(chat_config),
+        )
+
+    query.answer()
+
+
+def group_file_handler(update: Update, context: CallbackContext):
+    """Handle images in group chats — onboard first if needed."""
+    chat_id = update.effective_chat.id
+    chat_config = ChatConfig(chat_id)
+
+    if not chat_config.onboarded:
+        _send_onboarding(update, context)
+        return
+
+    if not chat_config.auto_search_enabled and not chat_config.show_buttons:
+        # Manual mode — ignore direct images, user must use /search
+        return
+
+    file_handler(update, context)
 
 
 def help_command(update: Update, context: CallbackContext):

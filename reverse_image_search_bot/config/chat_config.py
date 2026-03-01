@@ -41,6 +41,7 @@ class ChatConfig:
         "auto_search_engines": None,  # None = all; list[str] = enabled engine names for autosearch
         "button_engines": None,       # None = all; list[str] = engine names shown as buttons
         "engine_empty_counts": {},    # dict[str, int] consecutive empty result counts per engine
+        "onboarded": False,           # whether a group has completed the onboarding flow
     }
     _loaded_chats: dict = {}
 
@@ -51,6 +52,7 @@ class ChatConfig:
     auto_search_engines: list | None
     button_engines: list | None
     engine_empty_counts: dict
+    onboarded: bool
 
     def reset_engine_counter(self, engine_name: str):
         """Reset the consecutive-empty counter for an engine (e.g. after re-enabling it)."""
@@ -62,7 +64,14 @@ class ChatConfig:
         self.chat_id: int = chat_id
 
         config_file = app_path / f"{chat_id}_chat.json"
+        is_new = not (config_file.is_file() and config_file.stat().st_size > 0)
         self._config = CleverDict(self._default_config)
+
+        # Groups default to both off until onboarded
+        if is_new and chat_id < 0:
+            self._config["show_buttons"] = False
+            self._config["auto_search_enabled"] = False
+
         if config_file.is_file() and config_file.stat().st_size > 0:
             try:
                 self._config.update(CleverDict.from_json(file_path=config_file))
