@@ -1,5 +1,7 @@
 """SQLite backend for chat configuration with typed columns."""
 
+import atexit
+import contextlib
 import json
 import sqlite3
 import threading
@@ -8,6 +10,8 @@ from pathlib import Path
 from reverse_image_search_bot.settings import CONFIG_DB_PATH
 
 _local = threading.local()
+_all_connections: list[sqlite3.Connection] = []
+_conn_lock = threading.Lock()
 
 # Column definitions: (name, sql_type, default_value)
 # list/dict columns are stored as JSON text
@@ -18,7 +22,7 @@ COLUMNS = [
     ("auto_search_enabled", "INTEGER", True),
     ("auto_search_engines", "TEXT", None),  # JSON list or NULL
     ("button_engines", "TEXT", None),  # JSON list or NULL
-    ("engine_empty_counts", "TEXT", "{}"),  # JSON dict
+    ("engine_empty_counts", "TEXT", None),  # JSON dict, None → {} in _to_python
     ("onboarded", "INTEGER", False),
     ("failures_in_a_row", "INTEGER", 0),
 ]
@@ -38,8 +42,22 @@ def _get_conn() -> sqlite3.Connection:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=5000")
         _ensure_schema(conn)
+        with _conn_lock:
+            _all_connections.append(conn)
         _local.conn = conn
     return _local.conn
+
+
+def _close_all_connections():
+    """Close all thread-local connections on interpreter shutdown."""
+    with _conn_lock:
+        for conn in _all_connections:
+            with contextlib.suppress(Exception):
+                conn.close()
+        _all_connections.clear()
+
+
+atexit.register(_close_all_connections)
 
 
 def _ensure_schema(conn: sqlite3.Connection):
@@ -160,16 +178,23 @@ def migrate_json_files(config_dir: Path) -> int:
         except (ValueError, json.JSONDecodeError):
             continue
 
-    # User configs: {user_id}.json — old per-user settings are dropped.
-    # failures_in_a_row is now tracked per-chat (starts fresh at 0).
-    # Rename old user config files to .bak so they don't clutter the directory.
+    # User configs: {user_id}.json — for private chats (user_id == chat_id),
+    # migrate auto_search_enabled so users who disabled it keep it off.
+    # failures_in_a_row is now per-chat and starts fresh at 0.
     for f in config_dir.glob("*.json"):
         if "_chat" in f.stem or f.stem == "pixiv":
             continue
         try:
-            int(f.stem)  # validate it's a user config file
+            user_id = int(f.stem)
+            data = json.loads(f.read_text())
+            # In private chats, user_id == chat_id, so this is correct.
+            # For group users this is meaningless — but positive user IDs
+            # don't collide with group chat IDs (which are negative).
+            if "auto_search_enabled" in data and not data["auto_search_enabled"]:
+                save_field(user_id, "auto_search_enabled", False)
+                count += 1
             migrated_files.append(f)
-        except ValueError:
+        except (ValueError, json.JSONDecodeError):
             continue
 
     # Rename migrated files to .bak so migration doesn't re-run
