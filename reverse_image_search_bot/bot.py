@@ -186,7 +186,7 @@ def main():
 
     start_metrics_server()
 
-    persistence = PicklePersistence(filepath="bot_data.pickle")
+    persistence = PicklePersistence(filepath=str(settings.PERSISTENCE_PATH))
     builder = Application.builder().token(settings.TELEGRAM_API_TOKEN)
     builder.persistence(persistence)
     builder.concurrent_updates(settings.WORKERS)

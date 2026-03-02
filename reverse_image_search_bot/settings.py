@@ -71,6 +71,8 @@ CONFIG_DIR = Path(os.getenv("CONFIG_DIR", "~/.config/reverse_image_search_bot"))
 
 CONFIG_DB_PATH = Path(os.getenv("CONFIG_DB_PATH", str(CONFIG_DIR / "config.db"))).expanduser().absolute()
 
+PERSISTENCE_PATH = Path(os.getenv("PERSISTENCE_PATH", "bot_data.pickle")).expanduser().absolute()
+
 
 # Prometheus metrics
 METRICS_ENABLED = os.getenv("METRICS_ENABLED", "true").lower() in ("true", "1", "yes")
