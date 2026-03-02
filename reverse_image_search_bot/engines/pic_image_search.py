@@ -3,9 +3,9 @@ Generic base engine for PicImageSearch-backed engines.
 Each subclass sets `pic_engine_class` and optionally overrides `_extract`.
 """
 
-from cachetools import cached
 from yarl import URL
 
+from reverse_image_search_bot.utils.async_cache import async_cached
 from reverse_image_search_bot.utils.url import url_button
 
 from .generic import GenericRISEngine
@@ -39,7 +39,7 @@ class PicImageSearchEngine(GenericRISEngine):
             engine = self.pic_engine_class(client=client)
             return await engine.search(url=url)
 
-    def _extract(self, raw: list) -> InternalProviderData:
+    async def _extract(self, raw: list) -> InternalProviderData:
         """Default extractor — works for most engines with title/url/thumbnail attrs."""
         r = raw[0]
         result = {}
@@ -59,15 +59,8 @@ class PicImageSearchEngine(GenericRISEngine):
 
         return result, meta
 
-    @cached(GenericRISEngine._best_match_cache)
-    def best_match(self, url: str | URL) -> ProviderData:
-        """Synchronous wrapper — called from threads via asyncio.to_thread in commands.py.
-
-        PicImageSearch requires an async event loop, so we create a fresh one here
-        since this runs in a thread pool (not the main event loop).
-        """
-        import asyncio
-
+    @async_cached(GenericRISEngine._best_match_cache)
+    async def best_match(self, url: str | URL) -> ProviderData:
         self.logger.debug("Started looking for %s", url)
         meta: MetaData = {
             "provider": self.name,
@@ -75,7 +68,7 @@ class PicImageSearchEngine(GenericRISEngine):
         }
 
         try:
-            result_obj = asyncio.run(self._search(str(url)))
+            result_obj = await self._search(str(url))
         except KeyError as e:
             self.logger.debug("Parsing key missing, treating as no results: %s", e)
             return {}, meta
@@ -93,7 +86,7 @@ class PicImageSearchEngine(GenericRISEngine):
             return {}, {}
 
         try:
-            r, m = self._extract(result_obj.raw)
+            r, m = await self._extract(result_obj.raw)
         except Exception as e:
             self.logger.warning("Extraction failed: %s", e)
             return {}, {}

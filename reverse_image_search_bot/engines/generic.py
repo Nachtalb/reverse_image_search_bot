@@ -3,9 +3,11 @@ from urllib.parse import quote_plus
 
 import httpx
 import validators
-from cachetools import TTLCache, cached
+from cachetools import TTLCache
 from telegram import InlineKeyboardButton
 from yarl import URL
+
+from reverse_image_search_bot.utils.async_cache import async_cached
 
 from .types import InternalResultData, MetaData, ProviderData, ResultData
 
@@ -71,8 +73,8 @@ class GenericRISEngine:
     def best_match_implemented(cls):
         return "best_match" in cls.__dict__ and cls is not GenericRISEngine
 
-    @cached(cache=_best_match_cache)
-    def best_match(self, url: str | URL) -> ProviderData:
+    @async_cached(cache=_best_match_cache)
+    async def best_match(self, url: str | URL) -> ProviderData:
         """Get info about the best matching image found
 
         Returns:
@@ -88,16 +90,16 @@ class PreWorkEngine(GenericRISEngine):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._http_client = httpx.Client(timeout=10)
+        self._http_client = httpx.AsyncClient(timeout=10)
 
-    @cached(_url_cache)
-    def __call__(self, url: str | URL, text: str | None = None) -> InlineKeyboardButton | None:
-        search_url = self.get_search_link_by_url(url)
+    @async_cached(_url_cache)
+    async def __call__(self, url: str | URL, text: str | None = None) -> InlineKeyboardButton | None:
+        search_url = await self._resolve_search_url(url)
         if not search_url:
-            return
+            return None
         return InlineKeyboardButton(text=text or self.name, url=search_url)
 
-    def get_search_link_by_url(self, url: str | URL) -> str | None:
+    async def _resolve_search_url(self, url: str | URL) -> str | None:
         raise NotImplementedError()
 
     def empty_button(self):

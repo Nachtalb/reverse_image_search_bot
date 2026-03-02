@@ -5,13 +5,13 @@ import contextlib
 import html as html_mod
 import io
 import json
+from concurrent.futures import ProcessPoolExecutor
 from logging import getLogger
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from time import time
 
 from emoji import emojize
-from moviepy.video.io.VideoFileClip import VideoFileClip
 from PIL import Image
 from telegram import (
     Animation,
@@ -44,6 +44,21 @@ from reverse_image_search_bot.utils.tags import a, b, code, hidden_a, pre, title
 
 logger = getLogger("BEST MATCH")
 last_used: dict[int, float] = {}
+
+_process_executor = ProcessPoolExecutor(max_workers=2)
+
+
+def _extract_video_frame(video_path: str) -> bytes:
+    """Extract the first frame from a video as JPEG bytes. Runs in a separate process."""
+    from moviepy.video.io.VideoFileClip import VideoFileClip
+    from PIL import Image
+
+    with VideoFileClip(video_path, audio=False) as clip:
+        frame = clip.get_frame(0)
+    buf = io.BytesIO()
+    Image.fromarray(frame, "RGB").save(buf, "jpeg")
+    return buf.getvalue()
+
 
 # Telegram Bot API file download limit (20 MB)
 MAX_TELEGRAM_FILE_SIZE = 20 * 1024 * 1024
@@ -599,7 +614,7 @@ async def general_image_search(update: Update, image_url: URL, reply_done: async
         prework_engines: dict[asyncio.Task, PreWorkEngine] = {}
         for engine in active_engines:
             if isinstance(engine, PreWorkEngine) and (button := engine.empty_button()):
-                task = asyncio.create_task(asyncio.to_thread(engine, image_url))
+                task = asyncio.create_task(engine(image_url))
                 prework_engines[task] = engine
                 engine_buttons.append(button)
             elif button := engine(image_url):
@@ -771,11 +786,10 @@ async def _best_match_search(
     metrics.concurrent_searches.inc()
     _reply_to_msg_id: int | None = message.message_id
 
-    # Run each engine's best_match in a thread (they are sync + use cachetools)
     engine_start_times: dict[asyncio.Task, float] = {}
     engine_tasks: dict[asyncio.Task, GenericRISEngine] = {}
     for en in search_engines:
-        task = asyncio.create_task(asyncio.to_thread(en.best_match, url))
+        task = asyncio.create_task(en.best_match(url))
         engine_tasks[task] = en
         engine_start_times[task] = time()
 
@@ -947,14 +961,12 @@ async def video_to_url(attachment: Document | Video | Animation | Sticker) -> UR
         raise ValueError("This video is too large to download and has no thumbnail. Please send a smaller file.")
 
     video_file = await attachment.get_file()
-    with NamedTemporaryFile() as tmp:
+    with NamedTemporaryFile(suffix=".mp4") as tmp:
         await video_file.download_to_drive(tmp.name)
-        with VideoFileClip(tmp.name, audio=False) as video_clip:
-            frame = video_clip.get_frame(0)
+        loop = asyncio.get_running_loop()
+        frame_bytes = await loop.run_in_executor(_process_executor, _extract_video_frame, tmp.name)
 
-    with io.BytesIO() as file:
-        Image.fromarray(frame, "RGB").save(file, "jpeg")
-        file.seek(0)
+    with io.BytesIO(frame_bytes) as file:
         return upload_file(file, filename)
 
 

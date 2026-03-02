@@ -15,12 +15,13 @@ class BaiduEngine(PreWorkEngine):
 
     pre_url = "https://graph.baidu.com/upload?image={query_url}&from=pc"
 
-    def get_search_link_by_url(self, url: str | URL) -> str | None:
+    async def _resolve_search_url(self, url: str | URL) -> str | None:
         pre_url = self.pre_url.format(query_url=quote_plus(str(url)))
 
-        response = self._http_client.get(pre_url)
+        response = await self._http_client.get(pre_url)
         try:
             if response.status_code == 200 and (search_url := response.json().get("data", {}).get("url")):
                 return search_url
         except json.JSONDecodeError:
             return None
+        return None

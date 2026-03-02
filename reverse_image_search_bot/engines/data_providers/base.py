@@ -1,28 +1,23 @@
 import logging
 import time
-from functools import partial, wraps
+from functools import wraps
 from typing import TypedDict
 
 import httpx
-from cachetools import TTLCache, cachedmethod
-from cachetools.keys import hashkey
+from cachetools import TTLCache
 
 from reverse_image_search_bot import metrics
 
 
-def provider_cache(func):
-    return wraps(func)(cachedmethod(lambda self: self._cache, key=partial(hashkey, func.__qualname__))(func))
-
-
 def _instrumented_provide(original_provide):
-    """Wrap a data provider's provide() method with metrics tracking."""
+    """Wrap a data provider's async provide() method with metrics tracking."""
 
     @wraps(original_provide)
-    def wrapper(self, *args, **kwargs):
+    async def wrapper(self, *args, **kwargs):
         provider_name = self.info.get("name", type(self).__name__).lower()
         start = time.time()
         try:
-            result, meta = original_provide(self, *args, **kwargs)
+            result, meta = await original_provide(self, *args, **kwargs)
             duration = time.time() - start
             metrics.data_provider_duration_seconds.labels(provider=provider_name).observe(duration)
             if result:
@@ -58,5 +53,5 @@ class BaseProvider:
 
     def __init__(self):
         self._cache: TTLCache = TTLCache(1e4, self._cache_ttl)
-        self._http_client: httpx.Client = httpx.Client(timeout=10)
+        self._http_client: httpx.AsyncClient = httpx.AsyncClient(timeout=10)
         self.logger: logging.Logger = logging.getLogger(self.info["name"] + "DataProvider")

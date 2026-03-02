@@ -1,15 +1,15 @@
-from threading import Lock
+import asyncio
 from time import time
 from urllib.parse import quote_plus
 
 import httpx
 import validators
-from cachetools import cached
 from telegram import InlineKeyboardButton
 from yarl import URL
 
 from reverse_image_search_bot.settings import SAUCENAO_API
 from reverse_image_search_bot.utils import tagify, url_button
+from reverse_image_search_bot.utils.async_cache import async_cached
 
 from .data_providers import anilist, booru, mangadex, pixiv
 from .generic import GenericRISEngine
@@ -35,31 +35,31 @@ class SauceNaoEngine(GenericRISEngine):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._http_client = httpx.Client(timeout=10)
-        self.lock = Lock()
+        self._http_client = httpx.AsyncClient(timeout=10)
+        self._lock = asyncio.Lock()
 
-    def _21_provider(self, data: ResponseData) -> InternalProviderData | tuple[None, None]:
+    async def _21_provider(self, data: ResponseData) -> InternalProviderData | tuple[None, None]:
         """Anime"""
         if "anilist_id" not in data:
             return None, None
-        return anilist.provide(data["anilist_id"], data.get("part"))  # type: ignore
+        return await anilist.provide(data["anilist_id"], data.get("part"))  # type: ignore
 
-    def _booru_provider(self, data: ResponseData, api: str) -> InternalProviderData:
-        return booru.provide(api, data[api + "_id"])
+    async def _booru_provider(self, data: ResponseData, api: str) -> InternalProviderData:
+        return await booru.provide(api, data[api + "_id"])  # type: ignore[arg-type]
 
-    def _9_provider(self, data):
-        return self._booru_provider(data, "danbooru")
+    async def _9_provider(self, data):
+        return await self._booru_provider(data, "danbooru")
 
-    def _12_provider(self, data):
-        return self._booru_provider(data, "yandere")
+    async def _12_provider(self, data):
+        return await self._booru_provider(data, "yandere")
 
-    def _25_provider(self, data):
-        return self._booru_provider(data, "gelbooru")
+    async def _25_provider(self, data):
+        return await self._booru_provider(data, "gelbooru")
 
-    def _5_provider(self, data: ResponseData) -> InternalProviderData:
+    async def _5_provider(self, data: ResponseData) -> InternalProviderData:
         """Pixiv"""
         try:
-            result, meta = pixiv.provide(data["pixiv_id"])  # type: ignore
+            result, meta = await pixiv.provide(data["pixiv_id"])  # type: ignore
         except Exception as e:
             self.logger.exception(e)
             self.logger.warning("Error in pixiv provider")
@@ -78,7 +78,7 @@ class SauceNaoEngine(GenericRISEngine):
                 },
             )
 
-    def _37_provider(self, data: ResponseData) -> InternalProviderData:
+    async def _37_provider(self, data: ResponseData) -> InternalProviderData:
         """Mangadex"""
         kwargs = {}
         if chapter_id := data.get("md_id"):
@@ -88,9 +88,10 @@ class SauceNaoEngine(GenericRISEngine):
         if mangadex_url := next(iter(mangadex_urls), None):
             kwargs["url"] = URL(mangadex_url.strip("/"))
 
-        return mangadex.provide(**kwargs)
+        return await mangadex.provide(**kwargs)
 
-    _371_provider = _37_provider  # Mangadex V2
+    async def _371_provider(self, data: ResponseData) -> InternalProviderData:
+        return await self._37_provider(data)
 
     def _default_provider(self, data: ResponseData) -> InternalProviderData:
         """Generic"""
@@ -137,8 +138,8 @@ class SauceNaoEngine(GenericRISEngine):
 
         return result, meta  # type: ignore
 
-    @cached(GenericRISEngine._best_match_cache)
-    def best_match(self, url: str | URL) -> ProviderData:
+    @async_cached(GenericRISEngine._best_match_cache)
+    async def best_match(self, url: str | URL) -> ProviderData:
         self.logger.debug("Started looking for %s", url)
         meta: MetaData = {
             "provider": self.name,
@@ -157,8 +158,8 @@ class SauceNaoEngine(GenericRISEngine):
             quote_plus(str(url)), f"&api_key={SAUCENAO_API}" if SAUCENAO_API else ""
         )
         try:
-            with self.lock:
-                response = self._http_client.get(api_link, timeout=5)
+            async with self._lock:
+                response = await self._http_client.get(api_link, timeout=5)
         except httpx.ConnectError:
             meta["errors"] = ["Error connecting to SauceNAO API"]
             self.logger.debug("Error connecting to SauceNAO API")
@@ -196,8 +197,11 @@ class SauceNaoEngine(GenericRISEngine):
             self.logger.debug("Done with search: found nothing")
             return {}, {}
 
-        data_provider = getattr(self, f"_{data['header']['index_id']}_provider", self._default_provider)
-        result, new_meta = data_provider(data["data"])
+        data_provider = getattr(self, f"_{data['header']['index_id']}_provider", None)
+        if data_provider:
+            result, new_meta = await data_provider(data["data"])
+        else:
+            result, new_meta = self._default_provider(data["data"])
         if not result:
             result, new_meta = self._default_provider(data["data"])
 

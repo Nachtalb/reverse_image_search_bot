@@ -1,13 +1,13 @@
 from datetime import datetime
 
 import httpx
-from cachetools import cached
 from telegram import InlineKeyboardButton
 from telegram.ext import ContextTypes
 from yarl import URL
 
 from reverse_image_search_bot import settings
 from reverse_image_search_bot.utils import url_button
+from reverse_image_search_bot.utils.async_cache import async_cached
 
 from .data_providers import anilist
 from .generic import GenericRISEngine
@@ -28,7 +28,7 @@ class TraceEngine(GenericRISEngine):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._http_client = httpx.Client(timeout=10)
+        self._http_client = httpx.AsyncClient(timeout=10)
 
     @property
     def use_api_key(self):
@@ -50,26 +50,26 @@ class TraceEngine(GenericRISEngine):
     async def _stop_using_api_key(self, context: ContextTypes.DEFAULT_TYPE):
         self._use_api_key = False
 
-    def _fetch_data(self, url: URL | str) -> int | dict:
+    async def _fetch_data(self, url: URL | str) -> int | dict:
         api_link = "https://api.trace.moe/search"
         params = {"url": str(url)}
 
         result = None
         if not self.use_api_key:
-            result = self._http_client.get(api_link, params=params, timeout=5)
+            result = await self._http_client.get(api_link, params=params, timeout=5)
 
         if self.use_api_key or (result is not None and result.status_code == 402):
             self.use_api_key = True
             headers = {"x-trace-key": settings.TRACE_API}
-            result = self._http_client.get(api_link, params=params, headers=headers, timeout=5)
+            result = await self._http_client.get(api_link, params=params, headers=headers, timeout=5)
 
         if result and result.status_code != 200:
             return result.status_code
         else:
             return result.json() if result else {}
 
-    @cached(GenericRISEngine._best_match_cache)
-    def best_match(self, url: str | URL) -> ProviderData:
+    @async_cached(GenericRISEngine._best_match_cache)
+    async def best_match(self, url: str | URL) -> ProviderData:
         self.logger.debug("Started looking for %s", url)
 
         meta: MetaData = {
@@ -78,7 +78,7 @@ class TraceEngine(GenericRISEngine):
         }
         limit_reached_result = "Monthly limit reached. You can search Trace via it's button above or <b>More</b> below."
 
-        data = self._fetch_data(url)
+        data = await self._fetch_data(url)
 
         if data == 402:
             meta["errors"] = [limit_reached_result]
@@ -99,7 +99,7 @@ class TraceEngine(GenericRISEngine):
         if isinstance(data["anilist"], dict):
             anilist_id = data["anilist"]["id"]
 
-        result, meta = anilist.provide(int(anilist_id), data["episode"])
+        result, meta = await anilist.provide(int(anilist_id), data["episode"])
 
         if meta:
             buttons = meta.get("buttons", [])
