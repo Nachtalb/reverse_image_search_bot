@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import html as html_mod
 import io
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -855,13 +856,13 @@ def build_reply(result: ResultData, meta: MetaData) -> tuple[str, list[InputMedi
     reply += "\n\n"
 
     for key, value in result.items():
-        reply += title(key)
+        reply += title(html_mod.escape(str(key)))
         if isinstance(value, set):  # Tags
-            reply += ", ".join(value)
+            reply += ", ".join(html_mod.escape(str(v)) for v in value)
         elif isinstance(value, list):
-            reply += ", ".join(map(code, value))
+            reply += ", ".join(code(html_mod.escape(str(v))) for v in value)
         else:
-            reply += code(value)
+            reply += code(html_mod.escape(str(value)))
         reply += "\n"
 
     if errors := meta.get("errors"):
