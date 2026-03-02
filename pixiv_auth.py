@@ -69,7 +69,7 @@ def login():
 
     try:
         code = input("code: ").strip()
-    except (EOFError, KeyboardInterrupt):
+    except EOFError, KeyboardInterrupt:
         return
 
     response = requests.post(

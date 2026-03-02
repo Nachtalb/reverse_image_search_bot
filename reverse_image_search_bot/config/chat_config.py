@@ -1,7 +1,7 @@
 from reverse_image_search_bot.config.db import load_config, save_field
 
 
-def single_chat(cls: type["ChatConfig"]):
+def single_chat(cls: type[ChatConfig]):
     def get_instance(chat_id: int):
         if not hasattr(cls, "_loaded_chats"):
             cls._loaded_chats = {}

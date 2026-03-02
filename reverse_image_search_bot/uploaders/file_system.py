@@ -1,4 +1,6 @@
 import os
+import shutil
+import stat
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import IO
@@ -39,7 +41,8 @@ class FileSystemUploader(UploaderBase):
 
         os.makedirs(destination.parent, exist_ok=True)
 
-        os.system(f"mv {real_file} {destination} && chmod 664 {destination}")
+        shutil.move(str(real_file), str(destination))
+        destination.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IROTH)  # 664
         self.logger.debug('Saved file to "%s"', destination)
 
     def file_exists(self, file_name: str | Path) -> bool:
