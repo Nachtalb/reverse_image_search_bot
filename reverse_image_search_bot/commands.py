@@ -25,7 +25,6 @@ from telegram import (
     ReplyKeyboardMarkup,
     Sticker,
     Update,
-    User,
     Video,
 )
 from telegram.constants import ChatAction, ParseMode
@@ -56,9 +55,9 @@ MAX_TELEGRAM_FILE_SIZE = 20 * 1024 * 1024
 
 
 async def id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    assert update.message and update.effective_chat
     metrics.commands_total.labels(command="id").inc()
-    if update.effective_chat:
-        await update.message.reply_html(pre(json.dumps(update.effective_chat.to_dict(), sort_keys=True, indent=4)))
+    await update.message.reply_html(pre(json.dumps(update.effective_chat.to_dict(), sort_keys=True, indent=4)))
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -148,7 +147,7 @@ def _button_count(chat_config: ChatConfig, excluding_engine: str | None = None) 
 
 
 async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    assert update.effective_chat
+    assert update.message and update.effective_chat
     metrics.commands_total.labels(command="settings").inc()
     chat_config = ChatConfig(update.effective_chat.id)
     if _is_group(update.effective_chat.id) and not chat_config.onboarded:
@@ -161,6 +160,7 @@ async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def settings_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    assert query and query.data is not None
     data = query.data
 
     if data == "settings:noop":
@@ -285,6 +285,7 @@ _HELP_IMAGE = _LOCAL / "images/help.jpg"
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    assert update.message
     metrics.commands_total.labels(command="start").inc()
     chat = update.effective_chat
     if chat and chat.type != "private":
@@ -339,7 +340,9 @@ async def _send_onboarding(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• <b>Manual</b> — only search when someone replies with /search\n"
         "• <b>Settings</b> — configure everything yourself"
     )
-    await (update.effective_message or update.message).reply_html(text, reply_markup=keyboard)
+    msg = update.effective_message or update.message
+    assert msg
+    await msg.reply_html(text, reply_markup=keyboard)
 
 
 def _is_group(chat_id: int) -> bool:
@@ -350,6 +353,7 @@ async def onboard_callback_handler(update: Update, context: ContextTypes.DEFAULT
     """Handle onboarding button presses."""
     assert update.effective_chat
     query = update.callback_query
+    assert query and query.data is not None
     choice = query.data.split(":", 1)[1]
     chat_id = update.effective_chat.id
 
@@ -409,6 +413,7 @@ async def group_file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    assert update.message
     metrics.commands_total.labels(command="help").inc()
     with _HELP_IMAGE.open("rb") as photo:
         await update.message.reply_photo(
@@ -420,6 +425,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    assert update.message
     metrics.commands_total.labels(command="search").inc()
     orig_message: Message | None = update.message.reply_to_message
     if not orig_message:
@@ -433,8 +439,11 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
     message = message or update.effective_message
     if not message:
         return
+    assert update.effective_chat
 
     user = message.from_user
+    if not user:
+        return
     if user.id in context.bot_data.get("banned_users", []):
         await message.reply_text("🔴 You are banned from using this bot due to uploading illegal content.")
         return
@@ -467,25 +476,27 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
         file_type = "unknown"
 
     metrics.files_received_total.labels(file_type=file_type).inc()
-    if hasattr(attachment, "file_size") and attachment.file_size:
-        metrics.file_size_bytes.labels(file_type=file_type).observe(float(attachment.file_size))
+    file_size = getattr(attachment, "file_size", None)
+    if file_size:
+        metrics.file_size_bytes.labels(file_type=file_type).observe(float(file_size))
 
     language = getattr(user, "language_code", None) or "unknown"
 
     try:
         image_url = None
         error = None
+        mime = attachment.mime_type if isinstance(attachment, Document) else None
         try:
             if (
-                (isinstance(attachment, Document) and attachment.mime_type.startswith("video"))
+                (isinstance(attachment, Document) and mime and mime.startswith("video"))
                 or isinstance(attachment, (Video, Animation))
                 or (isinstance(attachment, Sticker) and attachment.is_video)
             ):
                 search_type = "video_frame" if isinstance(attachment, Video) else file_type
                 image_url = await video_to_url(attachment)
-            elif (
-                isinstance(attachment, Document) and attachment.mime_type.endswith(("jpeg", "png", "webp"))
-            ) or isinstance(attachment, (PhotoSize, Sticker)):
+            elif (isinstance(attachment, Document) and mime and mime.endswith(("jpeg", "png", "webp"))) or isinstance(
+                attachment, (PhotoSize, Sticker)
+            ):
                 if isinstance(attachment, Sticker) and attachment.is_animated:
                     await message.reply_text("Animated stickers are not supported.")
                     return
@@ -523,6 +534,7 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
 
 
 async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    assert update.callback_query and update.callback_query.data is not None
     query_parts = update.callback_query.data.split(" ")
 
     if len(query_parts) == 1:
@@ -547,11 +559,13 @@ async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_T
 
 
 async def send_wait_for(update: Update, context: ContextTypes.DEFAULT_TYPE, engine_name: str):
+    assert update.callback_query
     await update.callback_query.answer(f"Creating {engine_name} search url...")
 
 
 async def general_image_search(update: Update, image_url: URL, reply_done: asyncio.Event):
     """Send reverse image search link buttons for the image sent to us."""
+    assert update.message
     try:
         chat_config = ChatConfig(update.message.chat_id)
 
@@ -627,8 +641,9 @@ async def best_match(
     if update.callback_query:
         await update.callback_query.answer(show_alert=False)
 
-    user: User = update.effective_user
-    message: Message = update.effective_message
+    user = update.effective_user
+    message = update.effective_message
+    assert user and message
 
     if user.id not in ADMIN_IDS and (last_time := last_used.get(user.id)) and time() - last_time < 10:
         if general_done:
@@ -647,7 +662,9 @@ async def best_match(
     # Event to hold results until "⏳ searching..." is sent
     results_gate = asyncio.Event()
 
-    search_task = asyncio.create_task(_best_match_search(update, context, searchable_engines, url, results_gate))
+    search_task = asyncio.create_task(
+        _best_match_search(update, context, searchable_engines, URL(str(url)), results_gate)
+    )
 
     if general_done:
         await general_done.wait()
@@ -667,7 +684,7 @@ async def best_match(
         chat_config.failures_in_a_row += 1
         if chat_config.failures_in_a_row > 4 and chat_config.auto_search_enabled:
             chat_config.auto_search_enabled = False
-            await update.message.reply_text(
+            await message.reply_text(
                 emojize(
                     ":yellow_circle: 5 searches in a row returned no results — auto search has been disabled for"
                     " this chat. This helps prevent hitting rate limits. The auto search engines are mainly for anime"
@@ -735,7 +752,8 @@ async def _best_match_search(
     url: URL,
     results_gate: asyncio.Event,
 ):
-    message: Message = update.effective_message
+    message = update.effective_message
+    assert message
     identifiers = []
     thumbnail_identifiers = []
     match_found = False
@@ -908,7 +926,7 @@ def build_reply(result: ResultData, meta: MetaData) -> tuple[str, list[InputMedi
     return reply, None
 
 
-async def video_to_url(attachment: Document | Video | Sticker) -> URL:
+async def video_to_url(attachment: Document | Video | Animation | Sticker) -> URL:
     filename = f"{attachment.file_unique_id}.jpg"
     if uploader.file_exists(filename):
         return uploader.get_url(filename)
@@ -932,7 +950,7 @@ async def video_to_url(attachment: Document | Video | Sticker) -> URL:
 
 async def image_to_url(attachment: PhotoSize | Sticker | Document) -> URL:
     if isinstance(attachment, Document):
-        extension = attachment.file_name.lower().rsplit(".", 1)[1].strip(".")
+        extension = (attachment.file_name or "unknown.jpg").lower().rsplit(".", 1)[1].strip(".")
     else:
         extension = "jpg" if isinstance(attachment, PhotoSize) else "png"
 

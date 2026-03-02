@@ -107,6 +107,7 @@ class RISBot:
             self._banned_users = json.loads(self._banned_users_file.read_text())
 
     async def ban_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        assert update.message and update.message.text
         metrics.commands_total.labels(command="ban").inc()
         args = update.message.text.strip("/").split(" ")
         if len(args) != 2:
@@ -137,6 +138,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
 
 async def restart_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Gracefully stop and replace the current process."""
+    assert update.message and update.effective_chat
     metrics.commands_total.labels(command="restart").inc()
     await update.message.reply_text("Bot is restarting...")
     logger.info("User requested restart")
