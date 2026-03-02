@@ -64,8 +64,7 @@ if MODE_ACTIVE == "webhook":
         "webhook_url": required_env("MODE_WEBHOOK_URL"),
     }
 
-WORKERS = int(os.getenv("WORKERS", 4))
-CON_POOL_SIZE = int(os.getenv("CON_POOL_SIZE", WORKERS + 4))
+CONCURRENT_UPDATES = int(os.getenv("CONCURRENT_UPDATES", 16))
 
 CONFIG_DIR = Path(os.getenv("CONFIG_DIR", "~/.config/reverse_image_search_bot")).expanduser().absolute()
 

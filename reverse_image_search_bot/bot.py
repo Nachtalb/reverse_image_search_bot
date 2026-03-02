@@ -165,7 +165,7 @@ def main():
     persistence = PicklePersistence(filepath=str(settings.PERSISTENCE_PATH))
     builder = Application.builder().token(settings.TELEGRAM_API_TOKEN)
     builder.persistence(persistence)
-    builder.concurrent_updates(settings.WORKERS)
+    builder.concurrent_updates(settings.CONCURRENT_UPDATES)
     builder.post_init(post_init)
     app = builder.build()
     application = app
