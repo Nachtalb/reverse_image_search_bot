@@ -30,7 +30,7 @@ from telegram import (
     User,
     Video,
 )
-from telegram.error import BadRequest
+from telegram.error import BadRequest, TelegramError
 from telegram.ext import CallbackContext
 from telegram.parsemode import ParseMode
 from yarl import URL
@@ -257,23 +257,23 @@ def settings_callback_handler(update: Update, context: CallbackContext):
 
         # Re-render appropriate menu
         if value.startswith("auto_search_engine:"):
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(TelegramError):
                 query.edit_message_reply_markup(
                     reply_markup=_settings_engines_keyboard(chat_config, "auto_search_engines")
                 )
         elif value.startswith("button_engine:") or value in ("show_link", "show_best_match"):
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(TelegramError):
                 query.edit_message_reply_markup(reply_markup=_settings_engines_keyboard(chat_config, "button_engines"))
         else:
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(TelegramError):
                 query.edit_message_reply_markup(reply_markup=_settings_main_keyboard(chat_config))
 
     elif action == "menu":
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(TelegramError):
             query.edit_message_reply_markup(reply_markup=_settings_engines_keyboard(chat_config, value))
 
     elif action == "back":
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(TelegramError):
             query.edit_message_text(
                 _settings_main_text(chat_config),
                 parse_mode="HTML",
