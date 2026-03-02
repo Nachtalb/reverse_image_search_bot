@@ -3,9 +3,6 @@ import html
 import io
 import json
 import logging
-import os
-import re
-import sys
 from pathlib import Path
 
 from emoji import emojize
@@ -127,24 +124,6 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     logger.error("Uncaught exception in handler:", exc_info=context.error)
 
 
-async def restart_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Gracefully stop and replace the current process."""
-    assert update.message and update.effective_chat
-    metrics.commands_total.labels(command="restart").inc()
-    await update.message.reply_text("Bot is restarting...")
-    logger.info("User requested restart")
-    chat_id = update.effective_chat.id
-
-    async def _stop_and_restart():
-        if application is not None:
-            await application.stop()
-            await application.shutdown()
-        logger.info("Restarting: starting...")
-        os.execl(sys.executable, sys.executable, *sys.argv, f"restart={chat_id}")
-
-    _restart_task = asyncio.create_task(_stop_and_restart())  # noqa: RUF006
-
-
 async def post_init(app: Application) -> None:
     """Called after Application.initialize() — send restart/startup notifications."""
     loop = asyncio.get_running_loop()
@@ -163,9 +142,6 @@ async def post_init(app: Application) -> None:
             logger.info("Migrated banned_users.json → bot_data (%d users)", len(users))
         except Exception:
             logger.warning("Failed to migrate banned_users.json", exc_info=True)
-
-    if match := re.match(r"restart=(\d+)", sys.argv[-1]):
-        await app.bot.send_message(int(match.groups()[0]), "Restart successful!")
 
     for admin_id in settings.ADMIN_IDS:
         try:
@@ -199,7 +175,6 @@ def main():
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("id", id_command))
-    app.add_handler(CommandHandler("restart", restart_command, filters=ADMIN_FILTER))
     app.add_handler(CommandHandler("ban", ban_command, filters=ADMIN_FILTER), group=1)
     app.add_handler(CommandHandler("search", search_command))
     app.add_handler(CommandHandler(("settings", "conf", "pref"), settings_command))
