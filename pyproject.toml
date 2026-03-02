@@ -5,7 +5,7 @@ description = "Discover https://t.me/reverse_image_search_bot, a convenient Tele
 authors = [{name = "Nachtalb", email = "na@nachtalb.io"}]
 license = {text = "LGPL-3.0"}
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 dependencies = [
     "python-magic==0.4.24",
     "validators==0.18.2",
@@ -46,7 +46,7 @@ packages = ["reverse_image_search_bot"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py311"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
@@ -58,3 +58,6 @@ ignore = [
 
 [tool.ruff.format]
 quote-style = "double"
+
+[tool.uv]
+constraint-dependencies = ["lxml>=6.0"]
