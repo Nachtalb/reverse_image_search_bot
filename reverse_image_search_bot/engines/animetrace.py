@@ -4,6 +4,7 @@ import asyncio
 import re
 
 import httpx
+from cachetools import TTLCache
 from yarl import URL
 
 from reverse_image_search_bot import settings
@@ -86,8 +87,8 @@ def _best_work_node(media_nodes: list, original_work: str) -> tuple[str, int | N
     return title, node.get("id")
 
 
-# Use a simple dict cache for async results (lru_cache doesn't work with async)
-_anilist_resolve_cache: dict[tuple[str, str], tuple[str, str, int | None, int | None, str | None]] = {}
+# Bounded async cache for AniList character resolution (replaces @lru_cache which doesn't work with async)
+_anilist_resolve_cache: TTLCache = TTLCache(maxsize=2048, ttl=7 * 24 * 3600)
 
 
 async def _anilist_resolve(char_name: str, work: str) -> tuple[str, str, int | None, int | None, str | None]:
