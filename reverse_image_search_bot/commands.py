@@ -540,6 +540,9 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
         # Run general_image_search and best_match concurrently
         general_done = asyncio.Event()
         general_task = asyncio.create_task(general_image_search(update, image_url, general_done))
+        # Suppress "Task exception was never retrieved" — general_image_search
+        # handles its own errors internally; this just marks the exception as seen.
+        general_task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
 
         try:
             chat_config = ChatConfig(update.effective_chat.id)
