@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import contextlib
 import io
 import json
@@ -34,7 +36,7 @@ from telegram.parsemode import ParseMode
 from yarl import URL
 
 from reverse_image_search_bot import metrics
-from reverse_image_search_bot.config import ChatConfig, UserConfig
+from reverse_image_search_bot.config import ChatConfig
 from reverse_image_search_bot.engines import engines
 from reverse_image_search_bot.engines.generic import GenericRISEngine, PreWorkEngine
 from reverse_image_search_bot.engines.types import MetaData, ResultData
@@ -506,9 +508,8 @@ def file_handler(update: Update, context: CallbackContext, message: Message | No
         general_search_lock = Lock()
         general_search_lock.acquire()
         Thread(target=general_image_search, args=(update, image_url, general_search_lock)).start()
-        config = UserConfig(update.effective_user)  # type: ignore
         chat_config = ChatConfig(update.effective_chat.id)  # type: ignore
-        if config.auto_search_enabled and chat_config.auto_search_enabled:
+        if chat_config.auto_search_enabled:
             best_match(update, context, image_url, general_search_lock)
     except Exception as error:
         message.reply_text("An error occurred, try again.")
@@ -614,16 +615,15 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, general
 
     user: User = update.effective_user  # type: ignore
     message: Message = update.effective_message  # type: ignore
-    config = UserConfig(user)
 
-    if user.id not in ADMIN_IDS and (last_time := config.last_auto_search) and time() - last_time < 10:
+    if user.id not in ADMIN_IDS and (last_time := last_used.get(user.id)) and time() - last_time < 10:
         if general_search_lock:
             wait_for(general_search_lock)
         context.bot.send_message(
             text="Slow down a bit please....", chat_id=message.chat_id, reply_to_message_id=message.message_id
         )
         return
-    config.used_auto_search()
+    last_used[user.id] = time()
 
     chat_config = ChatConfig(message.chat_id)
     searchable_engines = [engine for engine in engines if engine.best_match_implemented]
@@ -653,16 +653,14 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, general
 
     engines_used_html = ", ".join([b(en.name) for en in searchable_engines])
     if not match_found:
-        config.failures_in_a_row += 1
-        if config.failures_in_a_row > 4 and config.auto_search_enabled:
-            config.auto_search_enabled = False
+        chat_config.failures_in_a_row += 1
+        if chat_config.failures_in_a_row > 4 and chat_config.auto_search_enabled:
+            chat_config.auto_search_enabled = False
             update.message.reply_text(
                 emojize(
-                    ":yellow_circle: You had 5 searches in a row returning no results thus I disabled auto search for"
-                    " you. This helps to prevent hitting rate limits of the search engines making the bot more useful"
-                    " for everyone. At the moment the auto search compatible engines are for anime & manga related"
-                    " content. If you mainly search for other material please keep auto search disabled. You can use"
-                    " /settings to reenable it."
+                    ":yellow_circle: 5 searches in a row returned no results — auto search has been disabled for"
+                    " this chat. This helps prevent hitting rate limits. The auto search engines are mainly for anime"
+                    " & manga content. Use /settings to re-enable it."
                 )
             )
         search_message.edit_text(
@@ -673,12 +671,16 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, general
             ParseMode.HTML,
         )
     else:
-        config.failures_in_a_row = 0
+        chat_config.failures_in_a_row = 0
         search_message.edit_text(
             emojize(
                 f":blue_circle: I searched for you on {engines_used_html}. You can try others above for more results."
             )
-            + (" You may reenable auto-search via /settings if you want." if not config.auto_search_enabled else ""),
+            + (
+                " You may reenable auto-search via /settings if you want."
+                if not chat_config.auto_search_enabled
+                else ""
+            ),
             ParseMode.HTML,
         )
 

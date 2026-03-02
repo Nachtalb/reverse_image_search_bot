@@ -1,5 +1,4 @@
 from .chat_config import ChatConfig
 from .pixiv_config import PixivConfig
-from .user_config import UserConfig
 
-__all__ = ["ChatConfig", "PixivConfig", "UserConfig"]
+__all__ = ["ChatConfig", "PixivConfig"]

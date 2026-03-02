@@ -1,9 +1,4 @@
-from cleverdict import CleverDict
-
-from reverse_image_search_bot.settings import CONFIG_DIR
-
-app_path = CONFIG_DIR
-app_path.mkdir(parents=True, exist_ok=True)
+from reverse_image_search_bot.config.db import load_config, save_field
 
 
 def single_chat(cls: type["ChatConfig"]):
@@ -41,6 +36,7 @@ class ChatConfig:
         "button_engines": None,  # None = all; list[str] = engine names shown as buttons
         "engine_empty_counts": {},  # dict[str, int] consecutive empty result counts per engine
         "onboarded": False,  # whether a group has completed the onboarding flow
+        "failures_in_a_row": 0,
     }
     _loaded_chats: dict = {}
 
@@ -52,6 +48,7 @@ class ChatConfig:
     button_engines: list | None
     engine_empty_counts: dict
     onboarded: bool
+    failures_in_a_row: int
 
     def reset_engine_counter(self, engine_name: str):
         """Reset the consecutive-empty counter for an engine (e.g. after re-enabling it)."""
@@ -61,23 +58,18 @@ class ChatConfig:
 
     def __init__(self, chat_id: int):
         self.chat_id: int = chat_id
-
-        config_file = app_path / f"{chat_id}_chat.json"
-        is_new = not (config_file.is_file() and config_file.stat().st_size > 0)
-        self._config = CleverDict(self._default_config)
+        self._config: dict = dict(self._default_config)
 
         # Groups default to both off until onboarded
+        is_new = True
+        saved = load_config(chat_id)
+        if saved is not None:
+            is_new = False
+            self._config.update(saved)
+
         if is_new and chat_id < 0:
             self._config["show_buttons"] = False
             self._config["auto_search_enabled"] = False
-
-        if config_file.is_file() and config_file.stat().st_size > 0:
-            try:
-                self._config.update(CleverDict.from_json(file_path=config_file))
-            except Exception:
-                config_file.unlink(missing_ok=True)  # corrupt file — reset
-        self._config.save_path = config_file
-        self._config.autosave(fullcopy=True)
 
     def __repr__(self):
         return f"<ChatConfig(chat_id={self.chat_id})>"
@@ -85,6 +77,7 @@ class ChatConfig:
     def __setattr__(self, name: str, value):
         if not name.startswith("_") and name in self._default_config:
             self._config[name] = value
+            save_field(self.chat_id, name, value)
         else:
             super().__setattr__(name, value)
 
