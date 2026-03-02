@@ -4,7 +4,6 @@ Metrics are exposed on a separate HTTP port (default 9100) and scraped by Promet
 Disable with METRICS_ENABLED=false.
 """
 
-import contextlib
 import logging
 import os
 import threading
@@ -163,8 +162,10 @@ def _collect_process_metrics():
         if _first_run:
             time.sleep(5)  # let engines/providers initialize
             _first_run = False
-        with contextlib.suppress(Exception):
+        try:
             update_provider_status()
+        except Exception:
+            logger.exception("provider status update failed")
         time.sleep(15)
 
 
