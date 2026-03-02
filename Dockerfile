@@ -1,8 +1,8 @@
 FROM python:3.11-slim AS builder
 
-# Build deps: C compiler + Kerberos headers (required by gssapi C extension)
+# Build deps: git required for moviepy git dependency
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends gcc libkrb5-dev git \
+    && apt-get install -y --no-install-recommends git \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
@@ -16,11 +16,9 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 FROM python:3.11-slim
 
-# Runtime deps only:
-#   ffmpeg           — required by moviepy for video frame extraction
-#   libgssapi-krb5-2 — runtime .so that the compiled gssapi extension links against
+# Runtime deps: ffmpeg required by moviepy for video frame extraction
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg libgssapi-krb5-2 \
+    && apt-get install -y --no-install-recommends ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
