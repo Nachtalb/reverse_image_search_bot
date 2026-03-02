@@ -10,6 +10,7 @@ dependencies = [
     "python-magic==0.4.24",
     "validators==0.18.2",
     "python-telegram-bot[json,socks]==13.15",
+    "standard-imghdr>=3.13",
     "gppt==1.6",
     "cleverdict==1.9.1",
     "paramiko>=3.4.0",
