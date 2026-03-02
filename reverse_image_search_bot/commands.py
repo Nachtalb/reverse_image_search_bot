@@ -526,11 +526,17 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
         general_done = asyncio.Event()
         general_task = asyncio.create_task(general_image_search(update, image_url, general_done))
 
-        chat_config = ChatConfig(update.effective_chat.id)
-        if chat_config.auto_search_enabled:
-            await best_match(update, context, image_url, general_done)
-        else:
-            await general_task
+        try:
+            chat_config = ChatConfig(update.effective_chat.id)
+            if chat_config.auto_search_enabled:
+                await best_match(update, context, image_url, general_done)
+            else:
+                await general_task
+        except Exception:
+            general_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await general_task
+            raise
 
     except Exception:
         await message.reply_text("An error occurred, try again.")
