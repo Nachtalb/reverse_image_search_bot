@@ -14,7 +14,7 @@ dependencies = [
     "cleverdict==1.9.1",
     "paramiko[all]==2.9.2",
     "pixiv-api==1.0.0",
-    "moviepy>=2.2.1",
+    "moviepy @ git+https://github.com/Zulko/moviepy.git@7ffa4f00376237137a25fe1c777355c37753e9af",
     "pyopenssl==21.0.0",
     "emoji>=2.2.0",
     "user-agent>=0.1.10",
@@ -37,6 +37,9 @@ dev = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["reverse_image_search_bot"]
