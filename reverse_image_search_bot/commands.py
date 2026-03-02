@@ -728,6 +728,7 @@ def _best_match_search(
     match_found = False
 
     metrics.concurrent_searches.inc()
+    _reply_to_msg_id: int | None = message.message_id
     engine_executor = ThreadPoolExecutor(max_workers=5)
     engine_start_times = {}
     engine_futures = {}
@@ -774,12 +775,23 @@ def _best_match_search(
                     wait_for(results_gate)
 
                     reply, media_group = build_reply(result, meta)
-                    provider_msg = message.reply_html(
-                        reply,
-                        reply_markup=InlineKeyboardMarkup(button_list),
-                        reply_to_message_id=message.message_id,
-                        disable_web_page_preview=not meta.get("thumbnail") or bool(media_group) or "errors" in meta,
-                    )
+                    _disable_preview = not meta.get("thumbnail") or bool(media_group) or "errors" in meta
+                    try:
+                        provider_msg = message.reply_html(
+                            reply,
+                            reply_markup=InlineKeyboardMarkup(button_list),
+                            reply_to_message_id=_reply_to_msg_id,  # type: ignore[arg-type]
+                            disable_web_page_preview=_disable_preview,
+                        )
+                    except BadRequest as er:
+                        if "message to be replied not found" not in er.message.lower():
+                            raise
+                        _reply_to_msg_id = None
+                        provider_msg = message.reply_html(
+                            reply,
+                            reply_markup=InlineKeyboardMarkup(button_list),
+                            disable_web_page_preview=_disable_preview,
+                        )
                     if media_group:
                         try:
                             message.reply_media_group(
