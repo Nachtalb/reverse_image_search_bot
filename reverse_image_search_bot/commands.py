@@ -1,15 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import html as html_mod
 import io
 import json
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from concurrent.futures import TimeoutError as FuturesTimeoutError
 from logging import getLogger
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from threading import Lock, Thread
 from time import time
 
 from emoji import emojize
@@ -17,7 +15,6 @@ from moviepy.video.io.VideoFileClip import VideoFileClip
 from PIL import Image
 from telegram import (
     Animation,
-    ChatAction,
     Document,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -31,9 +28,9 @@ from telegram import (
     User,
     Video,
 )
+from telegram.constants import ChatAction, ParseMode
 from telegram.error import BadRequest, TelegramError
-from telegram.ext import CallbackContext
-from telegram.parsemode import ParseMode
+from telegram.ext import ContextTypes
 from yarl import URL
 
 from reverse_image_search_bot import metrics
@@ -43,7 +40,7 @@ from reverse_image_search_bot.engines.generic import GenericRISEngine, PreWorkEn
 from reverse_image_search_bot.engines.types import MetaData, ResultData
 from reverse_image_search_bot.settings import ADMIN_IDS
 from reverse_image_search_bot.uploaders import uploader
-from reverse_image_search_bot.utils import ReturnableThread, chunks, upload_file
+from reverse_image_search_bot.utils import chunks, upload_file
 from reverse_image_search_bot.utils.tags import a, b, code, hidden_a, pre, title
 
 logger = getLogger("BEST MATCH")
@@ -58,10 +55,10 @@ MAX_TELEGRAM_FILE_SIZE = 20 * 1024 * 1024
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
-def id_command(update: Update, context: CallbackContext):
+async def id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     metrics.commands_total.labels(command="id").inc()
     if update.effective_chat:
-        update.message.reply_html(pre(json.dumps(update.effective_chat.to_dict(), sort_keys=True, indent=4)))
+        await update.message.reply_html(pre(json.dumps(update.effective_chat.to_dict(), sort_keys=True, indent=4)))
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -69,7 +66,7 @@ def id_command(update: Update, context: CallbackContext):
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
-def _is_settings_allowed(update: Update, context: CallbackContext) -> bool:
+async def _is_settings_allowed(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """Allow settings changes in private chats always; in groups only for admins."""
     chat = update.effective_chat
     user = update.effective_user
@@ -78,7 +75,7 @@ def _is_settings_allowed(update: Update, context: CallbackContext) -> bool:
     if chat.type == "private":
         return True
     try:
-        member = context.bot.get_chat_member(chat.id, user.id)
+        member = await context.bot.get_chat_member(chat.id, user.id)
         return member.status in ("creator", "administrator")
     except Exception:
         return False
@@ -115,15 +112,13 @@ def _settings_engines_keyboard(chat_config: ChatConfig, menu: str) -> InlineKeyb
     rows = []
 
     if menu == "auto_search_engines":
-        enabled = chat_config.auto_search_engines  # None = all enabled
+        enabled = chat_config.auto_search_engines
         cb_prefix = "settings:toggle:auto_search_engine"
-        # Only show engines that support best_match for autosearch
         relevant = [e for e in engines if e.best_match_implemented]
     else:
-        enabled = chat_config.button_engines  # None = all enabled
+        enabled = chat_config.button_engines
         cb_prefix = "settings:toggle:button_engine"
         relevant = list(engines)
-        # Mirror the final button layout: Best Match alone, Link alone, then engines in pairs
         bm = "✅" if chat_config.show_best_match else "❌"
         link = "✅" if chat_config.show_link else "❌"
         rows.append([InlineKeyboardButton(f"{bm} Best Match", callback_data="settings:toggle:show_best_match")])
@@ -152,41 +147,40 @@ def _button_count(chat_config: ChatConfig, excluding_engine: str | None = None) 
     return count
 
 
-def settings_command(update: Update, context: CallbackContext):
+async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     assert update.effective_chat
     metrics.commands_total.labels(command="settings").inc()
     chat_config = ChatConfig(update.effective_chat.id)
     if _is_group(update.effective_chat.id) and not chat_config.onboarded:
-        chat_config.onboarded = True  # opening settings counts as onboarding
-    update.message.reply_html(
+        chat_config.onboarded = True
+    await update.message.reply_html(
         _settings_main_text(chat_config),
         reply_markup=_settings_main_keyboard(chat_config),
     )
 
 
-def settings_callback_handler(update: Update, context: CallbackContext):
+async def settings_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    data = query.data  # e.g. "settings:toggle:auto_search"
+    data = query.data
 
-    # Noop / disabled buttons
     if data == "settings:noop":
-        query.answer()
+        await query.answer()
         return
     if data.startswith("settings:disabled:"):
         reason = {
             "auto_search_engines": "Enable auto-search first to configure its engines.",
             "button_engines": 'Enable "Show buttons" first to configure engine buttons.',
         }.get(data.split(":", 2)[2], "Enable the master toggle first.")
-        query.answer(reason, show_alert=False)
+        await query.answer(reason, show_alert=False)
         return
 
-    if not _is_settings_allowed(update, context):
-        query.answer("Only group admins can change settings.", show_alert=True)
+    if not await _is_settings_allowed(update, context):
+        await query.answer("Only group admins can change settings.", show_alert=True)
         return
 
     assert update.effective_chat
     chat_config = ChatConfig(update.effective_chat.id)
-    parts = data.split(":", 2)  # ["settings", action, value]
+    parts = data.split(":", 2)
     action = parts[1] if len(parts) > 1 else ""
     value = parts[2] if len(parts) > 2 else ""
 
@@ -195,24 +189,24 @@ def settings_callback_handler(update: Update, context: CallbackContext):
     if action == "toggle":
         if value == "auto_search":
             if not is_group and chat_config.auto_search_enabled and not chat_config.show_buttons:
-                query.answer("⚠️ Enable engine buttons first — at least one must be active.", show_alert=True)
+                await query.answer("⚠️ Enable engine buttons first — at least one must be active.", show_alert=True)
                 return
             chat_config.auto_search_enabled = not chat_config.auto_search_enabled
         elif value == "show_buttons":
             if not is_group and chat_config.show_buttons and not chat_config.auto_search_enabled:
-                query.answer("⚠️ Enable auto-search first — at least one must be active.", show_alert=True)
+                await query.answer("⚠️ Enable auto-search first — at least one must be active.", show_alert=True)
                 return
             chat_config.show_buttons = not chat_config.show_buttons
         elif value == "show_best_match":
             if chat_config.show_best_match and _button_count(chat_config) <= 1:
-                query.answer("⚠️ At least one button must stay enabled.", show_alert=True)
+                await query.answer("⚠️ At least one button must stay enabled.", show_alert=True)
                 return
             chat_config.show_best_match = not chat_config.show_best_match
             action = "disabled" if not chat_config.show_best_match else "enabled"
             metrics.button_toggle_total.labels(button="best_match", action=action).inc()
         elif value == "show_link":
             if chat_config.show_link and _button_count(chat_config) <= 1:
-                query.answer("⚠️ At least one button must stay enabled.", show_alert=True)
+                await query.answer("⚠️ At least one button must stay enabled.", show_alert=True)
                 return
             chat_config.show_link = not chat_config.show_link
             action = "disabled" if not chat_config.show_link else "enabled"
@@ -225,7 +219,7 @@ def settings_callback_handler(update: Update, context: CallbackContext):
                 current = relevant[:]
             if engine_name in current:
                 if len(current) == 1:
-                    query.answer("⚠️ At least one engine must stay enabled.", show_alert=True)
+                    await query.answer("⚠️ At least one engine must stay enabled.", show_alert=True)
                     return
                 current.remove(engine_name)
                 metrics.engine_manual_toggle_total.labels(
@@ -233,11 +227,10 @@ def settings_callback_handler(update: Update, context: CallbackContext):
                 ).inc()
             else:
                 current.append(engine_name)
-                chat_config.reset_engine_counter(engine_name)  # fresh start after manual re-enable
+                chat_config.reset_engine_counter(engine_name)
                 metrics.engine_manual_toggle_total.labels(
                     engine=engine_name, menu="auto_search", action="enabled"
                 ).inc()
-            # If all enabled, store None (= all)
             chat_config.auto_search_engines = None if set(current) >= set(relevant) else current
         elif value.startswith("button_engine:"):
             engine_name = value[len("button_engine:") :]
@@ -247,7 +240,7 @@ def settings_callback_handler(update: Update, context: CallbackContext):
                 current = all_names[:]
             if engine_name in current:
                 if _button_count(chat_config, excluding_engine=engine_name) < 1:
-                    query.answer("⚠️ At least one button must stay enabled.", show_alert=True)
+                    await query.answer("⚠️ At least one button must stay enabled.", show_alert=True)
                     return
                 current.remove(engine_name)
                 metrics.engine_manual_toggle_total.labels(engine=engine_name, menu="button", action="disabled").inc()
@@ -259,29 +252,31 @@ def settings_callback_handler(update: Update, context: CallbackContext):
         # Re-render appropriate menu
         if value.startswith("auto_search_engine:"):
             with contextlib.suppress(TelegramError):
-                query.edit_message_reply_markup(
+                await query.edit_message_reply_markup(
                     reply_markup=_settings_engines_keyboard(chat_config, "auto_search_engines")
                 )
         elif value.startswith("button_engine:") or value in ("show_link", "show_best_match"):
             with contextlib.suppress(TelegramError):
-                query.edit_message_reply_markup(reply_markup=_settings_engines_keyboard(chat_config, "button_engines"))
+                await query.edit_message_reply_markup(
+                    reply_markup=_settings_engines_keyboard(chat_config, "button_engines")
+                )
         else:
             with contextlib.suppress(TelegramError):
-                query.edit_message_reply_markup(reply_markup=_settings_main_keyboard(chat_config))
+                await query.edit_message_reply_markup(reply_markup=_settings_main_keyboard(chat_config))
 
     elif action == "menu":
         with contextlib.suppress(TelegramError):
-            query.edit_message_reply_markup(reply_markup=_settings_engines_keyboard(chat_config, value))
+            await query.edit_message_reply_markup(reply_markup=_settings_engines_keyboard(chat_config, value))
 
     elif action == "back":
         with contextlib.suppress(TelegramError):
-            query.edit_message_text(
+            await query.edit_message_text(
                 _settings_main_text(chat_config),
                 parse_mode="HTML",
                 reply_markup=_settings_main_keyboard(chat_config),
             )
 
-    query.answer()
+    await query.answer()
 
 
 _LOCAL = Path(__file__).parent
@@ -289,15 +284,15 @@ _HELP_TEXT = _LOCAL / "texts/help.html"
 _HELP_IMAGE = _LOCAL / "images/help.jpg"
 
 
-def start_command(update: Update, context: CallbackContext):
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     metrics.commands_total.labels(command="start").inc()
     chat = update.effective_chat
     if chat and chat.type != "private":
         chat_config = ChatConfig(chat.id)
         if not chat_config.onboarded:
-            _send_onboarding(update, context)
+            await _send_onboarding(update, context)
             return
-        update.message.reply_text(
+        await update.message.reply_text(
             "🔎 Send me an image, sticker, or video and I'll find its source.\n\n/search · /settings",
             parse_mode=ParseMode.HTML,
             disable_web_page_preview=True,
@@ -308,7 +303,7 @@ def start_command(update: Update, context: CallbackContext):
             resize_keyboard=True,
             one_time_keyboard=True,
         )
-        update.message.reply_text(
+        await update.message.reply_text(
             "🔎 Send me an image, sticker, or video and I'll find its source.",
             reply_markup=keyboard,
             parse_mode=ParseMode.HTML,
@@ -316,18 +311,18 @@ def start_command(update: Update, context: CallbackContext):
         )
 
 
-def on_added_to_group(update: Update, context: CallbackContext):
+async def on_added_to_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send start message when bot is added to a group."""
     message = update.message
     if not message or not message.new_chat_members:
         return
     for member in message.new_chat_members:
         if member.id == context.bot.id:
-            _send_onboarding(update, context)
+            await _send_onboarding(update, context)
             break
 
 
-def _send_onboarding(update: Update, context: CallbackContext):
+async def _send_onboarding(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send the group onboarding prompt with preset choices."""
     keyboard = InlineKeyboardMarkup(
         [
@@ -344,22 +339,22 @@ def _send_onboarding(update: Update, context: CallbackContext):
         "• <b>Manual</b> — only search when someone replies with /search\n"
         "• <b>Settings</b> — configure everything yourself"
     )
-    (update.effective_message or update.message).reply_html(text, reply_markup=keyboard)
+    await (update.effective_message or update.message).reply_html(text, reply_markup=keyboard)
 
 
 def _is_group(chat_id: int) -> bool:
     return chat_id < 0
 
 
-def onboard_callback_handler(update: Update, context: CallbackContext):
+async def onboard_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle onboarding button presses."""
     assert update.effective_chat
     query = update.callback_query
     choice = query.data.split(":", 1)[1]
     chat_id = update.effective_chat.id
 
-    if not _is_settings_allowed(update, context):
-        query.answer("Only group admins can configure the bot.", show_alert=True)
+    if not await _is_settings_allowed(update, context):
+        await query.answer("Only group admins can configure the bot.", show_alert=True)
         return
 
     chat_config = ChatConfig(chat_id)
@@ -368,56 +363,55 @@ def onboard_callback_handler(update: Update, context: CallbackContext):
     if choice == "search_only":
         chat_config.auto_search_enabled = True
         chat_config.show_buttons = False
-        query.edit_message_text(
+        await query.edit_message_text(
             "✅ Set to <b>search results only</b>. Change anytime with /settings.",
             parse_mode=ParseMode.HTML,
         )
     elif choice == "full":
         chat_config.auto_search_enabled = True
         chat_config.show_buttons = True
-        query.edit_message_text(
+        await query.edit_message_text(
             "✅ Set to <b>full mode</b> (results + buttons). Change anytime with /settings.",
             parse_mode=ParseMode.HTML,
         )
     elif choice == "manual":
         chat_config.auto_search_enabled = False
         chat_config.show_buttons = False
-        query.edit_message_text(
+        await query.edit_message_text(
             "✅ Set to <b>manual mode</b>. Use /search to search. Change anytime with /settings.",
             parse_mode=ParseMode.HTML,
         )
     elif choice == "settings":
-        query.edit_message_text("⚙️ Opening settings...")
+        await query.edit_message_text("⚙️ Opening settings...")
         assert update.effective_message
-        update.effective_message.reply_html(
+        await update.effective_message.reply_html(
             _settings_main_text(chat_config),
             reply_markup=_settings_main_keyboard(chat_config),
         )
 
-    query.answer()
+    await query.answer()
 
 
-def group_file_handler(update: Update, context: CallbackContext):
+async def group_file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle images in group chats — onboard first if needed."""
     assert update.effective_chat
     chat_id = update.effective_chat.id
     chat_config = ChatConfig(chat_id)
 
     if not chat_config.onboarded:
-        _send_onboarding(update, context)
+        await _send_onboarding(update, context)
         return
 
     if not chat_config.auto_search_enabled and not chat_config.show_buttons:
-        # Manual mode — ignore direct images, user must use /search
         return
 
-    file_handler(update, context)
+    await file_handler(update, context)
 
 
-def help_command(update: Update, context: CallbackContext):
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     metrics.commands_total.labels(command="help").inc()
     with _HELP_IMAGE.open("rb") as photo:
-        update.message.reply_photo(
+        await update.message.reply_photo(
             photo,
             caption=_HELP_TEXT.read_text(),
             parse_mode=ParseMode.HTML,
@@ -425,27 +419,34 @@ def help_command(update: Update, context: CallbackContext):
         )
 
 
-def search_command(update: Update, context: CallbackContext):
+async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     metrics.commands_total.labels(command="search").inc()
     orig_message: Message | None = update.message.reply_to_message
     if not orig_message:
-        update.message.reply_text("When using /search you have to reply to a message with an image or video")
+        await update.message.reply_text("When using /search you have to reply to a message with an image or video")
         return
 
-    file_handler(update, context, orig_message)
+    await file_handler(update, context, orig_message)
 
 
-def file_handler(update: Update, context: CallbackContext, message: Message | None = None):
+async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, message: Message | None = None):
     message = message or update.effective_message
     if not message:
         return
 
     user = message.from_user
-    if user.id in context.bot._banned_users:  # type: ignore[union-attr]
-        message.reply_text("🔴 You are banned from using this bot due to uploading illegal content.")
+    if user.id in context.bot_data.get("banned_users", []):
+        await message.reply_text("🔴 You are banned from using this bot due to uploading illegal content.")
         return
 
-    context.bot.send_chat_action(chat_id=message.chat_id, action=ChatAction.TYPING)
+    # Check banned users from RISBot instance
+    from .bot import ris_bot
+
+    if user.id in ris_bot._banned_users:
+        await message.reply_text("🔴 You are banned from using this bot due to uploading illegal content.")
+        return
+
+    await context.bot.send_chat_action(chat_id=message.chat_id, action=ChatAction.TYPING)
 
     attachment = message.effective_attachment
     if isinstance(attachment, list):
@@ -467,7 +468,7 @@ def file_handler(update: Update, context: CallbackContext, message: Message | No
 
     metrics.files_received_total.labels(file_type=file_type).inc()
     if hasattr(attachment, "file_size") and attachment.file_size:
-        metrics.file_size_bytes.labels(file_type=file_type).observe(float(attachment.file_size))  # type: ignore[arg-type]
+        metrics.file_size_bytes.labels(file_type=file_type).observe(float(attachment.file_size))
 
     language = getattr(user, "language_code", None) or "unknown"
 
@@ -481,23 +482,23 @@ def file_handler(update: Update, context: CallbackContext, message: Message | No
                 or (isinstance(attachment, Sticker) and attachment.is_video)
             ):
                 search_type = "video_frame" if isinstance(attachment, Video) else file_type
-                image_url = video_to_url(attachment)  # type: ignore
+                image_url = await video_to_url(attachment)
             elif (
                 isinstance(attachment, Document) and attachment.mime_type.endswith(("jpeg", "png", "webp"))
             ) or isinstance(attachment, (PhotoSize, Sticker)):
                 if isinstance(attachment, Sticker) and attachment.is_animated:
-                    message.reply_text("Animated stickers are not supported.")
+                    await message.reply_text("Animated stickers are not supported.")
                     return
                 search_type = file_type
-                image_url = image_to_url(attachment)
+                image_url = await image_to_url(attachment)
         except ValueError as e:
-            message.reply_text(str(e))
+            await message.reply_text(str(e))
             return
         except Exception as e:
             error = e
 
         if not image_url:
-            message.reply_text("Format is not supported")
+            await message.reply_text("Format is not supported")
             if error is not None:
                 raise error
             return
@@ -506,18 +507,22 @@ def file_handler(update: Update, context: CallbackContext, message: Message | No
         metrics.searches_total.labels(type=search_type, language=language).inc()
         metrics.searches_by_user_total.labels(user_id=str(user.id)).inc()
 
-        general_search_lock = Lock()
-        general_search_lock.acquire()
-        Thread(target=general_image_search, args=(update, image_url, general_search_lock)).start()
-        chat_config = ChatConfig(update.effective_chat.id)  # type: ignore
+        # Run general_image_search and best_match concurrently
+        general_done = asyncio.Event()
+        general_task = asyncio.create_task(general_image_search(update, image_url, general_done))
+
+        chat_config = ChatConfig(update.effective_chat.id)
         if chat_config.auto_search_enabled:
-            best_match(update, context, image_url, general_search_lock)
-    except Exception as error:
-        message.reply_text("An error occurred, try again.")
+            await best_match(update, context, image_url, general_done)
+        else:
+            await general_task
+
+    except Exception:
+        await message.reply_text("An error occurred, try again.")
         raise
 
 
-def callback_query_handler(update: Update, context: CallbackContext):
+async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query_parts = update.callback_query.data.split(" ")
 
     if len(query_parts) == 1:
@@ -527,13 +532,13 @@ def callback_query_handler(update: Update, context: CallbackContext):
 
     match command:
         case "best_match":
-            best_match(update, context, values[0])
+            await best_match(update, context, values[0])
         case "wait_for":
-            send_wait_for(update, context, values[0])
+            await send_wait_for(update, context, values[0])
         case "noop":
-            update.callback_query.answer()
+            await update.callback_query.answer()
         case _:
-            update.callback_query.answer("Something went wrong")
+            await update.callback_query.answer("Something went wrong")
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -541,17 +546,17 @@ def callback_query_handler(update: Update, context: CallbackContext):
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
-def send_wait_for(update: Update, context: CallbackContext, engine_name: str):
-    update.callback_query.answer(f"Creating {engine_name} search url...")
+async def send_wait_for(update: Update, context: ContextTypes.DEFAULT_TYPE, engine_name: str):
+    await update.callback_query.answer(f"Creating {engine_name} search url...")
 
 
-def general_image_search(update: Update, image_url: URL, reply_sent_lock: Lock):
-    """Send a reverse image search link for the image sent to us"""
+async def general_image_search(update: Update, image_url: URL, reply_done: asyncio.Event):
+    """Send reverse image search link buttons for the image sent to us."""
     try:
         chat_config = ChatConfig(update.message.chat_id)
 
         if not chat_config.show_buttons:
-            reply_sent_lock.release()
+            reply_done.set()
             return
 
         active_engines = engines
@@ -566,61 +571,69 @@ def general_image_search(update: Update, image_url: URL, reply_sent_lock: Lock):
 
         engine_buttons = []
 
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            prework_futures = {}
+        # Collect PreWorkEngine placeholders and regular buttons
+        prework_engines: dict[asyncio.Task, PreWorkEngine] = {}
+        for engine in active_engines:
+            if isinstance(engine, PreWorkEngine) and (button := engine.empty_button()):
+                task = asyncio.create_task(asyncio.to_thread(engine, image_url))
+                prework_engines[task] = engine
+                engine_buttons.append(button)
+            elif button := engine(image_url):
+                engine_buttons.append(button)
 
-            for engine in active_engines:
-                if isinstance(engine, PreWorkEngine) and (button := engine.empty_button()):
-                    prework_futures[executor.submit(engine, image_url)] = engine
-                    engine_buttons.append(button)
-                elif button := engine(image_url):
-                    engine_buttons.append(button)
+        def _build_markup(eng_buttons):
+            rows = list(top_buttons) + list(chunks(eng_buttons, 2))
+            return InlineKeyboardMarkup(rows)
 
-            def _build_markup(eng_buttons):
-                rows = list(top_buttons) + list(chunks(eng_buttons, 2))
-                return InlineKeyboardMarkup(rows)
+        reply = "Select a search engine:"
+        reply_markup = _build_markup(engine_buttons)
+        reply_message: Message = await update.message.reply_text(
+            text=reply,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_to_message_id=update.message.message_id,
+        )
+        reply_done.set()
 
-            reply = "Select a search engine:"
-            reply_markup = _build_markup(engine_buttons)
-            reply_message: Message = update.message.reply_text(
-                text=reply,
-                reply_markup=reply_markup,
-                parse_mode=ParseMode.MARKDOWN,
-                reply_to_message_id=update.message.message_id,
-            )
-            reply_sent_lock.release()
-
-            try:
-                for future in as_completed(prework_futures, timeout=15):
-                    engine = prework_futures[future]
-                    updated_button = future.result()
-                    for button in engine_buttons[:]:
-                        if button.text.endswith(engine.name):
-                            if not updated_button:
-                                engine_buttons.remove(button)
-                            else:
-                                engine_buttons[engine_buttons.index(button)] = updated_button
-                    reply_message.edit_reply_markup(reply_markup=_build_markup(engine_buttons))
-            except FuturesTimeoutError:
-                pass
+        # Update buttons as PreWorkEngines finish
+        if prework_engines:
+            done, _pending = await asyncio.wait(prework_engines.keys(), timeout=15)
+            for task in done:
+                engine = prework_engines[task]
+                try:
+                    updated_button = task.result()
+                except Exception:
+                    updated_button = None
+                for button in engine_buttons[:]:
+                    if button.text.endswith(engine.name):
+                        if not updated_button:
+                            engine_buttons.remove(button)
+                        else:
+                            engine_buttons[engine_buttons.index(button)] = updated_button
+            with contextlib.suppress(TelegramError):
+                await reply_message.edit_reply_markup(reply_markup=_build_markup(engine_buttons))
     finally:
-        if reply_sent_lock.locked:
-            with contextlib.suppress(RuntimeError):
-                reply_sent_lock.release()
+        if not reply_done.is_set():
+            reply_done.set()
 
 
-def best_match(update: Update, context: CallbackContext, url: str | URL, general_search_lock: Lock | None = None):
+async def best_match(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    url: str | URL,
+    general_done: asyncio.Event | None = None,
+):
     """Find best matches for an image."""
     if update.callback_query:
-        update.callback_query.answer(show_alert=False)
+        await update.callback_query.answer(show_alert=False)
 
-    user: User = update.effective_user  # type: ignore
-    message: Message = update.effective_message  # type: ignore
+    user: User = update.effective_user
+    message: Message = update.effective_message
 
     if user.id not in ADMIN_IDS and (last_time := last_used.get(user.id)) and time() - last_time < 10:
-        if general_search_lock:
-            wait_for(general_search_lock)
-        context.bot.send_message(
+        if general_done:
+            await general_done.wait()
+        await context.bot.send_message(
             text="Slow down a bit please....", chat_id=message.chat_id, reply_to_message_id=message.message_id
         )
         return
@@ -631,40 +644,37 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, general
     if chat_config.auto_search_engines is not None:
         searchable_engines = [e for e in searchable_engines if e.name in chat_config.auto_search_engines]
 
-    # Held until "⏳ searching..." is sent — prevents results arriving before the status message
-    results_gate = Lock()
-    results_gate.acquire()
+    # Event to hold results until "⏳ searching..." is sent
+    results_gate = asyncio.Event()
+
+    search_task = asyncio.create_task(_best_match_search(update, context, searchable_engines, url, results_gate))
+
+    if general_done:
+        await general_done.wait()
+
+    search_message = await context.bot.send_message(
+        text="⏳ searching...", chat_id=message.chat_id, reply_to_message_id=message.message_id
+    )
+    results_gate.set()
+
     try:
-        search_thread = ReturnableThread(
-            _best_match_search, args=(update, context, searchable_engines, url, results_gate)
-        )
-        search_thread.start()
-
-        if general_search_lock:
-            # Wait for general_image_search to send its buttons message before we send "⏳ searching..."
-            wait_for(general_search_lock)
-
-        search_message = context.bot.send_message(
-            text="⏳ searching...", chat_id=message.chat_id, reply_to_message_id=message.message_id
-        )
-    finally:
-        results_gate.release()
-
-    match_found = search_thread.join(timeout=65)
+        match_found = await asyncio.wait_for(search_task, timeout=65)
+    except TimeoutError:
+        match_found = False
 
     engines_used_html = ", ".join([b(en.name) for en in searchable_engines])
     if not match_found:
         chat_config.failures_in_a_row += 1
         if chat_config.failures_in_a_row > 4 and chat_config.auto_search_enabled:
             chat_config.auto_search_enabled = False
-            update.message.reply_text(
+            await update.message.reply_text(
                 emojize(
                     ":yellow_circle: 5 searches in a row returned no results — auto search has been disabled for"
                     " this chat. This helps prevent hitting rate limits. The auto search engines are mainly for anime"
                     " & manga content. Use /settings to re-enable it."
                 )
             )
-        search_message.edit_text(
+        await search_message.edit_text(
             emojize(
                 f":red_circle: I searched for you on {engines_used_html} but didn't find anything. Please try another"
                 " engine above."
@@ -673,7 +683,7 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, general
         )
     else:
         chat_config.failures_in_a_row = 0
-        search_message.edit_text(
+        await search_message.edit_text(
             emojize(
                 f":blue_circle: I searched for you on {engines_used_html}. You can try others above for more results."
             )
@@ -705,136 +715,147 @@ def _track_engine_result(chat_id: int, engine_name: str, found: bool) -> bool:
     if counts[engine_name] < _AUTO_DISABLE_THRESHOLD:
         return False
 
-    # Threshold hit — disable if there's at least one other engine still active
     relevant = [e.name for e in engines if e.best_match_implemented]
     current = list(chat_config.auto_search_engines or relevant)
     if engine_name not in current or len(current) <= 1:
-        return False  # already disabled or last engine — don't disable
+        return False
 
     current.remove(engine_name)
     chat_config.auto_search_engines = current
-    counts[engine_name] = 0  # reset so it doesn't re-trigger if re-enabled
+    counts[engine_name] = 0
     chat_config.engine_empty_counts = counts
     metrics.engine_auto_disabled_total.labels(engine=engine_name).inc()
     return True
 
 
-def _best_match_search(
-    update: Update, context: CallbackContext, engines: list[GenericRISEngine], url: URL, results_gate: Lock
+async def _best_match_search(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    search_engines: list[GenericRISEngine],
+    url: URL,
+    results_gate: asyncio.Event,
 ):
-    message: Message = update.effective_message  # type: ignore
+    message: Message = update.effective_message
     identifiers = []
     thumbnail_identifiers = []
     match_found = False
 
     metrics.concurrent_searches.inc()
     _reply_to_msg_id: int | None = message.message_id
-    engine_executor = ThreadPoolExecutor(max_workers=5)
-    engine_start_times = {}
-    engine_futures = {}
-    for en in engines:
-        future = engine_executor.submit(en.best_match, url)
-        engine_futures[future] = en
-        engine_start_times[future] = time()
+
+    # Run each engine's best_match in a thread (they are sync + use cachetools)
+    engine_start_times: dict[asyncio.Task, float] = {}
+    engine_tasks: dict[asyncio.Task, GenericRISEngine] = {}
+    for en in search_engines:
+        task = asyncio.create_task(asyncio.to_thread(en.best_match, url))
+        engine_tasks[task] = en
+        engine_start_times[task] = time()
+
     try:
-        for future in as_completed(engine_futures, timeout=60):
-            engine = engine_futures[future]
-            duration = time() - engine_start_times[future]
-            metrics.search_duration_seconds.labels(provider=engine.name).observe(duration)
-            try:
-                logger.debug("%s Searching for %s", engine.name, url)
-                result, meta = future.result()
+        done_tasks: set[asyncio.Task] = set()
+        pending = set(engine_tasks.keys())
 
-                if meta:
-                    logger.debug("Found something UmU")
-                    metrics.provider_results_total.labels(provider=engine.name, status="hit").inc()
-                    # Success — reset empty counter for this engine
-                    _track_engine_result(message.chat_id, engine.name, found=True)
+        while pending:
+            done_batch, pending = await asyncio.wait(pending, timeout=60, return_when=asyncio.FIRST_COMPLETED)
+            if not done_batch:
+                break  # timeout
+            done_tasks.update(done_batch)
 
-                    button_list = []
-                    more_button = engine(str(url), "More")
-                    if more_button := engine(str(url), "More"):
-                        button_list.append(more_button)
+            for future in done_batch:
+                engine = engine_tasks[future]
+                duration = time() - engine_start_times[future]
+                metrics.search_duration_seconds.labels(provider=engine.name).observe(duration)
+                try:
+                    logger.debug("%s Searching for %s", engine.name, url)
+                    result, meta = future.result()
 
-                    if buttons := meta.get("buttons"):
-                        button_list.extend(buttons)
+                    if meta:
+                        logger.debug("Found something UmU")
+                        metrics.provider_results_total.labels(provider=engine.name, status="hit").inc()
+                        _track_engine_result(message.chat_id, engine.name, found=True)
 
-                    button_list = list(chunks(button_list, 3))
+                        button_list = []
+                        if more_button := engine(str(url), "More"):
+                            button_list.append(more_button)
 
-                    identifier = meta.get("identifier")
-                    thumbnail_identifier = meta.get("thumbnail_identifier")
-                    if identifier in identifiers and thumbnail_identifier not in thumbnail_identifiers:
-                        result = {}
-                        result["Duplicate search result omitted"] = ""
-                    elif identifier not in identifiers and thumbnail_identifier in thumbnail_identifiers:
-                        result["Duplicate thumbnail omitted"] = ""
-                        del meta["thumbnail"]
-                    elif identifier in identifiers and thumbnail_identifier in thumbnail_identifiers:
-                        continue
+                        if buttons := meta.get("buttons"):
+                            button_list.extend(buttons)
 
-                    wait_for(results_gate)
+                        button_list = list(chunks(button_list, 3))
 
-                    reply, media_group = build_reply(result, meta)
-                    _disable_preview = not meta.get("thumbnail") or bool(media_group) or "errors" in meta
-                    try:
-                        provider_msg = message.reply_html(
-                            reply,
-                            reply_markup=InlineKeyboardMarkup(button_list),
-                            reply_to_message_id=_reply_to_msg_id,  # type: ignore[arg-type]
-                            disable_web_page_preview=_disable_preview,
-                        )
-                    except BadRequest as er:
-                        if "message to be replied not found" not in er.message.lower():
-                            raise
-                        _reply_to_msg_id = None
-                        provider_msg = message.reply_html(
-                            reply,
-                            reply_markup=InlineKeyboardMarkup(button_list),
-                            disable_web_page_preview=_disable_preview,
-                        )
-                    if media_group:
+                        identifier = meta.get("identifier")
+                        thumbnail_identifier = meta.get("thumbnail_identifier")
+                        if identifier in identifiers and thumbnail_identifier not in thumbnail_identifiers:
+                            result = {}
+                            result["Duplicate search result omitted"] = ""
+                        elif identifier not in identifiers and thumbnail_identifier in thumbnail_identifiers:
+                            result["Duplicate thumbnail omitted"] = ""
+                            del meta["thumbnail"]
+                        elif identifier in identifiers and thumbnail_identifier in thumbnail_identifiers:
+                            continue
+
+                        await results_gate.wait()
+
+                        reply, media_group = build_reply(result, meta)
+                        _disable_preview = not meta.get("thumbnail") or bool(media_group) or "errors" in meta
                         try:
-                            message.reply_media_group(
-                                media_group,  # type: ignore
-                                reply_to_message_id=provider_msg.message_id,
+                            provider_msg = await message.reply_html(
+                                reply,
+                                reply_markup=InlineKeyboardMarkup(button_list),
+                                reply_to_message_id=_reply_to_msg_id,
+                                disable_web_page_preview=_disable_preview,
                             )
                         except BadRequest as er:
-                            if "webpage_media_empty" not in er.message:
+                            if "message to be replied not found" not in er.message.lower():
                                 raise
-                    if "errors" not in meta and result:
-                        match_found = True
-                    if identifier:
-                        identifiers.append(identifier)
-                    if thumbnail_identifier:
-                        thumbnail_identifiers.append(thumbnail_identifier)
-                else:
-                    metrics.provider_results_total.labels(provider=engine.name, status="miss").inc()
-                    # Empty result — track and potentially auto-disable
-                    disabled = _track_engine_result(message.chat_id, engine.name, found=False)
-                    if disabled:
-                        context.bot.send_message(
-                            chat_id=message.chat_id,
-                            text=(
-                                f"🔕 <b>{engine.name}</b> was automatically disabled for this chat after "
-                                f"5 consecutive empty results. Use /settings to re-enable it."
-                            ),
-                            parse_mode=ParseMode.HTML,
-                        )
-            except Exception as error:
-                metrics.provider_results_total.labels(provider=engine.name, status="error").inc()
-                user = update.effective_user
-                user_info = f"{user.full_name} (tg://user?id={user.id})" if user else "Unknown"
-                logger.error(
-                    "Best match error [%s]\nUser: %s\nImage: %s",
-                    engine.name,
-                    user_info,
-                    url,
-                    exc_info=error,
-                )
-    except FuturesTimeoutError:
-        pass
+                            _reply_to_msg_id = None
+                            provider_msg = await message.reply_html(
+                                reply,
+                                reply_markup=InlineKeyboardMarkup(button_list),
+                                disable_web_page_preview=_disable_preview,
+                            )
+                        if media_group:
+                            try:
+                                await message.reply_media_group(
+                                    media_group,
+                                    reply_to_message_id=provider_msg.message_id,
+                                )
+                            except BadRequest as er:
+                                if "webpage_media_empty" not in er.message:
+                                    raise
+                        if "errors" not in meta and result:
+                            match_found = True
+                        if identifier:
+                            identifiers.append(identifier)
+                        if thumbnail_identifier:
+                            thumbnail_identifiers.append(thumbnail_identifier)
+                    else:
+                        metrics.provider_results_total.labels(provider=engine.name, status="miss").inc()
+                        disabled = _track_engine_result(message.chat_id, engine.name, found=False)
+                        if disabled:
+                            await context.bot.send_message(
+                                chat_id=message.chat_id,
+                                text=(
+                                    f"🔕 <b>{engine.name}</b> was automatically disabled for this chat after "
+                                    f"5 consecutive empty results. Use /settings to re-enable it."
+                                ),
+                                parse_mode=ParseMode.HTML,
+                            )
+                except Exception as error:
+                    metrics.provider_results_total.labels(provider=engine.name, status="error").inc()
+                    user = update.effective_user
+                    user_info = f"{user.full_name} (tg://user?id={user.id})" if user else "Unknown"
+                    logger.error(
+                        "Best match error [%s]\nUser: %s\nImage: %s",
+                        engine.name,
+                        user_info,
+                        url,
+                        exc_info=error,
+                    )
     finally:
-        engine_executor.shutdown(wait=False, cancel_futures=True)
+        # Cancel any remaining pending tasks
+        for task in pending:
+            task.cancel()
         metrics.concurrent_searches.dec()
 
     metrics.search_results_total.labels(has_results=str(match_found).lower()).inc()
@@ -869,7 +890,7 @@ def build_reply(result: ResultData, meta: MetaData) -> tuple[str, list[InputMedi
 
     for key, value in result.items():
         reply += title(html_mod.escape(str(key)))
-        if isinstance(value, set):  # Tags
+        if isinstance(value, set):
             reply += ", ".join(html_mod.escape(str(v)) for v in value)
         elif isinstance(value, list):
             reply += ", ".join(code(html_mod.escape(str(v))) for v in value)
@@ -887,20 +908,20 @@ def build_reply(result: ResultData, meta: MetaData) -> tuple[str, list[InputMedi
     return reply, None
 
 
-def video_to_url(attachment: Document | Video | Sticker) -> URL:
+async def video_to_url(attachment: Document | Video | Sticker) -> URL:
     filename = f"{attachment.file_unique_id}.jpg"
     if uploader.file_exists(filename):
         return uploader.get_url(filename)
 
     if attachment.file_size and attachment.file_size > MAX_TELEGRAM_FILE_SIZE:
-        if attachment.thumb:
-            return image_to_url(attachment.thumb)
+        if attachment.thumbnail:
+            return await image_to_url(attachment.thumbnail)
         raise ValueError("This video is too large to download and has no thumbnail. Please send a smaller file.")
 
-    video = attachment.get_file()
-    with NamedTemporaryFile() as video_file:
-        video.download(out=video_file)
-        with VideoFileClip(video_file.name, audio=False) as video_clip:
+    video_file = await attachment.get_file()
+    with NamedTemporaryFile() as tmp:
+        await video_file.download_to_drive(tmp.name)
+        with VideoFileClip(tmp.name, audio=False) as video_clip:
             frame = video_clip.get_frame(0)
 
     with io.BytesIO() as file:
@@ -909,7 +930,7 @@ def video_to_url(attachment: Document | Video | Sticker) -> URL:
         return upload_file(file, filename)
 
 
-def image_to_url(attachment: PhotoSize | Sticker | Document) -> URL:
+async def image_to_url(attachment: PhotoSize | Sticker | Document) -> URL:
     if isinstance(attachment, Document):
         extension = attachment.file_name.lower().rsplit(".", 1)[1].strip(".")
     else:
@@ -919,18 +940,12 @@ def image_to_url(attachment: PhotoSize | Sticker | Document) -> URL:
     if uploader.file_exists(filename):
         return uploader.get_url(filename)
 
-    photo = attachment.get_file()
+    photo_file = await attachment.get_file()
     with io.BytesIO() as file:
-        photo.download(out=file)
+        await photo_file.download_to_memory(file)
         if extension != "jpg":
             file.seek(0)
             with Image.open(file) as image:
                 file.seek(0)
                 image.save(file, extension)
         return upload_file(file, filename)
-
-
-def wait_for(lock: Lock):
-    if lock and lock.locked:
-        lock.acquire()
-        lock.release()
