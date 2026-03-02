@@ -458,7 +458,7 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
     await context.bot.send_chat_action(chat_id=message.chat_id, action=ChatAction.TYPING)
 
     attachment = message.effective_attachment
-    if isinstance(attachment, list):
+    if isinstance(attachment, (list, tuple)):
         attachment = attachment[-1]
 
     # Determine file type for metrics
@@ -486,6 +486,12 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
         image_url = None
         error = None
         mime = attachment.mime_type if isinstance(attachment, Document) else None
+        logger.info(
+            "file_handler: type=%s, mime=%s, file_type=%s",
+            type(attachment).__name__,
+            mime,
+            file_type,
+        )
         try:
             if (
                 (isinstance(attachment, Document) and mime and mime.startswith("video"))
