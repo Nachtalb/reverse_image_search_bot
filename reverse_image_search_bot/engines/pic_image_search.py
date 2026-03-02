@@ -3,8 +3,6 @@ Generic base engine for PicImageSearch-backed engines.
 Each subclass sets `pic_engine_class` and optionally overrides `_extract`.
 """
 
-import asyncio
-
 from cachetools import cached
 from yarl import URL
 
@@ -63,6 +61,13 @@ class PicImageSearchEngine(GenericRISEngine):
 
     @cached(GenericRISEngine._best_match_cache)
     def best_match(self, url: str | URL) -> ProviderData:
+        """Synchronous wrapper — called from threads via asyncio.to_thread in commands.py.
+
+        PicImageSearch requires an async event loop, so we create a fresh one here
+        since this runs in a thread pool (not the main event loop).
+        """
+        import asyncio
+
         self.logger.debug("Started looking for %s", url)
         meta: MetaData = {
             "provider": self.name,
@@ -72,15 +77,12 @@ class PicImageSearchEngine(GenericRISEngine):
         try:
             result_obj = asyncio.run(self._search(str(url)))
         except KeyError as e:
-            # Library parsing failures (e.g. AnimeTrace omits 'trace_id' on
-            # non-image inputs or error responses) — treat as no results.
             self.logger.debug("Parsing key missing, treating as no results: %s", e)
             return {}, meta
         except Exception as e:
             from PicImageSearch.exceptions import ParsingError
 
             if isinstance(e, ParsingError):
-                # Page structure changed or unsupported input type — no results.
                 self.logger.debug("ParsingError, treating as no results: %s", e)
                 return {}, meta
             self.logger.warning("Search failed: %s", e)

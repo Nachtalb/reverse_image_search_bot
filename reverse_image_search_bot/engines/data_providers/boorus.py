@@ -86,7 +86,7 @@ class BooruProvider(BaseProvider):
 
     def _request(self, api: str, post_id: int) -> dict | None:
         headers = {"User-Agent": generate_user_agent()}
-        response = self.session.get(self.urls[api]["api_url"].format(post_id=post_id), headers=headers)  # type: ignore[union-attr]
+        response = self._http_client.get(self.urls[api]["api_url"].format(post_id=post_id), headers=headers)  # type: ignore[union-attr]
         if response.status_code != 200:
             return
         return response.json()
@@ -138,7 +138,7 @@ class BooruProvider(BaseProvider):
                 "User-Agent": generate_user_agent(),
                 "Referer": self.urls[api]["post_url"].format(post_id=post_id),  # type: ignore[union-attr]
             }
-            response = self.session.get(thumbnail_url, headers=headers)
+            response = self._http_client.get(thumbnail_url, headers=headers)
             if response.status_code != 200:
                 return {}
 

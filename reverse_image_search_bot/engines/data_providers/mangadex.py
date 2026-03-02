@@ -14,7 +14,7 @@ class MangadexProvider(BaseProvider):
     def _request(
         self, endpoint: str, params: dict | None = None, json: dict | None = None, method: str = "get", **kwargs
     ) -> dict | list | None:
-        request_method = getattr(self.session, method.lower())
+        request_method = getattr(self._http_client, method.lower())
         if not request_method:
             return
 

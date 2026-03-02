@@ -1,5 +1,4 @@
 from .helpers import (
-    ReturnableThread,
     chunks,
     get_file,
     get_file_from_url,
@@ -10,7 +9,6 @@ from .helpers import (
 from .url import fix_url, url_button, url_icon
 
 __all__ = [
-    "ReturnableThread",
     "chunks",
     "fix_url",
     "get_file",

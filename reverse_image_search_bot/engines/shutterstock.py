@@ -17,7 +17,6 @@ class ShutterStockEngine(PreWorkEngine):
 
     url = "https://www.shutterstock.com/search/ris/{query}"
     pre_url = "https://www.shutterstock.com/studioapi/images/reverse-image-search"
-    has_session = True
 
     def get_search_link_by_url(self, url: str | URL) -> str | None:
         file = get_file_from_url(url)
@@ -31,7 +30,7 @@ class ShutterStockEngine(PreWorkEngine):
                     " Chrome/97.0.4692.71 Safari/537.36"
                 )
             }
-            response = self.session.post(self.pre_url, headers=headers, files={"image": (file.name, open_file)})
+            response = self._http_client.post(self.pre_url, headers=headers, files={"image": (file.name, open_file)})
         if response.status_code != 200:
             return
         ids = map(lambda item: item["id"], response.json())

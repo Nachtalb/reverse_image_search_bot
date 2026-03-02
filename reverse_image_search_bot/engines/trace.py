@@ -1,9 +1,9 @@
 from datetime import datetime
 
+import httpx
 from cachetools import cached
-from requests import Session
 from telegram import InlineKeyboardButton
-from telegram.ext import CallbackContext
+from telegram.ext import ContextTypes
 from yarl import URL
 
 from reverse_image_search_bot import settings
@@ -28,7 +28,7 @@ class TraceEngine(GenericRISEngine):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.session = Session()
+        self._http_client = httpx.Client(timeout=10)
 
     @property
     def use_api_key(self):
@@ -36,15 +36,18 @@ class TraceEngine(GenericRISEngine):
 
     @use_api_key.setter
     def use_api_key(self, value):
-        from reverse_image_search_bot.bot import job_queue  # import it now to not get import recursion during boot
+        from reverse_image_search_bot.bot import application
 
         self._use_api_key = value
 
-        job_name = "trace_api"
-        if value and not job_queue.get_jobs_by_name(job_name):
-            job_queue.run_monthly(self._stop_using_api_key, when=datetime.min.time(), day=1, name=job_name)
+        if value and application and application.job_queue:
+            job_name = "trace_api"
+            if not application.job_queue.get_jobs_by_name(job_name):
+                application.job_queue.run_monthly(
+                    self._stop_using_api_key, when=datetime.min.time(), day=1, name=job_name
+                )
 
-    def _stop_using_api_key(self, _: CallbackContext):
+    async def _stop_using_api_key(self, context: ContextTypes.DEFAULT_TYPE):
         self._use_api_key = False
 
     def _fetch_data(self, url: URL | str) -> int | dict:
@@ -53,12 +56,12 @@ class TraceEngine(GenericRISEngine):
 
         result = None
         if not self.use_api_key:
-            result = self.session.get(api_link, params=params, timeout=5)
+            result = self._http_client.get(api_link, params=params, timeout=5)
 
         if self.use_api_key or (result is not None and result.status_code == 402):
             self.use_api_key = True
             headers = {"x-trace-key": settings.TRACE_API}
-            result = self.session.get(api_link, params=params, headers=headers, timeout=5)
+            result = self._http_client.get(api_link, params=params, headers=headers, timeout=5)
 
         if result and result.status_code != 200:
             return result.status_code

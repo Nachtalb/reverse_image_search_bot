@@ -2,10 +2,9 @@ from threading import Lock
 from time import time
 from urllib.parse import quote_plus
 
-import requests
+import httpx
 import validators
 from cachetools import cached
-from requests import Session
 from telegram import InlineKeyboardButton
 from yarl import URL
 
@@ -36,7 +35,7 @@ class SauceNaoEngine(GenericRISEngine):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.session = Session()
+        self._http_client = httpx.Client(timeout=10)
         self.lock = Lock()
 
     def _21_provider(self, data: ResponseData) -> InternalProviderData | tuple[None, None]:
@@ -59,7 +58,6 @@ class SauceNaoEngine(GenericRISEngine):
 
     def _5_provider(self, data: ResponseData) -> InternalProviderData:
         """Pixiv"""
-        # __import__('ipdb').set_trace()
         try:
             result, meta = pixiv.provide(data["pixiv_id"])  # type: ignore
         except Exception as e:
@@ -123,7 +121,7 @@ class SauceNaoEngine(GenericRISEngine):
                     result[known[key][0]] = known[key][1](value)  # type: ignore[arg-type]
                 case k if k.endswith(("_id", "_aid")):
                     continue
-                case k if k.endswith("_url"):  # author_name + author_url fields
+                case k if k.endswith("_url"):
                     clean_key = key.replace("_url", "")
                     name = ""
                     if (alt_key := clean_key + "_name") in data:
@@ -160,8 +158,8 @@ class SauceNaoEngine(GenericRISEngine):
         )
         try:
             with self.lock:
-                response = self.session.get(api_link, timeout=5)
-        except requests.exceptions.ConnectionError:
+                response = self._http_client.get(api_link, timeout=5)
+        except httpx.ConnectError:
             meta["errors"] = ["Error connecting to SauceNAO API"]
             self.logger.debug("Error connecting to SauceNAO API")
             return {}, meta
@@ -180,7 +178,7 @@ class SauceNaoEngine(GenericRISEngine):
             lambda d: float(d["header"]["similarity"]) >= self.min_similarity, response.json().get("results", [])
         )
 
-        priority = 21, 371, 37, 5, 9, 12, 25  # Anime, Mangadex V2, Mangadex, Pixiv, Danbooru, Yandere, Gelbooru
+        priority = 21, 371, 37, 5, 9, 12, 25
         data = next(
             iter(
                 sorted(

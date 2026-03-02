@@ -1,3 +1,4 @@
+import asyncio
 import html
 import io
 import json
@@ -6,24 +7,19 @@ import os
 import re
 import sys
 from pathlib import Path
-from threading import Thread
 
 from emoji import emojize
 from telegram import Bot, Update
-from telegram.error import Unauthorized
+from telegram.constants import ParseMode
+from telegram.error import Forbidden
 from telegram.ext import (
-    CallbackContext,
+    Application,
     CallbackQueryHandler,
     CommandHandler,
-    Dispatcher,
-    ExtBot,
-    Filters,
-    JobQueue,
+    ContextTypes,
     MessageHandler,
-    Updater,
+    filters,
 )
-from telegram.parsemode import ParseMode
-from telegram.utils.request import Request
 
 from . import metrics, settings
 from .commands import (
@@ -41,10 +37,17 @@ from .commands import (
 )
 from .metrics import start_metrics_server
 
-job_queue: JobQueue = None  # type: ignore
+application: Application | None = None
 
 
 class TelegramLogHandler(logging.Handler):
+    """Forward WARNING+ log records to Telegram admin chats.
+
+    Because this handler is invoked from arbitrary threads (via the logging
+    framework), we schedule coroutines on the running event loop with
+    ``asyncio.run_coroutine_threadsafe``.
+    """
+
     prefixes = {
         logging.INFO: emojize(":blue_circle:"),
         logging.WARNING: emojize(":orange_circle:"),
@@ -52,9 +55,10 @@ class TelegramLogHandler(logging.Handler):
         logging.FATAL: emojize(":cross_mark:"),
     }
 
-    def __init__(self, *args, bot: Bot, **kwargs):
+    def __init__(self, *args, bot: Bot, loop: asyncio.AbstractEventLoop, **kwargs):
         super().__init__(*args, **kwargs)
         self.bot = bot
+        self.loop = loop
 
     def emit(self, record: logging.LogRecord):
         try:
@@ -62,17 +66,18 @@ class TelegramLogHandler(logging.Handler):
             msg = f"{prefix} {self.format(record)}"
             for admin in settings.ADMIN_IDS:
                 if len(msg) <= 4096:
-                    self.bot.send_message(admin, msg, parse_mode=ParseMode.HTML)
+                    coro = self.bot.send_message(admin, msg, parse_mode=ParseMode.HTML)
                 else:
-                    raw_text = super().format(record)  # plain text, no HTML
+                    raw_text = super().format(record)
                     filename = f"error_{int(record.created)}_{record.levelname.lower()}.log"
                     log_data = io.BytesIO(raw_text.encode("utf-8"))
                     log_data.name = filename
                     suffix = "\n... [truncated]"
                     caption = msg[: 1024 - len(suffix)] + suffix if len(msg) > 1024 else msg
-                    self.bot.send_document(
+                    coro = self.bot.send_document(
                         admin, log_data, filename=filename, caption=caption, parse_mode=ParseMode.HTML
                     )
+                asyncio.run_coroutine_threadsafe(coro, self.loop)
         except Exception:
             pass
 
@@ -88,23 +93,25 @@ class TelegramLogHandler(logging.Handler):
 
 logger = logging.getLogger(__name__)
 
-ADMIN_FILTER = Filters.user(user_id=settings.ADMIN_IDS)
+ADMIN_FILTER = filters.User(user_id=settings.ADMIN_IDS)
 
 
-class RISBot(ExtBot):
+class RISBot:
+    """Manages banned users. Stored as a plain class (no longer extends ExtBot)."""
+
     _banned_users: list[int] = []
     _banned_users_file: Path = Path("banned_users.json")
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self):
         if self._banned_users_file.is_file():
             self._banned_users = json.loads(self._banned_users_file.read_text())
 
-    def _ban_user(self, update: Update, _: CallbackContext):
+    async def ban_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        assert update.message and update.message.text
         metrics.commands_total.labels(command="ban").inc()
         args = update.message.text.strip("/").split(" ")
         if len(args) != 2:
-            update.message.reply_text("Usage: /ban <user_id>")
+            await update.message.reply_text("Usage: /ban <user_id>")
             return
         user_id = int(args[1])
 
@@ -115,19 +122,55 @@ class RISBot(ExtBot):
             self._banned_users.append(user_id)
             text = f"banned user {user_id=}"
         self._banned_users_file.write_text(json.dumps(self._banned_users))
-        update.message.reply_text(text)
+        await update.message.reply_text(text)
 
 
-def error_logger(update: Update, context: CallbackContext, *_, **__):
-    """Log all errors from the telegram bot api"""
-    if isinstance(context.error, Unauthorized):
+ris_bot = RISBot()
+
+
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+    """Log all errors from the telegram bot api."""
+    if isinstance(context.error, Forbidden):
         return
     metrics.errors_total.labels(type=type(context.error).__name__).inc()
     logger.error("Uncaught exception in handler:", exc_info=context.error)
 
 
+async def restart_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Gracefully stop and replace the current process."""
+    assert update.message and update.effective_chat
+    metrics.commands_total.labels(command="restart").inc()
+    await update.message.reply_text("Bot is restarting...")
+    logger.info("User requested restart")
+    chat_id = update.effective_chat.id
+
+    async def _stop_and_restart():
+        if application is not None:
+            await application.stop()
+            await application.shutdown()
+        logger.info("Restarting: starting...")
+        os.execl(sys.executable, sys.executable, *sys.argv, f"restart={chat_id}")
+
+    _restart_task = asyncio.create_task(_stop_and_restart())  # noqa: RUF006
+
+
+async def post_init(app: Application) -> None:
+    """Called after Application.initialize() — send restart/startup notifications."""
+    loop = asyncio.get_running_loop()
+    logging.getLogger("").addHandler(TelegramLogHandler(bot=app.bot, loop=loop, level=logging.WARNING))
+
+    if match := re.match(r"restart=(\d+)", sys.argv[-1]):
+        await app.bot.send_message(int(match.groups()[0]), "Restart successful!")
+
+    for admin_id in settings.ADMIN_IDS:
+        try:
+            await app.bot.send_message(admin_id, emojize(":check_mark_button: Bot started successfully."))
+        except Exception:
+            logger.warning("Failed to notify admin %d of startup", admin_id)
+
+
 def main():
-    global job_queue
+    global application
 
     # Auto-migrate JSON config files to SQLite on first run
     from .config.db import migrate_json_files
@@ -137,76 +180,49 @@ def main():
         logger.info("Migrated %d JSON config files to SQLite", migrated)
 
     start_metrics_server()
-    _request = Request(con_pool_size=settings.CON_POOL_SIZE)
-    bot = RISBot(settings.TELEGRAM_API_TOKEN, request=_request, arbitrary_callback_data=False)
-    updater = Updater(bot=bot, workers=settings.WORKERS)
-    dispatcher: Dispatcher = updater.dispatcher
-    job_queue = updater.job_queue
 
-    def stop_and_restart(chat_id: int):
-        """Gracefully stop the Updater and replace the current process with a new one."""
-        logger.info("Restarting: stopping...")
-        updater.stop()
-        logger.info("Restarting: starting...")
-        os.execl(sys.executable, sys.executable, *sys.argv, f"restart={chat_id}")
+    builder = Application.builder().token(settings.TELEGRAM_API_TOKEN)
+    builder.concurrent_updates(settings.WORKERS)
+    builder.post_init(post_init)
+    app = builder.build()
+    application = app
 
-    def restart_command(update: Update, context: CallbackContext):
-        """Start the restarting process"""
-        metrics.commands_total.labels(command="restart").inc()
-        update.message.reply_text("Bot is restarting...")
-        logger.info("User requested restart")
-        Thread(target=stop_and_restart, args=(update.effective_chat.id,)).start()  # type: ignore
+    # Handlers
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, on_added_to_group))
+    app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("id", id_command))
+    app.add_handler(CommandHandler("restart", restart_command, filters=ADMIN_FILTER))
+    app.add_handler(CommandHandler("ban", ris_bot.ban_command, filters=ADMIN_FILTER), group=1)
+    app.add_handler(CommandHandler("search", search_command))
+    app.add_handler(CommandHandler(("settings", "conf", "pref"), settings_command))
+    app.add_handler(CallbackQueryHandler(settings_callback_handler, pattern=r"^settings:"))
+    app.add_handler(CallbackQueryHandler(onboard_callback_handler, pattern=r"^onboard:"))
+    app.add_handler(CallbackQueryHandler(callback_query_handler))
 
-    dispatcher.add_handler(MessageHandler(Filters.status_update.new_chat_members, on_added_to_group))
-    dispatcher.add_handler(CommandHandler("start", start_command))
-    dispatcher.add_handler(CommandHandler("help", help_command))
-    dispatcher.add_handler(CommandHandler("id", id_command))
-    dispatcher.add_handler(CommandHandler("restart", restart_command, filters=ADMIN_FILTER))
-    dispatcher.add_handler(CommandHandler("ban", bot._ban_user, filters=ADMIN_FILTER), group=1)
-    dispatcher.add_handler(CommandHandler("search", search_command, run_async=True))
-    dispatcher.add_handler(CommandHandler(("settings", "conf", "pref"), settings_command, run_async=True))
-    dispatcher.add_handler(CallbackQueryHandler(settings_callback_handler, pattern=r"^settings:", run_async=True))
-    dispatcher.add_handler(CallbackQueryHandler(onboard_callback_handler, pattern=r"^onboard:", run_async=True))
-    dispatcher.add_handler(CallbackQueryHandler(callback_query_handler, run_async=True))
-
-    logging.getLogger("").addHandler(TelegramLogHandler(bot=updater.bot, level=logging.WARNING))
-
-    dispatcher.add_handler(
+    app.add_handler(
         MessageHandler(
-            (Filters.sticker | Filters.photo | Filters.video | Filters.document) & Filters.chat_type.private,
+            (filters.Sticker.ALL | filters.PHOTO | filters.VIDEO | filters.Document.ALL) & filters.ChatType.PRIVATE,
             file_handler,
-            run_async=True,
         )
     )
-    dispatcher.add_handler(
+    app.add_handler(
         MessageHandler(
-            (Filters.sticker | Filters.photo | Filters.video | Filters.document) & Filters.chat_type.groups,
+            (filters.Sticker.ALL | filters.PHOTO | filters.VIDEO | filters.Document.ALL) & filters.ChatType.GROUPS,
             group_file_handler,
-            run_async=True,
         )
     )
 
-    # log all errors
-    dispatcher.add_error_handler(error_logger)
-
-    if match := re.match(r"restart=(\d+)", sys.argv[-1]):
-        updater.bot.send_message(int(match.groups()[0]), "Restart successful!")
+    app.add_error_handler(error_handler)
 
     if settings.MODE["active"] == "webhook":
         logger.info("Starting webhook")
-        updater.start_webhook(**settings.MODE["configuration"])
+        app.run_webhook(**settings.MODE["configuration"])
     else:
         logger.info("Start polling")
-        updater.start_polling()
-    logger.info("Started bot. Waiting for requests...")
+        app.run_polling()
 
-    # Notify admins of successful startup
-    for admin_id in settings.ADMIN_IDS:
-        try:
-            updater.bot.send_message(admin_id, emojize(":check_mark_button: Bot started successfully."))
-        except Exception:
-            logger.warning("Failed to notify admin %d of startup", admin_id)
-    updater.idle()
+    logger.info("Bot stopped.")
 
 
 if __name__ == "__main__":
