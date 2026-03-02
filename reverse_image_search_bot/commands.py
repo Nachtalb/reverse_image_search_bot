@@ -453,13 +453,6 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
         await message.reply_text("🔴 You are banned from using this bot due to uploading illegal content.")
         return
 
-    # Check banned users from RISBot instance
-    from .bot import ris_bot
-
-    if user.id in ris_bot._banned_users:
-        await message.reply_text("🔴 You are banned from using this bot due to uploading illegal content.")
-        return
-
     await context.bot.send_chat_action(chat_id=message.chat_id, action=ChatAction.TYPING)
 
     attachment = message.effective_attachment

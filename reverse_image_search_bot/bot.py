@@ -18,6 +18,7 @@ from telegram.ext import (
     CommandHandler,
     ContextTypes,
     MessageHandler,
+    PicklePersistence,
     filters,
 )
 
@@ -96,36 +97,26 @@ logger = logging.getLogger(__name__)
 ADMIN_FILTER = filters.User(user_id=settings.ADMIN_IDS)
 
 
-class RISBot:
-    """Manages banned users. Stored as a plain class (no longer extends ExtBot)."""
-
-    _banned_users: list[int] = []
-    _banned_users_file: Path = Path("banned_users.json")
-
-    def __init__(self):
-        if self._banned_users_file.is_file():
-            self._banned_users = json.loads(self._banned_users_file.read_text())
-
-    async def ban_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        assert update.message and update.message.text
-        metrics.commands_total.labels(command="ban").inc()
-        args = update.message.text.strip("/").split(" ")
-        if len(args) != 2:
-            await update.message.reply_text("Usage: /ban <user_id>")
-            return
-        user_id = int(args[1])
-
-        if user_id in self._banned_users:
-            self._banned_users.remove(user_id)
-            text = f"Removed user {user_id=} from banned users"
-        else:
-            self._banned_users.append(user_id)
-            text = f"banned user {user_id=}"
-        self._banned_users_file.write_text(json.dumps(self._banned_users))
-        await update.message.reply_text(text)
+_BANNED_USERS_JSON = Path("banned_users.json")
 
 
-ris_bot = RISBot()
+async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    assert update.message and update.message.text
+    metrics.commands_total.labels(command="ban").inc()
+    args = update.message.text.strip("/").split(" ")
+    if len(args) != 2:
+        await update.message.reply_text("Usage: /ban <user_id>")
+        return
+    user_id = int(args[1])
+
+    banned: list[int] = context.bot_data.setdefault("banned_users", [])
+    if user_id in banned:
+        banned.remove(user_id)
+        text = f"Removed user {user_id=} from banned users"
+    else:
+        banned.append(user_id)
+        text = f"banned user {user_id=}"
+    await update.message.reply_text(text)
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
@@ -159,6 +150,20 @@ async def post_init(app: Application) -> None:
     loop = asyncio.get_running_loop()
     logging.getLogger("").addHandler(TelegramLogHandler(bot=app.bot, loop=loop, level=logging.WARNING))
 
+    # One-time migration: banned_users.json → bot_data
+    if _BANNED_USERS_JSON.is_file():
+        try:
+            users = json.loads(_BANNED_USERS_JSON.read_text())
+            if users:
+                banned: list[int] = app.bot_data.setdefault("banned_users", [])
+                for uid in users:
+                    if uid not in banned:
+                        banned.append(uid)
+            _BANNED_USERS_JSON.rename(_BANNED_USERS_JSON.with_suffix(".json.bak"))
+            logger.info("Migrated banned_users.json → bot_data (%d users)", len(users))
+        except Exception:
+            logger.warning("Failed to migrate banned_users.json", exc_info=True)
+
     if match := re.match(r"restart=(\d+)", sys.argv[-1]):
         await app.bot.send_message(int(match.groups()[0]), "Restart successful!")
 
@@ -181,7 +186,9 @@ def main():
 
     start_metrics_server()
 
+    persistence = PicklePersistence(filepath="bot_data.pickle")
     builder = Application.builder().token(settings.TELEGRAM_API_TOKEN)
+    builder.persistence(persistence)
     builder.concurrent_updates(settings.WORKERS)
     builder.post_init(post_init)
     app = builder.build()
@@ -193,7 +200,7 @@ def main():
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("id", id_command))
     app.add_handler(CommandHandler("restart", restart_command, filters=ADMIN_FILTER))
-    app.add_handler(CommandHandler("ban", ris_bot.ban_command, filters=ADMIN_FILTER), group=1)
+    app.add_handler(CommandHandler("ban", ban_command, filters=ADMIN_FILTER), group=1)
     app.add_handler(CommandHandler("search", search_command))
     app.add_handler(CommandHandler(("settings", "conf", "pref"), settings_command))
     app.add_handler(CallbackQueryHandler(settings_callback_handler, pattern=r"^settings:"))
