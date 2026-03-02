@@ -1,4 +1,5 @@
 """SQLite backend for chat configuration with typed columns."""
+
 import json
 import sqlite3
 import threading
@@ -15,9 +16,9 @@ COLUMNS = [
     ("show_best_match", "INTEGER", True),
     ("show_link", "INTEGER", True),
     ("auto_search_enabled", "INTEGER", True),
-    ("auto_search_engines", "TEXT", None),       # JSON list or NULL
-    ("button_engines", "TEXT", None),             # JSON list or NULL
-    ("engine_empty_counts", "TEXT", "{}"),         # JSON dict
+    ("auto_search_engines", "TEXT", None),  # JSON list or NULL
+    ("button_engines", "TEXT", None),  # JSON list or NULL
+    ("engine_empty_counts", "TEXT", "{}"),  # JSON dict
     ("onboarded", "INTEGER", False),
     ("failures_in_a_row", "INTEGER", 0),
 ]
@@ -101,13 +102,11 @@ def _to_sql(name: str, value):
 def load_config(chat_id: int) -> dict | None:
     """Load config dict for a chat_id, or None if not found."""
     conn = _get_conn()
-    row = conn.execute(
-        "SELECT * FROM chat_config WHERE chat_id = ?", (chat_id,)
-    ).fetchone()
+    row = conn.execute("SELECT * FROM chat_config WHERE chat_id = ?", (chat_id,)).fetchone()
     if row is None:
         return None
     col_names = [name for name, _, _ in COLUMNS]
-    return {name: _to_python(name, row[name]) for name in col_names if name in row.keys()}
+    return {name: _to_python(name, row[name]) for name in col_names if name in row}
 
 
 def save_config(chat_id: int, config: dict) -> None:
@@ -116,15 +115,14 @@ def save_config(chat_id: int, config: dict) -> None:
     col_names = [name for name, _, _ in COLUMNS]
     present = {k: v for k, v in config.items() if k in set(col_names)}
 
-    cols = ["chat_id"] + list(present.keys())
+    cols = ["chat_id", *list(present.keys())]
     vals = [chat_id] + [_to_sql(k, v) for k, v in present.items()]
     placeholders = ", ".join(["?"] * len(cols))
     col_str = ", ".join(cols)
-    update_str = ", ".join(f"{c} = excluded.{c}" for c in present.keys())
+    update_str = ", ".join(f"{c} = excluded.{c}" for c in present)
 
     conn.execute(
-        f"INSERT INTO chat_config ({col_str}) VALUES ({placeholders}) "
-        f"ON CONFLICT(chat_id) DO UPDATE SET {update_str}",
+        f"INSERT INTO chat_config ({col_str}) VALUES ({placeholders}) ON CONFLICT(chat_id) DO UPDATE SET {update_str}",
         vals,
     )
     conn.commit()

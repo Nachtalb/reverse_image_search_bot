@@ -131,6 +131,7 @@ def main():
 
     # Auto-migrate JSON config files to SQLite on first run
     from .config.db import migrate_json_files
+
     migrated = migrate_json_files(settings.CONFIG_DIR)
     if migrated:
         logger.info("Migrated %d JSON config files to SQLite", migrated)

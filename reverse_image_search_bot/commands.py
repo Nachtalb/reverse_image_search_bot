@@ -674,7 +674,11 @@ def best_match(update: Update, context: CallbackContext, url: str | URL, general
             emojize(
                 f":blue_circle: I searched for you on {engines_used_html}. You can try others above for more results."
             )
-            + (" You may reenable auto-search via /settings if you want." if not chat_config.auto_search_enabled else ""),
+            + (
+                " You may reenable auto-search via /settings if you want."
+                if not chat_config.auto_search_enabled
+                else ""
+            ),
             ParseMode.HTML,
         )
 
