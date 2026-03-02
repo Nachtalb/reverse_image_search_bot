@@ -2,7 +2,7 @@ FROM python:3.11-slim AS builder
 
 # Build deps: C compiler + Kerberos headers (required by gssapi C extension)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends gcc libkrb5-dev \
+    && apt-get install -y --no-install-recommends gcc libkrb5-dev git \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
