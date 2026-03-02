@@ -9,7 +9,7 @@ app_path = CONFIG_DIR
 app_path.mkdir(parents=True, exist_ok=True)
 
 
-def single(cls: type[UserConfig]):
+def single(cls: type["UserConfig"]):
     def get_instance(user: User | int):
         id: int = user.id if isinstance(user, User) else user
         if not hasattr(cls, "__loaded_users"):
@@ -35,7 +35,7 @@ class UserConfig:
         "auto_search_enabled": True,
         "failures_in_a_row": 0,
     }
-    __loaded_users: dict[int, UserConfig] = {}
+    __loaded_users: dict[int, "UserConfig"] = {}
 
     auto_search_enabled: bool
     failures_in_a_row: int

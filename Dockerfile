@@ -1,4 +1,4 @@
-FROM python:3.14-slim AS builder
+FROM python:3.12-slim AS builder
 
 # Build deps: git required for moviepy git dependency
 RUN apt-get update \
@@ -14,7 +14,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
 
-FROM python:3.14-slim
+FROM python:3.12-slim
 
 # Runtime deps: ffmpeg required by moviepy for video frame extraction
 RUN apt-get update \

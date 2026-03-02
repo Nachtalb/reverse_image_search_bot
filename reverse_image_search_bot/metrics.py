@@ -157,7 +157,7 @@ def _collect_process_metrics():
             with open("/proc/self/statm") as f:
                 pages = int(f.read().split()[1])
                 memory_bytes.set(pages * os.sysconf("SC_PAGE_SIZE"))
-        except OSError, ValueError:
+        except (OSError, ValueError):
             pass
         if _first_run:
             time.sleep(5)  # let engines/providers initialize

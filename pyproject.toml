@@ -5,12 +5,12 @@ description = "Discover https://t.me/reverse_image_search_bot, a convenient Tele
 authors = [{name = "Nachtalb", email = "na@nachtalb.io"}]
 license = {text = "LGPL-3.0"}
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = [
     "python-magic==0.4.24",
     "validators==0.18.2",
     "python-telegram-bot[json,socks]==13.15",
-    "standard-imghdr>=3.13",
+
     "gppt==1.6",
     "cleverdict==1.9.1",
     "paramiko>=3.4.0",
@@ -47,7 +47,7 @@ packages = ["reverse_image_search_bot"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py314"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
@@ -60,5 +60,3 @@ ignore = [
 [tool.ruff.format]
 quote-style = "double"
 
-[tool.uv]
-constraint-dependencies = ["lxml>=6.0"]
