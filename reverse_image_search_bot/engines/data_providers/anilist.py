@@ -52,7 +52,7 @@ query ($id: Int) {
             headers["Authorization"] = f"Bearer {settings.ANILIST_TOKEN}"
 
         payload = {"query": query, "variables": {"id": anilist_id}}
-        response = self.session.post(str(self.api_base), json=payload, headers=headers)
+        response = self._http_client.post(str(self.api_base), json=payload, headers=headers)
         if response.status_code != 200:
             return
 
