@@ -3,9 +3,9 @@ import time
 from functools import partial, wraps
 from typing import TypedDict
 
+import httpx
 from cachetools import TTLCache, cachedmethod
 from cachetools.keys import hashkey
-from requests import Session
 
 from reverse_image_search_bot import metrics
 
@@ -58,5 +58,5 @@ class BaseProvider:
 
     def __init__(self):
         self._cache: TTLCache = TTLCache(1e4, self._cache_ttl)
-        self.session: Session = Session()
+        self._http_client: httpx.Client = httpx.Client(timeout=10)
         self.logger: logging.Logger = logging.getLogger(self.info["name"] + "DataProvider")
