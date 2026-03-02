@@ -9,6 +9,7 @@ from yarl import URL
 
 from reverse_image_search_bot import settings
 from reverse_image_search_bot.utils.url import url_button
+
 from .data_providers import anilist as anilist_provider
 from .pic_image_search import PicImageSearchEngine
 from .types import InternalProviderData, MetaData
@@ -93,7 +94,7 @@ def _anilist_resolve(char_name: str, work: str) -> tuple[str, str, int | None, i
     clean = _clean_name(char_name)
     try:
         data = _anilist_post({"query": _ANILIST_QUERY, "variables": {"name": clean}})
-        char = data["data"]["Character"]
+        char = data["data"]["Character"]  # type: ignore[index]
         en_name = char["name"]["full"] or char_name
         char_id = char.get("id")
         char_image = (char.get("image") or {}).get("large")
@@ -105,10 +106,7 @@ def _anilist_resolve(char_name: str, work: str) -> tuple[str, str, int | None, i
 
 class AnimeTraceEngine(PicImageSearchEngine):
     name = "AnimeTrace"
-    description = (
-        "AnimeTrace identifies anime characters in images, returning the "
-        "character name and source work."
-    )
+    description = "AnimeTrace identifies anime characters in images, returning the character name and source work."
     provider_url = URL("https://www.animetrace.com/")
     types = ["Anime/Manga"]
     recommendation = ["Anime characters", "Fan art"]
@@ -116,11 +114,13 @@ class AnimeTraceEngine(PicImageSearchEngine):
 
     def __init__(self, *args, **kwargs):
         from PicImageSearch import AnimeTrace
+
         self.pic_engine_class = AnimeTrace
         super().__init__(*args, **kwargs)
 
     async def _search(self, url: str):
         from PicImageSearch import AnimeTrace, Network
+
         async with Network() as client:
             engine = AnimeTrace(client=client, is_multi=1)
             return await engine.search(url=url)
@@ -155,23 +155,25 @@ class AnimeTraceEngine(PicImageSearchEngine):
                         al_result.pop(key, None)
                     result.update(al_result)
                 if al_meta:
-                    meta["provided_via"] = al_meta.get("provided_via")
-                    meta["provided_via_url"] = al_meta.get("provided_via_url")
+                    meta["provided_via"] = al_meta.get("provided_via", "")
+                    meta["provided_via_url"] = al_meta.get("provided_via_url", URL())
 
             # Thumbnail fallback: prefer character portrait over anime cover
             if not getattr(confident[0], "thumbnail", None):
                 if char_image:
                     meta["thumbnail"] = URL(char_image)
                 elif al_meta and al_meta.get("thumbnail"):
-                    meta["thumbnail"] = al_meta.get("thumbnail")
+                    meta["thumbnail"] = al_meta["thumbnail"]
 
             # Build buttons: character page + media page
             buttons = []
             if char_id:
-                buttons.append(url_button(
-                    f"https://anilist.co/character/{char_id}",
-                    text=en_name,
-                ))
+                buttons.append(
+                    url_button(
+                        f"https://anilist.co/character/{char_id}",
+                        text=en_name,
+                    )
+                )
             if media_id and al_meta and al_meta.get("buttons"):
                 buttons.extend(al_meta["buttons"])
             if buttons:

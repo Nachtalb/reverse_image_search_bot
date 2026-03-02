@@ -1,5 +1,4 @@
 from datetime import datetime
-from urllib.parse import quote_plus
 
 from cachetools import cached
 from requests import Session
@@ -105,12 +104,12 @@ class TraceEngine(GenericRISEngine):
         if not result:
             titles = {}
             if isinstance(data["anilist"], int):
-                buttons.append(url_button("https://anilist.co/anime/%d" % data["anilist"]))
+                buttons.append(url_button(f"https://anilist.co/anime/{data['anilist']}"))
             else:
                 anilist_data = data["anilist"]
                 titles = anilist_data["titles"]
-                buttons.append(url_button("https://anilist.co/anime/%d" % anilist_data["id"]))
-                buttons.append(url_button("https://myanimelist.net/anime/%d" % anilist_data["idMal"]))
+                buttons.append(url_button(f"https://anilist.co/anime/{anilist_data['id']}"))
+                buttons.append(url_button(f"https://myanimelist.net/anime/{anilist_data['idMal']}"))
 
             result.update(
                 {

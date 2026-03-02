@@ -16,7 +16,7 @@ class BaiduEngine(PreWorkEngine):
     pre_url = "https://graph.baidu.com/upload?image={query_url}&from=pc"
     has_session = True
 
-    def get_search_link_by_url(self, url: URL) -> str | None:
+    def get_search_link_by_url(self, url: str | URL) -> str | None:
         pre_url = self.pre_url.format(query_url=quote_plus(str(url)))
 
         response = self.session.get(pre_url)

@@ -4,7 +4,7 @@ from .boorus import BooruProvider
 from .mangadex import MangadexProvider
 from .pixiv import PixivProvider
 
-__all__ = ["anilist", "booru", "mangadex", "provides", "pixiv"]
+__all__ = ["anilist", "booru", "mangadex", "pixiv", "provides"]
 
 anilist = AnilistProvider()
 booru = BooruProvider()

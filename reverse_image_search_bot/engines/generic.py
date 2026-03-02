@@ -1,15 +1,14 @@
 import logging
 from urllib.parse import quote_plus
 
+import validators
 from cachetools import TTLCache, cached
 from requests import Session
 from requests_html import HTMLSession
 from telegram import InlineKeyboardButton
-import validators
 from yarl import URL
 
 from .types import InternalResultData, MetaData, ProviderData, ResultData
-
 
 __all__ = ["GenericRISEngine", "PreWorkEngine"]
 
@@ -31,12 +30,12 @@ class GenericRISEngine:
 
     def __init__(
         self,
-        name: str = None,
-        url: str = None,
+        name: str | None = None,
+        url: str | None = None,
         description: str = "",
         provider_url: str | URL = "",
-        types: list[str] = [],
-        recommendation: list[str] = [],
+        types: list[str] | None = None,
+        recommendation: list[str] | None = None,
     ):
         self.name = name or self.name
         self.description = description or self.description
@@ -53,11 +52,12 @@ class GenericRISEngine:
 
         self.logger = logging.getLogger(f"RISEngine [{self.name}]")
 
-    def __call__(self, url: str | URL, text: str = None) -> InlineKeyboardButton:
+    def __call__(self, url: str | URL, text: str | None = None) -> InlineKeyboardButton:
         """Create the :obj:`InlineKeyboardButton` button for the telegram but to use"""
-        return InlineKeyboardButton(text=text or self.name, url=self.get_search_link_by_url(url))
+        search_url = self.get_search_link_by_url(url) or ""
+        return InlineKeyboardButton(text=text or self.name, url=search_url)
 
-    def get_search_link_by_url(self, url: str | URL) -> str:
+    def get_search_link_by_url(self, url: str | URL) -> str | None:
         """Get the reverse image search link for the given url"""
         return self.url.format(query_url=quote_plus(str(url)))
 
@@ -71,7 +71,7 @@ class GenericRISEngine:
     def _clean_meta_data(self, data: MetaData) -> MetaData:
         for button in data.get("buttons", [])[:]:
             if button.url and not validators.url(button.url):
-                data["buttons"].remove(button)  # type: ignore
+                data["buttons"].remove(button)
         return data
 
     def _clean_best_match(self, result: InternalResultData, meta: MetaData) -> tuple[ResultData, MetaData]:
@@ -102,8 +102,8 @@ class GenericRISEngine:
                     "provided_via": "Danbooru",                         # optional: Data provider (not search engine)
                                                                         # when additional API is used
                     "provided_via_url": "https://danbooru.donmai.us/"   # optional: URL to additional provider
-                    "identifier": "something"                           # optional: identifier to prevent search results from other engines (text only)
-                    "thumbnail_identifier": "something"                 # optional: identifier to prevent search results from other engines (thumbnail only)
+                    "identifier": "something"              # optional: dedup id (text)
+                    "thumbnail_identifier": "something"    # optional: dedup id (thumbnail)
                 }
             )
         """
@@ -119,7 +119,7 @@ class PreWorkEngine(GenericRISEngine):
         super().__init__(*args, **kwargs)
 
     @cached(_url_cache)
-    def __call__(self, url: str | URL, text: str = None) -> InlineKeyboardButton | None:
+    def __call__(self, url: str | URL, text: str | None = None) -> InlineKeyboardButton | None:
         search_url = self.get_search_link_by_url(url)
         if not search_url:
             return

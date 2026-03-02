@@ -2,6 +2,7 @@
 Generic base engine for PicImageSearch-backed engines.
 Each subclass sets `pic_engine_class` and optionally overrides `_extract`.
 """
+
 import asyncio
 
 from cachetools import cached
@@ -34,7 +35,9 @@ class PicImageSearchEngine(GenericRISEngine):
 
     async def _search(self, url: str):
         from PicImageSearch import Network
+
         async with Network() as client:
+            assert self.pic_engine_class, "pic_engine_class must be set on subclass"
             engine = self.pic_engine_class(client=client)
             return await engine.search(url=url)
 
@@ -75,6 +78,7 @@ class PicImageSearchEngine(GenericRISEngine):
             return {}, meta
         except Exception as e:
             from PicImageSearch.exceptions import ParsingError
+
             if isinstance(e, ParsingError):
                 # Page structure changed or unsupported input type — no results.
                 self.logger.debug("ParsingError, treating as no results: %s", e)

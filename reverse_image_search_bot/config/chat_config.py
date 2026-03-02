@@ -1,13 +1,12 @@
-from typing import Type
-
 from cleverdict import CleverDict
+
 from reverse_image_search_bot.settings import CONFIG_DIR
 
 app_path = CONFIG_DIR
 app_path.mkdir(parents=True, exist_ok=True)
 
 
-def single_chat(cls: Type["ChatConfig"]):
+def single_chat(cls: type["ChatConfig"]):
     def get_instance(chat_id: int):
         if not hasattr(cls, "_loaded_chats"):
             cls._loaded_chats = {}
@@ -34,14 +33,14 @@ class ChatConfig:
     """
 
     _default_config: dict = {
-        "show_buttons": True,         # show engine result buttons at all
-        "show_best_match": True,      # show the "Best Match" button
-        "show_link": True,            # show the "Go To Image" link button
+        "show_buttons": True,  # show engine result buttons at all
+        "show_best_match": True,  # show the "Best Match" button
+        "show_link": True,  # show the "Go To Image" link button
         "auto_search_enabled": True,  # master autosearch toggle for this chat
         "auto_search_engines": None,  # None = all; list[str] = enabled engine names for autosearch
-        "button_engines": None,       # None = all; list[str] = engine names shown as buttons
-        "engine_empty_counts": {},    # dict[str, int] consecutive empty result counts per engine
-        "onboarded": False,           # whether a group has completed the onboarding flow
+        "button_engines": None,  # None = all; list[str] = engine names shown as buttons
+        "engine_empty_counts": {},  # dict[str, int] consecutive empty result counts per engine
+        "onboarded": False,  # whether a group has completed the onboarding flow
     }
     _loaded_chats: dict = {}
 

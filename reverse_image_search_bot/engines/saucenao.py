@@ -2,11 +2,11 @@ from threading import Lock
 from time import time
 from urllib.parse import quote_plus
 
-from cachetools import cached
 import requests
+import validators
+from cachetools import cached
 from requests import Session
 from telegram import InlineKeyboardButton
-import validators
 from yarl import URL
 
 from reverse_image_search_bot.settings import SAUCENAO_API
@@ -39,27 +39,32 @@ class SauceNaoEngine(GenericRISEngine):
         self.session = Session()
         self.lock = Lock()
 
-    def _21_provider(self, data: ResponseData) -> InternalProviderData:
+    def _21_provider(self, data: ResponseData) -> InternalProviderData | tuple[None, None]:
         """Anime"""
-        if not "anilist_id" in data:
+        if "anilist_id" not in data:
             return None, None
         return anilist.provide(data["anilist_id"], data.get("part"))  # type: ignore
 
     def _booru_provider(self, data: ResponseData, api: str) -> InternalProviderData:
-        return booru.provide(api, data[api + "_id"])  # type: ignore
+        return booru.provide(api, data[api + "_id"])
 
-    _9_provider = lambda self, data: self._booru_provider(data, "danbooru")
-    _12_provider = lambda self, data: self._booru_provider(data, "yandere")
-    _25_provider = lambda self, data: self._booru_provider(data, "gelbooru")
+    def _9_provider(self, data):
+        return self._booru_provider(data, "danbooru")
+
+    def _12_provider(self, data):
+        return self._booru_provider(data, "yandere")
+
+    def _25_provider(self, data):
+        return self._booru_provider(data, "gelbooru")
 
     def _5_provider(self, data: ResponseData) -> InternalProviderData:
         """Pixiv"""
         # __import__('ipdb').set_trace()
         try:
-            result, meta = pixiv.provide(data['pixiv_id'])  # type: ignore
+            result, meta = pixiv.provide(data["pixiv_id"])  # type: ignore
         except Exception as e:
             self.logger.exception(e)
-            self.logger.warning('Error in pixiv provider')
+            self.logger.warning("Error in pixiv provider")
             result = meta = None
 
         if result and meta:
@@ -80,7 +85,9 @@ class SauceNaoEngine(GenericRISEngine):
         kwargs = {}
         if chapter_id := data.get("md_id"):
             kwargs["chapter_id"] = chapter_id
-        if mangadex_url := next(iter([url for url in data.get("ext_urls", []) if URL(url).host == "mangadex.org"]), None):  # type: ignore
+        ext_urls: list[str] = data.get("ext_urls", [])  # type: ignore[assignment]
+        mangadex_urls = [url for url in ext_urls if URL(url).host == "mangadex.org"]
+        if mangadex_url := next(iter(mangadex_urls), None):
             kwargs["url"] = URL(mangadex_url.strip("/"))
 
         return mangadex.provide(**kwargs)
@@ -98,7 +105,7 @@ class SauceNaoEngine(GenericRISEngine):
         buttons: list[InlineKeyboardButton] = []
         for key, text in known_buttons.items():
             value = data.pop(key, None)
-            if isinstance(value, str) and validators.url(value):  # type: ignore
+            if isinstance(value, str) and validators.url(value):
                 buttons.append(url_button(value, text=text))
 
         for item in data.pop("ext_urls", []):  # type: ignore
@@ -113,7 +120,7 @@ class SauceNaoEngine(GenericRISEngine):
                 continue
             match key:
                 case k if k in known:
-                    result[known[key][0]] = known[key][1](value)
+                    result[known[key][0]] = known[key][1](value)  # type: ignore[arg-type]
                 case k if k.endswith(("_id", "_aid")):
                     continue
                 case k if k.endswith("_url"):  # author_name + author_url fields
@@ -197,7 +204,7 @@ class SauceNaoEngine(GenericRISEngine):
             result, new_meta = self._default_provider(data["data"])
 
         meta.update(new_meta)
-        thumbnail = meta.get('thumbnail', data['header']['thumbnail'])
+        thumbnail = meta.get("thumbnail", data["header"]["thumbnail"])
         meta.update(
             {
                 "thumbnail": URL(thumbnail) if isinstance(thumbnail, str) else thumbnail,

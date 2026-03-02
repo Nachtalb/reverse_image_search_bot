@@ -25,9 +25,7 @@ from telegram.ext import (
 from telegram.parsemode import ParseMode
 from telegram.utils.request import Request
 
-from . import settings
-from . import metrics
-from .metrics import start_metrics_server
+from . import metrics, settings
 from .commands import (
     callback_query_handler,
     file_handler,
@@ -41,7 +39,7 @@ from .commands import (
     settings_command,
     start_command,
 )
-
+from .metrics import start_metrics_server
 
 job_queue: JobQueue = None  # type: ignore
 
@@ -71,8 +69,10 @@ class TelegramLogHandler(logging.Handler):
                     log_data = io.BytesIO(raw_text.encode("utf-8"))
                     log_data.name = filename
                     suffix = "\n... [truncated]"
-                    caption = msg[:1024 - len(suffix)] + suffix if len(msg) > 1024 else msg
-                    self.bot.send_document(admin, log_data, filename=filename, caption=caption, parse_mode=ParseMode.HTML)
+                    caption = msg[: 1024 - len(suffix)] + suffix if len(msg) > 1024 else msg
+                    self.bot.send_document(
+                        admin, log_data, filename=filename, caption=caption, parse_mode=ParseMode.HTML
+                    )
         except Exception:
             pass
 
@@ -140,7 +140,7 @@ def main():
         logger.info("Restarting: stopping...")
         updater.stop()
         logger.info("Restarting: starting...")
-        os.execl(sys.executable, sys.executable, *sys.argv, "restart=%d" % chat_id)
+        os.execl(sys.executable, sys.executable, *sys.argv, f"restart={chat_id}")
 
     def restart_command(update: Update, context: CallbackContext):
         """Start the restarting process"""
@@ -154,9 +154,7 @@ def main():
     dispatcher.add_handler(CommandHandler("help", help_command))
     dispatcher.add_handler(CommandHandler("id", id_command))
     dispatcher.add_handler(CommandHandler("restart", restart_command, filters=ADMIN_FILTER))
-    dispatcher.add_handler(
-        CommandHandler("ban", bot._ban_user, filters=ADMIN_FILTER), group=1
-    )
+    dispatcher.add_handler(CommandHandler("ban", bot._ban_user, filters=ADMIN_FILTER), group=1)
     dispatcher.add_handler(CommandHandler("search", search_command, run_async=True))
     dispatcher.add_handler(CommandHandler(("settings", "conf", "pref"), settings_command, run_async=True))
     dispatcher.add_handler(CallbackQueryHandler(settings_callback_handler, pattern=r"^settings:", run_async=True))

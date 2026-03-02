@@ -1,0 +1,51 @@
+name: Lint
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  ruff:
+    name: Ruff
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install lint tools
+        run: uv tool install ruff
+
+      - name: Ruff check
+        run: ruff check reverse_image_search_bot/
+
+      - name: Ruff format check
+        run: ruff format --check reverse_image_search_bot/
+
+  ty:
+    name: ty
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libkrb5-dev
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install all dependencies
+        run: uv sync --group dev
+
+      - name: ty check
+        run: uv run ty check reverse_image_search_bot/

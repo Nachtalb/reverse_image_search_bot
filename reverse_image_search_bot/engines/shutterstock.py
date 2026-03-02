@@ -19,7 +19,7 @@ class ShutterStockEngine(PreWorkEngine):
     pre_url = "https://www.shutterstock.com/studioapi/images/reverse-image-search"
     has_session = True
 
-    def get_search_link_by_url(self, url: URL) -> str | None:
+    def get_search_link_by_url(self, url: str | URL) -> str | None:
         file = get_file_from_url(url)
         if not file.is_file():
             return

@@ -58,7 +58,7 @@ query ($id: Int) {
 
         return next(iter(response.json()["data"]["Page"]["media"]), None)
 
-    def provide(self, anilist_id: int, episode_at: int | str = None) -> InternalProviderData:
+    def provide(self, anilist_id: int, episode_at: int | str | None = None) -> InternalProviderData:
         ani_data = self.request(anilist_id)
         if not ani_data:
             return {}, {}
@@ -68,7 +68,7 @@ query ($id: Int) {
         result = {
             "Title": ani_data["title"]["english"],
             "Title [romaji]": ani_data["title"]["romaji"],
-            "Episode": f'{episode_at}/{ani_data["episodes"]}',
+            "Episode": f"{episode_at}/{ani_data['episodes']}",
             "Status": ani_data["status"],
             "Type": ani_data["type"],
             "Year": f"{ani_data['startDate']['year']}-{ani_data['endDate']['year']}",
@@ -77,8 +77,8 @@ query ($id: Int) {
         }
 
         meta: MetaData = {
-            "provided_via": self.info["name"],
-            "provided_via_url": URL(self.info["url"]),
+            "provided_via": str(self.info["name"]),
+            "provided_via_url": URL(str(self.info["url"])),
             "thumbnail": URL(ani_data["coverImage"]["large"]),
             "buttons": [url_button(ani_data["siteUrl"])],
             "identifier": ani_data["siteUrl"],

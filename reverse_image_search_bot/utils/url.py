@@ -1,13 +1,13 @@
 import re
 
+import validators
 from emoji import emojize
 from telegram import InlineKeyboardButton
-import validators
 from yarl import URL
 
 
 def fix_url(url: URL | str) -> URL:
-    if not validators.url(str(url)) and (match := re.match("((?!:).+):((?!:).*):(.*)", str(url))):  # type: ignore
+    if not validators.url(str(url)) and (match := re.match("((?!:).+):((?!:).*):(.*)", str(url))):
         short, category, id = match.groups()
         match short:
             case "al" | "anilist":
@@ -44,7 +44,7 @@ def fix_url(url: URL | str) -> URL:
     return url
 
 
-def url_icon(url: URL | str, with_icon: bool = True, with_text: bool = True, custom_text: str = None) -> str:
+def url_icon(url: URL | str, with_icon: bool = True, with_text: bool = True, custom_text: str | None = None) -> str:
     url = URL(url)
 
     icon = ":globe_with_meridians:"
@@ -90,7 +90,7 @@ def url_icon(url: URL | str, with_icon: bool = True, with_text: bool = True, cus
         case "idol.sankakucomplex.com":
             text = "Idol Sankaku Complex"
         case _:
-            text = url.host.split(".")[-2].replace('_', ' ').replace('-', ' ').title()  # type: ignore
+            text = url.host.split(".")[-2].replace("_", " ").replace("-", " ").title()  # type: ignore
 
     if custom_text:
         text = custom_text
@@ -102,7 +102,7 @@ def url_icon(url: URL | str, with_icon: bool = True, with_text: bool = True, cus
 
 
 def url_button(
-    url: URL | str, with_icon: bool = True, with_text: bool = True, fix_url_: bool = True, text: str = None
+    url: URL | str, with_icon: bool = True, with_text: bool = True, fix_url_: bool = True, text: str | None = None
 ) -> InlineKeyboardButton:
     if fix_url_:
         url = fix_url(url)

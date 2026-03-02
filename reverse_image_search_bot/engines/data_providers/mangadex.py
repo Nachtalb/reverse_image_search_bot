@@ -12,7 +12,7 @@ class MangadexProvider(BaseProvider):
     api_base = URL("https://api.mangadex.org/")
 
     def _request(
-        self, endpoint: str, params: dict = {}, json: dict = {}, method: str = "get", **kwargs
+        self, endpoint: str, params: dict | None = None, json: dict | None = None, method: str = "get", **kwargs
     ) -> dict | list | None:
         request_method = getattr(self.session, method.lower())
         if not request_method:
@@ -48,18 +48,20 @@ class MangadexProvider(BaseProvider):
     def manga(self, manga_id: str) -> dict | None:
         return self._request(f"manga/{manga_id}", {"includes[]": ["artist", "cover_art", "author"]})  # type: ignore
 
-    def provide(self, url: str | URL = None, chapter_id: str = None, manga_id: str = None) -> InternalProviderData:
+    def provide(
+        self, url: str | URL | None = None, chapter_id: str | None = None, manga_id: str | None = None
+    ) -> InternalProviderData:
         chapter_id = str(chapter_id) if chapter_id else None
         manga_id = str(manga_id) if manga_id else None
         if not url and not chapter_id and not manga_id:
             return {}, {}
         elif url and (url := URL(url)):
-            if len(url.parts) != 3:  # ('/', 'chapter' | 'manga', '...')
+            if len(url.parts) != 3:  # ('/', 'chapter' | 'manga', '...') # type: ignore[union-attr]
                 return {}, {}
-            elif url.parts[0] == "manga":
-                manga_id = url.parts[-1]
-            elif url.parts[0] == "chapter":
-                chapter_id = url.parts[-1]
+            elif url.parts[0] == "manga":  # type: ignore[union-attr]
+                manga_id = url.parts[-1]  # type: ignore[union-attr]
+            elif url.parts[0] == "chapter":  # type: ignore[union-attr]
+                chapter_id = url.parts[-1]  # type: ignore[union-attr]
         if not chapter_id and not manga_id:
             return {}, {}
 
@@ -68,9 +70,10 @@ class MangadexProvider(BaseProvider):
         chapter_id = chapter_data.get("id", "")
 
         manga_data = {}
-        if chapter_data:
-            if manga_rel := next(iter(filter(lambda rel: rel["type"] == "manga", chapter_data["relationships"])), None):
-                manga_id = manga_rel["id"]
+        if chapter_data and (
+            manga_rel := next(iter(filter(lambda rel: rel["type"] == "manga", chapter_data["relationships"])), None)
+        ):
+            manga_id = manga_rel["id"]
 
         if not manga_id:
             return {}, {}
@@ -115,15 +118,12 @@ class MangadexProvider(BaseProvider):
             self.logger.warning("Found a manga with link list", manga_id)
         if isinstance(links, dict):
             for key, url in safe_get(manga_data, "attributes.links", {}).items():
-                if not validators.url(url):  # type: ignore
-                    url = fix_url(f"{key}:manga:{url}")
-                else:
-                    url = URL(url)  # type: ignore
+                url = fix_url(f"{key}:manga:{url}") if not validators.url(url) else URL(url)
                 buttons.append(url_button(url))
 
         meta: MetaData = {
-            "provided_via": self.info["name"],
-            "provided_via_url": URL(self.info["url"]),
+            "provided_via": str(self.info["name"]),
+            "provided_via_url": URL(str(self.info["url"])),
             "buttons": buttons,
             "identifier": manga_id,
         }

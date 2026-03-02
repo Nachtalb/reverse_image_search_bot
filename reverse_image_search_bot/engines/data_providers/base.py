@@ -1,6 +1,6 @@
-from functools import partial, wraps
 import logging
 import time
+from functools import partial, wraps
 from typing import TypedDict
 
 from cachetools import TTLCache, cachedmethod
@@ -16,6 +16,7 @@ def provider_cache(func):
 
 def _instrumented_provide(original_provide):
     """Wrap a data provider's provide() method with metrics tracking."""
+
     @wraps(original_provide)
     def wrapper(self, *args, **kwargs):
         provider_name = self.info.get("name", type(self).__name__).lower()
@@ -34,6 +35,7 @@ def _instrumented_provide(original_provide):
             metrics.data_provider_duration_seconds.labels(provider=provider_name).observe(duration)
             metrics.data_provider_total.labels(provider=provider_name, status="error").inc()
             raise
+
     return wrapper
 
 
@@ -51,7 +53,7 @@ class BaseProvider:
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        if hasattr(cls, 'provide') and callable(cls.provide):
+        if hasattr(cls, "provide") and callable(cls.provide):
             cls.provide = _instrumented_provide(cls.provide)
 
     def __init__(self):

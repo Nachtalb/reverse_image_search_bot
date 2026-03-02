@@ -1,5 +1,5 @@
-from pathlib import Path
 import re
+from pathlib import Path
 from threading import Thread
 from typing import Any, BinaryIO
 
@@ -47,8 +47,8 @@ def tagify(tags: list[str] | set[str] | str) -> set[str]:
 
 
 class ReturnableThread(Thread):
-    def __init__(self, target, args=(), kwargs={}):
-        super().__init__(target=target, args=args, kwargs=kwargs)
+    def __init__(self, target, args=(), kwargs=None):
+        super().__init__(target=target, args=args, kwargs=kwargs or {})
         self._return = None
 
     def run(self):
@@ -110,16 +110,18 @@ def safe_get(dct: dict | list, key_str: str, default: Any = None, none_to_defaul
                 key, value = match.groups()
                 if value.isdigit():
                     value = int(value)
-                for dct in dct:
-                    if dct[key] == value:  # type: ignore
+                for item in dct:
+                    if item[key] == value:
+                        dct = item
                         break
                 else:
                     return default
                 continue
             elif match := re.match(r"\[(.*)\]", key):
                 key = match.groups()[0]
-                for dct in dct:
-                    if key in dct:
+                for item in dct:
+                    if key in item:
+                        dct = item
                         break
                 else:
                     return default

@@ -1,11 +1,11 @@
-from pathlib import Path
 import random
 import re
+from pathlib import Path
 from tempfile import NamedTemporaryFile
 
+import validators
 from telegram import InlineKeyboardButton
 from user_agent import generate_user_agent
-import validators
 from yarl import URL
 
 from reverse_image_search_bot.engines.types import (
@@ -79,13 +79,14 @@ class BooruProvider(BaseProvider):
         "sankaku": {
             "check": "chan.sankakucomplex.com",
             "api_url": "https://capi-v2.sankakucomplex.com/posts/{post_id}",
-            "post_url": "https://chan.sankakucomplex.com/post/show/{post_id}",  # beta.sankakucomplex.com seems to have different post IDs
+            # beta.sankakucomplex.com seems to have different post IDs
+            "post_url": "https://chan.sankakucomplex.com/post/show/{post_id}",
         },
     }
 
     def _request(self, api: str, post_id: int) -> dict | None:
         headers = {"User-Agent": generate_user_agent()}
-        response = self.session.get(self.urls[api]["api_url"].format(post_id=post_id), headers=headers)
+        response = self.session.get(self.urls[api]["api_url"].format(post_id=post_id), headers=headers)  # type: ignore[union-attr]
         if response.status_code != 200:
             return
         return response.json()
@@ -118,7 +119,7 @@ class BooruProvider(BaseProvider):
             return None, None
         post_id = None
         if matcher := self.urls[api].get("id_reg"):
-            if match := matcher.match(str(url)):
+            if match := matcher.match(str(url)):  # type: ignore[union-attr]
                 post_id = match.groups()[0]
         else:
             post_id = url.parts[-1]
@@ -135,13 +136,13 @@ class BooruProvider(BaseProvider):
         elif self.urls[api].get("download_thumbnail"):
             headers = {
                 "User-Agent": generate_user_agent(),
-                "Referer": self.urls[api]["post_url"].format(post_id=post_id),
+                "Referer": self.urls[api]["post_url"].format(post_id=post_id),  # type: ignore[union-attr]
             }
             response = self.session.get(thumbnail_url, headers=headers)
             if response.status_code != 200:
                 return {}
 
-            with NamedTemporaryFile('rb+', delete=False) as file:
+            with NamedTemporaryFile("rb+", delete=False) as file:
                 file.write(response.content)
                 file.seek(0)
                 thumbnail = upload_file(Path(file.name), URL(thumbnail_url).name)
@@ -151,47 +152,46 @@ class BooruProvider(BaseProvider):
         return {"thumbnail": thumbnail, "thumbnail_identifier": thumbnail_url}
 
     def _get_tags(self, data: dict) -> InternalResultData:
-        main_tags = data.get('tag_string_general', data.get('tags', ''))
+        main_tags = data.get("tag_string_general", data.get("tags", ""))
         if isinstance(main_tags, list):
             kinds = {
-                0: 'general',
-                1: 'artist',
-                2: 'general',  # Don't know exactly what kind of tags belong here but it seems to include loli
-                3: 'copyright',
-                4: 'character',
-                5: 'general',  # Seems to be parrent tag, eg. bdsm > (bondage, dominance, ..)
-                8: 'meta',     # Meta information about the image not it's content directly, eg. high_resolution, large_filesize etc.
-                9: 'general',  # Some kind of descriptive of the kind of action, eg. extreme content, contentious content
-
+                0: "general",
+                1: "artist",
+                2: "general",  # Don't know exactly what kind of tags belong here but it seems to include loli
+                3: "copyright",
+                4: "character",
+                5: "general",  # Seems to be parrent tag, eg. bdsm > (bondage, dominance, ..)
+                8: "meta",  # Meta info not about content directly, eg. high_resolution, large_filesize
+                9: "general",  # Descriptive of action kind, eg. extreme content, contentious content
                 # Haven't seen any 6 & 7 so I can't determine what they are
             }
             tags = {}
             for tag in main_tags:
-                kind = kinds.get(tag['type'])
+                kind = kinds.get(tag["type"])
                 if kind:
                     tags.setdefault(kind, [])
-                    tags[kind].append(tag['tagName'])
+                    tags[kind].append(tag["tagName"])
 
-            chartags = set(tags.get('character', []))
-            authortags = set(tags.get('artist', []))
-            copyrighttags = set(tags.get('copyrighttags', []))
-            main_tags = set(tags.get('general', []) + tags.get('meta', []))
+            chartags = set(tags.get("character", []))
+            authortags = set(tags.get("artist", []))
+            copyrighttags = set(tags.get("copyrighttags", []))
+            main_tags = set(tags.get("general", []) + tags.get("meta", []))
         else:
-            chartags = set(data.get('tag_string_character', '').split(' '))
-            authortags = set(data.get('tag_string_artist', '').split(' '))
-            copyrighttags = set(data.get('tag_string_copyright', '').split(' '))
-            main_tags = set(main_tags.split(' ')) - copyrighttags - authortags - chartags
+            chartags = set(data.get("tag_string_character", "").split(" "))
+            authortags = set(data.get("tag_string_artist", "").split(" "))
+            copyrighttags = set(data.get("tag_string_copyright", "").split(" "))
+            main_tags = set(main_tags.split(" ")) - copyrighttags - authortags - chartags
 
         return {
-            'Character': tagify(chartags) or None,
-            'Tags': tagify(random.choices(list(main_tags), k=5)) or None,
-            'By': tagify(authortags) or None,
-            'Copyright': copyrighttags or None,
+            "Character": tagify(chartags) or None,
+            "Tags": tagify(random.choices(list(main_tags), k=5)) or None,
+            "By": tagify(authortags) or None,
+            "Copyright": copyrighttags or None,
         }
 
     @provider_cache
-    def provide(self, api_or_url: str | URL, post_id: int = None) -> InternalProviderData:
-        if isinstance(api_or_url, URL) or validators.url(api_or_url):  # type: ignore
+    def provide(self, api_or_url: str | URL, post_id: int | None = None) -> InternalProviderData:
+        if isinstance(api_or_url, URL) or validators.url(api_or_url):
             api, post_id = self.supports(api_or_url)
         else:
             api = str(api_or_url)
@@ -204,7 +204,7 @@ class BooruProvider(BaseProvider):
             return {}, {}
 
         buttons = self.source_button(data)
-        post_url = self.urls[api]["post_url"].format(post_id=post_id)
+        post_url = self.urls[api]["post_url"].format(post_id=post_id)  # type: ignore[union-attr]
         buttons.append(url_button(post_url))
 
         rating = data["rating"].title()
@@ -213,7 +213,7 @@ class BooruProvider(BaseProvider):
 
         result = {
             "Title": data.get("Title"),
-            'By': None,  # Placeholder to keep the order
+            "By": None,  # Placeholder to keep the order
             "Size": "{}x{}".format(
                 data["image_width" if api == "danbooru" else "width"],
                 data["image_height" if api == "danbooru" else "height"],
@@ -223,8 +223,8 @@ class BooruProvider(BaseProvider):
         result.update(self._get_tags(data))
 
         meta: MetaData = {
-            "provided_via": self.infos[api]["name"],
-            "provided_via_url": URL(self.infos[api]["url"]),
+            "provided_via": str(self.infos[api]["name"]),
+            "provided_via_url": URL(str(self.infos[api]["url"])),
             "buttons": buttons,
             "identifier": post_url,
         }
