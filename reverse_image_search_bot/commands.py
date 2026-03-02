@@ -149,6 +149,11 @@ def _button_count(chat_config: ChatConfig, excluding_engine: str | None = None) 
 async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     assert update.message and update.effective_chat
     metrics.commands_total.labels(command="settings").inc()
+
+    if not await _is_settings_allowed(update, context):
+        await update.message.reply_text("Only group admins can access settings.")
+        return
+
     chat_config = ChatConfig(update.effective_chat.id)
     if _is_group(update.effective_chat.id) and not chat_config.onboarded:
         chat_config.onboarded = True
