@@ -124,7 +124,8 @@ def load_config(chat_id: int) -> dict | None:
     if row is None:
         return None
     col_names = [name for name, _, _ in COLUMNS]
-    return {name: _to_python(name, row[name]) for name in col_names if name in row}
+    row_keys = row.keys()
+    return {name: _to_python(name, row[name]) for name in col_names if name in row_keys}
 
 
 def save_config(chat_id: int, config: dict) -> None:
