@@ -34,6 +34,11 @@ dev = [
     "ruff>=0.11.0",
     "ty>=0.0.1a7",
 ]
+test = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "respx>=0.22",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -44,6 +49,10 @@ allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["reverse_image_search_bot"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 120
