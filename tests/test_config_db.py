@@ -166,6 +166,44 @@ class TestCloseAllConnections:
 
 
 class TestMigrateJsonFiles:
+    def test_migrate_full_chat_config(self, tmp_path, _fresh_db):
+        """A full old chat config JSON should be completely imported with no data missed."""
+        import json
+
+        from reverse_image_search_bot.config.db import load_config, migrate_json_files
+
+        config_dir = tmp_path / "configs"
+        config_dir.mkdir()
+
+        full_config = {
+            "show_buttons": False,
+            "show_best_match": True,
+            "show_link": False,
+            "auto_search_enabled": True,
+            "auto_search_engines": ["SauceNAO", "Yandex"],
+            "button_engines": ["Google", "Bing"],
+            "engine_empty_counts": {"SauceNAO": 2, "Trace": 4},
+            "onboarded": True,
+            "failures_in_a_row": 3,
+        }
+        chat_file = config_dir / "55555_chat.json"
+        chat_file.write_text(json.dumps(full_config))
+
+        count = migrate_json_files(config_dir)
+        assert count == 1
+
+        loaded = load_config(55555)
+        assert loaded is not None
+        assert loaded["show_buttons"] is False
+        assert loaded["show_best_match"] is True
+        assert loaded["show_link"] is False
+        assert loaded["auto_search_enabled"] is True
+        assert loaded["auto_search_engines"] == ["SauceNAO", "Yandex"]
+        assert loaded["button_engines"] == ["Google", "Bing"]
+        assert loaded["engine_empty_counts"] == {"SauceNAO": 2, "Trace": 4}
+        assert loaded["onboarded"] is True
+        assert loaded["failures_in_a_row"] == 3
+
     def test_migrate_chat_config(self, tmp_path, _fresh_db):
         import json
 
