@@ -121,3 +121,23 @@ class TestUrlIcon:
     def test_sankaku(self):
         result = url_icon("https://chan.sankakucomplex.com/post/show/123")
         assert "Sankaku Complex" in result
+
+    def test_idol_sankaku(self):
+        result = url_icon("https://idol.sankakucomplex.com/post/show/123")
+        assert "Idol Sankaku Complex" in result
+
+    def test_seiga_nicovideo(self):
+        result = url_icon("https://seiga.nicovideo.jp/seiga/im123")
+        assert "Nico Nico Seiga" in result
+
+    def test_bookwalker(self):
+        result = url_icon("https://www.bookwalker.jp/de123")
+        assert "Book Walker" in result
+
+    def test_behoimi(self):
+        result = url_icon("https://behoimi.org/post/show/123")
+        assert "3D Booru" in result
+
+    def test_novelupdates(self):
+        result = url_icon("https://www.novelupdates.com/series/test")
+        assert "NovelUpdates" in result

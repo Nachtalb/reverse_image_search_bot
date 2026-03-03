@@ -2,10 +2,11 @@
 
 from unittest.mock import MagicMock
 
+import pytest
 from telegram import InlineKeyboardButton
 from yarl import URL
 
-from reverse_image_search_bot.engines.generic import GenericRISEngine
+from reverse_image_search_bot.engines.generic import GenericRISEngine, PreWorkEngine
 
 
 class TestGenericRISEngine:
@@ -99,3 +100,67 @@ class TestBestMatchImplemented:
                 return {}, {}
 
         assert MyEngine.best_match_implemented
+
+
+@pytest.mark.asyncio
+class TestGenericBestMatch:
+    async def test_base_best_match_raises(self):
+        engine = GenericRISEngine()
+        engine._best_match_cache.clear()
+        with pytest.raises(NotImplementedError):
+            await engine.best_match("https://example.com/img.jpg")
+
+
+class TestPreWorkEngine:
+    def test_init(self):
+        engine = PreWorkEngine(name="TestPre")
+        assert engine.name == "TestPre"
+        assert engine._http_client is not None
+
+    def test_empty_button(self):
+        engine = PreWorkEngine(name="TestPre")
+        button = engine.empty_button()
+        assert button.text == "⌛ TestPre"
+        assert button.callback_data == "wait_for TestPre"
+
+    @pytest.mark.asyncio
+    async def test_resolve_raises_not_implemented(self):
+        engine = PreWorkEngine(name="TestPre")
+        with pytest.raises(NotImplementedError):
+            await engine._resolve_search_url("https://example.com/img.jpg")
+
+    @pytest.mark.asyncio
+    async def test_call_returns_none_when_no_url(self):
+        from unittest.mock import AsyncMock, patch
+
+        engine = PreWorkEngine(name="TestPre")
+        engine._url_cache.clear()
+        with patch.object(engine, "_resolve_search_url", new_callable=AsyncMock, return_value=None):
+            result = await engine("https://example.com/img.jpg")
+            assert result is None
+
+    @pytest.mark.asyncio
+    async def test_call_returns_button_when_url(self):
+        from unittest.mock import AsyncMock, patch
+
+        engine = PreWorkEngine(name="TestPre")
+        engine._url_cache.clear()
+        with patch.object(
+            engine, "_resolve_search_url", new_callable=AsyncMock, return_value="https://search.example.com/result"
+        ):
+            result = await engine("https://example.com/img2.jpg")
+            assert result is not None
+            assert result.text == "TestPre"
+            assert result.url == "https://search.example.com/result"
+
+    @pytest.mark.asyncio
+    async def test_call_custom_text(self):
+        from unittest.mock import AsyncMock, patch
+
+        engine = PreWorkEngine(name="TestPre")
+        engine._url_cache.clear()
+        with patch.object(
+            engine, "_resolve_search_url", new_callable=AsyncMock, return_value="https://search.example.com/result"
+        ):
+            result = await engine("https://example.com/img3.jpg", text="More")
+            assert result.text == "More"
