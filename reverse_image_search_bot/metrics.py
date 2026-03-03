@@ -70,6 +70,12 @@ provider_results_total = Counter(
     ["provider", "status"],  # status: hit/miss/timeout/error
 )
 
+provider_rate_limits_total = Counter(
+    "ris_provider_rate_limits_total",
+    "Rate limit hits per provider",
+    ["provider"],
+)
+
 data_provider_total = Counter(
     "ris_data_provider_total",
     "Data provider calls and outcomes",

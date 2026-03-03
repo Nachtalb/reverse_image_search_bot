@@ -12,6 +12,7 @@ from reverse_image_search_bot.utils import tagify, url_button
 from reverse_image_search_bot.utils.async_cache import async_cached
 
 from .data_providers import anilist, booru, mangadex, pixiv
+from .errors import RateLimitError, SearchError
 from .generic import GenericRISEngine
 from .types import InternalProviderData, MetaData, ProviderData
 
@@ -145,14 +146,8 @@ class SauceNaoEngine(GenericRISEngine):
             "provider": self.name,
             "provider_url": self.provider_url,
         }
-        limit_reached_result = (
-            "Daily limit reached. You can search SauceNAO via it's button above or <b>More</b> below."
-        )
-
         if self.limit_reached and time() - self.limit_reached < 3600:
-            meta["errors"] = [limit_reached_result]
-            self.logger.debug("Done with search: found nothing")
-            return {}, meta
+            raise RateLimitError("SauceNAO daily limit still active", period="Daily")
 
         api_link = "https://saucenao.com/search.php?db=999&output_type=2&testmode=1&numres=8&url={}{}".format(
             quote_plus(str(url)), f"&api_key={SAUCENAO_API}" if SAUCENAO_API else ""
@@ -160,16 +155,12 @@ class SauceNaoEngine(GenericRISEngine):
         try:
             async with self._lock:
                 response = await self._http_client.get(api_link, timeout=5)
-        except httpx.ConnectError:
-            meta["errors"] = ["Error connecting to SauceNAO API"]
-            self.logger.debug("Error connecting to SauceNAO API")
-            return {}, meta
+        except httpx.ConnectError as e:
+            raise SearchError("Error connecting to SauceNAO API") from e
 
         if response.status_code == 429:
             self.limit_reached = time()
-            meta["errors"] = [limit_reached_result]
-            self.logger.debug("Done with search: found nothing")
-            return {}, meta
+            raise RateLimitError("SauceNAO 429", period="Daily")
 
         if response.status_code != 200:
             self.logger.debug("Done with search: found nothing")

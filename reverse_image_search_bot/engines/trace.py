@@ -10,6 +10,7 @@ from reverse_image_search_bot.utils import url_button
 from reverse_image_search_bot.utils.async_cache import async_cached
 
 from .data_providers import anilist
+from .errors import RateLimitError
 from .generic import GenericRISEngine
 from .types import MetaData, ProviderData
 
@@ -76,13 +77,10 @@ class TraceEngine(GenericRISEngine):
             "provider": self.name,
             "provider_url": self.provider_url,
         }
-        limit_reached_result = "Monthly limit reached. You can search Trace via it's button above or <b>More</b> below."
-
         data = await self._fetch_data(url)
 
         if data == 402:
-            meta["errors"] = [limit_reached_result]
-            return {}, meta
+            raise RateLimitError("Trace 402 monthly limit", period="Monthly")
         elif isinstance(data, int) or not data:
             self.logger.debug("Done with search: found nothing")
             return {}, {}

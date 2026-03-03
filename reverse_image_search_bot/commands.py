@@ -35,6 +35,7 @@ from yarl import URL
 from reverse_image_search_bot import metrics
 from reverse_image_search_bot.config import ChatConfig
 from reverse_image_search_bot.engines import engines
+from reverse_image_search_bot.engines.errors import EngineError, RateLimitError
 from reverse_image_search_bot.engines.generic import GenericRISEngine, PreWorkEngine
 from reverse_image_search_bot.engines.types import MetaData, ResultData
 from reverse_image_search_bot.settings import ADMIN_IDS
@@ -842,7 +843,7 @@ async def _best_match_search(
                         await results_gate.wait()
 
                         reply, media_group = build_reply(result, meta)
-                        _disable_preview = not meta.get("thumbnail") or bool(media_group) or "errors" in meta
+                        _disable_preview = not meta.get("thumbnail") or bool(media_group)
                         try:
                             provider_msg = await message.reply_html(
                                 reply,
@@ -868,7 +869,7 @@ async def _best_match_search(
                             except BadRequest as er:
                                 if "webpage_media_empty" not in er.message:
                                     raise
-                        if "errors" not in meta and result:
+                        if result:
                             match_found = True
                         if identifier:
                             identifiers.append(identifier)
@@ -886,6 +887,34 @@ async def _best_match_search(
                                 ),
                                 parse_mode=ParseMode.HTML,
                             )
+                except RateLimitError as rate_err:
+                    metrics.provider_rate_limits_total.labels(provider=engine.name).inc()
+                    logger.info("Rate limit hit for %s: %s", engine.name, rate_err)
+
+                    await results_gate.wait()
+                    more_button = engine(str(url), "More")
+                    button_list = list(chunks([more_button], 3)) if more_button else []
+                    period = f"{rate_err.period} limit" if rate_err.period else "Limit"
+                    rate_msg = f"{b(engine.name)}: {period} reached. Try the {b('More')} button to search directly."
+                    try:
+                        await message.reply_html(
+                            rate_msg,
+                            reply_markup=InlineKeyboardMarkup(button_list) if button_list else None,
+                            reply_to_message_id=_reply_to_msg_id,
+                            disable_web_page_preview=True,
+                        )
+                    except BadRequest as er:
+                        if "message to be replied not found" not in er.message.lower():
+                            raise
+                        _reply_to_msg_id = None
+                        await message.reply_html(
+                            rate_msg,
+                            reply_markup=InlineKeyboardMarkup(button_list) if button_list else None,
+                            disable_web_page_preview=True,
+                        )
+                except EngineError as engine_err:
+                    metrics.provider_results_total.labels(provider=engine.name, status="error").inc()
+                    logger.exception("Engine error [%s]", engine.name, exc_info=engine_err)
                 except Exception as error:
                     metrics.provider_results_total.labels(provider=engine.name, status="error").inc()
                     user = update.effective_user
@@ -942,10 +971,6 @@ def build_reply(result: ResultData, meta: MetaData) -> tuple[str, list[InputMedi
         else:
             reply += code(html_mod.escape(str(value)))
         reply += "\n"
-
-    if errors := meta.get("errors"):
-        for error in errors:
-            reply += error
 
     if media_group:
         return reply, media_group
