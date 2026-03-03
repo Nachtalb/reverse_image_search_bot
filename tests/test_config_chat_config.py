@@ -60,6 +60,18 @@ class TestChatConfigDefaults:
             assert config.failures_in_a_row == 5
 
 
+class TestChatConfigRepr:
+    def test_repr(self):
+        with (
+            patch("reverse_image_search_bot.config.chat_config.load_config", return_value=None),
+            patch("reverse_image_search_bot.config.chat_config.save_field"),
+        ):
+            from reverse_image_search_bot.config.chat_config import ChatConfig
+
+            config = ChatConfig(99999)
+            assert repr(config) == "<ChatConfig(chat_id=99999)>"
+
+
 class TestChatConfigSetattr:
     def test_setting_config_field_saves(self):
         with (
@@ -122,3 +134,20 @@ class TestSingleChatDecorator:
             c1 = ChatConfig(55555)
             c2 = ChatConfig(55555)
             assert c1 is c2
+
+    def test_loaded_chats_created_if_missing(self):
+        """Cover the hasattr guard in single_chat.get_instance."""
+        with (
+            patch("reverse_image_search_bot.config.chat_config.load_config", return_value=None),
+            patch("reverse_image_search_bot.config.chat_config.save_field"),
+        ):
+            from reverse_image_search_bot.config.chat_config import ChatConfig
+
+            real_cls = ChatConfig.__closure__[0].cell_contents
+            # Delete _loaded_chats to trigger the hasattr branch
+            if hasattr(real_cls, "_loaded_chats"):
+                delattr(real_cls, "_loaded_chats")
+
+            config = ChatConfig(66666)
+            assert config is not None
+            assert hasattr(real_cls, "_loaded_chats")
