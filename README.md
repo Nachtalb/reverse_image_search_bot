@@ -50,9 +50,12 @@ All configuration is done via environment variables.
 |---|---|---|
 | `ADMIN_IDS` | — | Comma-separated Telegram user IDs with admin access |
 | `ANILIST_TOKEN` | — | AniList OAuth token (raises rate limit from 90 to 120 req/min) |
-| `WORKERS` | `4` | Number of worker threads |
-| `CON_POOL_SIZE` | `WORKERS+4` | HTTP connection pool size |
-| `CONFIG_DIR` | `~/.config/reverse_image_search_bot` | Config/state directory |
+| `MODE_ACTIVE` | `polling` | Bot mode: `polling` or `webhook` |
+| `CONCURRENT_UPDATES` | `16` | Number of concurrent update handlers |
+| `OLD_CONFIG_DIR` | `~/.config/reverse_image_search_bot` | Legacy config directory (used for JSON→SQLite migration only) |
+| `PIXIV_CONFIG` | `~/.config/reverse_image_search_bot/pixiv.json` | Path to the Pixiv config file |
+| `CONFIG_DB_PATH` | `~/.config/reverse_image_search_bot/config.db` | Path to the configuration database |
+| `PERSISTENCE_PATH` | `~/.config/reverse_image_search_bot/bot_data.pickle` | Path to the bot persistence file |
 | `LOG_FORMAT` | `%(asctime)s - %(name)s - %(levelname)s - %(message)s` | Python log format string |
 | `METRICS_ENABLED` | `true` | Enable Prometheus metrics endpoint |
 | `RIS_METRICS_PORT` | `9100` | Prometheus metrics port |
