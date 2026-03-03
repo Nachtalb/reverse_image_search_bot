@@ -7,7 +7,7 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def _fresh_db(tmp_path):
+def _fresh_db(tmp_path):  # tmp_path is a built-in pytest fixture (unique temp dir per test)
     """Give each test a fresh DB by patching CONFIG_DB_PATH and clearing thread-local."""
     db_path = tmp_path / "config.db"
     with patch("reverse_image_search_bot.config.db.CONFIG_DB_PATH", db_path):
