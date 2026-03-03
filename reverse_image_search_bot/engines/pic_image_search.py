@@ -78,8 +78,8 @@ class PicImageSearchEngine(GenericRISEngine):
             if isinstance(e, ParsingError):
                 self.logger.debug("ParsingError, treating as no results: %s", e)
                 return {}, {}
-            self.logger.warning("Search failed: %s", e)
-            return {}, {**meta, "errors": [str(e)]}
+            self.logger.exception("Search failed for %s", self.name)
+            return {}, {}
 
         if not getattr(result_obj, "raw", None):
             self.logger.debug("Done: no results")
