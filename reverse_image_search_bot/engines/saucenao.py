@@ -163,8 +163,7 @@ class SauceNaoEngine(GenericRISEngine):
             raise RateLimitError("SauceNAO 429", period="Daily")
 
         if response.status_code != 200:
-            self.logger.debug("Done with search: found nothing")
-            return {}, {}
+            raise SearchError(f"SauceNAO returned HTTP {response.status_code}")
 
         results = filter(
             lambda d: float(d["header"]["similarity"]) >= self.min_similarity, response.json().get("results", [])

@@ -8,45 +8,31 @@ class TestTag:
         assert tag("b", "hello") == "<b >hello</b>"
 
     def test_tag_with_attrs(self):
-        result = tag("a", "click", {"href": "https://example.com"})
-        assert 'href="https://example.com"' in result
-        assert ">click</a>" in result
+        assert tag("a", "click", {"href": "https://example.com"}) == '<a href="https://example.com">click</a>'
 
     def test_multiple_attrs(self):
         result = tag("div", "text", {"class": "foo", "id": "bar"})
-        assert 'class="foo"' in result
-        assert 'id="bar"' in result
+        assert result == '<div class="foo" id="bar">text</div>'
 
 
 class TestShortcuts:
     def test_bold(self):
-        assert "<b" in b("text")
-        assert "text</b>" in b("text")
+        assert b("text") == "<b >text</b>"
 
     def test_italic(self):
-        assert "<i" in i("text")
-        assert "text</i>" in i("text")
+        assert i("text") == "<i >text</i>"
 
     def test_pre(self):
-        assert "<pre" in pre("text")
-        assert "text</pre>" in pre("text")
+        assert pre("text") == "<pre >text</pre>"
 
     def test_code(self):
-        assert "<code" in code("text")
-        assert "text</code>" in code("text")
+        assert code("text") == "<code >text</code>"
 
     def test_anchor(self):
-        result = a("click", "https://example.com")
-        assert 'href="https://example.com"' in result
-        assert ">click</a>" in result
+        assert a("click", "https://example.com") == '<a href="https://example.com">click</a>'
 
     def test_hidden_anchor(self):
-        result = hidden_a("https://example.com")
-        assert 'href="https://example.com"' in result
-        assert "\u200b" in result  # zero-width space, not empty
-        assert "</a>" in result
+        assert hidden_a("https://example.com") == '<a href="https://example.com">\u200b</a>'
 
     def test_title(self):
-        result = title("Name")
-        assert "<b" in result
-        assert "Name:" in result
+        assert title("Name") == "<b >Name:</b> "

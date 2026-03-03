@@ -22,36 +22,29 @@ class TestChunks:
 
 class TestTagify:
     def test_string_input(self):
-        result = tagify("cat dog")
-        assert "#cat" in result
-        assert "#dog" in result
+        assert tagify("cat dog") == {"#cat", "#dog"}
 
     def test_list_input(self):
-        result = tagify(["Action", "Comedy"])
-        assert "#action" in result
-        assert "#comedy" in result
+        assert tagify(["Action", "Comedy"]) == {"#action", "#comedy"}
+
+    def test_list_input_with_duplicates(self):
+        assert tagify(["Action", "Action", "Comedy"]) == {"#action", "#comedy"}
 
     def test_set_input(self):
-        result = tagify({"Romance"})
-        assert "#romance" in result
+        assert tagify({"Romance"}) == {"#romance"}
 
     def test_spaces_become_underscores(self):
-        result = tagify(["Slice of Life"])
-        assert "#slice_of_life" in result
+        assert tagify(["Slice of Life"]) == {"#slice_of_life"}
 
     def test_special_chars_replaced(self):
-        result = tagify("rock&roll")
-        assert all("#" in t for t in result)
+        assert tagify("rock&roll") == {"#rock_roll"}
 
     def test_empty_input(self):
         assert tagify("") == set()
         assert tagify([]) == set()
 
     def test_digit_start_filtered(self):
-        result = tagify("123numeric valid")
-        assert "#valid" in result
-        # Tags starting with digits should be filtered out
-        assert not any(t.lstrip("#")[0].isdigit() for t in result if t.lstrip("#"))
+        assert tagify("123numeric valid") == {"#valid"}
 
 
 class TestSafeGet:
@@ -75,18 +68,18 @@ class TestSafeGet:
 
     def test_list_index(self):
         result = safe_get(self.data, "hello.animal.[0]")
-        assert result["type"] == "cat"
+        assert result == {"type": "cat", "sound": "meow", "ja": "neko"}
 
     def test_list_key_value_match(self):
         result = safe_get(self.data, "hello.animal.[type=cat]")
-        assert result["sound"] == "meow"
+        assert result == {"type": "cat", "sound": "meow", "ja": "neko"}
 
     def test_list_key_value_nested(self):
         assert safe_get(self.data, "hello.animal.[type=shark].sound") == "a"
 
     def test_list_key_exists(self):
         result = safe_get(self.data, "hello.animal.[de]")
-        assert result["type"] == "shark"
+        assert result == {"type": "shark", "sound": "a", "de": "hai"}
 
     def test_missing_key_default(self):
         assert safe_get(self.data, "nonexistent") is None

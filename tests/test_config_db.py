@@ -1,15 +1,9 @@
 """Tests for reverse_image_search_bot.config.db — uses temp SQLite."""
 
 import contextlib
-import tempfile
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-
-# We need to patch CONFIG_DB_PATH before importing db module functions
-_tmp_dir = tempfile.mkdtemp()
-_tmp_db = Path(_tmp_dir) / "test_config.db"
 
 
 @pytest.fixture(autouse=True)

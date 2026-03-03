@@ -1,6 +1,6 @@
 """Tests for reverse_image_search_bot.engines.animetrace — pure logic helpers."""
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -47,10 +47,10 @@ class TestBestWorkNode:
 
     def test_exact_romaji_match(self):
         nodes = [
-            {"title": {"native": "ナルト", "romaji": "Naruto", "english": "Naruto"}, "id": 2},
+            {"title": {"native": "ナルト", "romaji": "Naruto", "english": "Naruto: The Series"}, "id": 2},
         ]
         title, mid = _best_work_node(nodes, "Naruto")
-        assert title == "Naruto"
+        assert title == "Naruto: The Series"
         assert mid == 2
 
     def test_fallback_to_most_popular(self):
@@ -76,12 +76,23 @@ class TestAnimeTraceSearch:
     async def test_keyerror_returns_empty_raw(self):
         """The fix from PR #116: KeyError in PicImageSearch → empty result, not crash."""
         engine = AnimeTraceEngine()
+        engine._best_match_cache.clear()
 
-        with patch.object(engine, "_search") as mock_search:
-            # Simulate the KeyError being caught → empty raw sentinel
-            mock_search.return_value = type("EmptyResult", (), {"raw": []})()
-            result = mock_search.return_value
-            assert result.raw == []
+        # Patch the PicImageSearch Network and AnimeTrace where they're imported
+        # (inside _search via lazy imports from PicImageSearch)
+        with patch("PicImageSearch.Network") as mock_network:
+            mock_ctx = AsyncMock()
+            mock_network.return_value.__aenter__ = AsyncMock(return_value=mock_ctx)
+            mock_network.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            with patch("PicImageSearch.AnimeTrace") as mock_at_cls:
+                mock_at_instance = AsyncMock()
+                mock_at_instance.search = AsyncMock(side_effect=KeyError("trace_id"))
+                mock_at_cls.return_value = mock_at_instance
+
+                result, meta = await engine.best_match("https://example.com/no-result.jpg")
+                assert result == {}
+                assert meta == {}
 
 
 @pytest.mark.asyncio

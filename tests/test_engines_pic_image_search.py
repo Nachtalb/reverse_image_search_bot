@@ -45,7 +45,7 @@ class TestBestMatch:
         engine._best_match_cache.clear()
 
         with patch.object(engine, "_search", new_callable=AsyncMock) as mock:
-            mock.side_effect = KeyError("trace_id")
+            mock.side_effect = KeyError("some_field")
             with pytest.raises(SearchError, match="Parsing key missing"):
                 await engine.best_match("https://example.com/img3.jpg")
 
