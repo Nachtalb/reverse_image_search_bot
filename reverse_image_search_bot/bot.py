@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 
 from emoji import emojize
-from telegram import Bot, Update
+from telegram import Bot, BotCommand, BotCommandScopeChat, BotCommandScopeDefault, Update
 from telegram.constants import ParseMode
 from telegram.error import Forbidden
 from telegram.ext import (
@@ -124,6 +124,34 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     logger.error("Uncaught exception in handler:", exc_info=context.error)
 
 
+_PUBLIC_COMMANDS = [
+    BotCommand("search", "Search for image source (reply to image)"),
+    BotCommand("settings", "Configure bot behaviour for this chat"),
+    BotCommand("help", "Show help"),
+    BotCommand("start", "Start the bot"),
+]
+
+_ADMIN_COMMANDS = [
+    *_PUBLIC_COMMANDS,
+    BotCommand("ban", "Ban/unban a user by ID"),
+    BotCommand("id", "Show current chat info"),
+]
+
+
+async def _set_bot_commands(app: Application) -> None:
+    """Register bot command menus with Telegram.
+
+    Public commands are set for the default scope. Admin commands (including
+    /ban and /id) are set per admin private chat via BotCommandScopeChat.
+    """
+    await app.bot.set_my_commands(_PUBLIC_COMMANDS, scope=BotCommandScopeDefault())
+    for admin_id in settings.ADMIN_IDS:
+        try:
+            await app.bot.set_my_commands(_ADMIN_COMMANDS, scope=BotCommandScopeChat(chat_id=admin_id))
+        except Exception:
+            logger.warning("Failed to set admin commands for %d", admin_id)
+
+
 async def post_init(app: Application) -> None:
     """Called after Application.initialize() — send restart/startup notifications."""
     loop = asyncio.get_running_loop()
@@ -142,6 +170,8 @@ async def post_init(app: Application) -> None:
             logger.info("Migrated banned_users.json → bot_data (%d users)", len(users))
         except Exception:
             logger.warning("Failed to migrate banned_users.json", exc_info=True)
+
+    await _set_bot_commands(app)
 
     for admin_id in settings.ADMIN_IDS:
         try:
