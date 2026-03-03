@@ -1,6 +1,10 @@
 """Tests for reverse_image_search_bot.utils.helpers."""
 
-from reverse_image_search_bot.utils.helpers import chunks, safe_get, tagify
+from pathlib import Path
+
+from yarl import URL
+
+from reverse_image_search_bot.utils.helpers import chunks, get_file, get_file_from_url, safe_get, tagify
 
 
 class TestChunks:
@@ -93,3 +97,36 @@ class TestSafeGet:
         assert safe_get(data, "key") is None
         assert safe_get(data, "key", "default", none_to_default=True) == "default"
         assert safe_get(data, "key", "default", none_to_default=False) is None
+
+    def test_key_value_match_on_non_list(self):
+        """[key=value] on a dict (not list) should return default."""
+        data = {"hello": {"type": "cat"}}
+        assert safe_get(data, "hello.[type=cat]") is None
+
+    def test_key_value_match_with_int_value(self):
+        """[key=123] should convert digit values to int for comparison."""
+        data = {"items": [{"id": 123, "name": "first"}, {"id": 456, "name": "second"}]}
+        assert safe_get(data, "items.[id=123].name") == "first"
+
+
+class TestGetFile:
+    def test_returns_path(self):
+        result = get_file("test.jpg")
+        assert isinstance(result, Path)
+        assert result.name == "test.jpg"
+
+
+class TestGetFileFromUrl:
+    def test_strips_base_url(self):
+        from reverse_image_search_bot.settings import UPLOADER
+
+        base = UPLOADER["url"].rstrip("/")
+        result = get_file_from_url(f"{base}/image.jpg")
+        assert result.name == "image.jpg"
+
+    def test_url_object(self):
+        from reverse_image_search_bot.settings import UPLOADER
+
+        base = UPLOADER["url"].rstrip("/")
+        result = get_file_from_url(URL(f"{base}/photo.png"))
+        assert result.name == "photo.png"
