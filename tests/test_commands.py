@@ -1,6 +1,6 @@
 """Tests for pure functions in reverse_image_search_bot.commands."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
@@ -15,6 +15,9 @@ from reverse_image_search_bot.commands import (
     _settings_main_text,
     _track_engine_result,
     build_reply,
+    callback_query_handler,
+    file_handler,
+    settings_callback_handler,
 )
 
 # ---------------------------------------------------------------------------
@@ -405,3 +408,495 @@ class TestExtractVideoFrame:
     def test_invalid_path_raises(self, tmp_path):
         with pytest.raises(OSError):
             _extract_video_frame(str(tmp_path / "nonexistent.mp4"))
+
+
+# ---------------------------------------------------------------------------
+# Mock helpers for Telegram objects
+# ---------------------------------------------------------------------------
+
+
+def _mock_update(
+    chat_id=12345,
+    chat_type="private",
+    user_id=99999,
+    callback_data=None,
+    attachment=None,
+    message_text=None,
+):
+    """Build a mock Update with the common structure."""
+    update = MagicMock()
+    update.effective_chat.id = chat_id
+    update.effective_chat.type = chat_type
+    update.effective_user.id = user_id
+
+    message = MagicMock()
+    message.chat_id = chat_id
+    message.from_user.id = user_id
+    message.from_user.language_code = "en"
+    message.reply_text = AsyncMock()
+    message.reply_html = AsyncMock()
+    message.effective_attachment = attachment
+
+    update.effective_message = message
+    update.message = message
+
+    if callback_data is not None:
+        query = MagicMock()
+        query.data = callback_data
+        query.answer = AsyncMock()
+        query.edit_message_reply_markup = AsyncMock()
+        query.edit_message_text = AsyncMock()
+        update.callback_query = query
+    else:
+        update.callback_query = None
+
+    return update
+
+
+def _mock_context(banned_users=None):
+    context = MagicMock()
+    context.bot_data = {"banned_users": banned_users or []}
+    context.bot.send_chat_action = AsyncMock()
+    context.bot.get_chat_member = AsyncMock()
+    return context
+
+
+# ---------------------------------------------------------------------------
+# settings_callback_handler
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+class TestSettingsCallbackHandler:
+    async def test_noop(self):
+        update = _mock_update(callback_data="settings:noop")
+        context = _mock_context()
+        await settings_callback_handler(update, context)
+        update.callback_query.answer.assert_awaited_once_with()
+
+    async def test_disabled_auto_search_engines(self):
+        update = _mock_update(callback_data="settings:disabled:auto_search_engines")
+        context = _mock_context()
+        await settings_callback_handler(update, context)
+        update.callback_query.answer.assert_awaited_once_with(
+            "Enable auto-search first to configure its engines.", show_alert=False
+        )
+
+    async def test_disabled_button_engines(self):
+        update = _mock_update(callback_data="settings:disabled:button_engines")
+        context = _mock_context()
+        await settings_callback_handler(update, context)
+        update.callback_query.answer.assert_awaited_once_with(
+            'Enable "Show buttons" first to configure engine buttons.', show_alert=False
+        )
+
+    async def test_toggle_auto_search_on_off(self):
+        cfg = _mock_chat_config(auto_search_enabled=True, show_buttons=True)
+        update = _mock_update(callback_data="settings:toggle:auto_search")
+        context = _mock_context()
+
+        with (
+            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
+            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+        ):
+            await settings_callback_handler(update, context)
+            assert cfg.auto_search_enabled is False
+            update.callback_query.edit_message_reply_markup.assert_awaited_once()
+
+    async def test_toggle_auto_search_blocked_in_private(self):
+        """In private chat, can't disable auto_search if show_buttons is also off."""
+        cfg = _mock_chat_config(auto_search_enabled=True, show_buttons=False)
+        update = _mock_update(callback_data="settings:toggle:auto_search", chat_id=12345)
+        context = _mock_context()
+
+        with (
+            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
+            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+        ):
+            await settings_callback_handler(update, context)
+            update.callback_query.answer.assert_any_await(
+                "⚠️ Enable engine buttons first — at least one must be active.", show_alert=True
+            )
+            # Should NOT have toggled
+            assert cfg.auto_search_enabled is True
+
+    async def test_toggle_show_buttons_blocked_in_private(self):
+        """In private chat, can't disable show_buttons if auto_search is also off."""
+        cfg = _mock_chat_config(auto_search_enabled=False, show_buttons=True)
+        update = _mock_update(callback_data="settings:toggle:show_buttons", chat_id=12345)
+        context = _mock_context()
+
+        with (
+            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
+            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+        ):
+            await settings_callback_handler(update, context)
+            update.callback_query.answer.assert_any_await(
+                "⚠️ Enable auto-search first — at least one must be active.", show_alert=True
+            )
+            assert cfg.show_buttons is True
+
+    async def test_toggle_show_best_match_off(self):
+        cfg = _mock_chat_config(show_best_match=True, show_link=True, button_engines=["SauceNAO"])
+        update = _mock_update(callback_data="settings:toggle:show_best_match")
+        context = _mock_context()
+
+        with (
+            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
+            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+        ):
+            await settings_callback_handler(update, context)
+            assert cfg.show_best_match is False
+
+    async def test_toggle_show_best_match_blocked_last_button(self):
+        """Can't disable best_match if it's the only active button."""
+        cfg = _mock_chat_config(show_best_match=True, show_link=False, button_engines=[])
+        update = _mock_update(callback_data="settings:toggle:show_best_match")
+        context = _mock_context()
+
+        with (
+            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
+            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+        ):
+            await settings_callback_handler(update, context)
+            update.callback_query.answer.assert_any_await("⚠️ At least one button must stay enabled.", show_alert=True)
+            assert cfg.show_best_match is True
+
+    async def test_toggle_show_link(self):
+        cfg = _mock_chat_config(show_link=True, show_best_match=True, button_engines=["SauceNAO"])
+        update = _mock_update(callback_data="settings:toggle:show_link")
+        context = _mock_context()
+
+        with (
+            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
+            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+        ):
+            await settings_callback_handler(update, context)
+            assert cfg.show_link is False
+
+    async def test_toggle_auto_search_engine(self):
+        cfg = _mock_chat_config(auto_search_engines=["SauceNAO", "AnimeTrace"])
+        update = _mock_update(callback_data="settings:toggle:auto_search_engine:SauceNAO")
+        context = _mock_context()
+
+        with (
+            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
+            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+        ):
+            await settings_callback_handler(update, context)
+            assert "SauceNAO" not in cfg.auto_search_engines
+
+    async def test_toggle_auto_search_engine_last_blocked(self):
+        cfg = _mock_chat_config(auto_search_engines=["SauceNAO"])
+        update = _mock_update(callback_data="settings:toggle:auto_search_engine:SauceNAO")
+        context = _mock_context()
+
+        with (
+            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
+            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+        ):
+            await settings_callback_handler(update, context)
+            update.callback_query.answer.assert_any_await("⚠️ At least one engine must stay enabled.", show_alert=True)
+            assert "SauceNAO" in cfg.auto_search_engines
+
+    async def test_toggle_auto_search_engine_re_enable(self):
+        cfg = _mock_chat_config(auto_search_engines=["AnimeTrace"])
+        cfg.reset_engine_counter = MagicMock()
+        update = _mock_update(callback_data="settings:toggle:auto_search_engine:SauceNAO")
+        context = _mock_context()
+
+        with (
+            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
+            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+        ):
+            await settings_callback_handler(update, context)
+            cfg.reset_engine_counter.assert_called_once_with("SauceNAO")
+
+    async def test_toggle_button_engine_disable(self):
+        cfg = _mock_chat_config(show_best_match=True, show_link=True, button_engines=["SauceNAO", "Google"])
+        update = _mock_update(callback_data="settings:toggle:button_engine:SauceNAO")
+        context = _mock_context()
+
+        with (
+            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
+            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+        ):
+            await settings_callback_handler(update, context)
+            assert "SauceNAO" not in cfg.button_engines
+
+    async def test_toggle_button_engine_blocked_last(self):
+        """Can't disable engine if it would leave 0 buttons."""
+        cfg = _mock_chat_config(show_best_match=False, show_link=False, button_engines=["SauceNAO"])
+        update = _mock_update(callback_data="settings:toggle:button_engine:SauceNAO")
+        context = _mock_context()
+
+        with (
+            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
+            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+        ):
+            await settings_callback_handler(update, context)
+            update.callback_query.answer.assert_any_await("⚠️ At least one button must stay enabled.", show_alert=True)
+
+    async def test_menu_action(self):
+        cfg = _mock_chat_config()
+        update = _mock_update(callback_data="settings:menu:auto_search_engines")
+        context = _mock_context()
+
+        with (
+            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
+            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+        ):
+            await settings_callback_handler(update, context)
+            update.callback_query.edit_message_reply_markup.assert_awaited_once()
+
+    async def test_back_action(self):
+        cfg = _mock_chat_config()
+        update = _mock_update(callback_data="settings:back")
+        context = _mock_context()
+
+        with (
+            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
+            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+        ):
+            await settings_callback_handler(update, context)
+            update.callback_query.edit_message_text.assert_awaited_once()
+
+    async def test_not_allowed_in_group(self):
+        update = _mock_update(callback_data="settings:toggle:auto_search", chat_type="group", chat_id=-100123)
+        context = _mock_context()
+
+        with patch(
+            "reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=False
+        ):
+            await settings_callback_handler(update, context)
+            update.callback_query.answer.assert_any_await("Only group admins can change settings.", show_alert=True)
+
+
+# ---------------------------------------------------------------------------
+# callback_query_handler
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+class TestCallbackQueryHandler:
+    async def test_noop(self):
+        update = _mock_update(callback_data="noop")
+        context = _mock_context()
+        await callback_query_handler(update, context)
+        update.callback_query.answer.assert_awaited_once()
+
+    async def test_unknown_command(self):
+        update = _mock_update(callback_data="something_unknown")
+        context = _mock_context()
+        await callback_query_handler(update, context)
+        update.callback_query.answer.assert_awaited_once_with("Something went wrong")
+
+    async def test_best_match_dispatches(self):
+        update = _mock_update(callback_data="best_match https://example.com/img.jpg")
+        context = _mock_context()
+
+        with patch("reverse_image_search_bot.commands.best_match", new_callable=AsyncMock) as mock_bm:
+            await callback_query_handler(update, context)
+            mock_bm.assert_awaited_once_with(update, context, "https://example.com/img.jpg")
+
+    async def test_wait_for_dispatches(self):
+        update = _mock_update(callback_data="wait_for SauceNAO")
+        context = _mock_context()
+
+        with patch("reverse_image_search_bot.commands.send_wait_for", new_callable=AsyncMock) as mock_wf:
+            await callback_query_handler(update, context)
+            mock_wf.assert_awaited_once_with(update, context, "SauceNAO")
+
+
+# ---------------------------------------------------------------------------
+# file_handler
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+class TestFileHandler:
+    async def test_no_message_returns(self):
+        update = _mock_update()
+        update.effective_message = None
+        context = _mock_context()
+        await file_handler(update, context, message=None)
+        # No crash, no reply
+
+    async def test_no_user_returns(self):
+        update = _mock_update()
+        update.effective_message.from_user = None
+        context = _mock_context()
+        await file_handler(update, context)
+        # No crash, no reply
+
+    async def test_banned_user_rejected(self):
+        update = _mock_update(user_id=666)
+        context = _mock_context(banned_users=[666])
+        await file_handler(update, context)
+        update.effective_message.reply_text.assert_awaited_once()
+        assert "banned" in update.effective_message.reply_text.call_args[0][0].lower()
+
+    async def test_photo_attachment_triggers_search(self):
+        from telegram import PhotoSize
+
+        photo = MagicMock(spec=PhotoSize)
+        photo.file_size = 1000
+        photo.file_unique_id = "test123"
+
+        update = _mock_update(attachment=photo)
+        context = _mock_context()
+
+        with (
+            patch(
+                "reverse_image_search_bot.commands.image_to_url",
+                new_callable=AsyncMock,
+                return_value=URL("https://ris-test-uploads.naa.gg/test123.jpg"),
+            ),
+            patch("reverse_image_search_bot.commands.general_image_search", new_callable=AsyncMock),
+            patch("reverse_image_search_bot.commands.best_match", new_callable=AsyncMock) as mock_bm,
+            patch("reverse_image_search_bot.commands.ChatConfig") as mock_cc,
+        ):
+            mock_cc.return_value = _mock_chat_config(auto_search_enabled=True)
+            await file_handler(update, context)
+            # Should have called best_match (auto_search enabled)
+            mock_bm.assert_awaited_once()
+
+    async def test_photo_auto_search_disabled_only_general(self):
+        from telegram import PhotoSize
+
+        photo = MagicMock(spec=PhotoSize)
+        photo.file_size = 1000
+        photo.file_unique_id = "test456"
+
+        update = _mock_update(attachment=photo)
+        context = _mock_context()
+
+        with (
+            patch(
+                "reverse_image_search_bot.commands.image_to_url",
+                new_callable=AsyncMock,
+                return_value=URL("https://ris-test-uploads.naa.gg/test456.jpg"),
+            ),
+            patch("reverse_image_search_bot.commands.general_image_search", new_callable=AsyncMock),
+            patch("reverse_image_search_bot.commands.best_match", new_callable=AsyncMock) as mock_bm,
+            patch("reverse_image_search_bot.commands.ChatConfig") as mock_cc,
+        ):
+            mock_cc.return_value = _mock_chat_config(auto_search_enabled=False)
+            await file_handler(update, context)
+            # Should NOT have called best_match
+            mock_bm.assert_not_awaited()
+
+    async def test_unsupported_format(self):
+        attachment = MagicMock()
+        attachment.file_size = 100
+        # Not a recognized type
+        type(attachment).__name__ = "UnknownType"
+
+        update = _mock_update(attachment=attachment)
+        context = _mock_context()
+
+        await file_handler(update, context)
+        update.effective_message.reply_text.assert_awaited()
+        assert "not supported" in update.effective_message.reply_text.call_args[0][0].lower()
+
+    async def test_video_attachment_triggers_video_to_url(self):
+        from telegram import Video
+
+        video = MagicMock(spec=Video)
+        video.file_size = 5000
+        video.file_unique_id = "vid789"
+        video.mime_type = "video/mp4"
+
+        update = _mock_update(attachment=video)
+        context = _mock_context()
+
+        with (
+            patch(
+                "reverse_image_search_bot.commands.video_to_url",
+                new_callable=AsyncMock,
+                return_value=URL("https://ris-test-uploads.naa.gg/vid789.jpg"),
+            ) as mock_vtu,
+            patch("reverse_image_search_bot.commands.general_image_search", new_callable=AsyncMock),
+            patch("reverse_image_search_bot.commands.best_match", new_callable=AsyncMock),
+            patch("reverse_image_search_bot.commands.ChatConfig") as mock_cc,
+        ):
+            mock_cc.return_value = _mock_chat_config(auto_search_enabled=True)
+            await file_handler(update, context)
+            mock_vtu.assert_awaited_once_with(video)
+
+    async def test_animated_sticker_rejected(self):
+        from telegram import Sticker
+
+        sticker = MagicMock(spec=Sticker)
+        sticker.file_size = 500
+        sticker.file_unique_id = "stk001"
+        sticker.is_video = False
+        sticker.is_animated = True
+        sticker.mime_type = None
+
+        update = _mock_update(attachment=sticker)
+        context = _mock_context()
+
+        await file_handler(update, context)
+        update.effective_message.reply_text.assert_awaited()
+        assert "animated" in update.effective_message.reply_text.call_args[0][0].lower()
+
+    async def test_list_attachment_uses_last(self):
+        """When attachment is a list (e.g. PhotoSize[]), use the last (largest)."""
+        from telegram import PhotoSize
+
+        small = MagicMock(spec=PhotoSize)
+        small.file_size = 100
+        small.file_unique_id = "small"
+
+        large = MagicMock(spec=PhotoSize)
+        large.file_size = 5000
+        large.file_unique_id = "large"
+
+        update = _mock_update(attachment=[small, large])
+        context = _mock_context()
+
+        with (
+            patch(
+                "reverse_image_search_bot.commands.image_to_url",
+                new_callable=AsyncMock,
+                return_value=URL("https://ris-test-uploads.naa.gg/large.jpg"),
+            ) as mock_itu,
+            patch("reverse_image_search_bot.commands.general_image_search", new_callable=AsyncMock),
+            patch("reverse_image_search_bot.commands.best_match", new_callable=AsyncMock),
+            patch("reverse_image_search_bot.commands.ChatConfig") as mock_cc,
+        ):
+            mock_cc.return_value = _mock_chat_config(auto_search_enabled=True)
+            await file_handler(update, context)
+            mock_itu.assert_awaited_once_with(large)
+
+    async def test_error_in_search_replies_error(self):
+        from telegram import PhotoSize
+
+        photo = MagicMock(spec=PhotoSize)
+        photo.file_size = 1000
+        photo.file_unique_id = "err001"
+
+        update = _mock_update(attachment=photo)
+        context = _mock_context()
+
+        with (
+            patch(
+                "reverse_image_search_bot.commands.image_to_url",
+                new_callable=AsyncMock,
+                return_value=URL("https://ris-test-uploads.naa.gg/err001.jpg"),
+            ),
+            patch("reverse_image_search_bot.commands.general_image_search", new_callable=AsyncMock),
+            patch(
+                "reverse_image_search_bot.commands.best_match",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("engine exploded"),
+            ),
+            patch("reverse_image_search_bot.commands.ChatConfig") as mock_cc,
+        ):
+            mock_cc.return_value = _mock_chat_config(auto_search_enabled=True)
+            with pytest.raises(RuntimeError, match="engine exploded"):
+                await file_handler(update, context)
+            # Should have sent error message before re-raising
+            update.effective_message.reply_text.assert_awaited()
+            assert "error" in update.effective_message.reply_text.call_args[0][0].lower()
