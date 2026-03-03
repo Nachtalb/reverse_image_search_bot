@@ -275,3 +275,147 @@ class TestSauceNaoProviderRouting:
         ):
             result, _meta = await engine.best_match("https://example.com/priority.jpg")
             assert result.get("Title") == "Anime Result"
+
+    async def test_index_21_no_anilist_id_returns_none(self, engine):
+        """Index 21 without anilist_id should fall back to default provider."""
+        mock_resp = _mock_response(
+            200,
+            {"results": [_make_result(21, data={"title": "Some Anime", "ext_urls": ["https://example.com"]})]},
+        )
+
+        with patch.object(engine._http_client, "get", new_callable=AsyncMock, return_value=mock_resp):
+            _result, meta = await engine.best_match("https://example.com/no_anilist.jpg")
+            # Falls through to _default_provider
+            assert meta.get("provider") == "SauceNAO"
+
+    async def test_index_5_pixiv_error_falls_back(self, engine):
+        """When pixiv.provide raises, _5_provider returns fallback data."""
+        mock_resp = _mock_response(
+            200,
+            {
+                "results": [
+                    _make_result(
+                        5,
+                        data={
+                            "pixiv_id": 11111,
+                            "member_id": 2222,
+                            "title": "Fallback Art",
+                            "member_name": "FallbackArtist",
+                        },
+                    )
+                ]
+            },
+        )
+        mock_pixiv = AsyncMock(side_effect=RuntimeError("pixiv down"))
+
+        with (
+            patch.object(engine._http_client, "get", new_callable=AsyncMock, return_value=mock_resp),
+            patch("reverse_image_search_bot.engines.saucenao.pixiv.provide", mock_pixiv),
+        ):
+            result, _meta = await engine.best_match("https://example.com/pixiv_err.jpg")
+            assert result["Title"] == "Fallback Art"
+            assert result["Creator"] == "FallbackArtist"
+
+    async def test_provider_returns_empty_falls_back_to_default(self, engine):
+        """When a named provider returns empty result, fall back to _default_provider."""
+        mock_resp = _mock_response(
+            200,
+            {
+                "results": [
+                    _make_result(
+                        21,
+                        data={
+                            "anilist_id": 999,
+                            "title": "Backup Title",
+                            "ext_urls": ["https://example.com/source"],
+                        },
+                    )
+                ]
+            },
+        )
+        mock_anilist = AsyncMock(return_value=(None, None))
+
+        with (
+            patch.object(engine._http_client, "get", new_callable=AsyncMock, return_value=mock_resp),
+            patch("reverse_image_search_bot.engines.saucenao.anilist.provide", mock_anilist),
+        ):
+            result, meta = await engine.best_match("https://example.com/empty_provider.jpg")
+            # Should have fallen through to _default_provider
+            assert result  # non-empty from default provider
+            assert meta.get("provider") == "SauceNAO"
+
+
+class TestDefaultProvider:
+    """Directly test _default_provider for all match branches."""
+
+    def test_known_fields(self):
+        engine = SauceNaoEngine()
+        data = {"characters": "Naruto, Sasuke", "material": "Manga", "creator": "Kishimoto"}
+        result, _meta = engine._default_provider(data)
+        # tagify returns a set of hashtags
+        assert isinstance(result["Character"], set)
+        assert "#naruto_" in result["Character"]
+        assert "#sasuke" in result["Character"]
+        assert result["Material"] == "Manga"
+        assert isinstance(result["By"], set)
+        assert "#kishimoto" in result["By"]
+
+    def test_source_url_button(self):
+        engine = SauceNaoEngine()
+        data = {"source": "https://example.com/source"}
+        _result, meta = engine._default_provider(data)
+        buttons = meta.get("buttons", [])
+        # url_button prefixes with 🌐
+        assert any("Source" in b.text for b in buttons)
+
+    def test_source_non_url_ignored(self):
+        engine = SauceNaoEngine()
+        data = {"source": "not a url"}
+        _result, meta = engine._default_provider(data)
+        buttons = meta.get("buttons", [])
+        assert not any(b.text == "Source" for b in buttons)
+
+    def test_ext_urls(self):
+        engine = SauceNaoEngine()
+        data = {"ext_urls": ["https://example.com/a", "https://example.com/b"]}
+        _result, meta = engine._default_provider(data)
+        buttons = meta.get("buttons", [])
+        assert len(buttons) == 2
+
+    def test_id_fields_skipped(self):
+        engine = SauceNaoEngine()
+        data = {"pixiv_id": 123, "danbooru_aid": 456, "title": "Test"}
+        result, _meta = engine._default_provider(data)
+        assert "Pixiv Id" not in result
+        assert "Danbooru Aid" not in result
+        assert result["Title"] == "Test"
+
+    def test_url_field_with_name(self):
+        engine = SauceNaoEngine()
+        data = {"artist_url": "https://example.com/artist", "artist_name": "Bob"}
+        result, meta = engine._default_provider(data)
+        buttons = meta.get("buttons", [])
+        assert any("Artist" in b.text for b in buttons)
+        # artist_name should be skipped (consumed by _url handler)
+        assert "Artist Name" not in result
+
+    def test_url_field_without_name(self):
+        engine = SauceNaoEngine()
+        data = {"source_url": "https://example.com/src"}
+        _result, meta = engine._default_provider(data)
+        buttons = meta.get("buttons", [])
+        assert any(b.url == "https://example.com/src" for b in buttons)
+
+    def test_twitter_user_handle(self):
+        engine = SauceNaoEngine()
+        data = {"twitter_user_handle": "elonmusk"}
+        result, meta = engine._default_provider(data)
+        assert result["Poster"] == "Elonmusk"
+        buttons = meta.get("buttons", [])
+        assert any("twitter.com/elonmusk" in b.url for b in buttons)
+
+    def test_generic_field_fallback(self):
+        engine = SauceNaoEngine()
+        data = {"some_random_key": "value123"}
+        result, _meta = engine._default_provider(data)
+        assert result["Some Random Key"] == "value123"
