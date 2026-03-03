@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import re
-import time
-from functools import lru_cache
 
 import httpx
+from cachetools import TTLCache
 from yarl import URL
 
 from reverse_image_search_bot import settings
@@ -30,6 +30,9 @@ query ($name: String) {
 }
 """
 
+# Module-level async client for AniList requests
+_anilist_client = httpx.AsyncClient(timeout=5)
+
 
 def _clean_name(name: str) -> str:
     """Strip parenthetical readings, nicknames after comma, etc.
@@ -48,12 +51,12 @@ def _anilist_headers() -> dict:
     return headers
 
 
-def _anilist_post(payload: dict) -> dict | None:
+async def _anilist_post(payload: dict) -> dict | None:
     """POST to AniList GraphQL with one retry on 429."""
     for _ in range(2):
-        r = httpx.post("https://graphql.anilist.co", json=payload, headers=_anilist_headers(), timeout=5)
+        r = await _anilist_client.post("https://graphql.anilist.co", json=payload, headers=_anilist_headers())
         if r.status_code == 429:
-            time.sleep(int(r.headers.get("Retry-After", "1")) + 0.1)
+            await asyncio.sleep(int(r.headers.get("Retry-After", "1")) + 0.1)
             continue
         r.raise_for_status()
         return r.json()
@@ -84,24 +87,34 @@ def _best_work_node(media_nodes: list, original_work: str) -> tuple[str, int | N
     return title, node.get("id")
 
 
-@lru_cache(maxsize=256)
-def _anilist_resolve(char_name: str, work: str) -> tuple[str, str, int | None, int | None, str | None]:
+# Bounded async cache for AniList character resolution (replaces @lru_cache which doesn't work with async)
+_anilist_resolve_cache: TTLCache = TTLCache(maxsize=2048, ttl=7 * 24 * 3600)
+
+
+async def _anilist_resolve(char_name: str, work: str) -> tuple[str, str, int | None, int | None, str | None]:
     """Resolve character name and work to English via AniList.
 
     Returns (english_char_name, english_work_title, anilist_char_id, anilist_media_id, char_image_url).
     Falls back to originals on failure; IDs and image are None on failure.
     """
+    cache_key = (char_name, work)
+    if cache_key in _anilist_resolve_cache:
+        return _anilist_resolve_cache[cache_key]
+
     clean = _clean_name(char_name)
     try:
-        data = _anilist_post({"query": _ANILIST_QUERY, "variables": {"name": clean}})
+        data = await _anilist_post({"query": _ANILIST_QUERY, "variables": {"name": clean}})
         char = data["data"]["Character"]  # type: ignore[index]
         en_name = char["name"]["full"] or char_name
         char_id = char.get("id")
         char_image = (char.get("image") or {}).get("large")
         en_work, media_id = _best_work_node(char["media"]["nodes"], work)
-        return en_name, en_work, char_id, media_id, char_image
+        result = en_name, en_work, char_id, media_id, char_image
     except Exception:
-        return char_name, work, None, None, None
+        result = char_name, work, None, None, None
+
+    _anilist_resolve_cache[cache_key] = result
+    return result
 
 
 class AnimeTraceEngine(PicImageSearchEngine):
@@ -125,7 +138,7 @@ class AnimeTraceEngine(PicImageSearchEngine):
             engine = AnimeTrace(client=client, is_multi=1)
             return await engine.search(url=url)
 
-    def _extract(self, raw: list) -> InternalProviderData:
+    async def _extract(self, raw: list) -> InternalProviderData:
         confident = [item for item in raw if not item.origin.get("not_confident", False)]
         if not confident:
             return {}, {}
@@ -140,7 +153,7 @@ class AnimeTraceEngine(PicImageSearchEngine):
                 return {}, {}
 
             top = characters[0]
-            en_name, en_work, char_id, media_id, char_image = _anilist_resolve(top.name, top.work)
+            en_name, en_work, char_id, media_id, char_image = await _anilist_resolve(top.name, top.work)
 
             result["Character"] = en_name
             result["Work"] = en_work
@@ -148,7 +161,7 @@ class AnimeTraceEngine(PicImageSearchEngine):
             # Enrich with AniList media data (status, year, genres, etc.)
             al_meta: MetaData = {}
             if media_id:
-                al_result, al_meta = anilist_provider.provide(media_id)
+                al_result, al_meta = await anilist_provider.provide(media_id)
                 if al_result:
                     # Skip Title/Title[romaji] (we have Work) and Episode (unknown)
                     for key in ("Title", "Title [romaji]", "Episode"):
@@ -184,7 +197,7 @@ class AnimeTraceEngine(PicImageSearchEngine):
             for c in characters[1:4]:
                 if c.name == top.name:
                     continue
-                alt_name, alt_work, *_ = _anilist_resolve(c.name, c.work)
+                alt_name, alt_work, *_ = await _anilist_resolve(c.name, c.work)
                 if alt_name not in seen_names:
                     seen_names.add(alt_name)
                     alts.append(f"{alt_name} ({alt_work})")
@@ -198,7 +211,7 @@ class AnimeTraceEngine(PicImageSearchEngine):
                 if not characters:
                     continue
                 top = characters[0]
-                en_name, en_work, *_ = _anilist_resolve(top.name, top.work)
+                en_name, en_work, *_ = await _anilist_resolve(top.name, top.work)
                 entries.append(f"{en_name} ({en_work})")
 
             if not entries:

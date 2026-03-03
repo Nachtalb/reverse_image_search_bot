@@ -3,13 +3,12 @@ Generic base engine for PicImageSearch-backed engines.
 Each subclass sets `pic_engine_class` and optionally overrides `_extract`.
 """
 
-import asyncio
-
-from cachetools import cached
 from yarl import URL
 
+from reverse_image_search_bot.utils.async_cache import async_cached
 from reverse_image_search_bot.utils.url import url_button
 
+from .errors import SearchError
 from .generic import GenericRISEngine
 from .types import InternalProviderData, MetaData, ProviderData
 
@@ -41,7 +40,7 @@ class PicImageSearchEngine(GenericRISEngine):
             engine = self.pic_engine_class(client=client)
             return await engine.search(url=url)
 
-    def _extract(self, raw: list) -> InternalProviderData:
+    async def _extract(self, raw: list) -> InternalProviderData:
         """Default extractor — works for most engines with title/url/thumbnail attrs."""
         r = raw[0]
         result = {}
@@ -61,8 +60,8 @@ class PicImageSearchEngine(GenericRISEngine):
 
         return result, meta
 
-    @cached(GenericRISEngine._best_match_cache)
-    def best_match(self, url: str | URL) -> ProviderData:
+    @async_cached(GenericRISEngine._best_match_cache)
+    async def best_match(self, url: str | URL) -> ProviderData:
         self.logger.debug("Started looking for %s", url)
         meta: MetaData = {
             "provider": self.name,
@@ -70,31 +69,24 @@ class PicImageSearchEngine(GenericRISEngine):
         }
 
         try:
-            result_obj = asyncio.run(self._search(str(url)))
+            result_obj = await self._search(str(url))
         except KeyError as e:
-            # Library parsing failures (e.g. AnimeTrace omits 'trace_id' on
-            # non-image inputs or error responses) — treat as no results.
-            self.logger.debug("Parsing key missing, treating as no results: %s", e)
-            return {}, meta
+            raise SearchError(f"Parsing key missing: {e}") from e
         except Exception as e:
             from PicImageSearch.exceptions import ParsingError
 
             if isinstance(e, ParsingError):
-                # Page structure changed or unsupported input type — no results.
-                self.logger.debug("ParsingError, treating as no results: %s", e)
-                return {}, meta
-            self.logger.warning("Search failed: %s", e)
-            return {}, {**meta, "errors": [str(e)]}
+                raise SearchError(f"ParsingError: {e}") from e
+            raise SearchError(f"Search failed: {e}") from e
 
         if not getattr(result_obj, "raw", None):
             self.logger.debug("Done: no results")
             return {}, {}
 
         try:
-            r, m = self._extract(result_obj.raw)
+            r, m = await self._extract(result_obj.raw)
         except Exception as e:
-            self.logger.warning("Extraction failed: %s", e)
-            return {}, {}
+            raise SearchError(f"Extraction failed: {e}") from e
 
         if not r:
             self.logger.debug("Done: extraction yielded nothing")

@@ -1,6 +1,5 @@
 import re
 from pathlib import Path
-from threading import Thread
 from typing import Any, BinaryIO
 
 from yarl import URL
@@ -44,25 +43,6 @@ def tagify(tags: list[str] | set[str] | str) -> set[str]:
     tags = " ".join(map(lambda s: s.replace(" ", "_"), tags)) if isinstance(tags, (list, set)) else tags
     tags = re.sub(r"(?![_a-zA-Z0-9\s]).", "_", tags).split(" ")
     return {f"#{tag}".lower() for tag in filter(lambda t: t and not t[0].isdigit(), tags)}
-
-
-class ReturnableThread(Thread):
-    def __init__(self, target, args=(), kwargs=None):
-        super().__init__(target=target, args=args, kwargs=kwargs or {})
-        self._return = None
-
-    def run(self):
-        try:
-            if self._target is not None:  # type: ignore
-                self._return = self._target(*self._args, **self._kwargs)  # type: ignore
-        finally:
-            # Avoid a refcycle if the thread is running a function with
-            # an argument that has a member that points to the thread.
-            del self._target, self._args, self._kwargs  # type: ignore
-
-    def join(self, timeout=None):
-        super().join(timeout)
-        return self._return
 
 
 def safe_get(dct: dict | list, key_str: str, default: Any = None, none_to_default: bool = True) -> Any:

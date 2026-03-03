@@ -1,12 +1,13 @@
 import logging
 from urllib.parse import quote_plus
 
+import httpx
 import validators
-from cachetools import TTLCache, cached
-from requests import Session
-from requests_html import HTMLSession
+from cachetools import TTLCache
 from telegram import InlineKeyboardButton
 from yarl import URL
+
+from reverse_image_search_bot.utils.async_cache import async_cached
 
 from .types import InternalResultData, MetaData, ProviderData, ResultData
 
@@ -18,15 +19,10 @@ class GenericRISEngine:
     name: str = "GenericRISEngine"
     description: str = ""
     provider_url: URL = URL()
-    types: list[str] = []  # eg. "Artwrok", "Manga", "Anime", "All-in-one", "Stock"
+    types: list[str] = []
     recommendation: list[str] = []
 
     url: str = ""
-
-    has_session: bool = False
-    has_html_session: bool = False
-    session: Session
-    html_session: HTMLSession
 
     def __init__(
         self,
@@ -45,15 +41,10 @@ class GenericRISEngine:
 
         self.url = url or self.url
 
-        if self.has_session:
-            self.session = Session()
-        if self.has_html_session:
-            self.html_session = HTMLSession()
-
         self.logger = logging.getLogger(f"RISEngine [{self.name}]")
 
     def __call__(self, url: str | URL, text: str | None = None) -> InlineKeyboardButton:
-        """Create the :obj:`InlineKeyboardButton` button for the telegram but to use"""
+        """Create the :obj:`InlineKeyboardButton` button for the telegram bot to use"""
         search_url = self.get_search_link_by_url(url) or ""
         return InlineKeyboardButton(text=text or self.name, url=search_url)
 
@@ -82,30 +73,12 @@ class GenericRISEngine:
     def best_match_implemented(cls):
         return "best_match" in cls.__dict__ and cls is not GenericRISEngine
 
-    @cached(cache=_best_match_cache)
-    def best_match(self, url: str | URL) -> ProviderData:
+    @async_cached(cache=_best_match_cache)
+    async def best_match(self, url: str | URL) -> ProviderData:
         """Get info about the best matching image found
 
         Returns:
-            ProviderData: (
-                {  # Everything is optional
-                    "Title": "Some Title",
-                    "Creator": "Shädman",
-                },
-                {  # optional fields are marked
-                    "thumbnail": URL("https://example.org/image.jpg"),
-                    "provider": "SauceNAO",
-                    "provider_url": URL("https://saucenao.com/"),
-                    "buttons": [InlineKeyboardButton("Source", "https://example.com/")],  # optional
-                    "similarity": 85.21,                                # optional: int/float in percentage
-                                                                        # some engines don't tell one so it's optional
-                    "provided_via": "Danbooru",                         # optional: Data provider (not search engine)
-                                                                        # when additional API is used
-                    "provided_via_url": "https://danbooru.donmai.us/"   # optional: URL to additional provider
-                    "identifier": "something"              # optional: dedup id (text)
-                    "thumbnail_identifier": "something"    # optional: dedup id (thumbnail)
-                }
-            )
+            ProviderData: (result_dict, meta_dict)
         """
         raise NotImplementedError()
 
@@ -117,15 +90,16 @@ class PreWorkEngine(GenericRISEngine):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._http_client = httpx.AsyncClient(timeout=10)
 
-    @cached(_url_cache)
-    def __call__(self, url: str | URL, text: str | None = None) -> InlineKeyboardButton | None:
-        search_url = self.get_search_link_by_url(url)
+    @async_cached(_url_cache)
+    async def __call__(self, url: str | URL, text: str | None = None) -> InlineKeyboardButton | None:
+        search_url = await self._resolve_search_url(url)
         if not search_url:
-            return
+            return None
         return InlineKeyboardButton(text=text or self.name, url=search_url)
 
-    def get_search_link_by_url(self, url: str | URL) -> str | None:
+    async def _resolve_search_url(self, url: str | URL) -> str | None:
         raise NotImplementedError()
 
     def empty_button(self):

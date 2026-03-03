@@ -3,52 +3,53 @@ from yarl import URL
 
 from reverse_image_search_bot.engines.types import InternalProviderData, MetaData
 from reverse_image_search_bot.utils import fix_url, safe_get, tagify, url_button
+from reverse_image_search_bot.utils.async_cache import async_provider_cache
 
-from .base import BaseProvider, provider_cache
+from .base import BaseProvider
 
 
 class MangadexProvider(BaseProvider):
     info = {"name": "Mangadex", "url": "https://mangadex.org/", "types": ["Manga"], "site_type": "Manga DB & Reader"}
     api_base = URL("https://api.mangadex.org/")
 
-    def _request(
+    async def _request(
         self, endpoint: str, params: dict | None = None, json: dict | None = None, method: str = "get", **kwargs
     ) -> dict | list | None:
-        request_method = getattr(self.session, method.lower())
+        request_method = getattr(self._http_client, method.lower())
         if not request_method:
-            return
+            return None
 
         url = self.api_base / endpoint
-        response = request_method(str(url), params=params, json=json, **kwargs)
+        response = await request_method(str(url), params=params, json=json, **kwargs)
 
         if response.status_code != 200:
             self.logger.error('Mangadex API error: "%s" -- %s', response.url, response.text)
-            return
+            return None
 
         data = response.json()
         if data["result"] == "error":
-            return
+            return None
         return data["data"]
 
-    def legacy_mapping(self, id: int, kind: str) -> str | None:
-        data = self._request("legacy/mapping", json={"type": kind, "ids": [id]}, method="POST")
+    async def legacy_mapping(self, id: int, kind: str) -> str | None:
+        data = await self._request("legacy/mapping", json={"type": kind, "ids": [id]}, method="POST")
         if not isinstance(data, list) or not data:
-            return
+            return None
         return safe_get(data, "[0].attributes.newId")
 
-    @provider_cache
-    def chapter(self, chapter_id: str) -> dict | None:
+    @async_provider_cache
+    async def chapter(self, chapter_id: str) -> dict | None:
         if chapter_id.isdigit():
-            chapter_id = self.legacy_mapping(int(chapter_id), "chapter")  # type: ignore
+            chapter_id = await self.legacy_mapping(int(chapter_id), "chapter")  # type: ignore
             if not chapter_id:
-                return
-        return self._request(f"chapter/{chapter_id}")  # type: ignore
+                return None
+        return await self._request(f"chapter/{chapter_id}")  # type: ignore
 
-    @provider_cache
-    def manga(self, manga_id: str) -> dict | None:
-        return self._request(f"manga/{manga_id}", {"includes[]": ["artist", "cover_art", "author"]})  # type: ignore
+    @async_provider_cache
+    async def manga(self, manga_id: str) -> dict | None:
+        return await self._request(f"manga/{manga_id}", {"includes[]": ["artist", "cover_art", "author"]})  # type: ignore
 
-    def provide(
+    async def provide(
         self, url: str | URL | None = None, chapter_id: str | None = None, manga_id: str | None = None
     ) -> InternalProviderData:
         chapter_id = str(chapter_id) if chapter_id else None
@@ -65,7 +66,7 @@ class MangadexProvider(BaseProvider):
         if not chapter_id and not manga_id:
             return {}, {}
 
-        chapter_data = self.chapter(chapter_id) if chapter_id else {}
+        chapter_data = await self.chapter(chapter_id) if chapter_id else {}
         chapter_data = chapter_data or {}
         chapter_id = chapter_data.get("id", "")
 
@@ -78,7 +79,7 @@ class MangadexProvider(BaseProvider):
         if not manga_id:
             return {}, {}
 
-        manga_data = self.manga(manga_id) or {}
+        manga_data = await self.manga(manga_id) or {}
 
         if not manga_data:
             return {}, {}

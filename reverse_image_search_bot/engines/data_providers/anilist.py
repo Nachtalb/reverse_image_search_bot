@@ -3,8 +3,9 @@ from yarl import URL
 from reverse_image_search_bot import settings
 from reverse_image_search_bot.engines.types import InternalProviderData, MetaData
 from reverse_image_search_bot.utils import tagify, url_button
+from reverse_image_search_bot.utils.async_cache import async_provider_cache
 
-from .base import BaseProvider, provider_cache
+from .base import BaseProvider
 
 
 class AnilistProvider(BaseProvider):
@@ -17,8 +18,8 @@ class AnilistProvider(BaseProvider):
 
     api_base = URL("https://graphql.anilist.co")
 
-    @provider_cache
-    def request(self, anilist_id: int) -> dict | None:
+    @async_provider_cache
+    async def request(self, anilist_id: int) -> dict | None:
         query = """
 query ($id: Int) {
     Page (perPage: 1) {
@@ -52,14 +53,14 @@ query ($id: Int) {
             headers["Authorization"] = f"Bearer {settings.ANILIST_TOKEN}"
 
         payload = {"query": query, "variables": {"id": anilist_id}}
-        response = self.session.post(str(self.api_base), json=payload, headers=headers)
+        response = await self._http_client.post(str(self.api_base), json=payload, headers=headers)
         if response.status_code != 200:
-            return
+            return None
 
         return next(iter(response.json()["data"]["Page"]["media"]), None)
 
-    def provide(self, anilist_id: int, episode_at: int | str | None = None) -> InternalProviderData:
-        ani_data = self.request(anilist_id)
+    async def provide(self, anilist_id: int, episode_at: int | str | None = None) -> InternalProviderData:
+        ani_data = await self.request(anilist_id)
         if not ani_data:
             return {}, {}
 

@@ -28,8 +28,6 @@ engines: list[GenericRISEngine] = [
         ["Cosplayers"],
     ),
     YandexEngine(),
-    # BaiduEngine(),
-    # ShutterStockEngine(),
     GenericRISEngine(
         "Bing",
         "https://www.bing.com/images/search?q=imgurl:{query_url}&view=detailv2&iss=sbi",

@@ -16,7 +16,7 @@ from reverse_image_search_bot.engines.types import (
 from reverse_image_search_bot.utils import tagify, upload_file, url_button
 from reverse_image_search_bot.utils.helpers import safe_get
 
-from .base import BaseProvider, provider_cache
+from .base import BaseProvider
 
 
 class BooruProvider(BaseProvider):
@@ -84,17 +84,17 @@ class BooruProvider(BaseProvider):
         },
     }
 
-    def _request(self, api: str, post_id: int) -> dict | None:
+    async def _request(self, api: str, post_id: int) -> dict | None:
         headers = {"User-Agent": generate_user_agent()}
-        response = self.session.get(self.urls[api]["api_url"].format(post_id=post_id), headers=headers)  # type: ignore[union-attr]
+        response = await self._http_client.get(self.urls[api]["api_url"].format(post_id=post_id), headers=headers)  # type: ignore[union-attr]
         if response.status_code != 200:
-            return
+            return None
         return response.json()
 
-    def get_post(self, api: str, post_id: int) -> dict | None:
-        data = self._request(api, post_id)
+    async def get_post(self, api: str, post_id: int) -> dict | None:
+        data = await self._request(api, post_id)
         if not data:
-            return
+            return None
         match api:
             case "danbooru":
                 if data.get("success") is not False:
@@ -106,6 +106,7 @@ class BooruProvider(BaseProvider):
                 if isinstance(data, list):
                     return next(iter(data), None)
                 return data
+        return None
 
     def source_button(self, data: dict) -> list[InlineKeyboardButton]:
         if (source := data.get("source")) and validators.url(source):
@@ -128,7 +129,7 @@ class BooruProvider(BaseProvider):
             return None, None
         return api, int(post_id)
 
-    def _get_thumbnail(self, api: str, post_id: int, data: dict) -> MetaData:
+    async def _get_thumbnail(self, api: str, post_id: int, data: dict) -> MetaData:
         thumbnail_url: str = data.get("file_url", data.get("sample_url", data.get("preview_file_url")))
 
         if not thumbnail_url:
@@ -138,7 +139,7 @@ class BooruProvider(BaseProvider):
                 "User-Agent": generate_user_agent(),
                 "Referer": self.urls[api]["post_url"].format(post_id=post_id),  # type: ignore[union-attr]
             }
-            response = self.session.get(thumbnail_url, headers=headers)
+            response = await self._http_client.get(thumbnail_url, headers=headers)
             if response.status_code != 200:
                 return {}
 
@@ -189,8 +190,7 @@ class BooruProvider(BaseProvider):
             "Copyright": copyrighttags or None,
         }
 
-    @provider_cache
-    def provide(self, api_or_url: str | URL, post_id: int | None = None) -> InternalProviderData:
+    async def provide(self, api_or_url: str | URL, post_id: int | None = None) -> InternalProviderData:
         if isinstance(api_or_url, URL) or validators.url(api_or_url):
             api, post_id = self.supports(api_or_url)
         else:
@@ -199,7 +199,7 @@ class BooruProvider(BaseProvider):
         if api is None or not post_id:
             return {}, {}
 
-        data = self.get_post(api, post_id)
+        data = await self.get_post(api, post_id)
         if not data:
             return {}, {}
 
@@ -229,7 +229,7 @@ class BooruProvider(BaseProvider):
             "identifier": post_url,
         }
 
-        if thumbnail_data := self._get_thumbnail(api, post_id, data):
+        if thumbnail_data := await self._get_thumbnail(api, post_id, data):
             meta.update(thumbnail_data)
 
         return result, meta
