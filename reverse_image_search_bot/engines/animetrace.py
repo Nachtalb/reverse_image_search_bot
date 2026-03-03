@@ -136,7 +136,13 @@ class AnimeTraceEngine(PicImageSearchEngine):
 
         async with Network() as client:
             engine = AnimeTrace(client=client, is_multi=1)
-            return await engine.search(url=url)
+            try:
+                return await engine.search(url=url)
+            except KeyError:
+                # AnimeTrace API may omit expected keys (e.g. trace_id) when
+                # it has no results.  Return an empty-raw sentinel so
+                # best_match() treats this as "no results" instead of an error.
+                return type("EmptyResult", (), {"raw": []})()
 
     async def _extract(self, raw: list) -> InternalProviderData:
         confident = [item for item in raw if not item.origin.get("not_confident", False)]
