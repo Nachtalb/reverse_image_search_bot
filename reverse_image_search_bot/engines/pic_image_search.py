@@ -8,6 +8,7 @@ from yarl import URL
 from reverse_image_search_bot.utils.async_cache import async_cached
 from reverse_image_search_bot.utils.url import url_button
 
+from .errors import SearchError
 from .generic import GenericRISEngine
 from .types import InternalProviderData, MetaData, ProviderData
 
@@ -70,16 +71,13 @@ class PicImageSearchEngine(GenericRISEngine):
         try:
             result_obj = await self._search(str(url))
         except KeyError as e:
-            self.logger.debug("Parsing key missing, treating as no results: %s", e)
-            return {}, {}
+            raise SearchError(f"Parsing key missing: {e}") from e
         except Exception as e:
             from PicImageSearch.exceptions import ParsingError
 
             if isinstance(e, ParsingError):
-                self.logger.debug("ParsingError, treating as no results: %s", e)
-                return {}, {}
-            self.logger.exception("Search failed for %s", self.name)
-            return {}, {}
+                raise SearchError(f"ParsingError: {e}") from e
+            raise SearchError(f"Search failed: {e}") from e
 
         if not getattr(result_obj, "raw", None):
             self.logger.debug("Done: no results")
@@ -88,8 +86,7 @@ class PicImageSearchEngine(GenericRISEngine):
         try:
             r, m = await self._extract(result_obj.raw)
         except Exception as e:
-            self.logger.warning("Extraction failed: %s", e)
-            return {}, {}
+            raise SearchError(f"Extraction failed: {e}") from e
 
         if not r:
             self.logger.debug("Done: extraction yielded nothing")
