@@ -50,9 +50,11 @@ All configuration is done via environment variables.
 |---|---|---|
 | `ADMIN_IDS` | — | Comma-separated Telegram user IDs with admin access |
 | `ANILIST_TOKEN` | — | AniList OAuth token (raises rate limit from 90 to 120 req/min) |
-| `WORKERS` | `4` | Number of worker threads |
-| `CON_POOL_SIZE` | `WORKERS+4` | HTTP connection pool size |
+| `MODE_ACTIVE` | `polling` | Bot mode: `polling` or `webhook` |
+| `CONCURRENT_UPDATES` | `16` | Number of concurrent update handlers |
 | `CONFIG_DIR` | `~/.config/reverse_image_search_bot` | Config/state directory |
+| `CONFIG_DB_PATH` | `CONFIG_DIR/config.db` | Path to the configuration database |
+| `PERSISTENCE_PATH` | `bot_data.pickle` | Path to the bot persistence file |
 | `LOG_FORMAT` | `%(asctime)s - %(name)s - %(levelname)s - %(message)s` | Python log format string |
 | `METRICS_ENABLED` | `true` | Enable Prometheus metrics endpoint |
 | `RIS_METRICS_PORT` | `9100` | Prometheus metrics port |
