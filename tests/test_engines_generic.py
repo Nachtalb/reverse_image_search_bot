@@ -33,8 +33,7 @@ class TestGenericRISEngine:
     def test_get_search_link_by_url(self):
         engine = GenericRISEngine(url="https://example.com/?q={query_url}")
         link = engine.get_search_link_by_url("https://img.example.com/test.jpg")
-        assert "https://example.com/?q=" in link
-        assert "img.example.com" in link
+        assert link == "https://example.com/?q=https%3A%2F%2Fimg.example.com%2Ftest.jpg"
 
     def test_call_returns_button(self):
         engine = GenericRISEngine(
