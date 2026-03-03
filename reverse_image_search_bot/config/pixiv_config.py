@@ -1,9 +1,6 @@
 from cleverdict import CleverDict
 
-from reverse_image_search_bot.settings import CONFIG_DIR
-
-app_path = CONFIG_DIR
-app_path.mkdir(parents=True, exist_ok=True)
+from reverse_image_search_bot.settings import PIXIV_CONFIG
 
 
 class PixivConfig:
@@ -16,11 +13,11 @@ class PixivConfig:
     access_token: str | None
 
     def __init__(self):
-        config_file = app_path / "pixiv.json"
+        PIXIV_CONFIG.parent.mkdir(parents=True, exist_ok=True)
         self._config = CleverDict(self._default_config)
-        if config_file.is_file():
-            self._config.update(CleverDict.from_json(file_path=config_file))
-        self._config.save_path = config_file
+        if PIXIV_CONFIG.is_file():
+            self._config.update(CleverDict.from_json(file_path=PIXIV_CONFIG))
+        self._config.save_path = PIXIV_CONFIG
         self._config.autosave(fullcopy=True)
 
     def __repr__(self):

@@ -66,11 +66,17 @@ if MODE_ACTIVE == "webhook":
 
 CONCURRENT_UPDATES = int(os.getenv("CONCURRENT_UPDATES", 16))
 
-CONFIG_DIR = Path(os.getenv("CONFIG_DIR", "~/.config/reverse_image_search_bot")).expanduser().absolute()
+_DEFAULT_CONFIG_DIR = Path("~/.config/reverse_image_search_bot").expanduser().absolute()
 
-CONFIG_DB_PATH = Path(os.getenv("CONFIG_DB_PATH", str(CONFIG_DIR / "config.db"))).expanduser().absolute()
+OLD_CONFIG_DIR = Path(os.getenv("OLD_CONFIG_DIR", str(_DEFAULT_CONFIG_DIR))).expanduser().absolute()
 
-PERSISTENCE_PATH = Path(os.getenv("PERSISTENCE_PATH", "bot_data.pickle")).expanduser().absolute()
+PIXIV_CONFIG = Path(os.getenv("PIXIV_CONFIG", str(_DEFAULT_CONFIG_DIR / "pixiv.json"))).expanduser().absolute()
+
+CONFIG_DB_PATH = Path(os.getenv("CONFIG_DB_PATH", str(_DEFAULT_CONFIG_DIR / "config.db"))).expanduser().absolute()
+
+PERSISTENCE_PATH = (
+    Path(os.getenv("PERSISTENCE_PATH", str(_DEFAULT_CONFIG_DIR / "bot_data.pickle"))).expanduser().absolute()
+)
 
 
 # Prometheus metrics
