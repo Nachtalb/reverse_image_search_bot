@@ -71,13 +71,13 @@ class PicImageSearchEngine(GenericRISEngine):
             result_obj = await self._search(str(url))
         except KeyError as e:
             self.logger.debug("Parsing key missing, treating as no results: %s", e)
-            return {}, meta
+            return {}, {}
         except Exception as e:
             from PicImageSearch.exceptions import ParsingError
 
             if isinstance(e, ParsingError):
                 self.logger.debug("ParsingError, treating as no results: %s", e)
-                return {}, meta
+                return {}, {}
             self.logger.warning("Search failed: %s", e)
             return {}, {**meta, "errors": [str(e)]}
 
