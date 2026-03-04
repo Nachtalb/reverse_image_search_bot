@@ -131,6 +131,51 @@ _PUBLIC_COMMANDS = [
     BotCommand("start", "Start the bot"),
 ]
 
+_LOCALISED_COMMANDS: dict[str, list[BotCommand]] = {
+    "ru": [
+        BotCommand("search", "Поиск источника изображения (ответьте на изображение)"),
+        BotCommand("settings", "Настройки бота для этого чата"),
+        BotCommand("help", "Показать справку"),
+        BotCommand("start", "Запустить бота"),
+    ],
+    "zh": [
+        BotCommand("search", "搜索图片来源（回复图片）"),
+        BotCommand("settings", "配置此聊天的机器人设置"),
+        BotCommand("help", "显示帮助"),
+        BotCommand("start", "启动机器人"),
+    ],
+    "es": [
+        BotCommand("search", "Buscar origen de imagen (responder a imagen)"),
+        BotCommand("settings", "Configurar el bot para este chat"),
+        BotCommand("help", "Mostrar ayuda"),
+        BotCommand("start", "Iniciar el bot"),
+    ],
+    "it": [
+        BotCommand("search", "Cerca l'origine dell'immagine (rispondi a un'immagine)"),
+        BotCommand("settings", "Configura il bot per questa chat"),
+        BotCommand("help", "Mostra aiuto"),
+        BotCommand("start", "Avvia il bot"),
+    ],
+    "ar": [
+        BotCommand("search", "البحث عن مصدر الصورة (رد على صورة)"),
+        BotCommand("settings", "إعدادات البوت لهذه المحادثة"),
+        BotCommand("help", "عرض المساعدة"),
+        BotCommand("start", "تشغيل البوت"),
+    ],
+    "ja": [
+        BotCommand("search", "画像のソースを検索（画像に返信）"),
+        BotCommand("settings", "このチャットのボット設定"),
+        BotCommand("help", "ヘルプを表示"),
+        BotCommand("start", "ボットを起動"),
+    ],
+    "de": [
+        BotCommand("search", "Bildquelle suchen (auf Bild antworten)"),
+        BotCommand("settings", "Bot-Einstellungen für diesen Chat"),
+        BotCommand("help", "Hilfe anzeigen"),
+        BotCommand("start", "Bot starten"),
+    ],
+}
+
 _ADMIN_COMMANDS = [
     *_PUBLIC_COMMANDS,
     BotCommand("ban", "Ban/unban a user by ID"),
@@ -141,10 +186,16 @@ _ADMIN_COMMANDS = [
 async def _set_bot_commands(app: Application) -> None:
     """Register bot command menus with Telegram.
 
-    Public commands are set for the default scope. Admin commands (including
-    /ban and /id) are set per admin private chat via BotCommandScopeChat.
+    Public commands are set for the default scope with localised variants.
+    Admin commands (including /ban and /id) are set per admin private chat
+    via BotCommandScopeChat (English only).
     """
     await app.bot.set_my_commands(_PUBLIC_COMMANDS, scope=BotCommandScopeDefault())
+    for lang, commands in _LOCALISED_COMMANDS.items():
+        try:
+            await app.bot.set_my_commands(commands, scope=BotCommandScopeDefault(), language_code=lang)
+        except Exception:
+            logger.warning("Failed to set %s commands", lang)
     for admin_id in settings.ADMIN_IDS:
         try:
             await app.bot.set_my_commands(_ADMIN_COMMANDS, scope=BotCommandScopeChat(chat_id=admin_id))
