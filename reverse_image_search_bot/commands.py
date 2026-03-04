@@ -37,7 +37,7 @@ from reverse_image_search_bot.engines import engines
 from reverse_image_search_bot.engines.errors import EngineError, RateLimitError
 from reverse_image_search_bot.engines.generic import GenericRISEngine, PreWorkEngine
 from reverse_image_search_bot.engines.types import MetaData, ResultData
-from reverse_image_search_bot.i18n import available_languages, t
+from reverse_image_search_bot.i18n import available_languages, t, translate_field
 from reverse_image_search_bot.i18n import lang as get_lang
 from reverse_image_search_bot.settings import ADMIN_IDS
 from reverse_image_search_bot.uploaders import uploader
@@ -1057,7 +1057,7 @@ def build_reply(result: ResultData, meta: MetaData, L: str = "en") -> tuple[str,
     reply += "\n\n"
 
     for key, value in result.items():
-        reply += title(html_mod.escape(str(key)))
+        reply += title(html_mod.escape(translate_field(str(key), L)))
         if isinstance(value, set):
             reply += ", ".join(html_mod.escape(str(v)) for v in value)
         elif isinstance(value, list):

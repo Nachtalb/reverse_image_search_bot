@@ -58,3 +58,41 @@ def lang(update: Update) -> str:
 def available_languages() -> list[str]:
     """Return sorted list of available language codes."""
     return sorted(_CATALOG.keys())
+
+
+# Mapping from English field labels to TOML keys under [fields]
+_FIELD_KEY_MAP: dict[str, str] = {
+    "Title": "fields.title",
+    "Title [romaji]": "fields.title_romaji",
+    "Title [ja]": "fields.title_ja",
+    "Chapter": "fields.chapter",
+    "Episode": "fields.episode",
+    "Status": "fields.status",
+    "Type": "fields.type",
+    "Year": "fields.year",
+    "Genres": "fields.genres",
+    "18+ Audience": "fields.audience_18",
+    "Est. Time": "fields.est_time",
+    "Description": "fields.description",
+    "Author": "fields.author",
+    "Artist": "fields.artist",
+    "Rating": "fields.rating",
+    "Tags": "fields.tags",
+    "Character": "fields.character",
+    "Characters": "fields.characters",
+    "Work": "fields.work",
+    "Also possible": "fields.also_possible",
+    "Material": "fields.material",
+    "By": "fields.by",
+    "Poster": "fields.poster",
+    "Source": "fields.source",
+    "Score": "fields.score",
+}
+
+
+def translate_field(label: str, lang: str = "en") -> str:
+    """Translate a result field label. Falls back to the original label."""
+    key = _FIELD_KEY_MAP.get(label)
+    if key:
+        return t(key, lang)
+    return label
