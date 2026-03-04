@@ -7,6 +7,7 @@ from telegram import BotCommand, BotCommandScopeChat, BotCommandScopeDefault
 
 from reverse_image_search_bot.bot import (
     _ADMIN_COMMANDS,
+    _LOCALISED_COMMANDS,
     _PUBLIC_COMMANDS,
     _set_bot_commands,
 )
@@ -53,18 +54,42 @@ class TestSetBotCommands:
 
     @pytest.mark.asyncio
     @patch("reverse_image_search_bot.bot.settings")
+    async def test_sets_localised_commands(self, mock_settings, mock_app):
+        mock_settings.ADMIN_IDS = []
+        await _set_bot_commands(mock_app)
+        for lang, commands in _LOCALISED_COMMANDS.items():
+            mock_app.bot.set_my_commands.assert_any_call(
+                commands, scope=BotCommandScopeDefault(), language_code=lang
+            )
+        # 1 default + N localised + 0 admin
+        assert mock_app.bot.set_my_commands.call_count == 1 + len(_LOCALISED_COMMANDS)
+
+    @pytest.mark.asyncio
+    @patch("reverse_image_search_bot.bot.settings")
     async def test_sets_admin_scope_per_admin(self, mock_settings, mock_app):
         mock_settings.ADMIN_IDS = [111, 222]
         await _set_bot_commands(mock_app)
         mock_app.bot.set_my_commands.assert_any_call(_ADMIN_COMMANDS, scope=BotCommandScopeChat(chat_id=111))
         mock_app.bot.set_my_commands.assert_any_call(_ADMIN_COMMANDS, scope=BotCommandScopeChat(chat_id=222))
-        # 1 default + 2 admin = 3 calls
-        assert mock_app.bot.set_my_commands.call_count == 3
+        # 1 default + N localised + 2 admin
+        assert mock_app.bot.set_my_commands.call_count == 1 + len(_LOCALISED_COMMANDS) + 2
 
     @pytest.mark.asyncio
     @patch("reverse_image_search_bot.bot.settings")
     async def test_admin_failure_does_not_crash(self, mock_settings, mock_app):
         mock_settings.ADMIN_IDS = [111]
-        mock_app.bot.set_my_commands = AsyncMock(side_effect=[None, Exception("chat not found")])
+        # 1 default + N localised succeed, then admin fails
+        side_effects: list[bool | Exception] = [True] * (1 + len(_LOCALISED_COMMANDS)) + [Exception("chat not found")]
+        mock_app.bot.set_my_commands = AsyncMock(side_effect=side_effects)
+        # Should not raise
+        await _set_bot_commands(mock_app)
+
+    @pytest.mark.asyncio
+    @patch("reverse_image_search_bot.bot.settings")
+    async def test_localised_failure_does_not_crash(self, mock_settings, mock_app):
+        mock_settings.ADMIN_IDS = []
+        # Default succeeds, first localised fails, rest succeed
+        side_effects: list[bool | Exception] = [True, Exception("lang fail")] + [True] * (len(_LOCALISED_COMMANDS) - 1)
+        mock_app.bot.set_my_commands = AsyncMock(side_effect=side_effects)
         # Should not raise
         await _set_bot_commands(mock_app)
