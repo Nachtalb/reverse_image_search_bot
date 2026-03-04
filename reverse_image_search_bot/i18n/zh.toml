@@ -1,0 +1,88 @@
+[commands]
+ban_usage = "用法：/ban <user_id>"
+bot_started = "✅ 机器人启动成功。"
+
+[search]
+reply_required = "使用 /search 时请回复一条包含图片或视频的消息"
+select_engine = "选择搜索引擎："
+best_match = "最佳匹配"
+go_to_image = "🔗 查看图片"
+creating_url = "正在创建 {engine} 搜索链接..."
+searching = "⏳ 搜索中..."
+no_results = "🔴 已通过 {engines} 搜索，但未找到结果。请尝试上方其他引擎。"
+results_found = "🔵 已通过 {engines} 搜索。您可以尝试上方其他引擎获取更多结果。"
+results_found_reenable = " 您可以在 /settings 中重新启用自动搜索。"
+slow_down = "请慢一点...."
+something_went_wrong = "出了点问题"
+generic_error = "发生错误，请重试。"
+
+[search.files]
+banned = "🔴 由于上传违禁内容，您已被禁止使用此机器人。"
+animated_not_supported = "不支持动画贴纸。"
+format_not_supported = "不支持此格式"
+video_too_large = "此视频太大无法下载且没有缩略图。请发送较小的文件。"
+
+[search.results]
+provided_by = "来源：{provider}"
+with_via = " 通过 {via}"
+with_similarity = " 相似度 {similarity}%"
+duplicate_result = "重复搜索结果已省略"
+duplicate_thumbnail = "重复缩略图已省略"
+rate_limit = "{engine}：已达到{period}限制。请点击 <b>更多</b> 按钮直接搜索。"
+rate_limit_default_period = "频率"
+engine_auto_disabled = "🔕 <b>{engine}</b> 在连续 5 次无结果后已自动禁用。使用 /settings 重新启用。"
+
+[search.auto_disable]
+message = "🟡 连续 5 次搜索无结果 — 已为此聊天禁用自动搜索。这有助于避免触发频率限制。自动搜索引擎主要用于动漫内容。使用 /settings 重新启用。"
+
+[settings]
+title = "⚙️ <b>聊天设置</b>"
+subtitle = "配置机器人在此聊天中的行为。"
+admins_only = "仅群组管理员可以访问设置。"
+admins_only_change = "仅群组管理员可以更改设置。"
+admins_only_configure = "仅群组管理员可以配置机器人。"
+
+[settings.toggles]
+auto_search = "🔍 自动搜索：{status}"
+show_buttons = "🔘 显示按钮：{status}"
+auto_search_engines = "🔍 自动搜索引擎 →"
+auto_search_engines_locked = "🔍 自动搜索引擎 🔒"
+button_engines = "🔘 引擎按钮 →"
+button_engines_locked = "🔘 引擎按钮 🔒"
+best_match_btn = "{status} 最佳匹配"
+show_link_btn = "{status} 🔗 查看图片"
+back = "← 返回"
+language = "🌐 语言：{language}"
+
+[settings.disabled_reasons]
+auto_search_engines = "请先启用自动搜索以配置其引擎。"
+button_engines = "请先启用「显示按钮」以配置引擎按钮。"
+default = "请先启用主开关。"
+
+[settings.warnings]
+enable_buttons_first = "⚠️ 请先启用引擎按钮 — 至少需要一个活跃项。"
+enable_autosearch_first = "⚠️ 请先启用自动搜索 — 至少需要一个活跃项。"
+min_one_button = "⚠️ 至少需要保留一个按钮。"
+min_one_engine = "⚠️ 至少需要保留一个引擎。"
+
+[start]
+private = "🔎 发送图片、贴纸或视频给我，我会帮你找到来源。"
+group = "🔎 发送图片、贴纸或视频给我，我会帮你找到来源。\n\n/search · /settings"
+opening_settings = "⚙️ 正在打开设置..."
+
+[onboarding]
+title = "👋 <b>我该如何处理此群组中的图片？</b>"
+description = "• <b>仅搜索结果</b> — 自动搜索图片，显示结果\n• <b>完整模式</b> — 自动搜索 + 显示引擎按钮\n• <b>手动模式</b> — 仅在回复 /search 时搜索\n• <b>设置</b> — 自定义所有配置"
+btn_search_only = "🔍 仅搜索结果"
+btn_full = "🔍 完整模式（结果 + 按钮）"
+btn_manual = "❌ 仅手动（/search）"
+btn_settings = "⚙️ 打开设置"
+done_search_only = "✅ 已设为<b>仅搜索结果</b>。随时通过 /settings 更改。"
+done_full = "✅ 已设为<b>完整模式</b>（结果 + 按钮）。随时通过 /settings 更改。"
+done_manual = "✅ 已设为<b>手动模式</b>。使用 /search 搜索。随时通过 /settings 更改。"
+
+[bot_commands]
+search = "搜索图片来源（回复图片）"
+settings = "配置此聊天的机器人设置"
+help = "显示帮助"
+start = "启动机器人"

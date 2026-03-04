@@ -1,0 +1,88 @@
+[commands]
+ban_usage = "Verwendung: /ban <user_id>"
+bot_started = "✅ Bot erfolgreich gestartet."
+
+[search]
+reply_required = "Bei /search musst du auf eine Nachricht mit einem Bild oder Video antworten"
+select_engine = "Wähle eine Suchmaschine:"
+best_match = "Bestes Ergebnis"
+go_to_image = "🔗 Zum Bild"
+creating_url = "Erstelle {engine}-Suchlink..."
+searching = "⏳ suche..."
+no_results = "🔴 Ich habe auf {engines} gesucht, aber nichts gefunden. Versuche eine andere Suchmaschine oben."
+results_found = "🔵 Ich habe auf {engines} gesucht. Du kannst oben weitere Suchmaschinen für mehr Ergebnisse ausprobieren."
+results_found_reenable = " Du kannst die automatische Suche in /settings wieder aktivieren."
+slow_down = "Etwas langsamer bitte...."
+something_went_wrong = "Etwas ist schiefgelaufen"
+generic_error = "Ein Fehler ist aufgetreten, bitte versuche es erneut."
+
+[search.files]
+banned = "🔴 Du wurdest wegen des Hochladens illegaler Inhalte gesperrt."
+animated_not_supported = "Animierte Sticker werden nicht unterstützt."
+format_not_supported = "Format wird nicht unterstützt"
+video_too_large = "Dieses Video ist zu groß zum Herunterladen und hat kein Vorschaubild. Bitte sende eine kleinere Datei."
+
+[search.results]
+provided_by = "Bereitgestellt von: {provider}"
+with_via = " über {via}"
+with_similarity = " mit {similarity}% Ähnlichkeit"
+duplicate_result = "Doppeltes Suchergebnis übersprungen"
+duplicate_thumbnail = "Doppeltes Vorschaubild übersprungen"
+rate_limit = "{engine}: {period}-Limit erreicht. Nutze den <b>Mehr</b>-Button für eine direkte Suche."
+rate_limit_default_period = "Limit"
+engine_auto_disabled = "🔕 <b>{engine}</b> wurde nach 5 aufeinanderfolgenden leeren Ergebnissen automatisch deaktiviert. Über /settings wieder aktivieren."
+
+[search.auto_disable]
+message = "🟡 5 Suchen hintereinander ohne Ergebnisse — die automatische Suche wurde für diesen Chat deaktiviert. Dies verhindert das Erreichen von Rate-Limits. Die Auto-Suchmaschinen sind hauptsächlich für Anime- und Manga-Inhalte. Über /settings wieder aktivieren."
+
+[settings]
+title = "⚙️ <b>Chat-Einstellungen</b>"
+subtitle = "Konfiguriere das Verhalten des Bots in diesem Chat."
+admins_only = "Nur Gruppenadmins können auf die Einstellungen zugreifen."
+admins_only_change = "Nur Gruppenadmins können die Einstellungen ändern."
+admins_only_configure = "Nur Gruppenadmins können den Bot konfigurieren."
+
+[settings.toggles]
+auto_search = "🔍 Automatische Suche: {status}"
+show_buttons = "🔘 Buttons anzeigen: {status}"
+auto_search_engines = "🔍 Auto-Such-Engines →"
+auto_search_engines_locked = "🔍 Auto-Such-Engines 🔒"
+button_engines = "🔘 Engine-Buttons →"
+button_engines_locked = "🔘 Engine-Buttons 🔒"
+best_match_btn = "{status} Bestes Ergebnis"
+show_link_btn = "{status} 🔗 Zum Bild"
+back = "← Zurück"
+language = "🌐 Sprache: {language}"
+
+[settings.disabled_reasons]
+auto_search_engines = "Aktiviere zuerst die automatische Suche, um die Engines zu konfigurieren."
+button_engines = "Aktiviere zuerst \"Buttons anzeigen\", um die Engine-Buttons zu konfigurieren."
+default = "Aktiviere zuerst den Hauptschalter."
+
+[settings.warnings]
+enable_buttons_first = "⚠️ Aktiviere zuerst die Engine-Buttons — mindestens einer muss aktiv sein."
+enable_autosearch_first = "⚠️ Aktiviere zuerst die automatische Suche — mindestens eine muss aktiv sein."
+min_one_button = "⚠️ Mindestens ein Button muss aktiv bleiben."
+min_one_engine = "⚠️ Mindestens eine Engine muss aktiv bleiben."
+
+[start]
+private = "🔎 Sende mir ein Bild, einen Sticker oder ein Video und ich finde die Quelle."
+group = "🔎 Sende mir ein Bild, einen Sticker oder ein Video und ich finde die Quelle.\n\n/search · /settings"
+opening_settings = "⚙️ Öffne Einstellungen..."
+
+[onboarding]
+title = "👋 <b>Wie soll ich mit Bildern in dieser Gruppe umgehen?</b>"
+description = "• <b>Nur Ergebnisse</b> — Bilder automatisch suchen, Ergebnisse anzeigen\n• <b>Vollständig</b> — automatische Suche + Engine-Buttons\n• <b>Manuell</b> — nur suchen, wenn jemand mit /search antwortet\n• <b>Einstellungen</b> — alles selbst konfigurieren"
+btn_search_only = "🔍 Nur Ergebnisse"
+btn_full = "🔍 Vollständig (Ergebnisse + Buttons)"
+btn_manual = "❌ Nur manuell (/search)"
+btn_settings = "⚙️ Einstellungen öffnen"
+done_search_only = "✅ Eingestellt: <b>nur Ergebnisse</b>. Jederzeit ändern unter /settings."
+done_full = "✅ Eingestellt: <b>Vollmodus</b> (Ergebnisse + Buttons). Jederzeit ändern unter /settings."
+done_manual = "✅ Eingestellt: <b>manueller Modus</b>. Nutze /search zum Suchen. Jederzeit ändern unter /settings."
+
+[bot_commands]
+search = "Bildquelle suchen (auf Bild antworten)"
+settings = "Bot-Einstellungen für diesen Chat"
+help = "Hilfe anzeigen"
+start = "Bot starten"

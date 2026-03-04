@@ -58,13 +58,22 @@ class TestSetBotCommands:
         await _set_bot_commands(mock_app)
         mock_app.bot.set_my_commands.assert_any_call(_ADMIN_COMMANDS, scope=BotCommandScopeChat(chat_id=111))
         mock_app.bot.set_my_commands.assert_any_call(_ADMIN_COMMANDS, scope=BotCommandScopeChat(chat_id=222))
-        # 1 default + 2 admin = 3 calls
-        assert mock_app.bot.set_my_commands.call_count == 3
+        # 1 default + 7 localised + 2 admin = 10 calls
+        from reverse_image_search_bot.i18n import available_languages
+
+        n_localised = len(available_languages()) - 1  # minus "en"
+        assert mock_app.bot.set_my_commands.call_count == 1 + n_localised + 2
 
     @pytest.mark.asyncio
     @patch("reverse_image_search_bot.bot.settings")
     async def test_admin_failure_does_not_crash(self, mock_settings, mock_app):
         mock_settings.ADMIN_IDS = [111]
-        mock_app.bot.set_my_commands = AsyncMock(side_effect=[None, Exception("chat not found")])
+        from reverse_image_search_bot.i18n import available_languages
+
+        n_localised = len(available_languages()) - 1
+        # 1 default + N localised succeed, then admin fails
+        mock_app.bot.set_my_commands = AsyncMock(
+            side_effect=[None] * (1 + n_localised) + [Exception("chat not found")]
+        )
         # Should not raise
         await _set_bot_commands(mock_app)

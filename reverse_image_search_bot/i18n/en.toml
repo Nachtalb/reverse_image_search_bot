@@ -1,0 +1,88 @@
+[commands]
+ban_usage = "Usage: /ban <user_id>"
+bot_started = "✅ Bot started successfully."
+
+[search]
+reply_required = "When using /search you have to reply to a message with an image or video"
+select_engine = "Select a search engine:"
+best_match = "Best Match"
+go_to_image = "🔗 Go To Image"
+creating_url = "Creating {engine} search url..."
+searching = "⏳ searching..."
+no_results = "🔴 I searched for you on {engines} but didn't find anything. Please try another engine above."
+results_found = "🔵 I searched for you on {engines}. You can try others above for more results."
+results_found_reenable = " You may reenable auto-search via /settings if you want."
+slow_down = "Slow down a bit please...."
+something_went_wrong = "Something went wrong"
+generic_error = "An error occurred, try again."
+
+[search.files]
+banned = "🔴 You are banned from using this bot due to uploading illegal content."
+animated_not_supported = "Animated stickers are not supported."
+format_not_supported = "Format is not supported"
+video_too_large = "This video is too large to download and has no thumbnail. Please send a smaller file."
+
+[search.results]
+provided_by = "Provided by: {provider}"
+with_via = " with {via}"
+with_similarity = " with {similarity}% similarity"
+duplicate_result = "Duplicate search result omitted"
+duplicate_thumbnail = "Duplicate thumbnail omitted"
+rate_limit = "{engine}: {period} limit reached. Try the <b>More</b> button to search directly."
+rate_limit_default_period = "Limit"
+engine_auto_disabled = "🔕 <b>{engine}</b> was automatically disabled for this chat after 5 consecutive empty results. Use /settings to re-enable it."
+
+[search.auto_disable]
+message = "🟡 5 searches in a row returned no results — auto search has been disabled for this chat. This helps prevent hitting rate limits. The auto search engines are mainly for anime & manga content. Use /settings to re-enable it."
+
+[settings]
+title = "⚙️ <b>Chat Settings</b>"
+subtitle = "Configure how the bot behaves in this chat."
+admins_only = "Only group admins can access settings."
+admins_only_change = "Only group admins can change settings."
+admins_only_configure = "Only group admins can configure the bot."
+
+[settings.toggles]
+auto_search = "🔍 Auto-search: {status}"
+show_buttons = "🔘 Show buttons: {status}"
+auto_search_engines = "🔍 Auto-search engines →"
+auto_search_engines_locked = "🔍 Auto-search engines 🔒"
+button_engines = "🔘 Engine buttons →"
+button_engines_locked = "🔘 Engine buttons 🔒"
+best_match_btn = "{status} Best Match"
+show_link_btn = "{status} 🔗 Go To Image"
+back = "← Back"
+language = "🌐 Language: {language}"
+
+[settings.disabled_reasons]
+auto_search_engines = "Enable auto-search first to configure its engines."
+button_engines = "Enable \"Show buttons\" first to configure engine buttons."
+default = "Enable the master toggle first."
+
+[settings.warnings]
+enable_buttons_first = "⚠️ Enable engine buttons first — at least one must be active."
+enable_autosearch_first = "⚠️ Enable auto-search first — at least one must be active."
+min_one_button = "⚠️ At least one button must stay enabled."
+min_one_engine = "⚠️ At least one engine must stay enabled."
+
+[start]
+private = "🔎 Send me an image, sticker, or video and I'll find its source."
+group = "🔎 Send me an image, sticker, or video and I'll find its source.\n\n/search · /settings"
+opening_settings = "⚙️ Opening settings..."
+
+[onboarding]
+title = "👋 <b>How should I handle images in this group?</b>"
+description = "• <b>Search results only</b> — auto-search images, show results\n• <b>Full</b> — auto-search + show engine buttons\n• <b>Manual</b> — only search when someone replies with /search\n• <b>Settings</b> — configure everything yourself"
+btn_search_only = "🔍 Search results only"
+btn_full = "🔍 Full (results + buttons)"
+btn_manual = "❌ Manual only (/search)"
+btn_settings = "⚙️ Open settings"
+done_search_only = "✅ Set to <b>search results only</b>. Change anytime with /settings."
+done_full = "✅ Set to <b>full mode</b> (results + buttons). Change anytime with /settings."
+done_manual = "✅ Set to <b>manual mode</b>. Use /search to search. Change anytime with /settings."
+
+[bot_commands]
+search = "Search for image source (reply to image)"
+settings = "Configure bot behaviour for this chat"
+help = "Show help"
+start = "Start the bot"
