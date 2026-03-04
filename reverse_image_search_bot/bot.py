@@ -33,6 +33,7 @@ from .commands import (
     settings_command,
     start_command,
 )
+from .i18n import available_languages, t
 from .metrics import start_metrics_server
 
 application: Application | None = None
@@ -102,7 +103,7 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     metrics.commands_total.labels(command="ban").inc()
     args = update.message.text.strip("/").split(" ")
     if len(args) != 2:
-        await update.message.reply_text("Usage: /ban <user_id>")
+        await update.message.reply_text(t("commands.ban_usage"))
         return
     user_id = int(args[1])
 
@@ -125,10 +126,10 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
 
 
 _PUBLIC_COMMANDS = [
-    BotCommand("search", "Search for image source (reply to image)"),
-    BotCommand("settings", "Configure bot behaviour for this chat"),
-    BotCommand("help", "Show help"),
-    BotCommand("start", "Start the bot"),
+    BotCommand("search", t("bot_commands.search")),
+    BotCommand("settings", t("bot_commands.settings")),
+    BotCommand("help", t("bot_commands.help")),
+    BotCommand("start", t("bot_commands.start")),
 ]
 
 _ADMIN_COMMANDS = [
@@ -141,10 +142,24 @@ _ADMIN_COMMANDS = [
 async def _set_bot_commands(app: Application) -> None:
     """Register bot command menus with Telegram.
 
-    Public commands are set for the default scope. Admin commands (including
-    /ban and /id) are set per admin private chat via BotCommandScopeChat.
+    Public commands are set for the default scope with localised variants
+    driven by TOML string catalogs. Admin commands (including /ban and /id)
+    are set per admin private chat via BotCommandScopeChat (English only).
     """
     await app.bot.set_my_commands(_PUBLIC_COMMANDS, scope=BotCommandScopeDefault())
+    for lang_code in available_languages():
+        if lang_code == "en":
+            continue
+        commands = [
+            BotCommand("search", t("bot_commands.search", lang_code)),
+            BotCommand("settings", t("bot_commands.settings", lang_code)),
+            BotCommand("help", t("bot_commands.help", lang_code)),
+            BotCommand("start", t("bot_commands.start", lang_code)),
+        ]
+        try:
+            await app.bot.set_my_commands(commands, scope=BotCommandScopeDefault(), language_code=lang_code)
+        except Exception:
+            logger.warning("Failed to set %s commands", lang_code)
     for admin_id in settings.ADMIN_IDS:
         try:
             await app.bot.set_my_commands(_ADMIN_COMMANDS, scope=BotCommandScopeChat(chat_id=admin_id))
@@ -175,7 +190,7 @@ async def post_init(app: Application) -> None:
 
     for admin_id in settings.ADMIN_IDS:
         try:
-            await app.bot.send_message(admin_id, emojize(":check_mark_button: Bot started successfully."))
+            await app.bot.send_message(admin_id, t("commands.bot_started"))
         except Exception:
             logger.warning("Failed to notify admin %d of startup", admin_id)
 

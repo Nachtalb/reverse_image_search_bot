@@ -11,7 +11,6 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from time import time
 
-from emoji import emojize
 from PIL import Image
 from telegram import (
     Animation,
@@ -38,6 +37,8 @@ from reverse_image_search_bot.engines import engines
 from reverse_image_search_bot.engines.errors import EngineError, RateLimitError
 from reverse_image_search_bot.engines.generic import GenericRISEngine, PreWorkEngine
 from reverse_image_search_bot.engines.types import MetaData, ResultData
+from reverse_image_search_bot.i18n import available_languages, t, translate_field
+from reverse_image_search_bot.i18n import lang as get_lang
 from reverse_image_search_bot.settings import ADMIN_IDS
 from reverse_image_search_bot.uploaders import uploader
 from reverse_image_search_bot.utils import chunks, upload_file
@@ -63,6 +64,18 @@ def _extract_video_frame(video_path: str) -> bytes:
 
 # Telegram Bot API file download limit (20 MB)
 MAX_TELEGRAM_FILE_SIZE = 20 * 1024 * 1024
+
+_LANG_NAMES: dict[str, str] = {
+    "auto": "🌐 Auto",
+    "en": "🇬🇧 English",
+    "ru": "🇷🇺 Русский",
+    "zh": "🇨🇳 中文",
+    "es": "🇪🇸 Español",
+    "it": "🇮🇹 Italiano",
+    "ar": "🇸🇦 العربية",
+    "ja": "🇯🇵 日本語",
+    "de": "🇩🇪 Deutsch",
+}
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -96,35 +109,59 @@ async def _is_settings_allowed(update: Update, context: ContextTypes.DEFAULT_TYP
         return False
 
 
-def _settings_main_text(chat_config: ChatConfig) -> str:
-    return "⚙️ <b>Chat Settings</b>\nConfigure how the bot behaves in this chat."
+def _settings_main_text(chat_config: ChatConfig, L: str = "en") -> str:
+    return f"{t('settings.title', L)}\n{t('settings.subtitle', L)}"
 
 
-def _settings_main_keyboard(chat_config: ChatConfig) -> InlineKeyboardMarkup:
+def _settings_main_keyboard(chat_config: ChatConfig, L: str = "en") -> InlineKeyboardMarkup:
     auto = "✅" if chat_config.auto_search_enabled else "❌"
     buttons = "✅" if chat_config.show_buttons else "❌"
-    as_engines_label = "🔍 Auto-search engines →" if chat_config.auto_search_enabled else "🔍 Auto-search engines 🔒"
+    as_engines_label = (
+        t("settings.toggles.auto_search_engines", L)
+        if chat_config.auto_search_enabled
+        else t("settings.toggles.auto_search_engines_locked", L)
+    )
     as_engines_cb = (
         "settings:menu:auto_search_engines"
         if chat_config.auto_search_enabled
         else "settings:disabled:auto_search_engines"
     )
-    btn_engines_label = "🔘 Engine buttons →" if chat_config.show_buttons else "🔘 Engine buttons 🔒"
+    btn_engines_label = (
+        t("settings.toggles.button_engines", L)
+        if chat_config.show_buttons
+        else t("settings.toggles.button_engines_locked", L)
+    )
     btn_engines_cb = "settings:menu:button_engines" if chat_config.show_buttons else "settings:disabled:button_engines"
+
+    lang_display = _LANG_NAMES.get(chat_config.language or "auto", chat_config.language or "auto")
 
     return InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton(f"🔍 Auto-search: {auto}", callback_data="settings:toggle:auto_search")],
-            [InlineKeyboardButton(f"🔘 Show buttons: {buttons}", callback_data="settings:toggle:show_buttons")],
+            [
+                InlineKeyboardButton(
+                    t("settings.toggles.auto_search", L, status=auto), callback_data="settings:toggle:auto_search"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    t("settings.toggles.show_buttons", L, status=buttons), callback_data="settings:toggle:show_buttons"
+                )
+            ],
             [InlineKeyboardButton(as_engines_label, callback_data=as_engines_cb)],
             [InlineKeyboardButton(btn_engines_label, callback_data=btn_engines_cb)],
+            [
+                InlineKeyboardButton(
+                    t("settings.toggles.language", L, language=lang_display),
+                    callback_data="settings:menu:language",
+                )
+            ],
         ]
     )
 
 
-def _settings_engines_keyboard(chat_config: ChatConfig, menu: str) -> InlineKeyboardMarkup:
+def _settings_engines_keyboard(chat_config: ChatConfig, menu: str, L: str = "en") -> InlineKeyboardMarkup:
     """Build a per-engine toggle keyboard for either 'auto_search_engines' or 'button_engines'."""
-    rows = []
+    rows: list[list[InlineKeyboardButton]] = []
 
     if menu == "auto_search_engines":
         enabled = chat_config.auto_search_engines
@@ -136,8 +173,20 @@ def _settings_engines_keyboard(chat_config: ChatConfig, menu: str) -> InlineKeyb
         relevant = list(engines)
         bm = "✅" if chat_config.show_best_match else "❌"
         link = "✅" if chat_config.show_link else "❌"
-        rows.append([InlineKeyboardButton(f"{bm} Best Match", callback_data="settings:toggle:show_best_match")])
-        rows.append([InlineKeyboardButton(f"{link} 🔗 Go To Image", callback_data="settings:toggle:show_link")])
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    t("settings.toggles.best_match_btn", L, status=bm), callback_data="settings:toggle:show_best_match"
+                )
+            ]
+        )
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    t("settings.toggles.show_link_btn", L, status=link), callback_data="settings:toggle:show_link"
+                )
+            ]
+        )
 
     engine_btns = [
         InlineKeyboardButton(
@@ -147,7 +196,28 @@ def _settings_engines_keyboard(chat_config: ChatConfig, menu: str) -> InlineKeyb
         for e in relevant
     ]
     rows.extend(chunks(engine_btns, 2))
-    rows.append([InlineKeyboardButton("← Back", callback_data="settings:back")])
+    rows.append([InlineKeyboardButton(t("settings.toggles.back", L), callback_data="settings:back")])
+    return InlineKeyboardMarkup(rows)
+
+
+def _settings_language_keyboard(chat_config: ChatConfig, L: str = "en") -> InlineKeyboardMarkup:
+    """Build a language selection keyboard."""
+    current = chat_config.language
+    rows: list[list[InlineKeyboardButton]] = []
+
+    # Auto option
+    check = "✅ " if current is None else ""
+    rows.append([InlineKeyboardButton(f"{check}{_LANG_NAMES['auto']}", callback_data="settings:lang:auto")])
+
+    # Language options in pairs
+    lang_btns = []
+    for lang_code in available_languages():
+        check = "✅ " if current == lang_code else ""
+        display = _LANG_NAMES.get(lang_code, lang_code)
+        lang_btns.append(InlineKeyboardButton(f"{check}{display}", callback_data=f"settings:lang:{lang_code}"))
+    rows.extend(chunks(lang_btns, 2))
+
+    rows.append([InlineKeyboardButton(t("settings.toggles.back", L), callback_data="settings:back")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -165,17 +235,18 @@ def _button_count(chat_config: ChatConfig, excluding_engine: str | None = None) 
 async def settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     assert update.message and update.effective_chat
     metrics.commands_total.labels(command="settings").inc()
+    L = get_lang(update)
 
     if not await _is_settings_allowed(update, context):
-        await update.message.reply_text("Only group admins can access settings.")
+        await update.message.reply_text(t("settings.admins_only", L))
         return
 
     chat_config = ChatConfig(update.effective_chat.id)
     if _is_group(update.effective_chat.id) and not chat_config.onboarded:
         chat_config.onboarded = True
     await update.message.reply_html(
-        _settings_main_text(chat_config),
-        reply_markup=_settings_main_keyboard(chat_config),
+        _settings_main_text(chat_config, L),
+        reply_markup=_settings_main_keyboard(chat_config, L),
     )
 
 
@@ -183,20 +254,23 @@ async def settings_callback_handler(update: Update, context: ContextTypes.DEFAUL
     query = update.callback_query
     assert query and query.data is not None
     data = query.data
+    L = get_lang(update)
 
     if data == "settings:noop":
         await query.answer()
         return
     if data.startswith("settings:disabled:"):
-        reason = {
-            "auto_search_engines": "Enable auto-search first to configure its engines.",
-            "button_engines": 'Enable "Show buttons" first to configure engine buttons.',
-        }.get(data.split(":", 2)[2], "Enable the master toggle first.")
+        field = data.split(":", 2)[2]
+        if field in ("auto_search_engines", "button_engines"):
+            key = f"settings.disabled_reasons.{field}"
+        else:
+            key = "settings.disabled_reasons.default"
+        reason = t(key, L)
         await query.answer(reason, show_alert=False)
         return
 
     if not await _is_settings_allowed(update, context):
-        await query.answer("Only group admins can change settings.", show_alert=True)
+        await query.answer(t("settings.admins_only_change", L), show_alert=True)
         return
 
     assert update.effective_chat
@@ -207,27 +281,44 @@ async def settings_callback_handler(update: Update, context: ContextTypes.DEFAUL
 
     is_group = _is_group(update.effective_chat.id)
 
+    if action == "lang":
+        # Language selection
+        if value == "auto":
+            chat_config.language = None
+        else:
+            chat_config.language = value
+        # Re-resolve language after change
+        L = get_lang(update)
+        with contextlib.suppress(TelegramError):
+            await query.edit_message_text(
+                _settings_main_text(chat_config, L),
+                parse_mode="HTML",
+                reply_markup=_settings_main_keyboard(chat_config, L),
+            )
+        await query.answer()
+        return
+
     if action == "toggle":
         if value == "auto_search":
             if not is_group and chat_config.auto_search_enabled and not chat_config.show_buttons:
-                await query.answer("⚠️ Enable engine buttons first — at least one must be active.", show_alert=True)
+                await query.answer(t("settings.warnings.enable_buttons_first", L), show_alert=True)
                 return
             chat_config.auto_search_enabled = not chat_config.auto_search_enabled
         elif value == "show_buttons":
             if not is_group and chat_config.show_buttons and not chat_config.auto_search_enabled:
-                await query.answer("⚠️ Enable auto-search first — at least one must be active.", show_alert=True)
+                await query.answer(t("settings.warnings.enable_autosearch_first", L), show_alert=True)
                 return
             chat_config.show_buttons = not chat_config.show_buttons
         elif value == "show_best_match":
             if chat_config.show_best_match and _button_count(chat_config) <= 1:
-                await query.answer("⚠️ At least one button must stay enabled.", show_alert=True)
+                await query.answer(t("settings.warnings.min_one_button", L), show_alert=True)
                 return
             chat_config.show_best_match = not chat_config.show_best_match
             action = "disabled" if not chat_config.show_best_match else "enabled"
             metrics.button_toggle_total.labels(button="best_match", action=action).inc()
         elif value == "show_link":
             if chat_config.show_link and _button_count(chat_config) <= 1:
-                await query.answer("⚠️ At least one button must stay enabled.", show_alert=True)
+                await query.answer(t("settings.warnings.min_one_button", L), show_alert=True)
                 return
             chat_config.show_link = not chat_config.show_link
             action = "disabled" if not chat_config.show_link else "enabled"
@@ -240,7 +331,7 @@ async def settings_callback_handler(update: Update, context: ContextTypes.DEFAUL
                 current = relevant[:]
             if engine_name in current:
                 if len(current) == 1:
-                    await query.answer("⚠️ At least one engine must stay enabled.", show_alert=True)
+                    await query.answer(t("settings.warnings.min_one_engine", L), show_alert=True)
                     return
                 current.remove(engine_name)
                 metrics.engine_manual_toggle_total.labels(
@@ -261,7 +352,7 @@ async def settings_callback_handler(update: Update, context: ContextTypes.DEFAUL
                 current = all_names[:]
             if engine_name in current:
                 if _button_count(chat_config, excluding_engine=engine_name) < 1:
-                    await query.answer("⚠️ At least one button must stay enabled.", show_alert=True)
+                    await query.answer(t("settings.warnings.min_one_button", L), show_alert=True)
                     return
                 current.remove(engine_name)
                 metrics.engine_manual_toggle_total.labels(engine=engine_name, menu="button", action="disabled").inc()
@@ -274,27 +365,31 @@ async def settings_callback_handler(update: Update, context: ContextTypes.DEFAUL
         if value.startswith("auto_search_engine:"):
             with contextlib.suppress(TelegramError):
                 await query.edit_message_reply_markup(
-                    reply_markup=_settings_engines_keyboard(chat_config, "auto_search_engines")
+                    reply_markup=_settings_engines_keyboard(chat_config, "auto_search_engines", L)
                 )
         elif value.startswith("button_engine:") or value in ("show_link", "show_best_match"):
             with contextlib.suppress(TelegramError):
                 await query.edit_message_reply_markup(
-                    reply_markup=_settings_engines_keyboard(chat_config, "button_engines")
+                    reply_markup=_settings_engines_keyboard(chat_config, "button_engines", L)
                 )
         else:
             with contextlib.suppress(TelegramError):
-                await query.edit_message_reply_markup(reply_markup=_settings_main_keyboard(chat_config))
+                await query.edit_message_reply_markup(reply_markup=_settings_main_keyboard(chat_config, L))
 
     elif action == "menu":
-        with contextlib.suppress(TelegramError):
-            await query.edit_message_reply_markup(reply_markup=_settings_engines_keyboard(chat_config, value))
+        if value == "language":
+            with contextlib.suppress(TelegramError):
+                await query.edit_message_reply_markup(reply_markup=_settings_language_keyboard(chat_config, L))
+        else:
+            with contextlib.suppress(TelegramError):
+                await query.edit_message_reply_markup(reply_markup=_settings_engines_keyboard(chat_config, value, L))
 
     elif action == "back":
         with contextlib.suppress(TelegramError):
             await query.edit_message_text(
-                _settings_main_text(chat_config),
+                _settings_main_text(chat_config, L),
                 parse_mode="HTML",
-                reply_markup=_settings_main_keyboard(chat_config),
+                reply_markup=_settings_main_keyboard(chat_config, L),
             )
 
     await query.answer()
@@ -308,6 +403,7 @@ _HELP_IMAGE = _LOCAL / "images/help.jpg"
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     assert update.message
     metrics.commands_total.labels(command="start").inc()
+    L = get_lang(update)
     chat = update.effective_chat
     if chat and chat.type != "private":
         chat_config = ChatConfig(chat.id)
@@ -315,7 +411,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await _send_onboarding(update, context)
             return
         await update.message.reply_text(
-            "🔎 Send me an image, sticker, or video and I'll find its source.\n\n/search · /settings",
+            t("start.group", L),
             parse_mode=ParseMode.HTML,
             disable_web_page_preview=True,
         )
@@ -331,7 +427,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             one_time_keyboard=True,
         )
         await update.message.reply_text(
-            "🔎 Send me an image, sticker, or video and I'll find its source.",
+            t("start.private", L),
             reply_markup=keyboard,
             parse_mode=ParseMode.HTML,
             disable_web_page_preview=True,
@@ -351,21 +447,16 @@ async def on_added_to_group(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def _send_onboarding(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send the group onboarding prompt with preset choices."""
+    L = get_lang(update)
     keyboard = InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton("🔍 Search results only", callback_data="onboard:search_only")],
-            [InlineKeyboardButton("🔍 Full (results + buttons)", callback_data="onboard:full")],
-            [InlineKeyboardButton("❌ Manual only (/search)", callback_data="onboard:manual")],
-            [InlineKeyboardButton("⚙️ Open settings", callback_data="onboard:settings")],
+            [InlineKeyboardButton(t("onboarding.btn_search_only", L), callback_data="onboard:search_only")],
+            [InlineKeyboardButton(t("onboarding.btn_full", L), callback_data="onboard:full")],
+            [InlineKeyboardButton(t("onboarding.btn_manual", L), callback_data="onboard:manual")],
+            [InlineKeyboardButton(t("onboarding.btn_settings", L), callback_data="onboard:settings")],
         ]
     )
-    text = (
-        "👋 <b>How should I handle images in this group?</b>\n\n"
-        "• <b>Search results only</b> — auto-search images, show results\n"
-        "• <b>Full</b> — auto-search + show engine buttons\n"
-        "• <b>Manual</b> — only search when someone replies with /search\n"
-        "• <b>Settings</b> — configure everything yourself"
-    )
+    text = f"{t('onboarding.title', L)}\n\n{t('onboarding.description', L)}"
     msg = update.effective_message or update.message
     assert msg
     await msg.reply_html(text, reply_markup=keyboard)
@@ -382,9 +473,10 @@ async def onboard_callback_handler(update: Update, context: ContextTypes.DEFAULT
     assert query and query.data is not None
     choice = query.data.split(":", 1)[1]
     chat_id = update.effective_chat.id
+    L = get_lang(update)
 
     if not await _is_settings_allowed(update, context):
-        await query.answer("Only group admins can configure the bot.", show_alert=True)
+        await query.answer(t("settings.admins_only_configure", L), show_alert=True)
         return
 
     chat_config = ChatConfig(chat_id)
@@ -394,29 +486,29 @@ async def onboard_callback_handler(update: Update, context: ContextTypes.DEFAULT
         chat_config.auto_search_enabled = True
         chat_config.show_buttons = False
         await query.edit_message_text(
-            "✅ Set to <b>search results only</b>. Change anytime with /settings.",
+            t("onboarding.done_search_only", L),
             parse_mode=ParseMode.HTML,
         )
     elif choice == "full":
         chat_config.auto_search_enabled = True
         chat_config.show_buttons = True
         await query.edit_message_text(
-            "✅ Set to <b>full mode</b> (results + buttons). Change anytime with /settings.",
+            t("onboarding.done_full", L),
             parse_mode=ParseMode.HTML,
         )
     elif choice == "manual":
         chat_config.auto_search_enabled = False
         chat_config.show_buttons = False
         await query.edit_message_text(
-            "✅ Set to <b>manual mode</b>. Use /search to search. Change anytime with /settings.",
+            t("onboarding.done_manual", L),
             parse_mode=ParseMode.HTML,
         )
     elif choice == "settings":
-        await query.edit_message_text("⚙️ Opening settings...")
+        await query.edit_message_text(t("start.opening_settings", L))
         assert update.effective_message
         await update.effective_message.reply_html(
-            _settings_main_text(chat_config),
-            reply_markup=_settings_main_keyboard(chat_config),
+            _settings_main_text(chat_config, L),
+            reply_markup=_settings_main_keyboard(chat_config, L),
         )
 
     await query.answer()
@@ -453,9 +545,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     assert update.message
     metrics.commands_total.labels(command="search").inc()
+    L = get_lang(update)
     orig_message: Message | None = update.message.reply_to_message
     if not orig_message:
-        await update.message.reply_text("When using /search you have to reply to a message with an image or video")
+        await update.message.reply_text(t("search.reply_required", L))
         return
 
     await file_handler(update, context, orig_message)
@@ -470,8 +563,9 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
     user = message.from_user
     if not user:
         return
+    L = get_lang(update)
     if user.id in context.bot_data.get("banned_users", []):
-        await message.reply_text("🔴 You are banned from using this bot due to uploading illegal content.")
+        await message.reply_text(t("search.files.banned", L))
         return
 
     await context.bot.send_chat_action(chat_id=message.chat_id, action=ChatAction.TYPING)
@@ -523,7 +617,7 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
                 attachment, (PhotoSize, Sticker)
             ):
                 if isinstance(attachment, Sticker) and attachment.is_animated:
-                    await message.reply_text("Animated stickers are not supported.")
+                    await message.reply_text(t("search.files.animated_not_supported", L))
                     return
                 search_type = file_type
                 image_url = await image_to_url(attachment)
@@ -534,7 +628,7 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
             error = e
 
         if not image_url:
-            await message.reply_text("Format is not supported")
+            await message.reply_text(t("search.files.format_not_supported", L))
             if error is not None:
                 raise error
             return
@@ -563,7 +657,7 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
             raise
 
     except Exception:
-        await message.reply_text("An error occurred, try again.")
+        await message.reply_text(t("search.generic_error", L))
         raise
 
 
@@ -584,7 +678,7 @@ async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_T
         case "noop":
             await update.callback_query.answer()
         case _:
-            await update.callback_query.answer("Something went wrong")
+            await update.callback_query.answer(t("search.something_went_wrong", get_lang(update)))
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -594,7 +688,8 @@ async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_T
 
 async def send_wait_for(update: Update, context: ContextTypes.DEFAULT_TYPE, engine_name: str):
     assert update.callback_query
-    await update.callback_query.answer(f"Creating {engine_name} search url...")
+    L = get_lang(update)
+    await update.callback_query.answer(t("search.creating_url", L, engine=engine_name))
 
 
 async def general_image_search(update: Update, image_url: URL, reply_done: asyncio.Event):
@@ -611,11 +706,14 @@ async def general_image_search(update: Update, image_url: URL, reply_done: async
         if chat_config.button_engines is not None:
             active_engines = [e for e in engines if e.name in chat_config.button_engines]
 
+        L = get_lang(update)
         top_buttons = []
         if chat_config.show_best_match:
-            top_buttons.append([InlineKeyboardButton(text="Best Match", callback_data="best_match " + str(image_url))])
+            top_buttons.append(
+                [InlineKeyboardButton(text=t("search.best_match", L), callback_data="best_match " + str(image_url))]
+            )
         if chat_config.show_link:
-            top_buttons.append([InlineKeyboardButton(text="🔗 Go To Image", url=str(image_url))])
+            top_buttons.append([InlineKeyboardButton(text=t("search.go_to_image", L), url=str(image_url))])
 
         engine_buttons = []
 
@@ -633,7 +731,7 @@ async def general_image_search(update: Update, image_url: URL, reply_done: async
             rows = list(top_buttons) + list(chunks(eng_buttons, 2))
             return InlineKeyboardMarkup(rows)
 
-        reply = "Select a search engine:"
+        reply = t("search.select_engine", L)
         reply_markup = _build_markup(engine_buttons)
         reply_message: Message = await update.message.reply_text(
             text=reply,
@@ -679,11 +777,12 @@ async def best_match(
     message = update.effective_message
     assert user and message
 
+    L = get_lang(update)
     if user.id not in ADMIN_IDS and (last_time := last_used.get(user.id)) and time() - last_time < 10:
         if general_done:
             await general_done.wait()
         await context.bot.send_message(
-            text="Slow down a bit please....", chat_id=message.chat_id, reply_to_message_id=message.message_id
+            text=t("search.slow_down", L), chat_id=message.chat_id, reply_to_message_id=message.message_id
         )
         return
     last_used[user.id] = time()
@@ -697,14 +796,14 @@ async def best_match(
     results_gate = asyncio.Event()
 
     search_task = asyncio.create_task(
-        _best_match_search(update, context, searchable_engines, URL(str(url)), results_gate)
+        _best_match_search(update, context, searchable_engines, URL(str(url)), results_gate, L)
     )
 
     if general_done:
         await general_done.wait()
 
     search_message = await context.bot.send_message(
-        text="⏳ searching...", chat_id=message.chat_id, reply_to_message_id=message.message_id
+        text=t("search.searching", L), chat_id=message.chat_id, reply_to_message_id=message.message_id
     )
     results_gate.set()
 
@@ -718,31 +817,18 @@ async def best_match(
         chat_config.failures_in_a_row += 1
         if chat_config.failures_in_a_row > 4 and chat_config.auto_search_enabled:
             chat_config.auto_search_enabled = False
-            await message.reply_text(
-                emojize(
-                    ":yellow_circle: 5 searches in a row returned no results — auto search has been disabled for"
-                    " this chat. This helps prevent hitting rate limits. The auto search engines are mainly for anime"
-                    " & manga content. Use /settings to re-enable it."
-                )
-            )
+            await message.reply_text(t("search.auto_disable.message", L))
         await search_message.edit_text(
-            emojize(
-                f":red_circle: I searched for you on {engines_used_html} but didn't find anything. Please try another"
-                " engine above."
-            ),
+            t("search.no_results", L, engines=engines_used_html),
             ParseMode.HTML,
         )
     else:
         chat_config.failures_in_a_row = 0
+        result_text = t("search.results_found", L, engines=engines_used_html)
+        if not chat_config.auto_search_enabled:
+            result_text += t("search.results_found_reenable", L)
         await search_message.edit_text(
-            emojize(
-                f":blue_circle: I searched for you on {engines_used_html}. You can try others above for more results."
-            )
-            + (
-                " You may reenable auto-search via /settings if you want."
-                if not chat_config.auto_search_enabled
-                else ""
-            ),
+            result_text,
             ParseMode.HTML,
         )
 
@@ -785,6 +871,7 @@ async def _best_match_search(
     search_engines: list[GenericRISEngine],
     url: URL,
     results_gate: asyncio.Event,
+    L: str = "en",
 ):
     message = update.effective_message
     assert message
@@ -838,16 +925,16 @@ async def _best_match_search(
                         thumbnail_identifier = meta.get("thumbnail_identifier")
                         if identifier in identifiers and thumbnail_identifier not in thumbnail_identifiers:
                             result = {}
-                            result["Duplicate search result omitted"] = ""
+                            result[t("search.results.duplicate_result", L)] = ""
                         elif identifier not in identifiers and thumbnail_identifier in thumbnail_identifiers:
-                            result["Duplicate thumbnail omitted"] = ""
+                            result[t("search.results.duplicate_thumbnail", L)] = ""
                             del meta["thumbnail"]
                         elif identifier in identifiers and thumbnail_identifier in thumbnail_identifiers:
                             continue
 
                         await results_gate.wait()
 
-                        reply, media_group = build_reply(result, meta)
+                        reply, media_group = build_reply(result, meta, L)
                         _disable_preview = not meta.get("thumbnail") or bool(media_group)
                         try:
                             provider_msg = await message.reply_html(
@@ -886,10 +973,7 @@ async def _best_match_search(
                         if disabled:
                             await context.bot.send_message(
                                 chat_id=message.chat_id,
-                                text=(
-                                    f"🔕 <b>{engine.name}</b> was automatically disabled for this chat after "
-                                    f"5 consecutive empty results. Use /settings to re-enable it."
-                                ),
+                                text=t("search.results.engine_auto_disabled", L, engine=engine.name),
                                 parse_mode=ParseMode.HTML,
                             )
                 except RateLimitError as rate_err:
@@ -899,8 +983,12 @@ async def _best_match_search(
                     await results_gate.wait()
                     more_button = engine(str(url), "More")
                     button_list = list(chunks([more_button], 3)) if more_button else []
-                    period = f"{rate_err.period} limit" if rate_err.period else "Limit"
-                    rate_msg = f"{b(engine.name)}: {period} reached. Try the {b('More')} button to search directly."
+                    period = (
+                        f"{rate_err.period} limit"
+                        if rate_err.period
+                        else t("search.results.rate_limit_default_period", L)
+                    )
+                    rate_msg = t("search.results.rate_limit", L, engine=b(engine.name), period=period)
                     try:
                         await message.reply_html(
                             rate_msg,
@@ -946,17 +1034,18 @@ async def _best_match_search(
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
-def build_reply(result: ResultData, meta: MetaData) -> tuple[str, list[InputMediaPhoto] | None]:
-    reply = f"Provided by: {a(b(meta['provider']), meta['provider_url'])}"
+def build_reply(result: ResultData, meta: MetaData, L: str = "en") -> tuple[str, list[InputMediaPhoto] | None]:
+    provider_link = a(b(meta["provider"]), meta["provider_url"])
+    reply = t("search.results.provided_by", L, provider=provider_link)
 
     if via := meta.get("provided_via"):
-        via = b(via)
+        via_text = b(via)
         if via_url := meta.get("provided_via_url"):
-            via = a(b(via), via_url)
-        reply += f" with {via}"
+            via_text = a(b(via), via_url)
+        reply += t("search.results.with_via", L, via=via_text)
 
     if similarity := meta.get("similarity"):
-        reply += f" with {b(str(similarity) + '%')} similarity"
+        reply += t("search.results.with_similarity", L, similarity=str(similarity))
 
     media_group = []
     if thumbnail := meta.get("thumbnail"):
@@ -968,7 +1057,7 @@ def build_reply(result: ResultData, meta: MetaData) -> tuple[str, list[InputMedi
     reply += "\n\n"
 
     for key, value in result.items():
-        reply += title(html_mod.escape(str(key)))
+        reply += title(html_mod.escape(translate_field(str(key), L)))
         if isinstance(value, set):
             reply += ", ".join(html_mod.escape(str(v)) for v in value)
         elif isinstance(value, list):
@@ -991,7 +1080,7 @@ async def video_to_url(attachment: Document | Video | Animation | Sticker) -> UR
     if attachment.file_size and attachment.file_size > MAX_TELEGRAM_FILE_SIZE:
         if attachment.thumbnail:
             return await image_to_url(attachment.thumbnail)
-        raise ValueError("This video is too large to download and has no thumbnail. Please send a smaller file.")
+        raise ValueError(t("search.files.video_too_large"))
 
     video_file = await attachment.get_file()
     with NamedTemporaryFile(suffix=".mp4") as tmp:
