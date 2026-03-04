@@ -206,15 +206,15 @@ def _settings_language_keyboard(chat_config: ChatConfig, L: str = "en") -> Inlin
     rows: list[list[InlineKeyboardButton]] = []
 
     # Auto option
-    check = "✅" if current is None else "⬜"
-    rows.append([InlineKeyboardButton(f"{check} {_LANG_NAMES['auto']}", callback_data="settings:lang:auto")])
+    check = "✅ " if current is None else ""
+    rows.append([InlineKeyboardButton(f"{check}{_LANG_NAMES['auto']}", callback_data="settings:lang:auto")])
 
     # Language options in pairs
     lang_btns = []
     for lang_code in available_languages():
-        check = "✅" if current == lang_code else "⬜"
+        check = "✅ " if current == lang_code else ""
         display = _LANG_NAMES.get(lang_code, lang_code)
-        lang_btns.append(InlineKeyboardButton(f"{check} {display}", callback_data=f"settings:lang:{lang_code}"))
+        lang_btns.append(InlineKeyboardButton(f"{check}{display}", callback_data=f"settings:lang:{lang_code}"))
     rows.extend(chunks(lang_btns, 2))
 
     rows.append([InlineKeyboardButton(t("settings.toggles.back", L), callback_data="settings:back")])
