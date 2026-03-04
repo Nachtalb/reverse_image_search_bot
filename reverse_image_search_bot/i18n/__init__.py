@@ -87,6 +87,8 @@ _FIELD_KEY_MAP: dict[str, str] = {
     "Poster": "fields.poster",
     "Source": "fields.source",
     "Score": "fields.score",
+    "Creator": "fields.creator",
+    "Created At": "fields.created_at",
 }
 
 
