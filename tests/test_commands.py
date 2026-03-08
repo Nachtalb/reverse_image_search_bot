@@ -310,7 +310,7 @@ class TestBuildReply:
             "similarity": 92.5,
         }
         reply, _media = build_reply(result, meta)
-        assert "<b >92.5%</b>" in reply
+        assert "92.5% similarity" in reply
 
     def test_with_provided_via(self):
         result = {"Title": "Test"}
@@ -331,7 +331,7 @@ class TestBuildReply:
             "provided_via_url": "https://anilist.co",
         }
         reply, _media = build_reply(result, meta)
-        assert 'with <a href="https://anilist.co"><b ><b >Anilist</b></b></a>' in reply
+        assert '<a href="https://anilist.co"><b >Anilist</b></a>' in reply
 
     def test_thumbnail_url_becomes_hidden_anchor(self):
         result = {"Title": "Test"}

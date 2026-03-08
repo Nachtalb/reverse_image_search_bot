@@ -1,0 +1,118 @@
+[commands]
+ban_usage = "الاستخدام: /ban <user_id>"
+bot_started = "✅ تم تشغيل البوت بنجاح."
+
+[search]
+reply_required = "عند استخدام /search يجب الرد على رسالة تحتوي على صورة أو فيديو"
+select_engine = "اختر محرك بحث:"
+best_match = "أفضل تطابق"
+go_to_image = "🔗 عرض الصورة"
+creating_url = "جارٍ إنشاء رابط البحث في {engine}..."
+searching = "⏳ جارٍ البحث..."
+no_results = "🔴 بحثت في {engines} ولم أجد شيئاً. جرّب محركاً آخر أعلاه."
+results_found = "🔵 بحثت في {engines}. يمكنك تجربة محركات أخرى أعلاه للمزيد من النتائج."
+results_found_reenable = " يمكنك إعادة تفعيل البحث التلقائي من /settings."
+slow_down = "أبطئ قليلاً من فضلك...."
+something_went_wrong = "حدث خطأ ما"
+generic_error = "حدث خطأ، حاول مرة أخرى."
+more_button = "المزيد"
+
+[search.files]
+banned = "🔴 تم حظرك بسبب تحميل محتوى محظور."
+animated_not_supported = "الملصقات المتحركة غير مدعومة."
+format_not_supported = "الصيغة غير مدعومة"
+video_too_large = "هذا الفيديو كبير جداً ولا يحتوي على صورة مصغرة. أرسل ملفاً أصغر."
+
+[search.results]
+provided_by = "المصدر: {provider}"
+with_via = " عبر {via}"
+with_similarity = " بتشابه {similarity}%"
+duplicate_result = "تم تخطي نتيجة بحث مكررة"
+duplicate_thumbnail = "تم تخطي صورة مصغرة مكررة"
+rate_limit = "{engine}: تم الوصول لحد {period}. استخدم زر <b>المزيد</b> للبحث مباشرة."
+rate_limit_default_period = "الحد"
+engine_auto_disabled = "🔕 تم تعطيل <b>{engine}</b> تلقائياً بعد 5 نتائج فارغة متتالية. استخدم /settings لإعادة التفعيل."
+
+[search.auto_disable]
+message = "🟡 5 عمليات بحث متتالية بدون نتائج — تم تعطيل البحث التلقائي لهذه المحادثة. هذا يساعد في تجنب حدود الاستخدام. محركات البحث التلقائي مخصصة بشكل رئيسي لمحتوى الأنمي والمانغا. استخدم /settings لإعادة التفعيل."
+
+[settings]
+title = "⚙️ <b>إعدادات المحادثة</b>"
+subtitle = "اضبط سلوك البوت في هذه المحادثة."
+admins_only = "فقط مشرفو المجموعة يمكنهم الوصول للإعدادات."
+admins_only_change = "فقط مشرفو المجموعة يمكنهم تغيير الإعدادات."
+admins_only_configure = "فقط مشرفو المجموعة يمكنهم تهيئة البوت."
+
+[settings.toggles]
+auto_search = "🔍 بحث تلقائي: {status}"
+show_buttons = "🔘 إظهار الأزرار: {status}"
+auto_search_engines = "🔍 محركات البحث التلقائي →"
+auto_search_engines_locked = "🔍 محركات البحث التلقائي 🔒"
+button_engines = "🔘 أزرار المحركات →"
+button_engines_locked = "🔘 أزرار المحركات 🔒"
+best_match_btn = "{status} أفضل تطابق"
+show_link_btn = "{status} 🔗 عرض الصورة"
+back = "← رجوع"
+language = "🌐 اللغة: {language}"
+
+[settings.disabled_reasons]
+auto_search_engines = "فعّل البحث التلقائي أولاً لتهيئة المحركات."
+button_engines = "فعّل \"إظهار الأزرار\" أولاً لتهيئة أزرار المحركات."
+default = "فعّل المفتاح الرئيسي أولاً."
+
+[settings.warnings]
+enable_buttons_first = "⚠️ فعّل أزرار المحركات أولاً — يجب أن يكون واحد على الأقل نشطاً."
+enable_autosearch_first = "⚠️ فعّل البحث التلقائي أولاً — يجب أن يكون واحد على الأقل نشطاً."
+min_one_button = "⚠️ يجب أن يبقى زر واحد على الأقل مفعّلاً."
+min_one_engine = "⚠️ يجب أن يبقى محرك واحد على الأقل مفعّلاً."
+
+[start]
+private = "🔎 أرسل لي صورة أو ملصقاً أو فيديو وسأجد مصدره."
+group = "🔎 أرسل لي صورة أو ملصقاً أو فيديو وسأجد مصدره.\n\n/search · /settings"
+opening_settings = "⚙️ جارٍ فتح الإعدادات..."
+
+[onboarding]
+title = "👋 <b>كيف أتعامل مع الصور في هذه المجموعة؟</b>"
+description = "• <b>نتائج فقط</b> — بحث تلقائي عن الصور وعرض النتائج\n• <b>كامل</b> — بحث تلقائي + أزرار المحركات\n• <b>يدوي</b> — البحث فقط عند الرد بـ /search\n• <b>الإعدادات</b> — تهيئة كل شيء يدوياً"
+btn_search_only = "🔍 نتائج فقط"
+btn_full = "🔍 كامل (نتائج + أزرار)"
+btn_manual = "❌ يدوي فقط (/search)"
+btn_settings = "⚙️ فتح الإعدادات"
+done_search_only = "✅ تم الضبط: <b>نتائج فقط</b>. للتغيير: /settings."
+done_full = "✅ تم الضبط: <b>الوضع الكامل</b> (نتائج + أزرار). للتغيير: /settings."
+done_manual = "✅ تم الضبط: <b>الوضع اليدوي</b>. استخدم /search للبحث. للتغيير: /settings."
+
+[bot_commands]
+search = "البحث عن مصدر الصورة (رد على صورة)"
+settings = "إعدادات البوت لهذه المحادثة"
+help = "عرض المساعدة"
+start = "تشغيل البوت"
+
+[fields]
+title = "العنوان"
+"title_romaji" = "العنوان [رومانجي]"
+"title_ja" = "العنوان [ياباني]"
+chapter = "الفصل"
+episode = "الحلقة"
+status = "الحالة"
+type = "النوع"
+year = "السنة"
+genres = "التصنيفات"
+"audience_18" = "جمهور +18"
+"est_time" = "الوقت المقدر"
+description = "الوصف"
+author = "المؤلف"
+artist = "الفنان"
+rating = "التصنيف"
+tags = "الوسوم"
+character = "الشخصية"
+characters = "الشخصيات"
+work = "العمل"
+also_possible = "محتمل أيضاً"
+material = "المادة"
+by = "بواسطة"
+poster = "الملصق"
+source = "المصدر"
+score = "التقييم"
+creator = "المنشئ"
+"created_at" = "أُنشئ في"

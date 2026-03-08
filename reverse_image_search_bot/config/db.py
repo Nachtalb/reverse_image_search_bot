@@ -25,6 +25,7 @@ COLUMNS = [
     ("engine_empty_counts", "TEXT", None),  # JSON dict, None → {} in _to_python
     ("onboarded", "INTEGER", False),
     ("failures_in_a_row", "INTEGER", 0),
+    ("language", "TEXT", None),
 ]
 
 # Fields stored as JSON text that need serialization

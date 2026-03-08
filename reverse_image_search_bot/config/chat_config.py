@@ -37,6 +37,7 @@ class ChatConfig:
         "engine_empty_counts": {},  # dict[str, int] consecutive empty result counts per engine
         "onboarded": False,  # whether a group has completed the onboarding flow
         "failures_in_a_row": 0,
+        "language": None,  # None = auto-detect from Telegram; str = explicit override
     }
     _loaded_chats: dict = {}
 
@@ -49,6 +50,7 @@ class ChatConfig:
     engine_empty_counts: dict
     onboarded: bool
     failures_in_a_row: int
+    language: str | None
 
     def reset_engine_counter(self, engine_name: str):
         """Reset the consecutive-empty counter for an engine (e.g. after re-enabling it)."""

@@ -1,0 +1,118 @@
+[commands]
+ban_usage = "使い方：/ban <user_id>"
+bot_started = "✅ ボットが正常に起動しました。"
+
+[search]
+reply_required = "/search を使うには、画像または動画のメッセージに返信してください"
+select_engine = "検索エンジンを選択："
+best_match = "ベストマッチ"
+go_to_image = "🔗 画像を表示"
+creating_url = "{engine} の検索リンクを作成中..."
+searching = "⏳ 検索中..."
+no_results = "🔴 {engines} で検索しましたが、見つかりませんでした。上の別のエンジンを試してください。"
+results_found = "🔵 {engines} で検索しました。上の他のエンジンでさらに結果を得られます。"
+results_found_reenable = " /settings で自動検索を再有効化できます。"
+slow_down = "少しゆっくりお願いします...."
+something_went_wrong = "問題が発生しました"
+generic_error = "エラーが発生しました。もう一度お試しください。"
+more_button = "もっと見る"
+
+[search.files]
+banned = "🔴 違法コンテンツのアップロードにより、このボットの使用が禁止されています。"
+animated_not_supported = "アニメーションステッカーには対応していません。"
+format_not_supported = "このフォーマットには対応していません"
+video_too_large = "この動画は大きすぎてダウンロードできず、サムネイルもありません。小さいファイルを送信してください。"
+
+[search.results]
+provided_by = "提供元：{provider}"
+with_via = "（{via} 経由）"
+with_similarity = " 類似度 {similarity}%"
+duplicate_result = "重複する検索結果を省略"
+duplicate_thumbnail = "重複するサムネイルを省略"
+rate_limit = "{engine}：{period}制限に達しました。<b>もっと見る</b>ボタンで直接検索してください。"
+rate_limit_default_period = "制限"
+engine_auto_disabled = "🔕 <b>{engine}</b> は5回連続で結果が得られなかったため自動的に無効化されました。/settings で再有効化できます。"
+
+[search.auto_disable]
+message = "🟡 5回連続で結果が得られませんでした — このチャットの自動検索が無効化されました。レート制限を防ぐためです。自動検索エンジンは主にアニメ・マンガコンテンツ向けです。/settings で再有効化できます。"
+
+[settings]
+title = "⚙️ <b>チャット設定</b>"
+subtitle = "このチャットでのボットの動作を設定します。"
+admins_only = "グループ管理者のみが設定にアクセスできます。"
+admins_only_change = "グループ管理者のみが設定を変更できます。"
+admins_only_configure = "グループ管理者のみがボットを設定できます。"
+
+[settings.toggles]
+auto_search = "🔍 自動検索：{status}"
+show_buttons = "🔘 ボタン表示：{status}"
+auto_search_engines = "🔍 自動検索エンジン →"
+auto_search_engines_locked = "🔍 自動検索エンジン 🔒"
+button_engines = "🔘 エンジンボタン →"
+button_engines_locked = "🔘 エンジンボタン 🔒"
+best_match_btn = "{status} ベストマッチ"
+show_link_btn = "{status} 🔗 画像を表示"
+back = "← 戻る"
+language = "🌐 言語：{language}"
+
+[settings.disabled_reasons]
+auto_search_engines = "まず自動検索を有効にしてエンジンを設定してください。"
+button_engines = "まず「ボタン表示」を有効にしてエンジンボタンを設定してください。"
+default = "まずメインスイッチを有効にしてください。"
+
+[settings.warnings]
+enable_buttons_first = "⚠️ まずエンジンボタンを有効にしてください — 少なくとも1つは必要です。"
+enable_autosearch_first = "⚠️ まず自動検索を有効にしてください — 少なくとも1つは必要です。"
+min_one_button = "⚠️ 少なくとも1つのボタンを有効にしておく必要があります。"
+min_one_engine = "⚠️ 少なくとも1つのエンジンを有効にしておく必要があります。"
+
+[start]
+private = "🔎 画像、ステッカー、動画を送ってください — ソースを見つけます。"
+group = "🔎 画像、ステッカー、動画を送ってください — ソースを見つけます。\n\n/search · /settings"
+opening_settings = "⚙️ 設定を開いています..."
+
+[onboarding]
+title = "👋 <b>このグループの画像をどう処理しますか？</b>"
+description = "• <b>結果のみ</b> — 画像を自動検索、結果を表示\n• <b>フル</b> — 自動検索 + エンジンボタン\n• <b>手動</b> — /search で返信した時のみ検索\n• <b>設定</b> — すべて手動で設定"
+btn_search_only = "🔍 結果のみ"
+btn_full = "🔍 フル（結果 + ボタン）"
+btn_manual = "❌ 手動のみ（/search）"
+btn_settings = "⚙️ 設定を開く"
+done_search_only = "✅ <b>結果のみ</b>に設定しました。/settings で変更できます。"
+done_full = "✅ <b>フルモード</b>（結果 + ボタン）に設定しました。/settings で変更できます。"
+done_manual = "✅ <b>手動モード</b>に設定しました。/search で検索。/settings で変更できます。"
+
+[bot_commands]
+search = "画像のソースを検索（画像に返信）"
+settings = "このチャットのボット設定"
+help = "ヘルプを表示"
+start = "ボットを起動"
+
+[fields]
+title = "タイトル"
+"title_romaji" = "タイトル [ローマ字]"
+"title_ja" = "タイトル [日本語]"
+chapter = "章"
+episode = "エピソード"
+status = "ステータス"
+type = "タイプ"
+year = "年"
+genres = "ジャンル"
+"audience_18" = "18+ 対象"
+"est_time" = "推定時間"
+description = "説明"
+author = "著者"
+artist = "アーティスト"
+rating = "レーティング"
+tags = "タグ"
+character = "キャラクター"
+characters = "キャラクター"
+work = "作品"
+also_possible = "他の候補"
+material = "素材"
+by = "作者"
+poster = "ポスター"
+source = "ソース"
+score = "スコア"
+creator = "作成者"
+"created_at" = "作成日"
