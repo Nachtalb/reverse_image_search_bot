@@ -15,6 +15,7 @@ results_found_reenable = " Вы можете включить автопоиск
 slow_down = "Помедленнее, пожалуйста...."
 something_went_wrong = "Что-то пошло не так"
 generic_error = "Произошла ошибка, попробуйте ещё раз."
+more_button = "Ещё"
 
 [search.files]
 banned = "🔴 Вы заблокированы за загрузку запрещённого контента."

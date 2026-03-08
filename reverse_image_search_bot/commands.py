@@ -915,7 +915,7 @@ async def _best_match_search(
                         _track_engine_result(message.chat_id, engine.name, found=True)
 
                         button_list = []
-                        if more_button := engine(str(url), "More"):
+                        if more_button := engine(str(url), t("search.more_button", L)):
                             button_list.append(more_button)
 
                         if buttons := meta.get("buttons"):
@@ -983,7 +983,7 @@ async def _best_match_search(
                     logger.info("Rate limit hit for %s: %s", engine.name, rate_err)
 
                     await results_gate.wait()
-                    more_button = engine(str(url), "More")
+                    more_button = engine(str(url), t("search.more_button", L))
                     button_list = list(chunks([more_button], 3)) if more_button else []
                     period = (
                         f"{rate_err.period} limit"

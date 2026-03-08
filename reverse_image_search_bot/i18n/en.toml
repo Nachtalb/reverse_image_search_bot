@@ -15,6 +15,7 @@ results_found_reenable = " You may reenable auto-search via /settings if you wan
 slow_down = "Slow down a bit please...."
 something_went_wrong = "Something went wrong"
 generic_error = "An error occurred, try again."
+more_button = "More"
 
 [search.files]
 banned = "🔴 You are banned from using this bot due to uploading illegal content."

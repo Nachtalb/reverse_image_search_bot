@@ -15,6 +15,7 @@ results_found_reenable = " Puoi riattivare la ricerca automatica in /settings."
 slow_down = "Un po' più piano, per favore...."
 something_went_wrong = "Qualcosa è andato storto"
 generic_error = "Si è verificato un errore, riprova."
+more_button = "Altro"
 
 [search.files]
 banned = "🔴 Sei stato bloccato per aver caricato contenuti illegali."

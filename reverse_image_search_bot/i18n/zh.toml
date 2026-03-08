@@ -15,6 +15,7 @@ results_found_reenable = " 您可以在 /settings 中重新启用自动搜索。
 slow_down = "请慢一点...."
 something_went_wrong = "出了点问题"
 generic_error = "发生错误，请重试。"
+more_button = "更多"
 
 [search.files]
 banned = "🔴 由于上传违禁内容，您已被禁止使用此机器人。"
