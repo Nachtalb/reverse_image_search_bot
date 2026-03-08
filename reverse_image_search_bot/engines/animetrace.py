@@ -63,8 +63,19 @@ async def _anilist_post(payload: dict) -> dict | None:
     return None
 
 
-def _best_work_node(media_nodes: list, original_work: str) -> tuple[str, int | None]:
-    """Find the best matching work node and return (english_title, anilist_id).
+def _pick_title(titles: dict, user_lang: str, fallback: str) -> str:
+    """Pick the best title for the user's language from AniList title dict."""
+    if user_lang == "ja":
+        return titles.get("native") or titles.get("romaji") or titles.get("english") or fallback
+    if user_lang == "zh":
+        # AniList has no Chinese titles; native (Japanese) is closer than romaji
+        return titles.get("native") or titles.get("english") or titles.get("romaji") or fallback
+    # Default: English > romaji > native
+    return titles.get("english") or titles.get("romaji") or titles.get("native") or fallback
+
+
+def _best_work_node(media_nodes: list, original_work: str, user_lang: str = "en") -> tuple[str, int | None]:
+    """Find the best matching work node and return (localized_title, anilist_id).
 
     Returns (original_work, None) if no match found.
     """
@@ -77,27 +88,27 @@ def _best_work_node(media_nodes: list, original_work: str) -> tuple[str, int | N
         native = (t.get("native") or "").lower()
         romaji = (t.get("romaji") or "").lower()
         if orig_lower in (native, romaji) or native in orig_lower or romaji in orig_lower:
-            title = t.get("english") or t.get("romaji") or original_work
-            return title, node.get("id")
+            return _pick_title(t, user_lang, original_work), node.get("id")
 
     # Fallback to most popular node
     node = media_nodes[0]
     t = node["title"]
-    title = t.get("english") or t.get("romaji") or original_work
-    return title, node.get("id")
+    return _pick_title(t, user_lang, original_work), node.get("id")
 
 
 # Bounded async cache for AniList character resolution (replaces @lru_cache which doesn't work with async)
 _anilist_resolve_cache: TTLCache = TTLCache(maxsize=2048, ttl=7 * 24 * 3600)
 
 
-async def _anilist_resolve(char_name: str, work: str) -> tuple[str, str, int | None, int | None, str | None]:
-    """Resolve character name and work to English via AniList.
+async def _anilist_resolve(
+    char_name: str, work: str, user_lang: str = "en"
+) -> tuple[str, str, int | None, int | None, str | None]:
+    """Resolve character name and work via AniList, localized to user_lang.
 
-    Returns (english_char_name, english_work_title, anilist_char_id, anilist_media_id, char_image_url).
+    Returns (localized_char_name, localized_work_title, anilist_char_id, anilist_media_id, char_image_url).
     Falls back to originals on failure; IDs and image are None on failure.
     """
-    cache_key = (char_name, work)
+    cache_key = (char_name, work, user_lang)
     if cache_key in _anilist_resolve_cache:
         return _anilist_resolve_cache[cache_key]
 
@@ -105,11 +116,16 @@ async def _anilist_resolve(char_name: str, work: str) -> tuple[str, str, int | N
     try:
         data = await _anilist_post({"query": _ANILIST_QUERY, "variables": {"name": clean}})
         char = data["data"]["Character"]  # type: ignore[index]
-        en_name = char["name"]["full"] or char_name
+        char_name_data = char["name"]
+        if user_lang == "ja":
+            # Prefer native name (usually Japanese) for Japanese users
+            resolved_name = char_name_data.get("native") or char_name_data.get("full") or char_name
+        else:
+            resolved_name = char_name_data.get("full") or char_name
         char_id = char.get("id")
         char_image = (char.get("image") or {}).get("large")
-        en_work, media_id = _best_work_node(char["media"]["nodes"], work)
-        result = en_name, en_work, char_id, media_id, char_image
+        resolved_work, media_id = _best_work_node(char["media"]["nodes"], work, user_lang)
+        result = resolved_name, resolved_work, char_id, media_id, char_image
     except Exception:
         result = char_name, work, None, None, None
 
@@ -124,6 +140,9 @@ class AnimeTraceEngine(PicImageSearchEngine):
     types = ["Anime/Manga"]
     recommendation = ["Anime characters", "Fan art"]
     url = "https://www.animetrace.com/"
+
+    # Per-search language hint, set before best_match() by the caller
+    _user_lang: str = "en"
 
     def __init__(self, *args, **kwargs):
         from PicImageSearch import AnimeTrace
@@ -159,7 +178,9 @@ class AnimeTraceEngine(PicImageSearchEngine):
                 return {}, {}
 
             top = characters[0]
-            en_name, en_work, char_id, media_id, char_image = await _anilist_resolve(top.name, top.work)
+            en_name, en_work, char_id, media_id, char_image = await _anilist_resolve(
+                top.name, top.work, self._user_lang
+            )
 
             result["Character"] = en_name
             result["Work"] = en_work
@@ -203,7 +224,7 @@ class AnimeTraceEngine(PicImageSearchEngine):
             for c in characters[1:4]:
                 if c.name == top.name:
                     continue
-                alt_name, alt_work, *_ = await _anilist_resolve(c.name, c.work)
+                alt_name, alt_work, *_ = await _anilist_resolve(c.name, c.work, self._user_lang)
                 if alt_name not in seen_names:
                     seen_names.add(alt_name)
                     alts.append(f"{alt_name} ({alt_work})")
@@ -217,7 +238,7 @@ class AnimeTraceEngine(PicImageSearchEngine):
                 if not characters:
                     continue
                 top = characters[0]
-                en_name, en_work, *_ = await _anilist_resolve(top.name, top.work)
+                en_name, en_work, *_ = await _anilist_resolve(top.name, top.work, self._user_lang)
                 entries.append(f"{en_name} ({en_work})")
 
             if not entries:

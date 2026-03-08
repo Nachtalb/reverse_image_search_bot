@@ -72,8 +72,6 @@ class TestSetBotCommands:
 
         n_localised = len(available_languages()) - 1
         # 1 default + N localised succeed, then admin fails
-        mock_app.bot.set_my_commands = AsyncMock(
-            side_effect=[None] * (1 + n_localised) + [Exception("chat not found")]
-        )
+        mock_app.bot.set_my_commands = AsyncMock(side_effect=[None] * (1 + n_localised) + [Exception("chat not found")])
         # Should not raise
         await _set_bot_commands(mock_app)

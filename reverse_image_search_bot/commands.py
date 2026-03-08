@@ -885,6 +885,8 @@ async def _best_match_search(
     engine_start_times: dict[asyncio.Task, float] = {}
     engine_tasks: dict[asyncio.Task, GenericRISEngine] = {}
     for en in search_engines:
+        if hasattr(en, "_user_lang"):
+            en._user_lang = L  # type: ignore[union-attr]
         task = asyncio.create_task(en.best_match(url))
         engine_tasks[task] = en
         engine_start_times[task] = time()

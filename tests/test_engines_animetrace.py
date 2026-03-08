@@ -75,10 +75,19 @@ class TestBestWorkNode:
         assert title == "Tesuto"
         assert mid == 5
 
-    def test_fallback_no_english_no_romaji(self):
-        """When both english and romaji are None in fallback, uses original_work."""
+    def test_fallback_no_english_no_romaji_uses_native(self):
+        """When both english and romaji are None, uses native title."""
         nodes = [
             {"title": {"native": "zzz", "romaji": None, "english": None}, "id": 99},
+        ]
+        title, mid = _best_work_node(nodes, "YYYYYY")
+        assert title == "zzz"
+        assert mid == 99
+
+    def test_fallback_all_none_uses_original(self):
+        """When all title fields are None, falls back to original_work."""
+        nodes = [
+            {"title": {"native": None, "romaji": None, "english": None}, "id": 99},
         ]
         title, mid = _best_work_node(nodes, "YYYYYY")
         assert title == "YYYYYY"
@@ -177,7 +186,7 @@ class TestAnilistResolve:
 
     async def test_cache_hit(self):
         _anilist_resolve_cache.clear()
-        _anilist_resolve_cache[("cached", "work")] = ("CachedName", "CachedWork", 1, 2, "img.jpg")
+        _anilist_resolve_cache[("cached", "work", "en")] = ("CachedName", "CachedWork", 1, 2, "img.jpg")
         result = await _anilist_resolve("cached", "work")
         assert result == ("CachedName", "CachedWork", 1, 2, "img.jpg")
 
@@ -349,7 +358,7 @@ class TestAnimeTraceExtract:
         ]
         mock_item = _mock_item(characters=chars, thumbnail="https://example.com/t.jpg")
 
-        async def fake_resolve(name, work):
+        async def fake_resolve(name, work, user_lang="en"):
             return f"{name} EN", f"{work} EN", None, None, None
 
         with (
@@ -435,7 +444,7 @@ class TestAnimeTraceExtract:
             _mock_item(characters=[_mock_character("Char2", "Work2")]),
         ]
 
-        async def fake_resolve(name, work):
+        async def fake_resolve(name, work, user_lang="en"):
             return f"{name} EN", f"{work} EN", None, None, None
 
         with patch(
@@ -471,7 +480,7 @@ class TestAnimeTraceExtract:
         ]
         mock_item = _mock_item(characters=chars, thumbnail="https://example.com/t.jpg")
 
-        async def fake_resolve(name, work):
+        async def fake_resolve(name, work, user_lang="en"):
             return "Same EN", "Work EN", None, None, None
 
         with (
