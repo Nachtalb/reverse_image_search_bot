@@ -1,6 +1,11 @@
+import json
+import logging
+
 from cleverdict import CleverDict
 
 from reverse_image_search_bot.settings import PIXIV_CONFIG
+
+logger = logging.getLogger(__name__)
 
 
 class PixivConfig:
@@ -16,7 +21,10 @@ class PixivConfig:
         PIXIV_CONFIG.parent.mkdir(parents=True, exist_ok=True)
         self._config = CleverDict(self._default_config)
         if PIXIV_CONFIG.is_file():
-            self._config.update(CleverDict.from_json(file_path=PIXIV_CONFIG))
+            try:
+                self._config.update(CleverDict.from_json(file_path=PIXIV_CONFIG))
+            except (json.JSONDecodeError, ValueError):
+                logger.warning("Invalid pixiv config at %s, using defaults", PIXIV_CONFIG)
         self._config.save_path = PIXIV_CONFIG
         self._config.autosave(fullcopy=True)
 
