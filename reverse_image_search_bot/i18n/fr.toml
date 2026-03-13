@@ -1,0 +1,118 @@
+[commands]
+ban_usage = "Utilisation : /ban <user_id>"
+bot_started = "✅ Bot démarré avec succès."
+
+[search]
+reply_required = "Pour utiliser /search, vous devez répondre à un message contenant une image ou une vidéo"
+select_engine = "Sélectionnez un moteur de recherche :"
+best_match = "Meilleur résultat"
+go_to_image = "🔗 Voir l'image"
+creating_url = "Création de l'URL de recherche {engine}..."
+searching = "⏳ recherche en cours..."
+no_results = "🔴 J'ai cherché pour vous sur {engines} mais je n'ai rien trouvé. Essayez un autre moteur ci-dessus."
+results_found = "🔵 J'ai cherché pour vous sur {engines}. Vous pouvez en essayer d'autres ci-dessus pour plus de résultats."
+results_found_reenable = " Vous pouvez réactiver la recherche automatique via /settings si vous le souhaitez."
+slow_down = "Doucement, s'il vous plaît..."
+something_went_wrong = "Quelque chose s'est mal passé"
+generic_error = "Une erreur est survenue, réessayez."
+more_button = "Plus"
+
+[search.files]
+banned = "🔴 Vous êtes banni de ce bot en raison de l'envoi de contenu illégal."
+animated_not_supported = "Les stickers animés ne sont pas supportés."
+format_not_supported = "Format non supporté"
+video_too_large = "Cette vidéo est trop volumineuse pour être téléchargée et n'a pas de miniature. Veuillez envoyer un fichier plus petit."
+
+[search.results]
+provided_by = "Fourni par : {provider}"
+with_via = " via {via}"
+with_similarity = " avec {similarity}% de similarité"
+duplicate_result = "Résultat de recherche en double omis"
+duplicate_thumbnail = "Miniature en double omise"
+rate_limit = "{engine} : limite {period} atteinte. Essayez le bouton <b>Plus</b> pour chercher directement."
+rate_limit_default_period = "Limite"
+engine_auto_disabled = "🔕 <b>{engine}</b> a été automatiquement désactivé pour ce chat après 5 résultats vides consécutifs. Utilisez /settings pour le réactiver."
+
+[search.auto_disable]
+message = "🟡 5 recherches consécutives sans résultat — la recherche automatique a été désactivée pour ce chat. Cela aide à éviter les limites de requêtes. Les moteurs de recherche automatique sont principalement destinés au contenu anime et manga. Utilisez /settings pour la réactiver."
+
+[settings]
+title = "⚙️ <b>Paramètres du chat</b>"
+subtitle = "Configurez le comportement du bot dans ce chat."
+admins_only = "Seuls les administrateurs du groupe peuvent accéder aux paramètres."
+admins_only_change = "Seuls les administrateurs du groupe peuvent modifier les paramètres."
+admins_only_configure = "Seuls les administrateurs du groupe peuvent configurer le bot."
+
+[settings.toggles]
+auto_search = "🔍 Recherche auto : {status}"
+show_buttons = "🔘 Afficher les boutons : {status}"
+auto_search_engines = "🔍 Moteurs de recherche auto →"
+auto_search_engines_locked = "🔍 Moteurs de recherche auto 🔒"
+button_engines = "🔘 Boutons de moteurs →"
+button_engines_locked = "🔘 Boutons de moteurs 🔒"
+best_match_btn = "{status} Meilleur résultat"
+show_link_btn = "{status} 🔗 Voir l'image"
+back = "← Retour"
+language = "🌐 Langue : {language}"
+
+[settings.disabled_reasons]
+auto_search_engines = "Activez d'abord la recherche automatique pour configurer ses moteurs."
+button_engines = "Activez d'abord « Afficher les boutons » pour configurer les boutons de moteurs."
+default = "Activez d'abord l'option principale."
+
+[settings.warnings]
+enable_buttons_first = "⚠️ Activez d'abord les boutons de moteurs — au moins un doit être actif."
+enable_autosearch_first = "⚠️ Activez d'abord la recherche automatique — au moins un doit être actif."
+min_one_button = "⚠️ Au moins un bouton doit rester activé."
+min_one_engine = "⚠️ Au moins un moteur doit rester activé."
+
+[start]
+private = "🔎 Envoyez-moi une image, un sticker ou une vidéo et je trouverai sa source."
+group = "🔎 Envoyez-moi une image, un sticker ou une vidéo et je trouverai sa source.\n\n/search · /settings"
+opening_settings = "⚙️ Ouverture des paramètres..."
+
+[onboarding]
+title = "👋 <b>Comment dois-je traiter les images dans ce groupe ?</b>"
+description = "• <b>Résultats uniquement</b> — recherche auto des images, afficher les résultats\n• <b>Complet</b> — recherche auto + boutons de moteurs\n• <b>Manuel</b> — rechercher uniquement quand quelqu'un répond avec /search\n• <b>Paramètres</b> — tout configurer vous-même"
+btn_search_only = "🔍 Résultats uniquement"
+btn_full = "🔍 Complet (résultats + boutons)"
+btn_manual = "❌ Manuel uniquement (/search)"
+btn_settings = "⚙️ Ouvrir les paramètres"
+done_search_only = "✅ Configuré en mode <b>résultats uniquement</b>. Modifiable à tout moment avec /settings."
+done_full = "✅ Configuré en mode <b>complet</b> (résultats + boutons). Modifiable à tout moment avec /settings."
+done_manual = "✅ Configuré en mode <b>manuel</b>. Utilisez /search pour chercher. Modifiable à tout moment avec /settings."
+
+[bot_commands]
+search = "Rechercher la source d'une image (répondre à une image)"
+settings = "Configurer le comportement du bot pour ce chat"
+help = "Afficher l'aide"
+start = "Démarrer le bot"
+
+[fields]
+title = "Titre"
+"title_romaji" = "Titre [romaji]"
+"title_ja" = "Titre [ja]"
+chapter = "Chapitre"
+episode = "Épisode"
+status = "Statut"
+type = "Type"
+year = "Année"
+genres = "Genres"
+"audience_18" = "Public 18+"
+"est_time" = "Temps estimé"
+description = "Description"
+author = "Auteur"
+artist = "Artiste"
+rating = "Note"
+tags = "Tags"
+character = "Personnage"
+characters = "Personnages"
+work = "Œuvre"
+also_possible = "Aussi possible"
+material = "Matériel"
+by = "Par"
+poster = "Affiche"
+source = "Source"
+score = "Score"
+creator = "Créateur"
+"created_at" = "Créé le"
