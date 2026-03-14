@@ -398,7 +398,6 @@ async def settings_callback_handler(update: Update, context: ContextTypes.DEFAUL
 
 
 _LOCAL = Path(__file__).parent
-_HELP_TEXT = _LOCAL / "texts/help.html"
 _HELP_IMAGE = _LOCAL / "images/help.jpg"
 
 
@@ -535,10 +534,18 @@ async def group_file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     assert update.message
     metrics.commands_total.labels(command="help").inc()
+    L = get_lang(update)
+    text = (
+        f"<b>{t('help.title', L)}</b>\n\n"
+        f"<b>{t('help.how_to_use', L)}</b>\n"
+        f"{t('help.how_to_use_text', L)}\n\n"
+        f"<b>{t('help.commands_title', L)}</b>\n"
+        f"{t('help.commands_list', L)}"
+    )
     with _HELP_IMAGE.open("rb") as photo:
         await update.message.reply_photo(
             photo,
-            caption=_HELP_TEXT.read_text(),
+            caption=text,
             parse_mode=ParseMode.HTML,
             api_kwargs={"show_caption_above_media": True},
         )

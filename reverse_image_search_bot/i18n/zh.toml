@@ -1,3 +1,10 @@
+[help]
+title = "🔎 反向图片搜索机器人 — 帮助"
+how_to_use = "🤔 使用方法"
+how_to_use_text = "发送图片、贴纸、视频/GIF 或链接给我，我会为你提供 SauceNao、Google、Yandex 等反向搜索的直接链接。\n动漫图片推荐使用 SauceNao，其他图片推荐使用 Google 或 Yandex。"
+commands_title = "🖥️ 命令"
+commands_list = "/help — 显示帮助\n/search — 回复图片进行搜索\n/settings — 聊天设置"
+
 [commands]
 ban_usage = "用法：/ban <user_id>"
 bot_started = "✅ 机器人启动成功。"

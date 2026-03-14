@@ -1,3 +1,10 @@
+[help]
+title = "🔎 Búsqueda inversa de imágenes — Ayuda"
+how_to_use = "🤔 Cómo usarme"
+how_to_use_text = "Envíame una imagen, sticker, video/GIF o URL y te enviaré enlaces directos de búsqueda inversa en SauceNao, Google, Yandex y más.\nPara imágenes de anime recomiendo SauceNao, para otras imágenes Google o Yandex."
+commands_title = "🖥️ Comandos"
+commands_list = "/help — Mostrar ayuda\n/search — Responde a una imagen para buscar\n/settings — Configuración del chat"
+
 [commands]
 ban_usage = "Uso: /ban <user_id>"
 bot_started = "✅ Bot iniciado correctamente."
