@@ -152,6 +152,28 @@ errors_total = Counter(
     ["type"],  # exception class name
 )
 
+send_permission_errors_total = Counter(
+    "ris_send_permission_errors_total",
+    "Messages the bot could not send due to missing chat permissions",
+    ["chat_id", "chat_title", "chat_type"],  # chat_type: group/supergroup/channel
+)
+
+
+def track_permission_error(chat) -> None:
+    """Record a permission error for the given chat.
+
+    Args:
+        chat: A ``telegram.Chat`` or ``None``.
+    """
+    if chat is None:
+        send_permission_errors_total.labels(chat_id="unknown", chat_title="unknown", chat_type="unknown").inc()
+        return
+    send_permission_errors_total.labels(
+        chat_id=str(chat.id),
+        chat_title=chat.title or chat.full_name or str(chat.id),
+        chat_type=chat.type or "unknown",
+    ).inc()
+
 
 def _collect_process_metrics():
     """Periodically update thread count, memory usage, and provider status."""
