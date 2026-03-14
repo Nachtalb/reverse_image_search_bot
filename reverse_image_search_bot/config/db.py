@@ -133,7 +133,25 @@ def save_config(chat_id: int, config: dict) -> None:
     """Insert or update config for a chat_id."""
     conn = _get_conn()
     col_names = [name for name, _, _ in COLUMNS]
-    present = {k: v for k, v in config.items() if k in set(col_names)}
+    col_set = set(col_names)
+    # Normalize keys: CleverDict JSON files wrap keys in single quotes
+    normalized = {}
+    for k, v in config.items():
+        clean_key = k.strip("'")
+        if clean_key in col_set:
+            normalized[clean_key] = v
+    # Also check for nested _mapping_encoded (CleverDict format)
+    if "_mapping_encoded" in config and isinstance(config["_mapping_encoded"], dict):
+        for k, v in config["_mapping_encoded"].items():
+            clean_key = k.strip("'")
+            if clean_key in col_set:
+                normalized[clean_key] = v
+    present = normalized
+    if not present:
+        # Nothing to save, just ensure the row exists
+        conn.execute("INSERT OR IGNORE INTO chat_config (chat_id) VALUES (?)", (chat_id,))
+        conn.commit()
+        return
 
     cols = ["chat_id", *list(present.keys())]
     vals = [chat_id] + [_to_sql(k, v) for k, v in present.items()]
