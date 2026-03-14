@@ -8,7 +8,7 @@ from pathlib import Path
 from emoji import emojize
 from telegram import Bot, BotCommand, BotCommandScopeChat, BotCommandScopeDefault, Update
 from telegram.constants import ParseMode
-from telegram.error import Forbidden
+from telegram.error import BadRequest, Forbidden
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -121,6 +121,19 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     """Log all errors from the telegram bot api."""
     if isinstance(context.error, Forbidden):
         return
+
+    # Track permission errors separately instead of crashing
+    if isinstance(context.error, BadRequest) and "rights" in str(context.error).lower():
+        chat = getattr(update, "effective_chat", None) if isinstance(update, Update) else None
+        metrics.track_permission_error(chat)
+        logger.warning(
+            "Permission denied sending to chat %s (%s): %s",
+            chat.id if chat else "?",
+            chat.title if chat else "?",
+            context.error,
+        )
+        return
+
     metrics.errors_total.labels(type=type(context.error).__name__).inc()
     logger.error("Uncaught exception in handler:", exc_info=context.error)
 
