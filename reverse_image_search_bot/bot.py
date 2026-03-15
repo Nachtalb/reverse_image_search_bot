@@ -122,13 +122,16 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     chat = getattr(update, "effective_chat", None) if isinstance(update, Update) else None
 
     if isinstance(context.error, Forbidden):
-        metrics.track_write_forbidden(chat)
         return
 
-    # Track permission errors separately instead of crashing
-    if isinstance(context.error, BadRequest) and "rights" in str(context.error).lower():
-        metrics.track_permission_error(chat)
-        return
+    if isinstance(context.error, BadRequest):
+        error_msg = str(context.error).lower()
+        if "chat_write_forbidden" in error_msg:
+            metrics.track_write_forbidden(chat)
+            return
+        if "rights" in error_msg:
+            metrics.track_permission_error(chat)
+            return
 
     if isinstance(context.error, RetryAfter):
         metrics.track_retry_after(context.error.retry_after)
