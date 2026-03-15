@@ -8,7 +8,7 @@ from pathlib import Path
 from emoji import emojize
 from telegram import Bot, BotCommand, BotCommandScopeChat, BotCommandScopeDefault, Update
 from telegram.constants import ParseMode
-from telegram.error import BadRequest, Forbidden
+from telegram.error import BadRequest, Forbidden, RetryAfter
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -119,13 +119,19 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     """Log all errors from the telegram bot api."""
+    chat = getattr(update, "effective_chat", None) if isinstance(update, Update) else None
+
     if isinstance(context.error, Forbidden):
+        metrics.track_write_forbidden(chat)
         return
 
     # Track permission errors separately instead of crashing
     if isinstance(context.error, BadRequest) and "rights" in str(context.error).lower():
-        chat = getattr(update, "effective_chat", None) if isinstance(update, Update) else None
         metrics.track_permission_error(chat)
+        return
+
+    if isinstance(context.error, RetryAfter):
+        metrics.track_retry_after(context.error.retry_after)
         return
 
     metrics.errors_total.labels(type=type(context.error).__name__).inc()

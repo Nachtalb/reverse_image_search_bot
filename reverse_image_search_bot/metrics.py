@@ -158,6 +158,23 @@ send_permission_errors_total = Counter(
     ["chat_id", "chat_title", "chat_type"],  # chat_type: group/supergroup/channel
 )
 
+write_forbidden_total = Counter(
+    "ris_write_forbidden_total",
+    "Chat write forbidden errors (bot was blocked or kicked)",
+    ["chat_id", "chat_title", "chat_type"],
+)
+
+retry_after_total = Counter(
+    "ris_retry_after_total",
+    "Telegram RetryAfter rate limit hits",
+)
+
+retry_after_seconds = Histogram(
+    "ris_retry_after_seconds",
+    "RetryAfter delay requested by Telegram in seconds",
+    buckets=(1, 5, 10, 30, 60, 120, 300, 600),
+)
+
 
 def track_permission_error(chat) -> None:
     """Record a permission error for the given chat.
@@ -173,6 +190,35 @@ def track_permission_error(chat) -> None:
         chat_title=chat.title or chat.full_name or str(chat.id),
         chat_type=chat.type or "unknown",
     ).inc()
+
+
+def track_write_forbidden(chat) -> None:
+    """Record a write-forbidden error for the given chat.
+
+    Args:
+        chat: A ``telegram.Chat`` or ``None``.
+    """
+    if chat is None:
+        write_forbidden_total.labels(chat_id="unknown", chat_title="unknown", chat_type="unknown").inc()
+        return
+    write_forbidden_total.labels(
+        chat_id=str(chat.id),
+        chat_title=chat.title or chat.full_name or str(chat.id),
+        chat_type=chat.type or "unknown",
+    ).inc()
+
+
+def track_retry_after(retry_after: "int | float | __import__('datetime').timedelta") -> None:
+    """Record a RetryAfter rate limit hit.
+
+    Args:
+        retry_after: The delay Telegram requested (seconds or timedelta).
+    """
+    from datetime import timedelta
+
+    seconds = retry_after.total_seconds() if isinstance(retry_after, timedelta) else float(retry_after)
+    retry_after_total.inc()
+    retry_after_seconds.observe(seconds)
 
 
 def _collect_process_metrics():
