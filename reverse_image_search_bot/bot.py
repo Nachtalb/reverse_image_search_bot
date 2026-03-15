@@ -126,12 +126,6 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     if isinstance(context.error, BadRequest) and "rights" in str(context.error).lower():
         chat = getattr(update, "effective_chat", None) if isinstance(update, Update) else None
         metrics.track_permission_error(chat)
-        logger.warning(
-            "Permission denied sending to chat %s (%s): %s",
-            chat.id if chat else "?",
-            chat.title if chat else "?",
-            context.error,
-        )
         return
 
     metrics.errors_total.labels(type=type(context.error).__name__).inc()
