@@ -20,7 +20,9 @@ class MangadexProvider(BaseProvider):
             return None
 
         url = self.api_base / endpoint
-        response = await request_method(str(url), params=params, json=json, **kwargs)
+        if json is not None:
+            kwargs["json"] = json
+        response = await request_method(str(url), params=params, **kwargs)
 
         if response.status_code != 200:
             self.logger.error('Mangadex API error: "%s" -- %s', response.url, response.text)
