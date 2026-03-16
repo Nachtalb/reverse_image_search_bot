@@ -1103,9 +1103,14 @@ async def video_to_url(attachment: Document | Video | Animation | Sticker) -> UR
         return upload_file(file, filename)
 
 
+_JPEG_ALIASES = {"jfif", "jpe", "jpeg"}
+
+
 async def image_to_url(attachment: PhotoSize | Sticker | Document) -> URL:
     if isinstance(attachment, Document):
         extension = (attachment.file_name or "unknown.jpg").lower().rsplit(".", 1)[1].strip(".")
+        if extension in _JPEG_ALIASES:
+            extension = "jpg"
     else:
         extension = "jpg" if isinstance(attachment, PhotoSize) else "png"
 
