@@ -86,9 +86,10 @@ _LANG_NAMES: dict[str, str] = {
 
 
 async def id_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    assert update.message and update.effective_chat
+    message = update.effective_message
+    assert message and update.effective_chat
     metrics.commands_total.labels(command="id").inc()
-    await update.message.reply_html(pre(json.dumps(update.effective_chat.to_dict(), sort_keys=True, indent=4)))
+    await message.reply_html(pre(json.dumps(update.effective_chat.to_dict(), sort_keys=True, indent=4)))
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
