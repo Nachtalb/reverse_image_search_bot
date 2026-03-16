@@ -17,7 +17,7 @@ dependencies = [
     "paramiko>=3.4.0",
     "pixiv-api==1.0.0",
     "moviepy @ git+https://github.com/Zulko/moviepy.git@7ffa4f00376237137a25fe1c777355c37753e9af",
-    "pyopenssl==21.0.0",
+    "pyopenssl==26.0.0",
     "emoji>=2.2.0",
     "user-agent>=0.1.10",
     "httpx>=0.27,<0.29",
