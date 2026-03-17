@@ -79,6 +79,16 @@ def _ensure_schema(conn: sqlite3.Connection):
     conn.commit()
 
 
+def count_groups() -> dict[str, int]:
+    """Count groups by onboarding status. Only negative chat_ids (groups)."""
+    conn = _get_conn()
+    onboarded = conn.execute("SELECT COUNT(*) FROM chat_config WHERE chat_id < 0 AND onboarded = 1").fetchone()[0]
+    not_onboarded = conn.execute(
+        "SELECT COUNT(*) FROM chat_config WHERE chat_id < 0 AND (onboarded = 0 OR onboarded IS NULL)"
+    ).fetchone()[0]
+    return {"onboarded": onboarded, "not_onboarded": not_onboarded}
+
+
 def _to_sql_default(value) -> str:
     if value is None:
         return "NULL"
