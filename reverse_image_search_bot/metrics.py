@@ -29,6 +29,18 @@ searches_by_user_total = Counter(
     ["user_id"],
 )
 
+queries_received_total = Counter(
+    "ris_queries_received_total",
+    "Total media messages received (before validation)",
+    ["chat_type", "file_type"],
+)
+
+queries_handled_total = Counter(
+    "ris_queries_handled_total",
+    "Total media messages that resulted in a search",
+    ["chat_type", "file_type", "language"],
+)
+
 # ── Settings / Engine Stats ──────────────────────────────────────────────────
 
 engine_auto_disabled_total = Counter(
@@ -136,6 +148,12 @@ data_provider_status = Gauge(
     ["provider"],
 )
 
+groups_total = Gauge(
+    "ris_groups_total",
+    "Number of groups by onboarding status",
+    ["status"],  # onboarded / not_onboarded
+)
+
 active_threads = Gauge(
     "ris_active_threads",
     "Current number of active threads",
@@ -240,7 +258,20 @@ def _collect_process_metrics():
             update_provider_status()
         except Exception:
             logger.exception("provider status update failed")
+        try:
+            _update_group_counts()
+        except Exception:
+            logger.exception("group count update failed")
         time.sleep(15)
+
+
+def _update_group_counts():
+    """Query SQLite for group onboarding stats."""
+    from .config.db import count_groups
+
+    counts = count_groups()
+    groups_total.labels(status="onboarded").set(counts["onboarded"])
+    groups_total.labels(status="not_onboarded").set(counts["not_onboarded"])
 
 
 def update_provider_status():

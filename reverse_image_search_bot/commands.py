@@ -516,9 +516,34 @@ async def onboard_callback_handler(update: Update, context: ContextTypes.DEFAULT
     await query.answer()
 
 
+def _detect_file_type(attachment) -> str:
+    """Determine file type string from a Telegram attachment."""
+    if isinstance(attachment, Sticker):
+        return "sticker"
+    elif isinstance(attachment, Animation):
+        return "gif"
+    elif isinstance(attachment, Video):
+        return "video"
+    elif isinstance(attachment, PhotoSize):
+        return "photo"
+    elif isinstance(attachment, Document):
+        return "document"
+    return "unknown"
+
+
 async def group_file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle images in group chats — onboard first if needed."""
     assert update.effective_chat
+    chat_type = update.effective_chat.type or "unknown"
+
+    # Count every media message received in groups
+    msg = update.effective_message
+    attachment = msg.effective_attachment if msg else None
+    if isinstance(attachment, (list, tuple)):
+        attachment = attachment[-1] if attachment else None
+    _file_type = _detect_file_type(attachment) if attachment else "unknown"
+    metrics.queries_received_total.labels(chat_type=chat_type, file_type=_file_type).inc()
+
     chat_id = update.effective_chat.id
     chat_config = ChatConfig(chat_id)
 
@@ -603,6 +628,11 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
     if file_size:
         metrics.file_size_bytes.labels(file_type=file_type).observe(float(file_size))
 
+    # Count query received (private chats only — groups counted in group_file_handler)
+    chat_type = update.effective_chat.type or "unknown"
+    if chat_type == "private":
+        metrics.queries_received_total.labels(chat_type=chat_type, file_type=file_type).inc()
+
     language = getattr(user, "language_code", None) or "unknown"
 
     try:
@@ -646,6 +676,7 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
         # Track usage metrics
         metrics.searches_total.labels(type=search_type, language=language).inc()
         metrics.searches_by_user_total.labels(user_id=str(user.id)).inc()
+        metrics.queries_handled_total.labels(chat_type=chat_type, file_type=file_type, language=language).inc()
 
         # Run general_image_search and best_match concurrently
         general_done = asyncio.Event()
