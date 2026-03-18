@@ -531,6 +531,45 @@ def _detect_file_type(attachment) -> str:
     return "unknown"
 
 
+# Mapping of file extensions to their normalized form
+_EXTENSION_ALIASES: dict[str, str] = {
+    "jpeg": "jpg",
+    "jfif": "jpg",
+    "jpe": "jpg",
+    "tiff": "tif",
+    "mpeg": "mpg",
+}
+
+
+def _normalize_extension(attachment) -> str:
+    """Extract and normalize file extension from a Telegram attachment.
+
+    Tries ``file_name`` first, then falls back to ``mime_type``.
+    Returns a lowercase normalized extension (e.g. ``jpg``, ``png``, ``mp4``)
+    or ``"unknown"`` when neither is available.
+    """
+    ext = None
+
+    # Try file_name first (Documents, Videos, etc.)
+    file_name = getattr(attachment, "file_name", None)
+    if file_name and "." in file_name:
+        ext = file_name.rsplit(".", 1)[-1].lower().strip()
+
+    # Fall back to mime_type
+    if not ext:
+        mime = getattr(attachment, "mime_type", None)
+        if mime and "/" in mime:
+            ext = mime.split("/", 1)[-1].lower().strip()
+
+    if not ext:
+        # PhotoSize has no mime_type or file_name — it's always JPEG
+        if isinstance(attachment, PhotoSize):
+            return "jpg"
+        return "unknown"
+
+    return _EXTENSION_ALIASES.get(ext, ext)
+
+
 async def group_file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle images in group chats — onboard first if needed."""
     assert update.effective_chat
@@ -609,21 +648,11 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
     if isinstance(attachment, (list, tuple)):
         attachment = attachment[-1]
 
-    # Determine file type for metrics
-    if isinstance(attachment, Sticker):
-        file_type = "sticker"
-    elif isinstance(attachment, Animation):
-        file_type = "gif"
-    elif isinstance(attachment, Video):
-        file_type = "video"
-    elif isinstance(attachment, PhotoSize):
-        file_type = "photo"
-    elif isinstance(attachment, Document):
-        file_type = "document"
-    else:
-        file_type = "unknown"
+    file_type = _detect_file_type(attachment)
+    file_ext = _normalize_extension(attachment)
 
     metrics.files_received_total.labels(file_type=file_type).inc()
+    metrics.files_by_extension_total.labels(extension=file_ext).inc()
     file_size = getattr(attachment, "file_size", None)
     if file_size:
         metrics.file_size_bytes.labels(file_type=file_type).observe(float(file_size))

@@ -114,6 +114,12 @@ files_received_total = Counter(
     ["file_type"],  # photo/sticker/gif/video/document
 )
 
+files_by_extension_total = Counter(
+    "ris_files_by_extension_total",
+    "Total files received by normalized extension (jpg, png, mp4, webm, etc.)",
+    ["extension"],
+)
+
 file_size_bytes = Histogram(
     "ris_file_size_bytes",
     "File sizes received in bytes",
