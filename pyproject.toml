@@ -29,8 +29,6 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "ipdb>=0.13.13",
-    "ipython[black]>=8.12.0",
     "ruff>=0.11.0",
     "ty>=0.0.1a7",
 ]
