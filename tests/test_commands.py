@@ -214,21 +214,21 @@ class TestButtonCount:
 class TestTrackEngineResult:
     def test_found_resets_counter(self):
         cfg = _mock_chat_config(engine_empty_counts={"SauceNAO": 3})
-        with patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg):
+        with patch("reverse_image_search_bot.commands.search.ChatConfig", return_value=cfg):
             result = _track_engine_result(12345, "SauceNAO", found=True)
             assert result is False
             assert cfg.engine_empty_counts == {}
 
     def test_not_found_increments(self):
         cfg = _mock_chat_config(engine_empty_counts={})
-        with patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg):
+        with patch("reverse_image_search_bot.commands.search.ChatConfig", return_value=cfg):
             result = _track_engine_result(12345, "SauceNAO", found=False)
             assert result is False
             assert cfg.engine_empty_counts == {"SauceNAO": 1}
 
     def test_not_found_below_threshold(self):
         cfg = _mock_chat_config(engine_empty_counts={"SauceNAO": 3})
-        with patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg):
+        with patch("reverse_image_search_bot.commands.search.ChatConfig", return_value=cfg):
             result = _track_engine_result(12345, "SauceNAO", found=False)
             assert result is False
             assert cfg.engine_empty_counts["SauceNAO"] == 4
@@ -239,7 +239,7 @@ class TestTrackEngineResult:
             engine_empty_counts={"SauceNAO": 4},
             auto_search_engines=["SauceNAO", "AnimeTrace", "Trace"],
         )
-        with patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg):
+        with patch("reverse_image_search_bot.commands.search.ChatConfig", return_value=cfg):
             result = _track_engine_result(12345, "SauceNAO", found=False)
             assert result is True
             assert "SauceNAO" not in cfg.auto_search_engines
@@ -251,7 +251,7 @@ class TestTrackEngineResult:
             engine_empty_counts={"SauceNAO": 4},
             auto_search_engines=["SauceNAO"],
         )
-        with patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg):
+        with patch("reverse_image_search_bot.commands.search.ChatConfig", return_value=cfg):
             result = _track_engine_result(12345, "SauceNAO", found=False)
             assert result is False
 
@@ -261,7 +261,7 @@ class TestTrackEngineResult:
             engine_empty_counts={"SauceNAO": 4},
             auto_search_engines=["AnimeTrace", "Trace"],
         )
-        with patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg):
+        with patch("reverse_image_search_bot.commands.search.ChatConfig", return_value=cfg):
             result = _track_engine_result(12345, "SauceNAO", found=False)
             assert result is False
 
@@ -274,7 +274,7 @@ class TestTrackEngineResult:
             engine_empty_counts={relevant[0]: 4},
             auto_search_engines=None,
         )
-        with patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg):
+        with patch("reverse_image_search_bot.commands.search.ChatConfig", return_value=cfg):
             result = _track_engine_result(12345, relevant[0], found=False)
             # Should auto-disable since there are multiple relevant engines
             assert result is True
@@ -496,8 +496,12 @@ class TestSettingsCallbackHandler:
         context = _mock_context()
 
         with (
-            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
-            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+            patch(
+                "reverse_image_search_bot.commands.settings._is_settings_allowed",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch("reverse_image_search_bot.commands.settings.ChatConfig", return_value=cfg),
         ):
             await settings_callback_handler(update, context)
             assert cfg.auto_search_enabled is False
@@ -510,8 +514,12 @@ class TestSettingsCallbackHandler:
         context = _mock_context()
 
         with (
-            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
-            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+            patch(
+                "reverse_image_search_bot.commands.settings._is_settings_allowed",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch("reverse_image_search_bot.commands.settings.ChatConfig", return_value=cfg),
         ):
             await settings_callback_handler(update, context)
             update.callback_query.answer.assert_any_await(
@@ -527,8 +535,12 @@ class TestSettingsCallbackHandler:
         context = _mock_context()
 
         with (
-            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
-            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+            patch(
+                "reverse_image_search_bot.commands.settings._is_settings_allowed",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch("reverse_image_search_bot.commands.settings.ChatConfig", return_value=cfg),
         ):
             await settings_callback_handler(update, context)
             update.callback_query.answer.assert_any_await(
@@ -542,8 +554,12 @@ class TestSettingsCallbackHandler:
         context = _mock_context()
 
         with (
-            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
-            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+            patch(
+                "reverse_image_search_bot.commands.settings._is_settings_allowed",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch("reverse_image_search_bot.commands.settings.ChatConfig", return_value=cfg),
         ):
             await settings_callback_handler(update, context)
             assert cfg.show_best_match is False
@@ -555,8 +571,12 @@ class TestSettingsCallbackHandler:
         context = _mock_context()
 
         with (
-            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
-            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+            patch(
+                "reverse_image_search_bot.commands.settings._is_settings_allowed",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch("reverse_image_search_bot.commands.settings.ChatConfig", return_value=cfg),
         ):
             await settings_callback_handler(update, context)
             update.callback_query.answer.assert_any_await("⚠️ At least one button must stay enabled.", show_alert=True)
@@ -568,8 +588,12 @@ class TestSettingsCallbackHandler:
         context = _mock_context()
 
         with (
-            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
-            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+            patch(
+                "reverse_image_search_bot.commands.settings._is_settings_allowed",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch("reverse_image_search_bot.commands.settings.ChatConfig", return_value=cfg),
         ):
             await settings_callback_handler(update, context)
             assert cfg.show_link is False
@@ -580,8 +604,12 @@ class TestSettingsCallbackHandler:
         context = _mock_context()
 
         with (
-            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
-            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+            patch(
+                "reverse_image_search_bot.commands.settings._is_settings_allowed",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch("reverse_image_search_bot.commands.settings.ChatConfig", return_value=cfg),
         ):
             await settings_callback_handler(update, context)
             assert "SauceNAO" not in cfg.auto_search_engines
@@ -592,8 +620,12 @@ class TestSettingsCallbackHandler:
         context = _mock_context()
 
         with (
-            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
-            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+            patch(
+                "reverse_image_search_bot.commands.settings._is_settings_allowed",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch("reverse_image_search_bot.commands.settings.ChatConfig", return_value=cfg),
         ):
             await settings_callback_handler(update, context)
             update.callback_query.answer.assert_any_await("⚠️ At least one engine must stay enabled.", show_alert=True)
@@ -606,8 +638,12 @@ class TestSettingsCallbackHandler:
         context = _mock_context()
 
         with (
-            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
-            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+            patch(
+                "reverse_image_search_bot.commands.settings._is_settings_allowed",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch("reverse_image_search_bot.commands.settings.ChatConfig", return_value=cfg),
         ):
             await settings_callback_handler(update, context)
             cfg.reset_engine_counter.assert_called_once_with("SauceNAO")
@@ -618,8 +654,12 @@ class TestSettingsCallbackHandler:
         context = _mock_context()
 
         with (
-            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
-            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+            patch(
+                "reverse_image_search_bot.commands.settings._is_settings_allowed",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch("reverse_image_search_bot.commands.settings.ChatConfig", return_value=cfg),
         ):
             await settings_callback_handler(update, context)
             assert "SauceNAO" not in cfg.button_engines
@@ -631,8 +671,12 @@ class TestSettingsCallbackHandler:
         context = _mock_context()
 
         with (
-            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
-            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+            patch(
+                "reverse_image_search_bot.commands.settings._is_settings_allowed",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch("reverse_image_search_bot.commands.settings.ChatConfig", return_value=cfg),
         ):
             await settings_callback_handler(update, context)
             update.callback_query.answer.assert_any_await("⚠️ At least one button must stay enabled.", show_alert=True)
@@ -643,8 +687,12 @@ class TestSettingsCallbackHandler:
         context = _mock_context()
 
         with (
-            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
-            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+            patch(
+                "reverse_image_search_bot.commands.settings._is_settings_allowed",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch("reverse_image_search_bot.commands.settings.ChatConfig", return_value=cfg),
         ):
             await settings_callback_handler(update, context)
             update.callback_query.edit_message_reply_markup.assert_awaited_once()
@@ -655,8 +703,12 @@ class TestSettingsCallbackHandler:
         context = _mock_context()
 
         with (
-            patch("reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=True),
-            patch("reverse_image_search_bot.commands.ChatConfig", return_value=cfg),
+            patch(
+                "reverse_image_search_bot.commands.settings._is_settings_allowed",
+                new_callable=AsyncMock,
+                return_value=True,
+            ),
+            patch("reverse_image_search_bot.commands.settings.ChatConfig", return_value=cfg),
         ):
             await settings_callback_handler(update, context)
             update.callback_query.edit_message_text.assert_awaited_once()
@@ -666,7 +718,9 @@ class TestSettingsCallbackHandler:
         context = _mock_context()
 
         with patch(
-            "reverse_image_search_bot.commands._is_settings_allowed", new_callable=AsyncMock, return_value=False
+            "reverse_image_search_bot.commands.settings._is_settings_allowed",
+            new_callable=AsyncMock,
+            return_value=False,
         ):
             await settings_callback_handler(update, context)
             update.callback_query.answer.assert_any_await("Only group admins can change settings.", show_alert=True)
@@ -695,7 +749,7 @@ class TestCallbackQueryHandler:
         update = _mock_update(callback_data="best_match https://example.com/img.jpg")
         context = _mock_context()
 
-        with patch("reverse_image_search_bot.commands.best_match", new_callable=AsyncMock) as mock_bm:
+        with patch("reverse_image_search_bot.commands.handlers.best_match", new_callable=AsyncMock) as mock_bm:
             await callback_query_handler(update, context)
             mock_bm.assert_awaited_once_with(update, context, "https://example.com/img.jpg")
 
@@ -703,7 +757,7 @@ class TestCallbackQueryHandler:
         update = _mock_update(callback_data="wait_for SauceNAO")
         context = _mock_context()
 
-        with patch("reverse_image_search_bot.commands.send_wait_for", new_callable=AsyncMock) as mock_wf:
+        with patch("reverse_image_search_bot.commands.handlers.send_wait_for", new_callable=AsyncMock) as mock_wf:
             await callback_query_handler(update, context)
             mock_wf.assert_awaited_once_with(update, context, "SauceNAO")
 
@@ -748,13 +802,13 @@ class TestFileHandler:
 
         with (
             patch(
-                "reverse_image_search_bot.commands.image_to_url",
+                "reverse_image_search_bot.commands.search.image_to_url",
                 new_callable=AsyncMock,
                 return_value=URL("https://ris-test-uploads.naa.gg/test123.jpg"),
             ),
-            patch("reverse_image_search_bot.commands.general_image_search", new_callable=AsyncMock),
-            patch("reverse_image_search_bot.commands.best_match", new_callable=AsyncMock) as mock_bm,
-            patch("reverse_image_search_bot.commands.ChatConfig") as mock_cc,
+            patch("reverse_image_search_bot.commands.search.general_image_search", new_callable=AsyncMock),
+            patch("reverse_image_search_bot.commands.search.best_match", new_callable=AsyncMock) as mock_bm,
+            patch("reverse_image_search_bot.commands.search.ChatConfig") as mock_cc,
         ):
             mock_cc.return_value = _mock_chat_config(auto_search_enabled=True)
             await file_handler(update, context)
@@ -773,13 +827,13 @@ class TestFileHandler:
 
         with (
             patch(
-                "reverse_image_search_bot.commands.image_to_url",
+                "reverse_image_search_bot.commands.search.image_to_url",
                 new_callable=AsyncMock,
                 return_value=URL("https://ris-test-uploads.naa.gg/test456.jpg"),
             ),
-            patch("reverse_image_search_bot.commands.general_image_search", new_callable=AsyncMock),
-            patch("reverse_image_search_bot.commands.best_match", new_callable=AsyncMock) as mock_bm,
-            patch("reverse_image_search_bot.commands.ChatConfig") as mock_cc,
+            patch("reverse_image_search_bot.commands.search.general_image_search", new_callable=AsyncMock),
+            patch("reverse_image_search_bot.commands.search.best_match", new_callable=AsyncMock) as mock_bm,
+            patch("reverse_image_search_bot.commands.search.ChatConfig") as mock_cc,
         ):
             mock_cc.return_value = _mock_chat_config(auto_search_enabled=False)
             await file_handler(update, context)
@@ -812,13 +866,13 @@ class TestFileHandler:
 
         with (
             patch(
-                "reverse_image_search_bot.commands.video_to_url",
+                "reverse_image_search_bot.commands.search.video_to_url",
                 new_callable=AsyncMock,
                 return_value=URL("https://ris-test-uploads.naa.gg/vid789.jpg"),
             ) as mock_vtu,
-            patch("reverse_image_search_bot.commands.general_image_search", new_callable=AsyncMock),
-            patch("reverse_image_search_bot.commands.best_match", new_callable=AsyncMock),
-            patch("reverse_image_search_bot.commands.ChatConfig") as mock_cc,
+            patch("reverse_image_search_bot.commands.search.general_image_search", new_callable=AsyncMock),
+            patch("reverse_image_search_bot.commands.search.best_match", new_callable=AsyncMock),
+            patch("reverse_image_search_bot.commands.search.ChatConfig") as mock_cc,
         ):
             mock_cc.return_value = _mock_chat_config(auto_search_enabled=True)
             await file_handler(update, context)
@@ -858,13 +912,13 @@ class TestFileHandler:
 
         with (
             patch(
-                "reverse_image_search_bot.commands.image_to_url",
+                "reverse_image_search_bot.commands.search.image_to_url",
                 new_callable=AsyncMock,
                 return_value=URL("https://ris-test-uploads.naa.gg/large.jpg"),
             ) as mock_itu,
-            patch("reverse_image_search_bot.commands.general_image_search", new_callable=AsyncMock),
-            patch("reverse_image_search_bot.commands.best_match", new_callable=AsyncMock),
-            patch("reverse_image_search_bot.commands.ChatConfig") as mock_cc,
+            patch("reverse_image_search_bot.commands.search.general_image_search", new_callable=AsyncMock),
+            patch("reverse_image_search_bot.commands.search.best_match", new_callable=AsyncMock),
+            patch("reverse_image_search_bot.commands.search.ChatConfig") as mock_cc,
         ):
             mock_cc.return_value = _mock_chat_config(auto_search_enabled=True)
             await file_handler(update, context)
@@ -882,17 +936,17 @@ class TestFileHandler:
 
         with (
             patch(
-                "reverse_image_search_bot.commands.image_to_url",
+                "reverse_image_search_bot.commands.search.image_to_url",
                 new_callable=AsyncMock,
                 return_value=URL("https://ris-test-uploads.naa.gg/err001.jpg"),
             ),
-            patch("reverse_image_search_bot.commands.general_image_search", new_callable=AsyncMock),
+            patch("reverse_image_search_bot.commands.search.general_image_search", new_callable=AsyncMock),
             patch(
-                "reverse_image_search_bot.commands.best_match",
+                "reverse_image_search_bot.commands.handlers.best_match",
                 new_callable=AsyncMock,
                 side_effect=RuntimeError("engine exploded"),
             ),
-            patch("reverse_image_search_bot.commands.ChatConfig") as mock_cc,
+            patch("reverse_image_search_bot.commands.search.ChatConfig") as mock_cc,
         ):
             mock_cc.return_value = _mock_chat_config(auto_search_enabled=True)
             with pytest.raises(RuntimeError, match="engine exploded"):
