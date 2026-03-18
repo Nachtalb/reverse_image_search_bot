@@ -942,7 +942,7 @@ class TestFileHandler:
             ),
             patch("reverse_image_search_bot.commands.search.general_image_search", new_callable=AsyncMock),
             patch(
-                "reverse_image_search_bot.commands.handlers.best_match",
+                "reverse_image_search_bot.commands.search.best_match",
                 new_callable=AsyncMock,
                 side_effect=RuntimeError("engine exploded"),
             ),
