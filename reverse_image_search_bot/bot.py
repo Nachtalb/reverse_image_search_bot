@@ -45,6 +45,7 @@ from .payments import (
     successful_payment_handler,
     support_command,
     terms_command,
+    transactions_command,
 )
 
 application: Application | None = None
@@ -166,6 +167,7 @@ _PUBLIC_COMMANDS = [
 _ADMIN_COMMANDS = [
     *_PUBLIC_COMMANDS,
     BotCommand("ban", "Ban/unban a user by ID"),
+    BotCommand("transactions", "List all Star transactions"),
     BotCommand("id", "Show current chat info"),
 ]
 
@@ -264,6 +266,7 @@ def main():
     app.add_handler(CommandHandler("terms", terms_command))
     app.add_handler(CommandHandler("support", support_command))
     app.add_handler(CommandHandler("refund", refund_command))
+    app.add_handler(CommandHandler("transactions", transactions_command, filters=ADMIN_FILTER))
     app.add_handler(PreCheckoutQueryHandler(pre_checkout_handler))
     app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_handler))
     app.add_handler(CallbackQueryHandler(refund_callback_handler, pattern=r"^refund_"))

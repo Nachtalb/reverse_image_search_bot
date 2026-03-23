@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html as html_mod
 import logging
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice, Update
@@ -11,7 +12,7 @@ from telegram.ext import ContextTypes
 from reverse_image_search_bot import metrics
 from reverse_image_search_bot.i18n import lang as get_lang
 from reverse_image_search_bot.i18n import t
-from reverse_image_search_bot.settings import SUBSCRIPTION_STARS_PRICE
+from reverse_image_search_bot.settings import ADMIN_IDS, SUBSCRIPTION_STARS_PRICE
 
 from . import db
 from .subscription import get_remaining_saucenao, get_remaining_searches, invalidate_premium_cache, is_premium
@@ -89,6 +90,22 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
         t("subscription.payment_success", L),
         parse_mode=ParseMode.HTML,
     )
+
+    # Notify admins
+    user = update.effective_user
+    user_info = f"{html_mod.escape(user.full_name)} (<code>{user.id}</code>)" if user else f"<code>{chat_id}</code>"
+    admin_msg = (
+        f"💰 <b>New payment!</b>\n"
+        f"User: {user_info}\n"
+        f"Chat: <code>{chat_id}</code>\n"
+        f"Amount: <b>{stars} ⭐</b>\n"
+        f"Txn: <code>{transaction_id}</code>"
+    )
+    for admin_id in ADMIN_IDS:
+        try:
+            await context.bot.send_message(admin_id, admin_msg, parse_mode=ParseMode.HTML)
+        except Exception:
+            logger.warning("Failed to notify admin %d of payment", admin_id)
 
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -206,3 +223,31 @@ async def refund_callback_handler(update: Update, context: ContextTypes.DEFAULT_
         except Exception as e:
             logger.error("Refund failed: chat_id=%d, txn=%s, error=%s", chat_id, transaction_id, e)
             await query.answer(f"Refund failed: {e}", show_alert=True)
+
+
+async def transactions_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /transactions (admin only) — list all subscription transactions."""
+    assert update.message
+    metrics.commands_total.labels(command="transactions").inc()
+
+    rows = db.list_all_subscriptions()
+    if not rows:
+        await update.message.reply_text("No transactions found.")
+        return
+
+    total_stars = sum(r["stars_amount"] for r in rows)
+    active = sum(1 for r in rows if not r.get("revoked", False))
+
+    lines = [f"📊 <b>Transactions</b> ({len(rows)} total, {active} active, {total_stars} ⭐ total)\n"]
+    for r in rows[-25:]:  # Last 25
+        start = r["subscription_start"][:10]
+        end = r["subscription_end"][:10]
+        chat = r["chat_id"]
+        stars = r["stars_amount"]
+        txn = r["transaction_id"][:16]
+        lines.append(f"• <code>{chat}</code> | {stars}⭐ | {start}→{end} | <code>{txn}…</code>")
+
+    if len(rows) > 25:
+        lines.append(f"\n<i>(showing last 25 of {len(rows)})</i>")
+
+    await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML)

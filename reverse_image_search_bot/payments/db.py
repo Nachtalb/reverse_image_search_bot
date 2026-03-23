@@ -143,6 +143,13 @@ def reset_all_daily_usage() -> int:
     return cursor.rowcount
 
 
+def list_all_subscriptions() -> list[dict]:
+    """Return all subscriptions ordered by start date descending."""
+    conn = _get_conn()
+    rows = conn.execute("SELECT * FROM subscriptions ORDER BY subscription_start DESC").fetchall()
+    return [dict(r) for r in rows]
+
+
 def revoke_subscription(chat_id: int, transaction_id: str) -> bool:
     """Revoke a subscription by setting its end date to now. Returns True if a row was updated."""
     conn = _get_conn()

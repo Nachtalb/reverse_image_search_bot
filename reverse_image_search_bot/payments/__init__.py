@@ -7,6 +7,7 @@ from .handlers import (
     successful_payment_handler,
     support_command,
     terms_command,
+    transactions_command,
 )
 from .subscription import get_remaining_saucenao, get_remaining_searches, is_premium, reset_daily_counts, use_search
 
@@ -23,5 +24,6 @@ __all__ = [
     "successful_payment_handler",
     "support_command",
     "terms_command",
+    "transactions_command",
     "use_search",
 ]
