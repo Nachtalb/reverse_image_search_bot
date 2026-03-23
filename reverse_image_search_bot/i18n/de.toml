@@ -3,7 +3,7 @@ title = "🔎 Bilderrückwärtssuche — Hilfe"
 how_to_use = "🤔 So funktioniert es"
 how_to_use_text = "Sende mir ein Bild, einen Sticker, ein Video/GIF oder eine URL und ich schicke dir direkte Links zur Bilderrückwärtssuche über SauceNao, Google, Yandex und weitere.\nFür Anime-Bilder empfehle ich SauceNao, für andere Bilder Google oder Yandex."
 commands_title = "🖥️ Befehle"
-commands_list = "/help — Hilfe anzeigen\n/search — Auf ein Bild antworten um zu suchen\n/settings — Chat-Einstellungen"
+commands_list = "/help — Hilfe anzeigen\n/search — Auf ein Bild antworten um zu suchen\n/settings — Chat-Einstellungen\n/feedback — Feedback an die Admins senden"
 
 [commands]
 ban_usage = "Verwendung: /ban <user_id>"
@@ -94,6 +94,14 @@ search = "Bildquelle suchen (auf Bild antworten)"
 settings = "Bot-Einstellungen für diesen Chat"
 help = "Hilfe anzeigen"
 start = "Bot starten"
+feedback = "Feedback an die Admins senden"
+
+[feedback]
+prompt = "💬 Bitte schreibe dein Feedback unten. Sende /cancel zum Abbrechen."
+empty = "Deine Nachricht scheint leer zu sein. Bitte schreibe dein Feedback oder sende /cancel zum Abbrechen."
+thanks = "✅ Vielen Dank für dein Feedback! Es wurde an die Admins weitergeleitet."
+cancelled = "Feedback abgebrochen."
+admin_message = "📬 <b>Neues Feedback</b>\nVon: {user} (<code>{user_id}</code>)\n\n{feedback}"
 
 [fields]
 title = "Titel"

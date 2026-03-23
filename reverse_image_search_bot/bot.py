@@ -14,6 +14,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     CommandHandler,
     ContextTypes,
+    ConversationHandler,
     MessageHandler,
     PicklePersistence,
     filters,
@@ -32,6 +33,13 @@ from .commands import (
     settings_callback_handler,
     settings_command,
     start_command,
+)
+from .commands.feedback import (
+    WAITING_FOR_FEEDBACK,
+    feedback_cancel,
+    feedback_command,
+    feedback_received,
+    feedback_reply_handler,
 )
 from .i18n import available_languages, t
 from .metrics import start_metrics_server
@@ -144,6 +152,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
 _PUBLIC_COMMANDS = [
     BotCommand("search", t("bot_commands.search")),
     BotCommand("settings", t("bot_commands.settings")),
+    BotCommand("feedback", t("bot_commands.feedback")),
     BotCommand("help", t("bot_commands.help")),
     BotCommand("start", t("bot_commands.start")),
 ]
@@ -169,6 +178,7 @@ async def _set_bot_commands(app: Application) -> None:
         commands = [
             BotCommand("search", t("bot_commands.search", lang_code)),
             BotCommand("settings", t("bot_commands.settings", lang_code)),
+            BotCommand("feedback", t("bot_commands.feedback", lang_code)),
             BotCommand("help", t("bot_commands.help", lang_code)),
             BotCommand("start", t("bot_commands.start", lang_code)),
         ]
@@ -240,6 +250,30 @@ def main():
     app.add_handler(CommandHandler("ban", ban_command, filters=ADMIN_FILTER), group=1)
     app.add_handler(CommandHandler("search", search_command))
     app.add_handler(CommandHandler(("settings", "conf", "pref"), settings_command))
+
+    # Feedback conversation handler
+    feedback_handler = ConversationHandler(
+        entry_points=[CommandHandler("feedback", feedback_command)],
+        states={
+            WAITING_FOR_FEEDBACK: [
+                CommandHandler("cancel", feedback_cancel),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, feedback_received),
+            ],
+        },
+        fallbacks=[CommandHandler("cancel", feedback_cancel)],
+        conversation_timeout=300,  # 5 minute timeout
+    )
+    app.add_handler(feedback_handler)
+
+    # Feedback reply handler — allows admins and users to reply back and forth
+    app.add_handler(
+        MessageHandler(
+            filters.REPLY & filters.TEXT & filters.ChatType.PRIVATE,
+            feedback_reply_handler,
+        ),
+        group=2,
+    )
+
     app.add_handler(CallbackQueryHandler(settings_callback_handler, pattern=r"^settings:"))
     app.add_handler(CallbackQueryHandler(onboard_callback_handler, pattern=r"^onboard:"))
     app.add_handler(CallbackQueryHandler(callback_query_handler))

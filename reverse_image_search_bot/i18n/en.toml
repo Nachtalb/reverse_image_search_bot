@@ -3,7 +3,7 @@ title = "🔎 Reverse Image Search Bot — Help"
 how_to_use = "🤔 How to use me"
 how_to_use_text = "Send me an image, sticker, video/gif or URL and I will send you direct reverse image search links for SauceNao, Google, Yandex and the like.\nFor anime images I recommend SauceNao, for other images I recommend Google or Yandex."
 commands_title = "🖥️ Commands"
-commands_list = "/help — Show help\n/search — Reply to an image or video to search\n/settings — Configure per-chat behaviour"
+commands_list = "/help — Show help\n/search — Reply to an image or video to search\n/settings — Configure per-chat behaviour\n/feedback — Send feedback to the admins"
 
 [commands]
 ban_usage = "Usage: /ban <user_id>"
@@ -89,11 +89,25 @@ done_search_only = "✅ Set to <b>search results only</b>. Change anytime with /
 done_full = "✅ Set to <b>full mode</b> (results + buttons). Change anytime with /settings."
 done_manual = "✅ Set to <b>manual mode</b>. Use /search to search. Change anytime with /settings."
 
+[feedback]
+prompt = "💬 Please type your feedback below. Send /cancel to abort."
+empty = "Your message seems empty. Please type some feedback or send /cancel to abort."
+thanks = "✅ Thank you for your feedback! It has been forwarded to the admins."
+cancelled = "Feedback cancelled."
+admin_message = "📬 <b>New Feedback</b>\nFrom: {user} (<code>{user_id}</code>)\n\n{feedback}\n\n💡 <i>Reply to this message to respond to the user.</i>"
+admin_reply = "📩 <b>Reply from admin:</b>\n\n{reply}\n\n💡 <i>Reply to this message to respond.</i>"
+reply_sent = "✅ Reply sent to user."
+reply_failed = "❌ Failed to send reply to user. They may have blocked the bot."
+user_followup = "📬 <b>Follow-up</b>\nFrom: {user} (<code>{user_id}</code>)\n\n{feedback}\n\n💡 <i>Reply to this message to respond to the user.</i>"
+followup_sent = "✅ Your reply has been sent to the admins."
+followup_failed = "❌ Failed to send your reply."
+
 [bot_commands]
 search = "Search for image source (reply to image)"
 settings = "Configure bot behaviour for this chat"
 help = "Show help"
 start = "Start the bot"
+feedback = "Send feedback to the admins"
 
 [fields]
 title = "Title"

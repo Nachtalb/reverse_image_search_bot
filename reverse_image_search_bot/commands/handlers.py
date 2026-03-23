@@ -45,7 +45,10 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [
                     KeyboardButton("/help", api_kwargs={"icon_custom_emoji_id": "5818947586702184246"}),
                     KeyboardButton("/settings", api_kwargs={"icon_custom_emoji_id": "5818705028424141605"}),
-                ]
+                ],
+                [
+                    KeyboardButton("/feedback", api_kwargs={"icon_custom_emoji_id": "5443038326535759644"}),
+                ],
             ],
             resize_keyboard=True,
             one_time_keyboard=True,

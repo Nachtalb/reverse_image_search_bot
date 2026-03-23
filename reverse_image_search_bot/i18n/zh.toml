@@ -3,7 +3,7 @@ title = "🔎 反向图片搜索机器人 — 帮助"
 how_to_use = "🤔 使用方法"
 how_to_use_text = "发送图片、贴纸、视频/GIF 或链接给我，我会为你提供 SauceNao、Google、Yandex 等反向搜索的直接链接。\n动漫图片推荐使用 SauceNao，其他图片推荐使用 Google 或 Yandex。"
 commands_title = "🖥️ 命令"
-commands_list = "/help — 显示帮助\n/search — 回复图片进行搜索\n/settings — 聊天设置"
+commands_list = "/help — 显示帮助\n/search — 回复图片进行搜索\n/settings — 聊天设置\n/feedback — 向管理员发送反馈"
 
 [commands]
 ban_usage = "用法：/ban <user_id>"
@@ -94,6 +94,14 @@ search = "搜索图片来源（回复图片）"
 settings = "配置此聊天的机器人设置"
 help = "显示帮助"
 start = "启动机器人"
+feedback = "向管理员发送反馈"
+
+[feedback]
+prompt = "💬 请在下方输入您的反馈。发送 /cancel 取消。"
+empty = "您的消息似乎是空的。请输入反馈或发送 /cancel 取消。"
+thanks = "✅ 感谢您的反馈！已转发给管理员。"
+cancelled = "反馈已取消。"
+admin_message = "📬 <b>新反馈</b>\n来自：{user}（<code>{user_id}</code>）\n\n{feedback}"
 
 [fields]
 title = "标题"

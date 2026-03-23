@@ -3,7 +3,7 @@ title = "🔎 逆画像検索ボット — ヘルプ"
 how_to_use = "🤔 使い方"
 how_to_use_text = "画像、ステッカー、動画/GIF、またはURLを送信すると、SauceNao、Google、Yandexなどの逆画像検索リンクをお送りします。\nアニメ画像にはSauceNao、その他の画像にはGoogleまたはYandexがおすすめです。"
 commands_title = "🖥️ コマンド"
-commands_list = "/help — ヘルプを表示\n/search — 画像に返信して検索\n/settings — チャット設定"
+commands_list = "/help — ヘルプを表示\n/search — 画像に返信して検索\n/settings — チャット設定\n/feedback — 管理者にフィードバックを送信"
 
 [commands]
 ban_usage = "使い方：/ban <user_id>"
@@ -94,6 +94,14 @@ search = "画像のソースを検索（画像に返信）"
 settings = "このチャットのボット設定"
 help = "ヘルプを表示"
 start = "ボットを起動"
+feedback = "管理者にフィードバックを送信"
+
+[feedback]
+prompt = "💬 フィードバックを入力してください。/cancel で中止できます。"
+empty = "メッセージが空のようです。フィードバックを入力するか、/cancel で中止してください。"
+thanks = "✅ フィードバックありがとうございます！管理者に転送されました。"
+cancelled = "フィードバックがキャンセルされました。"
+admin_message = "📬 <b>新しいフィードバック</b>\n送信者: {user} (<code>{user_id}</code>)\n\n{feedback}"
 
 [fields]
 title = "タイトル"
