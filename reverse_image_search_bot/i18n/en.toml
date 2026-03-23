@@ -89,11 +89,19 @@ done_search_only = "✅ Set to <b>search results only</b>. Change anytime with /
 done_full = "✅ Set to <b>full mode</b> (results + buttons). Change anytime with /settings."
 done_manual = "✅ Set to <b>manual mode</b>. Use /search to search. Change anytime with /settings."
 
+[feedback]
+prompt = "💬 Please type your feedback below. Send /cancel to abort."
+empty = "Your message seems empty. Please type some feedback or send /cancel to abort."
+thanks = "✅ Thank you for your feedback! It has been forwarded to the admins."
+cancelled = "Feedback cancelled."
+admin_message = "📬 <b>New Feedback</b>\nFrom: {user} (<code>{user_id}</code>)\n\n{feedback}"
+
 [bot_commands]
 search = "Search for image source (reply to image)"
 settings = "Configure bot behaviour for this chat"
 help = "Show help"
 start = "Start the bot"
+feedback = "Send feedback to the admins"
 
 [fields]
 title = "Title"

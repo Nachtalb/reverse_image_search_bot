@@ -1,3 +1,4 @@
+from .feedback import feedback_cancel, feedback_command, feedback_received
 from .handlers import (
     callback_query_handler,
     group_file_handler,
@@ -29,6 +30,9 @@ __all__ = [
     "_track_engine_result",
     "build_reply",
     "callback_query_handler",
+    "feedback_cancel",
+    "feedback_command",
+    "feedback_received",
     "file_handler",
     "group_file_handler",
     "help_command",
