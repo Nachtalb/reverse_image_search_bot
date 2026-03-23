@@ -7,7 +7,13 @@ import threading
 
 from cachetools import TTLCache
 
-from reverse_image_search_bot.settings import ADMIN_IDS, DAILY_SAUCENAO_LIMIT, DAILY_SEARCH_LIMIT
+from reverse_image_search_bot.settings import (
+    ADMIN_IDS,
+    FREE_DAILY_LIMIT,
+    FREE_MONTHLY_LIMIT,
+    PREMIUM_DAILY_LIMIT,
+    PREMIUM_GOOGLE_DAILY_LIMIT,
+)
 
 from . import db
 
@@ -43,50 +49,88 @@ def invalidate_premium_cache(chat_id: int) -> None:
         _premium_cache.pop(chat_id, None)
 
 
-def get_remaining_searches(chat_id: int) -> tuple[int, int]:
-    """Return (remaining, daily_limit) for a chat.
+def get_quota_info(chat_id: int) -> dict:
+    """Return quota info for a chat.
 
-    Premium chats get (-1, -1) meaning unlimited.
+    Returns dict with keys:
+        premium: bool
+        daily_remaining: int (-1 = unlimited)
+        daily_limit: int
+        monthly_remaining: int (-1 = unlimited)
+        monthly_limit: int
+        google_daily_remaining: int (-1 = not available / unlimited)
+        google_daily_limit: int
     """
-    if is_premium(chat_id):
-        return -1, -1
-    used, _ = db.get_daily_usage(chat_id)
-    remaining = max(0, DAILY_SEARCH_LIMIT - used)
-    return remaining, DAILY_SEARCH_LIMIT
+    premium = is_premium(chat_id)
+    daily_used, monthly_used, google_used = db.get_usage(chat_id)
+
+    if premium:
+        return {
+            "premium": True,
+            "daily_remaining": max(0, PREMIUM_DAILY_LIMIT - daily_used),
+            "daily_limit": PREMIUM_DAILY_LIMIT,
+            "monthly_remaining": -1,
+            "monthly_limit": -1,
+            "google_daily_remaining": max(0, PREMIUM_GOOGLE_DAILY_LIMIT - google_used),
+            "google_daily_limit": PREMIUM_GOOGLE_DAILY_LIMIT,
+        }
+    else:
+        return {
+            "premium": False,
+            "daily_remaining": max(0, FREE_DAILY_LIMIT - daily_used),
+            "daily_limit": FREE_DAILY_LIMIT,
+            "monthly_remaining": max(0, FREE_MONTHLY_LIMIT - monthly_used),
+            "monthly_limit": FREE_MONTHLY_LIMIT,
+            "google_daily_remaining": 0,  # Not available for free
+            "google_daily_limit": 0,
+        }
 
 
-def get_remaining_saucenao(chat_id: int) -> int:
-    """Return remaining SauceNAO searches for today. -1 if premium."""
-    if is_premium(chat_id):
-        return -1
-    _, saucenao_used = db.get_daily_usage(chat_id)
-    return max(0, DAILY_SAUCENAO_LIMIT - saucenao_used)
+def use_search(chat_id: int, engine_name: str) -> tuple[bool, str]:
+    """Try to consume a search quota.
 
-
-def use_search(chat_id: int, engine_name: str) -> bool:
-    """Try to consume a search quota. Returns True if allowed, False if limit hit.
-
-    For premium users, always returns True without incrementing.
+    Returns (allowed: bool, reason: str).
+    reason is empty if allowed, otherwise a key like 'daily', 'monthly', 'google', 'groups'.
     """
-    if is_premium(chat_id):
-        return True
+    premium = is_premium(chat_id)
+    is_google = "google" in engine_name.lower() or "lens" in engine_name.lower()
 
-    is_saucenao = engine_name.lower() == "saucenao"
-    used, saucenao_used = db.get_daily_usage(chat_id)
+    # Free tier: private chat only (negative chat_ids are groups)
+    if not premium and chat_id < 0:
+        return False, "groups"
 
-    # Check daily global limit
-    if used >= DAILY_SEARCH_LIMIT:
-        return False
+    # Google Lens: premium only
+    if is_google and not premium:
+        return False, "premium_engine"
 
-    # Check SauceNAO-specific limit
-    if is_saucenao and saucenao_used >= DAILY_SAUCENAO_LIMIT:
-        return False
+    daily_used, monthly_used, google_used = db.get_usage(chat_id)
 
-    db.increment_usage(chat_id, is_saucenao=is_saucenao)
-    return True
+    if premium:
+        # Premium daily limit
+        if daily_used >= PREMIUM_DAILY_LIMIT:
+            return False, "daily"
+        # Google daily limit
+        if is_google and google_used >= PREMIUM_GOOGLE_DAILY_LIMIT:
+            return False, "google"
+    else:
+        # Free daily limit
+        if daily_used >= FREE_DAILY_LIMIT:
+            return False, "daily"
+        # Free monthly limit
+        if monthly_used >= FREE_MONTHLY_LIMIT:
+            return False, "monthly"
+
+    db.increment_usage(chat_id, is_google=is_google)
+    return True, ""
 
 
 def reset_daily_counts() -> None:
     """Reset all daily usage counters. Called by the midnight UTC job."""
-    deleted = db.reset_all_daily_usage()
+    deleted = db.reset_daily_usage()
     logger.info("Reset daily usage counters (%d rows cleared)", deleted)
+
+
+def reset_monthly_counts() -> None:
+    """Reset all monthly usage counters. Called on the 1st of each month."""
+    deleted = db.reset_monthly_usage()
+    logger.info("Reset monthly usage counters (%d rows cleared)", deleted)

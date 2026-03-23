@@ -89,6 +89,23 @@ done_search_only = "✅ Configurado para <b>apenas resultados</b>. Altere a qual
 done_full = "✅ Configurado para <b>modo completo</b> (resultados + botões). Altere a qualquer momento com /settings."
 done_manual = "✅ Configurado para <b>modo manual</b>. Use /search para buscar. Altere a qualquer momento com /settings."
 
+[subscription]
+choose_plan = "⭐ <b>Choose your plan:</b>\n\nAll plans include:\n• Up to 100 searches/day\n• Google Lens (20/day)\n• Group chat support\n• Unlimited monthly searches"
+invoice_title = "Premium Subscription ({period})"
+invoice_description = "Up to 100 searches/day, Google Lens, group chat support, unlimited monthly searches."
+already_premium = "✅ You already have an active premium subscription (expires {end_date})."
+payment_success = "🎉 <b>Payment successful!</b> You now have premium access for {days} days. Enjoy!"
+status_premium = "⭐ <b>Premium</b> — active until {end_date}\nSearches today: <b>{daily_remaining}</b> / {daily_limit}\nGoogle Lens today: <b>{google_remaining}</b> / {google_limit}"
+status_free = "🆓 <b>Free tier</b> (private chats only)\nSearches today: <b>{daily_remaining}</b> / {daily_limit}\nThis month: <b>{monthly_remaining}</b> / {monthly_limit}\n\nUpgrade with /subscribe for more searches, group support, and Google Lens."
+limit_reached = "🔒 Daily search limit reached. Resets at midnight UTC.\nUpgrade to premium with /subscribe for up to 100 searches/day!"
+monthly_limit_reached = "🔒 Monthly search limit reached ({monthly_limit} searches). Resets on the 1st.\nUpgrade to premium with /subscribe for unlimited monthly searches!"
+groups_premium_only = "🔒 Group chat searches require a premium subscription. An admin can subscribe with /subscribe."
+premium_only_engine = "🔒 <b>{engine}</b> is a premium-only engine. Upgrade with /subscribe to unlock it!"
+subscribe = "Use /subscribe to get premium access."
+terms = "<b>Terms of Service</b>\n\nBy using this bot you agree to the following:\n\n• This bot provides reverse image search as a convenience. Results depend on third-party engines and may not always be accurate.\n• <b>No illegal content.</b> You must not upload illegal content, including but not limited to child sexual abuse material (CSAM), content that violates applicable laws, or content you do not have the right to distribute. Violations will result in an immediate and permanent ban.\n• <b>All sales are final.</b> Premium subscriptions are not refundable. Contact /paysupport for payment-related inquiries.\n• The bot is provided as-is without warranty. We are not responsible for any content returned by search engines.\n• <b>Data retention:</b> Uploaded images are stored for up to 30 days to provide the search functionality. After 30 days, images are automatically deleted.\n• Abuse (spam, automated bulk queries) may result in a ban.\n• Telegram Support cannot help with purchases made via this bot — use /paysupport instead."
+paysupport = "📬 <b>Payment Support</b>\n\nFor payment issues or questions:\n\n• Open an issue: <a href=\"https://github.com/Nachtalb/reverse_image_search_bot/issues\">GitHub Issues</a>\n• Contact the developer: @Nachtalb\n\nPlease note that Telegram Support cannot assist with bot purchases."
+
+
 [bot_commands]
 search = "Buscar fonte da imagem (responder a uma imagem)"
 settings = "Configurar o comportamento do bot para este chat"
@@ -127,19 +144,4 @@ source = "Fonte"
 score = "Pontuação"
 creator = "Criador"
 "created_at" = "Criado em"
-
-[subscription]
-invoice_title = "Assinatura Premium (30 dias)"
-invoice_description = "Pesquisas ilimitadas, todos os motores incluindo os premium."
-invoice_label = "Premium — 30 dias"
-already_premium = "✅ Você já tem uma assinatura premium ativa (expira em {end_date})."
-payment_success = "🎉 <b>Pagamento realizado!</b> Agora você tem acesso premium por 30 dias. Aproveite as pesquisas ilimitadas!"
-status_premium = "⭐ <b>Premium</b> — ativo até {end_date}\nPesquisas ilimitadas, todos os motores disponíveis."
-status_free = "🆓 <b>Gratuito</b>\nPesquisas hoje: <b>{remaining}</b> / {limit} restantes\nSauceNAO hoje: <b>{saucenao_remaining}</b> restantes\n\nAtualize com /subscribe para pesquisas ilimitadas."
-limit_reached = "🔒 Você usou todas as <b>{limit}</b> pesquisas de hoje. Reinicia à meia-noite UTC.\nAtualize para premium com /subscribe!"
-saucenao_limit = "🔒 Limite diário do SauceNAO atingido. Tente outros motores ou atualize com /subscribe."
-premium_only_engine = "🔒 <b>{engine}</b> é um motor premium. Atualize com /subscribe para desbloquear!"
-subscribe = "Use /subscribe para acesso premium com pesquisas ilimitadas e todos os motores."
-terms = "<b>Termos de Serviço</b>\n\nAo usar este bot, você concorda com o seguinte:\n\n• Este bot oferece pesquisa reversa de imagens. Os resultados dependem de motores de terceiros e podem não ser sempre precisos.\n• <b>Sem conteúdo ilegal.</b> É proibido enviar conteúdo ilegal, incluindo mas não limitado a CSAM, conteúdo que viole leis aplicáveis ou conteúdo que você não tem direito de distribuir. Violações resultarão em banimento imediato e permanente.\n• Assinaturas premium não são reembolsáveis. Todas as vendas são definitivas. Contate /paysupport para questões de pagamento.\n• O bot é fornecido como está, sem garantia.\n• <b>Retenção de dados:</b> Imagens enviadas são armazenadas por até 30 dias para fornecer a funcionalidade de pesquisa. Após 30 dias, são automaticamente excluídas.\n• O abuso pode resultar em banimento.\n• O suporte do Telegram não pode ajudar com compras do bot — use /paysupport."
-paysupport = "📬 <b>Suporte</b>\n\nPara dúvidas ou solicitações de reembolso:\n\n• Abrir issue: <a href=\"https://github.com/Nachtalb/reverse_image_search_bot/issues\">GitHub Issues</a>\n• Contatar o desenvolvedor: @Nachtalb"
 

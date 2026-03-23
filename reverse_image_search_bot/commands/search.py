@@ -32,8 +32,8 @@ from reverse_image_search_bot.engines.generic import GenericRISEngine, PreWorkEn
 from reverse_image_search_bot.engines.types import MetaData, ResultData
 from reverse_image_search_bot.i18n import lang as get_lang
 from reverse_image_search_bot.i18n import t, translate_field
-from reverse_image_search_bot.payments.subscription import get_remaining_searches, is_premium, use_search
-from reverse_image_search_bot.settings import ADMIN_IDS, DAILY_SEARCH_LIMIT
+from reverse_image_search_bot.payments.subscription import is_premium, use_search
+from reverse_image_search_bot.settings import ADMIN_IDS
 from reverse_image_search_bot.utils import chunks
 from reverse_image_search_bot.utils.tags import a, b, code, hidden_a, title
 
@@ -62,16 +62,8 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
         await message.reply_text(t("search.files.banned", L))
         return
 
-    # Check daily search quota (groups gate on chat_id, private chats too since chat_id == user_id)
+    # Quota is checked later per-engine via use_search(), but do a quick gate here
     chat_id = message.chat_id
-    remaining, _ = get_remaining_searches(chat_id)
-    if remaining == 0:
-        metrics.search_limit_hits_total.labels(limit_type="daily").inc()
-        await message.reply_text(
-            t("subscription.limit_reached", L, limit=str(DAILY_SEARCH_LIMIT)),
-            parse_mode=ParseMode.HTML,
-        )
-        return
 
     await context.bot.send_chat_action(chat_id=message.chat_id, action=ChatAction.TYPING)
 
@@ -133,13 +125,16 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
                 raise error
             return
 
-        # Consume one search quota (no-op for premium)
-        if not use_search(chat_id, "general"):
-            metrics.search_limit_hits_total.labels(limit_type="daily").inc()
-            await message.reply_text(
-                t("subscription.limit_reached", L, limit=str(DAILY_SEARCH_LIMIT)),
-                parse_mode=ParseMode.HTML,
-            )
+        # Consume one search quota
+        allowed, reason = use_search(chat_id, "general")
+        if not allowed:
+            metrics.search_limit_hits_total.labels(limit_type=reason).inc()
+            if reason == "groups":
+                await message.reply_text(t("subscription.groups_premium_only", L), parse_mode=ParseMode.HTML)
+            elif reason == "monthly":
+                await message.reply_text(t("subscription.monthly_limit_reached", L), parse_mode=ParseMode.HTML)
+            else:
+                await message.reply_text(t("subscription.limit_reached", L), parse_mode=ParseMode.HTML)
             return
 
         # Track usage metrics
@@ -373,12 +368,7 @@ async def _best_match_search(
 
     engine_start_times: dict[asyncio.Task, float] = {}
     engine_tasks: dict[asyncio.Task, GenericRISEngine] = {}
-    _chat_premium = is_premium(message.chat_id)
     for en in search_engines:
-        # Check SauceNAO-specific quota for free users
-        if not _chat_premium and en.name.lower() == "saucenao" and not use_search(message.chat_id, "saucenao"):
-            metrics.search_limit_hits_total.labels(limit_type="saucenao").inc()
-            continue
         if hasattr(en, "_user_lang"):
             en._user_lang = L  # type: ignore[union-attr]
         task = asyncio.create_task(en.best_match(url))

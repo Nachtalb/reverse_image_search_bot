@@ -42,6 +42,7 @@ from .payments import (
     paysupport_command,
     pre_checkout_handler,
     status_command,
+    subscribe_callback_handler,
     subscribe_command,
     successful_payment_handler,
     terms_command,
@@ -270,6 +271,7 @@ def main():
     app.add_handler(CommandHandler("transactions", transactions_command, filters=ADMIN_FILTER))
     app.add_handler(PreCheckoutQueryHandler(pre_checkout_handler))
     app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_handler))
+    app.add_handler(CallbackQueryHandler(subscribe_callback_handler, pattern=r"^sub_"))
     app.add_handler(CallbackQueryHandler(adminrefund_callback_handler, pattern=r"^adminrefund_"))
     app.add_handler(CallbackQueryHandler(settings_callback_handler, pattern=r"^settings:"))
     app.add_handler(CallbackQueryHandler(onboard_callback_handler, pattern=r"^onboard:"))
@@ -293,15 +295,25 @@ def main():
     # Schedule daily reset of search quotas at midnight UTC
     from datetime import time as dt_time
 
-    from .payments.subscription import reset_daily_counts
+    from .payments.subscription import reset_daily_counts, reset_monthly_counts
 
     async def _daily_reset_job(context: ContextTypes.DEFAULT_TYPE) -> None:
         reset_daily_counts()
 
+    async def _monthly_reset_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+        reset_monthly_counts()
+
     if app.job_queue is not None:
         app.job_queue.run_daily(_daily_reset_job, time=dt_time(hour=0, minute=0, second=0), name="daily_quota_reset")
+        # Monthly reset: run daily at 00:01, but only reset on the 1st
+        app.job_queue.run_monthly(
+            _monthly_reset_job,
+            when=dt_time(hour=0, minute=1, second=0),
+            day=1,
+            name="monthly_quota_reset",
+        )
     else:
-        logger.warning("JobQueue not available — daily quota reset will not run automatically")
+        logger.warning("JobQueue not available — quota resets will not run automatically")
 
     if settings.MODE["active"] == "webhook":
         logger.info("Starting webhook")

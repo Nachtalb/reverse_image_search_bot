@@ -89,6 +89,23 @@ done_search_only = "✅ <b>結果のみ</b>に設定しました。/settings で
 done_full = "✅ <b>フルモード</b>（結果 + ボタン）に設定しました。/settings で変更できます。"
 done_manual = "✅ <b>手動モード</b>に設定しました。/search で検索。/settings で変更できます。"
 
+[subscription]
+choose_plan = "⭐ <b>Choose your plan:</b>\n\nAll plans include:\n• Up to 100 searches/day\n• Google Lens (20/day)\n• Group chat support\n• Unlimited monthly searches"
+invoice_title = "Premium Subscription ({period})"
+invoice_description = "Up to 100 searches/day, Google Lens, group chat support, unlimited monthly searches."
+already_premium = "✅ You already have an active premium subscription (expires {end_date})."
+payment_success = "🎉 <b>Payment successful!</b> You now have premium access for {days} days. Enjoy!"
+status_premium = "⭐ <b>Premium</b> — active until {end_date}\nSearches today: <b>{daily_remaining}</b> / {daily_limit}\nGoogle Lens today: <b>{google_remaining}</b> / {google_limit}"
+status_free = "🆓 <b>Free tier</b> (private chats only)\nSearches today: <b>{daily_remaining}</b> / {daily_limit}\nThis month: <b>{monthly_remaining}</b> / {monthly_limit}\n\nUpgrade with /subscribe for more searches, group support, and Google Lens."
+limit_reached = "🔒 Daily search limit reached. Resets at midnight UTC.\nUpgrade to premium with /subscribe for up to 100 searches/day!"
+monthly_limit_reached = "🔒 Monthly search limit reached ({monthly_limit} searches). Resets on the 1st.\nUpgrade to premium with /subscribe for unlimited monthly searches!"
+groups_premium_only = "🔒 Group chat searches require a premium subscription. An admin can subscribe with /subscribe."
+premium_only_engine = "🔒 <b>{engine}</b> is a premium-only engine. Upgrade with /subscribe to unlock it!"
+subscribe = "Use /subscribe to get premium access."
+terms = "<b>Terms of Service</b>\n\nBy using this bot you agree to the following:\n\n• This bot provides reverse image search as a convenience. Results depend on third-party engines and may not always be accurate.\n• <b>No illegal content.</b> You must not upload illegal content, including but not limited to child sexual abuse material (CSAM), content that violates applicable laws, or content you do not have the right to distribute. Violations will result in an immediate and permanent ban.\n• <b>All sales are final.</b> Premium subscriptions are not refundable. Contact /paysupport for payment-related inquiries.\n• The bot is provided as-is without warranty. We are not responsible for any content returned by search engines.\n• <b>Data retention:</b> Uploaded images are stored for up to 30 days to provide the search functionality. After 30 days, images are automatically deleted.\n• Abuse (spam, automated bulk queries) may result in a ban.\n• Telegram Support cannot help with purchases made via this bot — use /paysupport instead."
+paysupport = "📬 <b>Payment Support</b>\n\nFor payment issues or questions:\n\n• Open an issue: <a href=\"https://github.com/Nachtalb/reverse_image_search_bot/issues\">GitHub Issues</a>\n• Contact the developer: @Nachtalb\n\nPlease note that Telegram Support cannot assist with bot purchases."
+
+
 [bot_commands]
 search = "画像のソースを検索（画像に返信）"
 settings = "このチャットのボット設定"
@@ -127,19 +144,4 @@ source = "ソース"
 score = "スコア"
 creator = "作成者"
 "created_at" = "作成日"
-
-[subscription]
-invoice_title = "プレミアムサブスクリプション（30日間）"
-invoice_description = "無制限の検索、プレミアム専用エンジンを含むすべてのエンジン。"
-invoice_label = "プレミアム — 30日間"
-already_premium = "✅ すでにアクティブなプレミアムサブスクリプションがあります（{end_date}に期限切れ）。"
-payment_success = "🎉 <b>支払い成功！</b>30日間のプレミアムアクセスが有効になりました。無制限の検索をお楽しみください！"
-status_premium = "⭐ <b>プレミアム</b> — {end_date}まで有効\n無制限の検索、すべてのエンジンが利用可能。"
-status_free = "🆓 <b>無料プラン</b>\n本日の検索: <b>{remaining}</b> / {limit} 残り\nSauceNAO: <b>{saucenao_remaining}</b> 残り\n\n/subscribe で無制限の検索にアップグレード。"
-limit_reached = "🔒 本日の<b>{limit}</b>回の検索をすべて使い切りました。UTC深夜にリセットされます。\n/subscribe でプレミアムにアップグレード！"
-saucenao_limit = "🔒 SauceNAOの1日の上限に達しました。他のエンジンを試すか、/subscribe でアップグレードしてください。"
-premium_only_engine = "🔒 <b>{engine}</b> はプレミアム専用エンジンです。/subscribe でアンロック！"
-subscribe = "/subscribe でプレミアムアクセス（無制限の検索、すべてのエンジン）を取得。"
-terms = "<b>利用規約</b>\n\nこのボットを使用することで以下に同意します：\n\n• このボットは画像逆検索サービスを提供します。結果はサードパーティのエンジンに依存し、常に正確とは限りません。\n• <b>違法コンテンツ禁止。</b>CSAMを含む違法コンテンツ、適用法に違反するコンテンツ、または配布権のないコンテンツのアップロードは禁止されています。違反した場合、即時かつ永久的なBANとなります。\n• プレミアムサブスクリプションは返金不可です。すべての購入は最終的なものです。お支払いに関するお問い合わせは /paysupport まで。\n• ボットは現状のまま提供され、保証はありません。\n• <b>データ保持：</b>アップロードされた画像は検索機能を提供するために最大30日間保存されます。30日後、画像は自動的に削除されます。\n• 不正使用はBANの対象となります。\n• Telegramサポートはボットでの購入をサポートできません — /paysupport をご利用ください。"
-paysupport = "📬 <b>サポート</b>\n\nご質問や返金リクエスト：\n\n• Issue作成: <a href=\"https://github.com/Nachtalb/reverse_image_search_bot/issues\">GitHub Issues</a>\n• 開発者に連絡: @Nachtalb"
 

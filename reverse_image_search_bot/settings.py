@@ -79,10 +79,21 @@ PERSISTENCE_PATH = (
 )
 
 
-# Subscription / payment limits
-DAILY_SEARCH_LIMIT = int(os.getenv("DAILY_SEARCH_LIMIT", "50"))
-DAILY_SAUCENAO_LIMIT = int(os.getenv("DAILY_SAUCENAO_LIMIT", "20"))
-SUBSCRIPTION_STARS_PRICE = int(os.getenv("SUBSCRIPTION_STARS_PRICE", "75"))
+# Subscription / payment limits — Free tier
+FREE_DAILY_LIMIT = int(os.getenv("FREE_DAILY_LIMIT", "20"))
+FREE_MONTHLY_LIMIT = int(os.getenv("FREE_MONTHLY_LIMIT", "200"))
+
+# Subscription / payment limits — Premium tier
+PREMIUM_DAILY_LIMIT = int(os.getenv("PREMIUM_DAILY_LIMIT", "100"))
+PREMIUM_GOOGLE_DAILY_LIMIT = int(os.getenv("PREMIUM_GOOGLE_DAILY_LIMIT", "20"))
+
+# Subscription pricing (Stars): [(label, days, price)]
+SUBSCRIPTION_TIERS: list[tuple[str, int, int]] = [
+    ("1 week", 7, 100),
+    ("1 month", 30, 300),
+    ("6 months", 180, 1500),
+    ("12 months", 365, 3000),
+]
 
 # Prometheus metrics
 METRICS_ENABLED = os.getenv("METRICS_ENABLED", "true").lower() in ("true", "1", "yes")

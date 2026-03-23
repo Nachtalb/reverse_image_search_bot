@@ -12,18 +12,16 @@ from telegram.ext import ContextTypes
 from reverse_image_search_bot import metrics
 from reverse_image_search_bot.i18n import lang as get_lang
 from reverse_image_search_bot.i18n import t
-from reverse_image_search_bot.settings import ADMIN_IDS, SUBSCRIPTION_STARS_PRICE
+from reverse_image_search_bot.settings import ADMIN_IDS, SUBSCRIPTION_TIERS
 
 from . import db
-from .subscription import get_remaining_saucenao, get_remaining_searches, invalidate_premium_cache, is_premium
+from .subscription import get_quota_info, invalidate_premium_cache, is_premium
 
 logger = logging.getLogger(__name__)
 
-_SUBSCRIPTION_DAYS = 30
-
 
 async def subscribe_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /subscribe — send a Telegram Stars invoice."""
+    """Handle /subscribe — show subscription tier buttons."""
     assert update.message and update.effective_chat
     metrics.commands_total.labels(command="subscribe").inc()
     L = get_lang(update)
@@ -38,12 +36,57 @@ async def subscribe_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         )
         return
 
-    await update.message.reply_invoice(
-        title=t("subscription.invoice_title", L),
+    buttons = []
+    for label, days, price in SUBSCRIPTION_TIERS:
+        buttons.append([InlineKeyboardButton(f"⭐ {price} — {label}", callback_data=f"sub_{days}_{price}")])
+
+    await update.message.reply_text(
+        t("subscription.choose_plan", L),
+        parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup(buttons),
+    )
+
+
+async def subscribe_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle subscription tier selection — send invoice."""
+    assert update.callback_query and update.callback_query.data and update.effective_chat
+    query = update.callback_query
+    assert query.data is not None
+    data: str = query.data
+    L = get_lang(update)
+
+    if not data.startswith("sub_"):
+        return
+
+    parts = data.split("_")
+    if len(parts) != 3:
+        await query.answer("Invalid selection.", show_alert=True)
+        return
+
+    try:
+        days = int(parts[1])
+        price = int(parts[2])
+    except ValueError:
+        await query.answer("Invalid selection.", show_alert=True)
+        return
+
+    # Validate against configured tiers
+    valid = any(d == days and p == price for _, d, p in SUBSCRIPTION_TIERS)
+    if not valid:
+        await query.answer("Invalid tier.", show_alert=True)
+        return
+
+    label = next((lbl for lbl, d, p in SUBSCRIPTION_TIERS if d == days and p == price), "Premium")
+    chat_id = update.effective_chat.id
+
+    await query.answer()
+    await context.bot.send_invoice(
+        chat_id=query.from_user.id,
+        title=t("subscription.invoice_title", L, period=label),
         description=t("subscription.invoice_description", L),
-        payload=f"premium_{chat_id}",
+        payload=f"premium_{chat_id}_{days}",
         currency="XTR",
-        prices=[LabeledPrice(t("subscription.invoice_label", L), SUBSCRIPTION_STARS_PRICE)],
+        prices=[LabeledPrice(f"Premium — {label}", price)],
     )
 
 
@@ -52,15 +95,15 @@ async def pre_checkout_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     assert update.pre_checkout_query
     query = update.pre_checkout_query
 
-    # Validate payload format
     payload = query.invoice_payload
     if not payload.startswith("premium_"):
         await query.answer(ok=False, error_message="Invalid invoice payload.")
         metrics.subscription_payments_total.labels(status="failed").inc()
         return
 
-    # Validate amount
-    if query.total_amount != SUBSCRIPTION_STARS_PRICE:
+    # Validate amount matches a known tier
+    valid = any(p == query.total_amount for _, _, p in SUBSCRIPTION_TIERS)
+    if not valid:
         await query.answer(ok=False, error_message="Price mismatch. Please try again.")
         metrics.subscription_payments_total.labels(status="failed").inc()
         return
@@ -73,31 +116,49 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
     assert update.message and update.message.successful_payment and update.effective_chat
     payment = update.message.successful_payment
     L = get_lang(update)
-    chat_id = update.effective_chat.id
 
     transaction_id = payment.telegram_payment_charge_id
     stars = payment.total_amount
+    payload = payment.invoice_payload
 
-    db.add_subscription(chat_id, _SUBSCRIPTION_DAYS, transaction_id, stars)
-    invalidate_premium_cache(chat_id)
+    # Extract chat_id and days from payload: premium_{chat_id}_{days}
+    parts = payload.split("_")
+    if len(parts) >= 3:
+        try:
+            target_chat_id = int(parts[1])
+            days = int(parts[2])
+        except ValueError:
+            target_chat_id = update.effective_chat.id
+            days = next((d for _, d, p in SUBSCRIPTION_TIERS if p == stars), 30)
+    else:
+        target_chat_id = update.effective_chat.id
+        days = next((d for _, d, p in SUBSCRIPTION_TIERS if p == stars), 30)
+
+    db.add_subscription(target_chat_id, days, transaction_id, stars)
+    invalidate_premium_cache(target_chat_id)
 
     metrics.subscription_payments_total.labels(status="success").inc()
     metrics.premium_users_total.set(db.count_premium_chats())
 
-    logger.info("Payment successful: chat_id=%d, stars=%d, txn=%s", chat_id, stars, transaction_id)
+    logger.info(
+        "Payment successful: chat_id=%d, days=%d, stars=%d, txn=%s", target_chat_id, days, stars, transaction_id
+    )
 
     await update.message.reply_text(
-        t("subscription.payment_success", L),
+        t("subscription.payment_success", L, days=str(days)),
         parse_mode=ParseMode.HTML,
     )
 
     # Notify admins
     user = update.effective_user
-    user_info = f"{html_mod.escape(user.full_name)} (<code>{user.id}</code>)" if user else f"<code>{chat_id}</code>"
+    user_info = (
+        f"{html_mod.escape(user.full_name)} (<code>{user.id}</code>)" if user else f"<code>{target_chat_id}</code>"
+    )
     admin_msg = (
         f"💰 <b>New payment!</b>\n"
         f"User: {user_info}\n"
-        f"Chat: <code>{chat_id}</code>\n"
+        f"Chat: <code>{target_chat_id}</code>\n"
+        f"Plan: <b>{days} days</b>\n"
         f"Amount: <b>{stars} ⭐</b>\n"
         f"Txn: <code>{transaction_id}</code>"
     )
@@ -115,19 +176,27 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     L = get_lang(update)
     chat_id = update.effective_chat.id
 
-    if is_premium(chat_id):
+    info = get_quota_info(chat_id)
+    if info["premium"]:
         sub = db.get_active_subscription(chat_id)
         end_date = sub["subscription_end"][:10] if sub else "N/A"
-        text = t("subscription.status_premium", L, end_date=end_date)
+        text = t(
+            "subscription.status_premium",
+            L,
+            end_date=end_date,
+            daily_remaining=str(info["daily_remaining"]),
+            daily_limit=str(info["daily_limit"]),
+            google_remaining=str(info["google_daily_remaining"]),
+            google_limit=str(info["google_daily_limit"]),
+        )
     else:
-        remaining, limit = get_remaining_searches(chat_id)
-        saucenao_remaining = get_remaining_saucenao(chat_id)
         text = t(
             "subscription.status_free",
             L,
-            remaining=str(remaining),
-            limit=str(limit),
-            saucenao_remaining=str(saucenao_remaining),
+            daily_remaining=str(info["daily_remaining"]),
+            daily_limit=str(info["daily_limit"]),
+            monthly_remaining=str(info["monthly_remaining"]),
+            monthly_limit=str(info["monthly_limit"]),
         )
 
     await update.message.reply_text(text, parse_mode=ParseMode.HTML)
@@ -179,7 +248,6 @@ async def adminrefund_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         return
 
-    # Store in user_data for the confirmation callback
     context.user_data["admin_refund_target"] = target_chat_id  # type: ignore[index]
     context.user_data["admin_refund_txn"] = sub["transaction_id"]  # type: ignore[index]
 
@@ -230,9 +298,6 @@ async def adminrefund_callback_handler(update: Update, context: ContextTypes.DEF
             return
 
         try:
-            # For Stars refunds, user_id must be the user who paid.
-            # For private chats, chat_id == user_id. For groups, we need the original payer.
-            # Since we don't store payer user_id separately, use target_chat_id (works for private chats).
             await context.bot.refund_star_payment(user_id=target_chat_id, telegram_payment_charge_id=transaction_id)
             db.revoke_subscription(target_chat_id, transaction_id)
             invalidate_premium_cache(target_chat_id)

@@ -89,6 +89,23 @@ done_search_only = "✅ 已设为<b>仅搜索结果</b>。随时通过 /settings
 done_full = "✅ 已设为<b>完整模式</b>（结果 + 按钮）。随时通过 /settings 更改。"
 done_manual = "✅ 已设为<b>手动模式</b>。使用 /search 搜索。随时通过 /settings 更改。"
 
+[subscription]
+choose_plan = "⭐ <b>Choose your plan:</b>\n\nAll plans include:\n• Up to 100 searches/day\n• Google Lens (20/day)\n• Group chat support\n• Unlimited monthly searches"
+invoice_title = "Premium Subscription ({period})"
+invoice_description = "Up to 100 searches/day, Google Lens, group chat support, unlimited monthly searches."
+already_premium = "✅ You already have an active premium subscription (expires {end_date})."
+payment_success = "🎉 <b>Payment successful!</b> You now have premium access for {days} days. Enjoy!"
+status_premium = "⭐ <b>Premium</b> — active until {end_date}\nSearches today: <b>{daily_remaining}</b> / {daily_limit}\nGoogle Lens today: <b>{google_remaining}</b> / {google_limit}"
+status_free = "🆓 <b>Free tier</b> (private chats only)\nSearches today: <b>{daily_remaining}</b> / {daily_limit}\nThis month: <b>{monthly_remaining}</b> / {monthly_limit}\n\nUpgrade with /subscribe for more searches, group support, and Google Lens."
+limit_reached = "🔒 Daily search limit reached. Resets at midnight UTC.\nUpgrade to premium with /subscribe for up to 100 searches/day!"
+monthly_limit_reached = "🔒 Monthly search limit reached ({monthly_limit} searches). Resets on the 1st.\nUpgrade to premium with /subscribe for unlimited monthly searches!"
+groups_premium_only = "🔒 Group chat searches require a premium subscription. An admin can subscribe with /subscribe."
+premium_only_engine = "🔒 <b>{engine}</b> is a premium-only engine. Upgrade with /subscribe to unlock it!"
+subscribe = "Use /subscribe to get premium access."
+terms = "<b>Terms of Service</b>\n\nBy using this bot you agree to the following:\n\n• This bot provides reverse image search as a convenience. Results depend on third-party engines and may not always be accurate.\n• <b>No illegal content.</b> You must not upload illegal content, including but not limited to child sexual abuse material (CSAM), content that violates applicable laws, or content you do not have the right to distribute. Violations will result in an immediate and permanent ban.\n• <b>All sales are final.</b> Premium subscriptions are not refundable. Contact /paysupport for payment-related inquiries.\n• The bot is provided as-is without warranty. We are not responsible for any content returned by search engines.\n• <b>Data retention:</b> Uploaded images are stored for up to 30 days to provide the search functionality. After 30 days, images are automatically deleted.\n• Abuse (spam, automated bulk queries) may result in a ban.\n• Telegram Support cannot help with purchases made via this bot — use /paysupport instead."
+paysupport = "📬 <b>Payment Support</b>\n\nFor payment issues or questions:\n\n• Open an issue: <a href=\"https://github.com/Nachtalb/reverse_image_search_bot/issues\">GitHub Issues</a>\n• Contact the developer: @Nachtalb\n\nPlease note that Telegram Support cannot assist with bot purchases."
+
+
 [bot_commands]
 search = "搜索图片来源（回复图片）"
 settings = "配置此聊天的机器人设置"
@@ -127,19 +144,4 @@ source = "来源"
 score = "评分"
 creator = "创作者"
 "created_at" = "创建于"
-
-[subscription]
-invoice_title = "高级订阅（30天）"
-invoice_description = "无限搜索，所有引擎包括高级引擎。"
-invoice_label = "高级版 — 30天"
-already_premium = "✅ 您已有活跃的高级订阅（到期日 {end_date}）。"
-payment_success = "🎉 <b>支付成功！</b>您现在拥有30天的高级访问权限。享受无限搜索吧！"
-status_premium = "⭐ <b>高级版</b> — 有效期至 {end_date}\n无限搜索，所有引擎可用。"
-status_free = "🆓 <b>免费版</b>\n今日搜索: <b>{remaining}</b> / {limit} 剩余\nSauceNAO: <b>{saucenao_remaining}</b> 剩余\n\n使用 /subscribe 升级为无限搜索。"
-limit_reached = "🔒 您已用完今天的 <b>{limit}</b> 次搜索。UTC午夜重置。\n使用 /subscribe 升级到高级版！"
-saucenao_limit = "🔒 SauceNAO 每日限额已达。尝试其他引擎或使用 /subscribe 升级。"
-premium_only_engine = "🔒 <b>{engine}</b> 是高级引擎。使用 /subscribe 解锁！"
-subscribe = "使用 /subscribe 获取高级访问权限（无限搜索和所有引擎）。"
-terms = "<b>服务条款</b>\n\n使用本机器人即表示您同意以下内容：\n\n• 本机器人提供反向图片搜索服务。结果取决于第三方引擎，可能并不总是准确。\n• <b>禁止非法内容。</b>禁止上传非法内容，包括但不限于CSAM、违反适用法律的内容或您无权分发的内容。违规将导致立即永久封禁。\n• 高级订阅不可退款。所有购买均为最终购买。付款相关问题请联系 /paysupport。\n• 机器人按原样提供，不提供保证。\n• <b>数据保留：</b>上传的图片最多保存30天以提供搜索功能。30天后，图片将自动删除。\n• 滥用可能导致封禁。\n• Telegram客服无法协助机器人购买 — 请使用 /paysupport。"
-paysupport = "📬 <b>客服</b>\n\n如有问题或退款请求：\n\n• 提交Issue: <a href=\"https://github.com/Nachtalb/reverse_image_search_bot/issues\">GitHub Issues</a>\n• 联系开发者: @Nachtalb"
 

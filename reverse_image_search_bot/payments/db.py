@@ -1,4 +1,4 @@
-"""SQLite tables for subscriptions and daily usage tracking.
+"""SQLite tables for subscriptions and daily/monthly usage tracking.
 
 Uses the same database file and thread-local connection pattern as config/db.py.
 """
@@ -7,7 +7,7 @@ import atexit
 import contextlib
 import sqlite3
 import threading
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from reverse_image_search_bot.settings import CONFIG_DB_PATH
 
@@ -63,11 +63,28 @@ def _ensure_schema(conn: sqlite3.Connection):
             chat_id INTEGER NOT NULL,
             date TEXT NOT NULL,
             search_count INTEGER NOT NULL DEFAULT 0,
-            saucenao_count INTEGER NOT NULL DEFAULT 0,
+            google_count INTEGER NOT NULL DEFAULT 0,
             PRIMARY KEY (chat_id, date)
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS monthly_usage (
+            chat_id INTEGER NOT NULL,
+            month TEXT NOT NULL,
+            search_count INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (chat_id, month)
+        )
+    """)
+    # Migration: add google_count column if missing (from old schema)
+    try:
+        conn.execute("ALTER TABLE daily_usage ADD COLUMN google_count INTEGER NOT NULL DEFAULT 0")
+    except sqlite3.OperationalError as e:
+        if "duplicate column name" not in str(e):
+            raise
     conn.commit()
+
+
+# ── Subscriptions ────────────────────────────────────────────────────────
 
 
 def add_subscription(chat_id: int, days: int, transaction_id: str, stars_amount: int) -> None:
@@ -83,8 +100,6 @@ def add_subscription(chat_id: int, days: int, transaction_id: str, stars_amount:
         existing_end = datetime.fromisoformat(row["subscription_end"])
         if existing_end > now:
             now = existing_end
-
-    from datetime import timedelta
 
     end = now + timedelta(days=days)
     conn.execute(
@@ -106,41 +121,6 @@ def get_active_subscription(chat_id: int) -> dict | None:
     if row is None:
         return None
     return dict(row)
-
-
-def get_daily_usage(chat_id: int) -> tuple[int, int]:
-    """Return (search_count, saucenao_count) for today."""
-    conn = _get_conn()
-    today = datetime.now(UTC).strftime("%Y-%m-%d")
-    row = conn.execute(
-        "SELECT search_count, saucenao_count FROM daily_usage WHERE chat_id = ? AND date = ?",
-        (chat_id, today),
-    ).fetchone()
-    if row is None:
-        return 0, 0
-    return row["search_count"], row["saucenao_count"]
-
-
-def increment_usage(chat_id: int, is_saucenao: bool = False) -> None:
-    """Increment daily usage counters for a chat."""
-    conn = _get_conn()
-    today = datetime.now(UTC).strftime("%Y-%m-%d")
-    saucenao_inc = 1 if is_saucenao else 0
-    conn.execute(
-        "INSERT INTO daily_usage (chat_id, date, search_count, saucenao_count) VALUES (?, ?, 1, ?) "
-        "ON CONFLICT(chat_id, date) DO UPDATE SET search_count = search_count + 1, "
-        "saucenao_count = saucenao_count + ?",
-        (chat_id, today, saucenao_inc, saucenao_inc),
-    )
-    conn.commit()
-
-
-def reset_all_daily_usage() -> int:
-    """Delete all daily usage rows (called at midnight UTC). Returns rows deleted."""
-    conn = _get_conn()
-    cursor = conn.execute("DELETE FROM daily_usage")
-    conn.commit()
-    return cursor.rowcount
 
 
 def list_all_subscriptions() -> list[dict]:
@@ -183,3 +163,65 @@ def count_premium_chats() -> int:
         (now,),
     ).fetchone()
     return row["cnt"] if row else 0
+
+
+# ── Usage Tracking ───────────────────────────────────────────────────────
+
+
+def get_usage(chat_id: int) -> tuple[int, int, int]:
+    """Return (daily_searches, monthly_searches, google_daily) for a chat."""
+    conn = _get_conn()
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
+    month = datetime.now(UTC).strftime("%Y-%m")
+
+    daily_row = conn.execute(
+        "SELECT search_count, google_count FROM daily_usage WHERE chat_id = ? AND date = ?",
+        (chat_id, today),
+    ).fetchone()
+    daily = daily_row["search_count"] if daily_row else 0
+    google = daily_row["google_count"] if daily_row else 0
+
+    monthly_row = conn.execute(
+        "SELECT search_count FROM monthly_usage WHERE chat_id = ? AND month = ?",
+        (chat_id, month),
+    ).fetchone()
+    monthly = monthly_row["search_count"] if monthly_row else 0
+
+    return daily, monthly, google
+
+
+def increment_usage(chat_id: int, is_google: bool = False) -> None:
+    """Increment daily and monthly usage counters for a chat."""
+    conn = _get_conn()
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
+    month = datetime.now(UTC).strftime("%Y-%m")
+    google_inc = 1 if is_google else 0
+
+    conn.execute(
+        "INSERT INTO daily_usage (chat_id, date, search_count, google_count) VALUES (?, ?, 1, ?) "
+        "ON CONFLICT(chat_id, date) DO UPDATE SET search_count = search_count + 1, "
+        "google_count = google_count + ?",
+        (chat_id, today, google_inc, google_inc),
+    )
+    conn.execute(
+        "INSERT INTO monthly_usage (chat_id, month, search_count) VALUES (?, ?, 1) "
+        "ON CONFLICT(chat_id, month) DO UPDATE SET search_count = search_count + 1",
+        (chat_id, month),
+    )
+    conn.commit()
+
+
+def reset_daily_usage() -> int:
+    """Delete all daily usage rows (called at midnight UTC). Returns rows deleted."""
+    conn = _get_conn()
+    cursor = conn.execute("DELETE FROM daily_usage")
+    conn.commit()
+    return cursor.rowcount
+
+
+def reset_monthly_usage() -> int:
+    """Delete all monthly usage rows (called on 1st of month). Returns rows deleted."""
+    conn = _get_conn()
+    cursor = conn.execute("DELETE FROM monthly_usage")
+    conn.commit()
+    return cursor.rowcount
