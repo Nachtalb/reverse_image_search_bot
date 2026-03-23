@@ -4,6 +4,8 @@ how_to_use = "🤔 كيفية الاستخدام"
 how_to_use_text = "أرسل لي صورة أو ملصق أو فيديو/GIF أو رابط وسأرسل لك روابط بحث عكسي مباشرة عبر SauceNao وGoogle وYandex وغيرها.\nلصور الأنمي أنصح بـ SauceNao، للصور الأخرى Google أو Yandex."
 commands_title = "🖥️ الأوامر"
 commands_list = "/help — عرض المساعدة\n/search — رد على صورة للبحث\n/settings — إعدادات المحادثة"
+premium_promo = "\n\n⭐ <b>Premium</b>\n🆓 Free: 20 searches/day, private chats only\n⭐ Premium: 100/day, Google search, group chats &amp; more\n👉 /subscribe"
+
 
 [commands]
 ban_usage = "الاستخدام: /ban <user_id>"

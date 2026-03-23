@@ -4,6 +4,8 @@ how_to_use = "🤔 So funktioniert es"
 how_to_use_text = "Sende mir ein Bild, einen Sticker, ein Video/GIF oder eine URL und ich schicke dir direkte Links zur Bilderrückwärtssuche über SauceNao, Google, Yandex und weitere.\nFür Anime-Bilder empfehle ich SauceNao, für andere Bilder Google oder Yandex."
 commands_title = "🖥️ Befehle"
 commands_list = "/help — Hilfe anzeigen\n/search — Auf ein Bild antworten um zu suchen\n/settings — Chat-Einstellungen"
+premium_promo = "\n\n⭐ <b>Premium</b>\n🆓 Free: 20 searches/day, private chats only\n⭐ Premium: 100/day, Google search, group chats &amp; more\n👉 /subscribe"
+
 
 [commands]
 ban_usage = "Verwendung: /ban <user_id>"

@@ -3,7 +3,8 @@ title = "🔎 Reverse Image Search Bot — Help"
 how_to_use = "🤔 How to use me"
 how_to_use_text = "Send me an image, sticker, video/gif or URL and I will send you direct reverse image search links for SauceNao, Google, Yandex and the like.\nFor anime images I recommend SauceNao, for other images I recommend Google or Yandex."
 commands_title = "🖥️ Commands"
-commands_list = "/help — Show help\n/search — Reply to an image or video to search\n/settings — Configure per-chat behaviour"
+commands_list = "/help — Show help\n/search — Reply to an image or video to search\n/settings — Configure per-chat behaviour\n/subscribe — Get premium access\n/status — Check your quota"
+premium_promo = "\n\n⭐ <b>Premium</b>\n🆓 Free: 20 searches/day, private chats only\n⭐ Premium: 100/day, Google search, group chats &amp; more\n👉 /subscribe"
 
 [commands]
 ban_usage = "Usage: /ban <user_id>"
@@ -74,13 +75,13 @@ min_one_button = "⚠️ At least one button must stay enabled."
 min_one_engine = "⚠️ At least one engine must stay enabled."
 
 [start]
-private = "🔎 Send me an image, sticker, or video and I'll find its source.\n\n🆓 <b>Free:</b> 20 searches/day in private chats\n⭐ <b>Premium:</b> 100/day, Google search, group chats &amp; more\n\n/subscribe · /status · /help"
+private = "🔎 Send me an image, sticker, or video and I'll find its source."
 group = "🔎 Send me an image, sticker, or video and I'll find its source.\n\n⭐ Premium features available — /subscribe\n\n/search · /settings"
 opening_settings = "⚙️ Opening settings..."
 
 [onboarding]
 title = "👋 <b>How should I handle images in this group?</b>"
-description = "• <b>Search results only</b> — auto-search images, show results\n• <b>Full</b> — auto-search + show engine buttons\n• <b>Manual</b> — only search when someone replies with /search\n• <b>Settings</b> — configure everything yourself"
+description = "• <b>Search results only</b> — auto-search images, show results\n• <b>Full</b> — auto-search + show engine buttons\n• <b>Manual</b> — only search when someone replies with /search\n• <b>Settings</b> — configure everything yourself\n\n⭐ Group search requires a premium subscription — /subscribe"
 btn_search_only = "🔍 Search results only"
 btn_full = "🔍 Full (results + buttons)"
 btn_manual = "❌ Manual only (/search)"
