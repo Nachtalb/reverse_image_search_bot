@@ -265,10 +265,10 @@ def main():
     )
     app.add_handler(feedback_handler)
 
-    # Admin reply to feedback — forwards the reply back to the original user
+    # Feedback reply handler — allows admins and users to reply back and forth
     app.add_handler(
         MessageHandler(
-            ADMIN_FILTER & filters.REPLY & filters.TEXT & filters.ChatType.PRIVATE,
+            filters.REPLY & filters.TEXT & filters.ChatType.PRIVATE,
             feedback_reply_handler,
         ),
         group=2,

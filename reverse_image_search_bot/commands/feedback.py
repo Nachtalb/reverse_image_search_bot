@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import logging
 
 from telegram import Update
@@ -13,6 +14,13 @@ from reverse_image_search_bot.i18n import t
 logger = logging.getLogger(__name__)
 
 WAITING_FOR_FEEDBACK = 0
+
+# bot_data["feedback_replies"] maps "chat_id:message_id" → target_chat_id
+# This allows chaining: admin replies to user, user replies back, etc.
+
+
+def _feedback_map(context: ContextTypes.DEFAULT_TYPE) -> dict[str, int]:
+    return context.bot_data.setdefault("feedback_replies", {})
 
 
 async def feedback_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> object:
@@ -34,17 +42,16 @@ async def feedback_received(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         return WAITING_FOR_FEEDBACK
 
     user = update.effective_user
-    user_link = f'<a href="tg://user?id={user.id}">{user.full_name}</a>'
-    admin_text = t("feedback.admin_message", "en", user=user_link, user_id=user.id, feedback=text)
+    user_link = f'<a href="tg://user?id={user.id}">{html.escape(user.full_name)}</a>'
+    admin_text = t("feedback.admin_message", "en", user=user_link, user_id=user.id, feedback=html.escape(text))
 
-    # Map to track which admin messages correspond to which user chat
-    feedback_map: dict[str, int] = context.bot_data.setdefault("feedback_replies", {})
+    fmap = _feedback_map(context)
 
     for admin_id in settings.ADMIN_IDS:
         try:
             sent = await context.bot.send_message(admin_id, admin_text, parse_mode=ParseMode.HTML)
-            # Key: "admin_chat_id:message_id" → user chat id
-            feedback_map[f"{admin_id}:{sent.message_id}"] = user.id
+            # Admin message → points to user so admin can reply
+            fmap[f"{admin_id}:{sent.message_id}"] = user.id
         except Exception:
             logger.warning("Failed to send feedback to admin %d", admin_id)
 
@@ -53,32 +60,57 @@ async def feedback_received(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 
 async def feedback_reply_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle admin replies to feedback messages — forward the reply to the original user."""
+    """Handle replies to feedback messages — forwards between admin and user."""
     assert update.message and update.effective_chat and update.message.reply_to_message
 
     reply_to = update.message.reply_to_message
     chat_id = update.effective_chat.id
     key = f"{chat_id}:{reply_to.message_id}"
 
-    feedback_map: dict[str, int] = context.bot_data.get("feedback_replies", {})
-    user_id = feedback_map.get(key)
-    if user_id is None:
+    fmap = _feedback_map(context)
+    target_id = fmap.get(key)
+    if target_id is None:
         return
 
     reply_text = update.message.text
     if not reply_text:
         return
 
-    try:
-        await context.bot.send_message(
-            user_id,
-            t("feedback.admin_reply", "en", reply=reply_text),
-            parse_mode=ParseMode.HTML,
-        )
-        await update.message.reply_text(t("feedback.reply_sent", "en"))
-    except Exception:
-        logger.warning("Failed to send feedback reply to user %d", user_id)
-        await update.message.reply_text(t("feedback.reply_failed", "en"))
+    is_admin = chat_id in settings.ADMIN_IDS
+
+    if is_admin:
+        # Admin → user
+        msg_text = t("feedback.admin_reply", "en", reply=html.escape(reply_text))
+        success_key = "feedback.reply_sent"
+        fail_key = "feedback.reply_failed"
+    else:
+        # User → admin(s)
+        user = update.effective_user
+        assert user
+        user_link = f'<a href="tg://user?id={user.id}">{html.escape(user.full_name)}</a>'
+        msg_text = t("feedback.user_followup", "en", user=user_link, user_id=user.id, feedback=html.escape(reply_text))
+        success_key = "feedback.followup_sent"
+        fail_key = "feedback.followup_failed"
+
+    if is_admin:
+        # Send to the specific user
+        try:
+            sent = await context.bot.send_message(target_id, msg_text, parse_mode=ParseMode.HTML)
+            # Store reverse mapping so user can reply back
+            fmap[f"{target_id}:{sent.message_id}"] = chat_id
+            await update.message.reply_text(t(success_key, "en"))
+        except Exception:
+            logger.warning("Failed to send feedback reply to user %d", target_id)
+            await update.message.reply_text(t(fail_key, "en"))
+    else:
+        # User replying — send to all admins
+        for admin_id in settings.ADMIN_IDS:
+            try:
+                sent = await context.bot.send_message(admin_id, msg_text, parse_mode=ParseMode.HTML)
+                fmap[f"{admin_id}:{sent.message_id}"] = chat_id
+            except Exception:
+                logger.warning("Failed to send user followup to admin %d", admin_id)
+        await update.message.reply_text(t(success_key, "en"))
 
 
 async def feedback_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> object:
