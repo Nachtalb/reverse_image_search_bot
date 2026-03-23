@@ -165,10 +165,12 @@ async def refund_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text(t("subscription.refund_no_subscription", L), parse_mode=ParseMode.HTML)
         return
 
+    # Store txn ID in user_data since callback_data has a 64-byte limit
+    context.user_data["pending_refund_txn"] = sub["transaction_id"]  # type: ignore[index]
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("✅ Yes, refund", callback_data=f"refund_confirm_{sub['transaction_id']}"),
+                InlineKeyboardButton("✅ Yes, refund", callback_data="refund_confirm"),
                 InlineKeyboardButton("❌ Cancel", callback_data="refund_cancel"),
             ]
         ]
@@ -193,12 +195,12 @@ async def refund_callback_handler(update: Update, context: ContextTypes.DEFAULT_
             await msg.edit_text(t("subscription.refund_cancelled", L), parse_mode=ParseMode.HTML)  # type: ignore[union-attr]
         return
 
-    if data.startswith("refund_confirm_"):
-        transaction_id = data.removeprefix("refund_confirm_")
+    if data == "refund_confirm":
+        transaction_id = context.user_data.get("pending_refund_txn") if context.user_data else None
         chat_id = update.effective_chat.id
         sub = db.get_active_subscription(chat_id)
 
-        if not sub or sub["transaction_id"] != transaction_id:
+        if not sub or not transaction_id or sub["transaction_id"] != transaction_id:
             await query.answer(t("subscription.refund_no_subscription", L), show_alert=True)
             return
 
