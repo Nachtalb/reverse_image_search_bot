@@ -3,7 +3,7 @@ title = "🔎 بحث عكسي عن الصور — مساعدة"
 how_to_use = "🤔 كيفية الاستخدام"
 how_to_use_text = "أرسل لي صورة أو ملصق أو فيديو/GIF أو رابط وسأرسل لك روابط بحث عكسي مباشرة عبر SauceNao وGoogle وYandex وغيرها.\nلصور الأنمي أنصح بـ SauceNao، للصور الأخرى Google أو Yandex."
 commands_title = "🖥️ الأوامر"
-commands_list = "/help — عرض المساعدة\n/search — رد على صورة للبحث\n/settings — إعدادات المحادثة"
+commands_list = "/help — عرض المساعدة\n/search — رد على صورة للبحث\n/settings — إعدادات المحادثة\n/feedback — إرسال ملاحظات للمسؤولين"
 
 [commands]
 ban_usage = "الاستخدام: /ban <user_id>"
@@ -94,6 +94,14 @@ search = "البحث عن مصدر الصورة (رد على صورة)"
 settings = "إعدادات البوت لهذه المحادثة"
 help = "عرض المساعدة"
 start = "تشغيل البوت"
+feedback = "إرسال ملاحظات للمسؤولين"
+
+[feedback]
+prompt = "💬 اكتب ملاحظاتك أدناه. أرسل /cancel للإلغاء."
+empty = "رسالتك فارغة. اكتب ملاحظاتك أو أرسل /cancel للإلغاء."
+thanks = "✅ شكراً على ملاحظاتك! تم إرسالها إلى المسؤولين."
+cancelled = "تم إلغاء الملاحظات."
+admin_message = "📬 <b>ملاحظات جديدة</b>\nمن: {user} (<code>{user_id}</code>)\n\n{feedback}"
 
 [fields]
 title = "العنوان"

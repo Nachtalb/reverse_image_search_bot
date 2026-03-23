@@ -3,7 +3,7 @@ title = "🔎 Recherche inversée d'images — Aide"
 how_to_use = "🤔 Comment m'utiliser"
 how_to_use_text = "Envoyez-moi une image, un sticker, une vidéo/GIF ou un lien et je vous enverrai des liens de recherche inversée via SauceNao, Google, Yandex et d'autres.\nPour les images d'anime, je recommande SauceNao, pour les autres images Google ou Yandex."
 commands_title = "🖥️ Commandes"
-commands_list = "/help — Afficher l'aide\n/search — Répondre à une image pour chercher\n/settings — Paramètres du chat"
+commands_list = "/help — Afficher l'aide\n/search — Répondre à une image pour chercher\n/settings — Paramètres du chat\n/feedback — Envoyer un retour aux administrateurs"
 
 [commands]
 ban_usage = "Utilisation : /ban <user_id>"
@@ -94,6 +94,14 @@ search = "Rechercher la source d'une image (répondre à une image)"
 settings = "Configurer le comportement du bot pour ce chat"
 help = "Afficher l'aide"
 start = "Démarrer le bot"
+feedback = "Envoyer un retour aux administrateurs"
+
+[feedback]
+prompt = "💬 Écrivez votre retour ci-dessous. Envoyez /cancel pour annuler."
+empty = "Votre message semble vide. Écrivez votre retour ou envoyez /cancel pour annuler."
+thanks = "✅ Merci pour votre retour ! Il a été transmis aux administrateurs."
+cancelled = "Retour annulé."
+admin_message = "📬 <b>Nouveau retour</b>\nDe : {user} (<code>{user_id}</code>)\n\n{feedback}"
 
 [fields]
 title = "Titre"
