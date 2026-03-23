@@ -3,7 +3,7 @@ title = "🔎 Reverse Image Search Bot — Help"
 how_to_use = "🤔 How to use me"
 how_to_use_text = "Send me an image, sticker, video/gif or URL and I will send you direct reverse image search links for SauceNao, Google, Yandex and the like.\nFor anime images I recommend SauceNao, for other images I recommend Google or Yandex."
 commands_title = "🖥️ Commands"
-commands_list = "/help — Show help\n/search — Reply to an image or video to search\n/settings — Configure per-chat behaviour"
+commands_list = "/help — Show help\n/search — Reply to an image or video to search\n/settings — Configure per-chat behaviour\n/feedback — Send feedback to the admins"
 
 [commands]
 ban_usage = "Usage: /ban <user_id>"

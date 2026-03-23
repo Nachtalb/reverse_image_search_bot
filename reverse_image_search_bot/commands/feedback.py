@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 WAITING_FOR_FEEDBACK = 0
 
 
-async def feedback_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def feedback_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> object:
     """Entry point: /feedback — ask user to type their feedback."""
     assert update.message
     metrics.commands_total.labels(command="feedback").inc()
@@ -24,7 +24,7 @@ async def feedback_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     return WAITING_FOR_FEEDBACK
 
 
-async def feedback_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def feedback_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> object:
     """Receive the feedback text and forward it to admins."""
     assert update.message and update.effective_user
     L = get_lang(update)
@@ -47,7 +47,7 @@ async def feedback_received(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     return ConversationHandler.END
 
 
-async def feedback_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def feedback_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> object:
     """Cancel the feedback flow."""
     assert update.message
     L = get_lang(update)
