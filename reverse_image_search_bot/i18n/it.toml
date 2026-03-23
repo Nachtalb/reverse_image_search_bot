@@ -90,13 +90,13 @@ done_full = "✅ Impostato: <b>modo completo</b> (risultati + pulsanti). Modific
 done_manual = "✅ Impostato: <b>modo manuale</b>. Usa /search per cercare. Modifica in /settings."
 
 [subscription]
-choose_plan = "⭐ <b>Choose your plan:</b>\n\nAll plans include:\n• Up to 100 searches/day\n• Google Lens (20/day)\n• Group chat support\n• Unlimited monthly searches"
+choose_plan = "⭐ <b>Choose your plan:</b>\n\nAll plans include:\n• Up to 100 searches/day\n• Google (20/day)\n• Group chat support\n• Unlimited monthly searches"
 invoice_title = "Premium Subscription ({period})"
-invoice_description = "Up to 100 searches/day, Google Lens, group chat support, unlimited monthly searches."
+invoice_description = "Up to 100 searches/day, Google, group chat support, unlimited monthly searches."
 already_premium = "✅ You already have an active premium subscription (expires {end_date})."
 payment_success = "🎉 <b>Payment successful!</b> You now have premium access for {days} days. Enjoy!"
-status_premium = "⭐ <b>Premium</b> — active until {end_date}\nSearches today: <b>{daily_remaining}</b> / {daily_limit}\nGoogle Lens today: <b>{google_remaining}</b> / {google_limit}"
-status_free = "🆓 <b>Free tier</b> (private chats only)\nSearches today: <b>{daily_remaining}</b> / {daily_limit}\nThis month: <b>{monthly_remaining}</b> / {monthly_limit}\n\nUpgrade with /subscribe for more searches, group support, and Google Lens."
+status_premium = "⭐ <b>Premium</b> — active until {end_date}\nSearches today: <b>{daily_remaining}</b> / {daily_limit}\nGoogle today: <b>{google_remaining}</b> / {google_limit}"
+status_free = "🆓 <b>Free tier</b> (private chats only)\nSearches today: <b>{daily_remaining}</b> / {daily_limit}\nThis month: <b>{monthly_remaining}</b> / {monthly_limit}\n\nUpgrade with /subscribe for more searches, group support, and Google."
 limit_reached = "🔒 Daily search limit reached. Resets at midnight UTC.\nUpgrade to premium with /subscribe for up to 100 searches/day!"
 monthly_limit_reached = "🔒 Monthly search limit reached ({monthly_limit} searches). Resets on the 1st.\nUpgrade to premium with /subscribe for unlimited monthly searches!"
 groups_premium_only = "🔒 Group chat searches require a premium subscription. An admin can subscribe with /subscribe."

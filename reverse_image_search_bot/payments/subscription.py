@@ -93,13 +93,13 @@ def use_search(chat_id: int, engine_name: str) -> tuple[bool, str]:
     reason is empty if allowed, otherwise a key like 'daily', 'monthly', 'google', 'groups'.
     """
     premium = is_premium(chat_id)
-    is_google = "google" in engine_name.lower() or "lens" in engine_name.lower()
+    is_google = "google" in engine_name.lower()
 
     # Free tier: private chat only (negative chat_ids are groups)
     if not premium and chat_id < 0:
         return False, "groups"
 
-    # Google Lens: premium only
+    # Google: premium only
     if is_google and not premium:
         return False, "premium_engine"
 
