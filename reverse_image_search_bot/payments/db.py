@@ -144,10 +144,22 @@ def reset_all_daily_usage() -> int:
 
 
 def list_all_subscriptions() -> list[dict]:
-    """Return all subscriptions ordered by start date descending."""
+    """Return all subscriptions ordered by start date descending.
+
+    Each dict includes 'refunded' and 'active' booleans.
+    """
     conn = _get_conn()
+    now = datetime.now(UTC).isoformat()
     rows = conn.execute("SELECT * FROM subscriptions ORDER BY subscription_start DESC").fetchall()
-    return [dict(r) for r in rows]
+    result = []
+    for r in rows:
+        d = dict(r)
+        start = datetime.fromisoformat(d["subscription_start"])
+        end = datetime.fromisoformat(d["subscription_end"])
+        d["refunded"] = (end - start).days < 1
+        d["active"] = d["subscription_end"] > now and not d["refunded"]
+        result.append(d)
+    return result
 
 
 def revoke_subscription(chat_id: int, transaction_id: str) -> bool:

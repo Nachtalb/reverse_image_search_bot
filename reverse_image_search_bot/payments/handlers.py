@@ -237,17 +237,22 @@ async def transactions_command(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text("No transactions found.")
         return
 
-    total_stars = sum(r["stars_amount"] for r in rows)
-    active = sum(1 for r in rows if not r.get("revoked", False))
+    total_stars = sum(r["stars_amount"] for r in rows if not r["refunded"])
+    refunded_stars = sum(r["stars_amount"] for r in rows if r["refunded"])
+    active = sum(1 for r in rows if r["active"])
+    refunded = sum(1 for r in rows if r["refunded"])
 
-    lines = [f"📊 <b>Transactions</b> ({len(rows)} total, {active} active, {total_stars} ⭐ total)\n"]
+    lines = [
+        f"📊 <b>Transactions</b> ({len(rows)} total, {active} active, {refunded} refunded)\n"
+        f"💰 {total_stars} ⭐ earned, {refunded_stars} ⭐ refunded\n"
+    ]
     for r in rows[-25:]:  # Last 25
         start = r["subscription_start"][:10]
         end = r["subscription_end"][:10]
         chat = r["chat_id"]
         stars = r["stars_amount"]
-        txn = r["transaction_id"][:16]
-        lines.append(f"• <code>{chat}</code> | {stars}⭐ | {start}→{end} | <code>{txn}…</code>")
+        status = "🔴 refunded" if r["refunded"] else ("🟢 active" if r["active"] else "⚪ expired")
+        lines.append(f"• <code>{chat}</code> | {stars}⭐ | {start}→{end} | {status}")
 
     if len(rows) > 25:
         lines.append(f"\n<i>(showing last 25 of {len(rows)})</i>")
