@@ -101,7 +101,13 @@ prompt = "💬 フィードバックを入力してください。/cancel で中
 empty = "メッセージが空のようです。フィードバックを入力するか、/cancel で中止してください。"
 thanks = "✅ フィードバックありがとうございます！管理者に転送されました。"
 cancelled = "フィードバックがキャンセルされました。"
-admin_message = "📬 <b>新しいフィードバック</b>\n送信者: {user} (<code>{user_id}</code>)\n\n{feedback}"
+admin_message = "📬 <b>新しいフィードバック</b>\n送信者: {user} (<code>{user_id}</code>)\n\n{feedback}\n\n💡 <i>このメッセージに返信してユーザーに応答できます。</i>"
+admin_reply = "📩 <b>管理者からの返信:</b>\n\n{reply}\n\n💡 <i>このメッセージに返信して応答できます。</i>"
+reply_sent = "✅ ユーザーに返信を送信しました。"
+reply_failed = "❌ ユーザーへの返信に失敗しました。ボットがブロックされている可能性があります。"
+user_followup = "📬 <b>フォローアップ</b>\n送信者: {user} (<code>{user_id}</code>)\n\n{feedback}\n\n💡 <i>このメッセージに返信してユーザーに応答できます。</i>"
+followup_sent = "✅ 返信が管理者に送信されました。"
+followup_failed = "❌ 返信の送信に失敗しました。"
 
 [fields]
 title = "タイトル"

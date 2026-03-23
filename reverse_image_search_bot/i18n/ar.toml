@@ -101,7 +101,13 @@ prompt = "💬 اكتب ملاحظاتك أدناه. أرسل /cancel للإلغ
 empty = "رسالتك فارغة. اكتب ملاحظاتك أو أرسل /cancel للإلغاء."
 thanks = "✅ شكراً على ملاحظاتك! تم إرسالها إلى المسؤولين."
 cancelled = "تم إلغاء الملاحظات."
-admin_message = "📬 <b>ملاحظات جديدة</b>\nمن: {user} (<code>{user_id}</code>)\n\n{feedback}"
+admin_message = "📬 <b>ملاحظات جديدة</b>\nمن: {user} (<code>{user_id}</code>)\n\n{feedback}\n\n💡 <i>رد على هذه الرسالة للرد على المستخدم.</i>"
+admin_reply = "📩 <b>رد من المسؤول:</b>\n\n{reply}\n\n💡 <i>رد على هذه الرسالة للمتابعة.</i>"
+reply_sent = "✅ تم إرسال الرد إلى المستخدم."
+reply_failed = "❌ فشل إرسال الرد. ربما قام المستخدم بحظر البوت."
+user_followup = "📬 <b>متابعة</b>\nمن: {user} (<code>{user_id}</code>)\n\n{feedback}\n\n💡 <i>رد على هذه الرسالة للرد على المستخدم.</i>"
+followup_sent = "✅ تم إرسال ردك إلى المسؤولين."
+followup_failed = "❌ فشل إرسال ردك."
 
 [fields]
 title = "العنوان"

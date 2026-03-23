@@ -101,7 +101,13 @@ prompt = "💬 Escribe tu comentario a continuación. Envía /cancel para cancel
 empty = "Tu mensaje parece vacío. Escribe tu comentario o envía /cancel para cancelar."
 thanks = "✅ ¡Gracias por tu comentario! Ha sido enviado a los administradores."
 cancelled = "Comentario cancelado."
-admin_message = "📬 <b>Nuevo comentario</b>\nDe: {user} (<code>{user_id}</code>)\n\n{feedback}"
+admin_message = "📬 <b>Nuevo comentario</b>\nDe: {user} (<code>{user_id}</code>)\n\n{feedback}\n\n💡 <i>Responde a este mensaje para contestar al usuario.</i>"
+admin_reply = "📩 <b>Respuesta del administrador:</b>\n\n{reply}\n\n💡 <i>Responde a este mensaje para continuar.</i>"
+reply_sent = "✅ Respuesta enviada al usuario."
+reply_failed = "❌ No se pudo enviar la respuesta. El usuario puede haber bloqueado el bot."
+user_followup = "📬 <b>Seguimiento</b>\nDe: {user} (<code>{user_id}</code>)\n\n{feedback}\n\n💡 <i>Responde a este mensaje para contestar al usuario.</i>"
+followup_sent = "✅ Tu respuesta ha sido enviada a los administradores."
+followup_failed = "❌ No se pudo enviar tu respuesta."
 
 [fields]
 title = "Título"
