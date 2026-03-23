@@ -190,24 +190,35 @@ def get_usage(chat_id: int) -> tuple[int, int, int]:
     return daily, monthly, google
 
 
-def increment_usage(chat_id: int, is_google: bool = False) -> None:
-    """Increment daily and monthly usage counters for a chat."""
+def increment_usage(chat_id: int, is_google: bool = False, google_only: bool = False) -> None:
+    """Increment usage counters for a chat.
+
+    If google_only=True, only increment the google counter (not daily/monthly general).
+    """
     conn = _get_conn()
     today = datetime.now(UTC).strftime("%Y-%m-%d")
     month = datetime.now(UTC).strftime("%Y-%m")
-    google_inc = 1 if is_google else 0
 
-    conn.execute(
-        "INSERT INTO daily_usage (chat_id, date, search_count, google_count) VALUES (?, ?, 1, ?) "
-        "ON CONFLICT(chat_id, date) DO UPDATE SET search_count = search_count + 1, "
-        "google_count = google_count + ?",
-        (chat_id, today, google_inc, google_inc),
-    )
-    conn.execute(
-        "INSERT INTO monthly_usage (chat_id, month, search_count) VALUES (?, ?, 1) "
-        "ON CONFLICT(chat_id, month) DO UPDATE SET search_count = search_count + 1",
-        (chat_id, month),
-    )
+    if google_only:
+        # Only bump google counter
+        conn.execute(
+            "INSERT INTO daily_usage (chat_id, date, search_count, google_count) VALUES (?, ?, 0, 1) "
+            "ON CONFLICT(chat_id, date) DO UPDATE SET google_count = google_count + 1",
+            (chat_id, today),
+        )
+    else:
+        google_inc = 1 if is_google else 0
+        conn.execute(
+            "INSERT INTO daily_usage (chat_id, date, search_count, google_count) VALUES (?, ?, 1, ?) "
+            "ON CONFLICT(chat_id, date) DO UPDATE SET search_count = search_count + 1, "
+            "google_count = google_count + ?",
+            (chat_id, today, google_inc, google_inc),
+        )
+        conn.execute(
+            "INSERT INTO monthly_usage (chat_id, month, search_count) VALUES (?, ?, 1) "
+            "ON CONFLICT(chat_id, month) DO UPDATE SET search_count = search_count + 1",
+            (chat_id, month),
+        )
     conn.commit()
 
 

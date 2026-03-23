@@ -369,6 +369,13 @@ async def _best_match_search(
     engine_start_times: dict[asyncio.Task, float] = {}
     engine_tasks: dict[asyncio.Task, GenericRISEngine] = {}
     for en in search_engines:
+        # Check per-engine quota (e.g. Google daily limit)
+        is_google = "google" in en.name.lower()
+        if is_google:
+            allowed, reason = use_search(message.chat_id, en.name)
+            if not allowed:
+                metrics.search_limit_hits_total.labels(limit_type=reason).inc()
+                continue
         if hasattr(en, "_user_lang"):
             en._user_lang = L  # type: ignore[union-attr]
         task = asyncio.create_task(en.best_match(url))

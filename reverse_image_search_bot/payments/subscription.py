@@ -120,7 +120,11 @@ def use_search(chat_id: int, engine_name: str) -> tuple[bool, str]:
         if monthly_used >= FREE_MONTHLY_LIMIT:
             return False, "monthly"
 
-    db.increment_usage(chat_id, is_google=is_google)
+    # For Google engines, only increment the google counter (general counter already incremented)
+    if is_google:
+        db.increment_usage(chat_id, google_only=True)
+    else:
+        db.increment_usage(chat_id)
     return True, ""
 
 
