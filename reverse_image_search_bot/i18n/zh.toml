@@ -94,6 +94,10 @@ search = "搜索图片来源（回复图片）"
 settings = "配置此聊天的机器人设置"
 help = "显示帮助"
 start = "启动机器人"
+subscribe = "订阅高级版（Telegram Stars）"
+status = "显示订阅状态和剩余配额"
+terms = "服务条款"
+support = "联系客服"
 
 [fields]
 title = "标题"
@@ -143,8 +147,3 @@ refund_no_subscription = "您没有可退款的活跃订阅。"
 refund_confirm = "确定要退款高级订阅吗？高级访问权限将立即撤销。"
 refund_cancelled = "退款已取消。"
 
-[bot_commands]
-subscribe = "订阅高级版（Telegram Stars）"
-status = "显示订阅状态和剩余配额"
-terms = "服务条款"
-support = "联系客服"

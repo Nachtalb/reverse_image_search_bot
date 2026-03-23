@@ -94,6 +94,10 @@ search = "画像のソースを検索（画像に返信）"
 settings = "このチャットのボット設定"
 help = "ヘルプを表示"
 start = "ボットを起動"
+subscribe = "プレミアムに登録（Telegram Stars）"
+status = "サブスクリプション状態と残りクォータを表示"
+terms = "利用規約"
+support = "サポートに連絡"
 
 [fields]
 title = "タイトル"
@@ -143,8 +147,3 @@ refund_no_subscription = "返金するアクティブなサブスクリプショ
 refund_confirm = "プレミアムサブスクリプションを返金しますか？プレミアムアクセスは直ちに取り消されます。"
 refund_cancelled = "返金がキャンセルされました。"
 
-[bot_commands]
-subscribe = "プレミアムに登録（Telegram Stars）"
-status = "サブスクリプション状態と残りクォータを表示"
-terms = "利用規約"
-support = "サポートに連絡"

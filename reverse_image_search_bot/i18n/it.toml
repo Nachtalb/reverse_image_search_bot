@@ -94,6 +94,10 @@ search = "Cerca l'origine dell'immagine (rispondi a un'immagine)"
 settings = "Configura il bot per questa chat"
 help = "Mostra aiuto"
 start = "Avvia il bot"
+subscribe = "Abbonati al premium (Telegram Stars)"
+status = "Mostra stato abbonamento e quota rimanente"
+terms = "Termini di servizio"
+support = "Contatta il supporto"
 
 [fields]
 title = "Titolo"
@@ -143,8 +147,3 @@ refund_no_subscription = "Non hai nessun abbonamento attivo da rimborsare."
 refund_confirm = "Sei sicuro di voler rimborsare il tuo abbonamento premium? L'accesso premium sarà revocato immediatamente."
 refund_cancelled = "Rimborso annullato."
 
-[bot_commands]
-subscribe = "Abbonati al premium (Telegram Stars)"
-status = "Mostra stato abbonamento e quota rimanente"
-terms = "Termini di servizio"
-support = "Contatta il supporto"
