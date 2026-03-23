@@ -133,6 +133,25 @@ search_results_total = Counter(
     ["has_results"],  # true/false
 )
 
+# ── Subscription Stats ──────────────────────────────────────────────────
+
+subscription_payments_total = Counter(
+    "ris_subscription_payments_total",
+    "Total subscription payment attempts",
+    ["status"],  # success/failed
+)
+
+search_limit_hits_total = Counter(
+    "ris_search_limit_hits_total",
+    "Times a search was blocked by quota limits",
+    ["limit_type"],  # daily/saucenao
+)
+
+premium_users_total = Gauge(
+    "ris_premium_users_total",
+    "Number of chats with active premium subscriptions",
+)
+
 # ── Bot Health ───────────────────────────────────────────────────────────────
 
 bot_start_time = Gauge(
@@ -268,6 +287,10 @@ def _collect_process_metrics():
             _update_group_counts()
         except Exception:
             logger.exception("group count update failed")
+        try:
+            _update_premium_count()
+        except Exception:
+            logger.exception("premium count update failed")
         time.sleep(15)
 
 
@@ -278,6 +301,13 @@ def _update_group_counts():
     counts = count_groups()
     groups_total.labels(status="onboarded").set(counts["onboarded"])
     groups_total.labels(status="not_onboarded").set(counts["not_onboarded"])
+
+
+def _update_premium_count():
+    """Query SQLite for active premium subscription count."""
+    from .payments.db import count_premium_chats
+
+    premium_users_total.set(count_premium_chats())
 
 
 def update_provider_status():

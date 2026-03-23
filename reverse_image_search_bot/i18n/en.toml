@@ -89,11 +89,26 @@ done_search_only = "✅ Set to <b>search results only</b>. Change anytime with /
 done_full = "✅ Set to <b>full mode</b> (results + buttons). Change anytime with /settings."
 done_manual = "✅ Set to <b>manual mode</b>. Use /search to search. Change anytime with /settings."
 
+[subscription]
+invoice_title = "Premium Subscription (30 days)"
+invoice_description = "Unlimited searches, all engines including premium-only ones."
+invoice_label = "Premium — 30 days"
+already_premium = "✅ You already have an active premium subscription (expires {end_date})."
+payment_success = "🎉 <b>Payment successful!</b> You now have premium access for 30 days. Enjoy unlimited searches!"
+status_premium = "⭐ <b>Premium</b> — active until {end_date}\nUnlimited searches, all engines available."
+status_free = "🆓 <b>Free tier</b>\nSearches today: <b>{remaining}</b> / {limit} remaining\nSauceNAO today: <b>{saucenao_remaining}</b> remaining\n\nUpgrade with /subscribe for unlimited searches."
+limit_reached = "🔒 You've used all <b>{limit}</b> searches for today. Resets at midnight UTC.\nUpgrade to premium with /subscribe for unlimited access!"
+saucenao_limit = "🔒 SauceNAO daily limit reached. Try other engines or upgrade with /subscribe."
+premium_only_engine = "🔒 <b>{engine}</b> is a premium-only engine. Upgrade with /subscribe to unlock it!"
+subscribe = "Use /subscribe to get premium access with unlimited searches and all engines."
+
 [bot_commands]
 search = "Search for image source (reply to image)"
 settings = "Configure bot behaviour for this chat"
 help = "Show help"
 start = "Start the bot"
+subscribe = "Subscribe to premium (Telegram Stars)"
+status = "Show subscription status and remaining quota"
 
 [fields]
 title = "Title"

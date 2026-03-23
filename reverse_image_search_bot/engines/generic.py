@@ -21,6 +21,7 @@ class GenericRISEngine:
     provider_url: URL = URL()
     types: list[str] = []
     recommendation: list[str] = []
+    premium_only: bool = False
 
     url: str = ""
 
@@ -32,6 +33,7 @@ class GenericRISEngine:
         provider_url: str | URL = "",
         types: list[str] | None = None,
         recommendation: list[str] | None = None,
+        premium_only: bool = False,
     ):
         self.name = name or self.name
         self.description = description or self.description
@@ -40,6 +42,7 @@ class GenericRISEngine:
         self.recommendation = recommendation or self.recommendation
 
         self.url = url or self.url
+        self.premium_only = premium_only or self.premium_only
 
         self.logger = logging.getLogger(f"RISEngine [{self.name}]")
 

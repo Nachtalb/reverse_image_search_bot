@@ -79,6 +79,11 @@ PERSISTENCE_PATH = (
 )
 
 
+# Subscription / payment limits
+DAILY_SEARCH_LIMIT = int(os.getenv("DAILY_SEARCH_LIMIT", "50"))
+DAILY_SAUCENAO_LIMIT = int(os.getenv("DAILY_SAUCENAO_LIMIT", "20"))
+SUBSCRIPTION_STARS_PRICE = int(os.getenv("SUBSCRIPTION_STARS_PRICE", "75"))
+
 # Prometheus metrics
 METRICS_ENABLED = os.getenv("METRICS_ENABLED", "true").lower() in ("true", "1", "yes")
 METRICS_PORT = int(os.getenv("RIS_METRICS_PORT", "9100"))
