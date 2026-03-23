@@ -74,8 +74,8 @@ min_one_button = "⚠️ At least one button must stay enabled."
 min_one_engine = "⚠️ At least one engine must stay enabled."
 
 [start]
-private = "🔎 Send me an image, sticker, or video and I'll find its source."
-group = "🔎 Send me an image, sticker, or video and I'll find its source.\n\n/search · /settings"
+private = "🔎 Send me an image, sticker, or video and I'll find its source.\n\n🆓 <b>Free:</b> 20 searches/day in private chats\n⭐ <b>Premium:</b> 100/day, Google search, group chats &amp; more\n\n/subscribe · /status · /help"
+group = "🔎 Send me an image, sticker, or video and I'll find its source.\n\n⭐ Premium features available — /subscribe\n\n/search · /settings"
 opening_settings = "⚙️ Opening settings..."
 
 [onboarding]
