@@ -37,13 +37,13 @@ from .commands import (
 from .i18n import available_languages, t
 from .metrics import start_metrics_server
 from .payments import (
+    adminrefund_callback_handler,
+    adminrefund_command,
+    paysupport_command,
     pre_checkout_handler,
-    refund_callback_handler,
-    refund_command,
     status_command,
     subscribe_command,
     successful_payment_handler,
-    support_command,
     terms_command,
     transactions_command,
 )
@@ -159,7 +159,7 @@ _PUBLIC_COMMANDS = [
     BotCommand("subscribe", t("bot_commands.subscribe")),
     BotCommand("status", t("bot_commands.status")),
     BotCommand("terms", t("bot_commands.terms")),
-    BotCommand("support", t("bot_commands.support")),
+    BotCommand("paysupport", t("bot_commands.paysupport")),
     BotCommand("help", t("bot_commands.help")),
     BotCommand("start", t("bot_commands.start")),
 ]
@@ -168,6 +168,7 @@ _ADMIN_COMMANDS = [
     *_PUBLIC_COMMANDS,
     BotCommand("ban", "Ban/unban a user by ID"),
     BotCommand("transactions", "List all Star transactions"),
+    BotCommand("adminrefund", "Refund a user's subscription"),
     BotCommand("id", "Show current chat info"),
 ]
 
@@ -189,7 +190,7 @@ async def _set_bot_commands(app: Application) -> None:
             BotCommand("subscribe", t("bot_commands.subscribe", lang_code)),
             BotCommand("status", t("bot_commands.status", lang_code)),
             BotCommand("terms", t("bot_commands.terms", lang_code)),
-            BotCommand("support", t("bot_commands.support", lang_code)),
+            BotCommand("paysupport", t("bot_commands.paysupport", lang_code)),
             BotCommand("help", t("bot_commands.help", lang_code)),
             BotCommand("start", t("bot_commands.start", lang_code)),
         ]
@@ -264,12 +265,12 @@ def main():
     app.add_handler(CommandHandler("subscribe", subscribe_command))
     app.add_handler(CommandHandler("status", status_command))
     app.add_handler(CommandHandler("terms", terms_command))
-    app.add_handler(CommandHandler("support", support_command))
-    app.add_handler(CommandHandler("refund", refund_command))
+    app.add_handler(CommandHandler(("paysupport", "support"), paysupport_command))
+    app.add_handler(CommandHandler("adminrefund", adminrefund_command, filters=ADMIN_FILTER))
     app.add_handler(CommandHandler("transactions", transactions_command, filters=ADMIN_FILTER))
     app.add_handler(PreCheckoutQueryHandler(pre_checkout_handler))
     app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_handler))
-    app.add_handler(CallbackQueryHandler(refund_callback_handler, pattern=r"^refund_"))
+    app.add_handler(CallbackQueryHandler(adminrefund_callback_handler, pattern=r"^adminrefund_"))
     app.add_handler(CallbackQueryHandler(settings_callback_handler, pattern=r"^settings:"))
     app.add_handler(CallbackQueryHandler(onboard_callback_handler, pattern=r"^onboard:"))
     app.add_handler(CallbackQueryHandler(callback_query_handler))

@@ -97,7 +97,7 @@ start = "Avvia il bot"
 subscribe = "Abbonati al premium (Telegram Stars)"
 status = "Mostra stato abbonamento e quota rimanente"
 terms = "Termini di servizio"
-support = "Contatta il supporto"
+paysupport = "Contatta il supporto"
 
 [fields]
 title = "Titolo"
@@ -140,10 +140,6 @@ limit_reached = "🔒 Hai esaurito tutte le <b>{limit}</b> ricerche di oggi. Res
 saucenao_limit = "🔒 Limite giornaliero SauceNAO raggiunto. Prova altri motori o passa a /subscribe."
 premium_only_engine = "🔒 <b>{engine}</b> è un motore premium. Passa a /subscribe per sbloccarlo!"
 subscribe = "Usa /subscribe per accesso premium con ricerche illimitate e tutti i motori."
-terms = "<b>Termini di Servizio</b>\n\nUtilizzando questo bot accetti quanto segue:\n\n• Questo bot offre la ricerca inversa di immagini. I risultati dipendono da motori di terze parti e potrebbero non essere sempre accurati.\n• <b>Nessun contenuto illegale.</b> È vietato caricare contenuti illegali, inclusi ma non limitati a CSAM, contenuti che violano le leggi applicabili o contenuti che non hai il diritto di distribuire. Le violazioni comporteranno un ban immediato e permanente.\n• Gli abbonamenti premium non sono rimborsabili salvo obbligo di legge. Contatta /support per richieste di rimborso.\n• Il bot è fornito così com'è, senza garanzia.\n• <b>Conservazione dati:</b> Le immagini caricate vengono conservate fino a 30 giorni per fornire la funzionalità di ricerca. Dopo 30 giorni, vengono eliminate automaticamente.\n• L'abuso può comportare un ban.\n• Il supporto Telegram non può aiutare con gli acquisti del bot — usa /support."
-support = "📬 <b>Supporto</b>\n\nPer domande o richieste di rimborso:\n\n• Apri un issue: <a href=\"https://github.com/Nachtalb/reverse_image_search_bot/issues\">GitHub Issues</a>\n• Contatta lo sviluppatore: @Nachtalb"
-refund_success = "✅ Rimborso di <b>{amount} ⭐</b> elaborato. Il tuo accesso premium è stato revocato."
-refund_no_subscription = "Non hai nessun abbonamento attivo da rimborsare."
-refund_confirm = "Sei sicuro di voler rimborsare il tuo abbonamento premium? L'accesso premium sarà revocato immediatamente."
-refund_cancelled = "Rimborso annullato."
+terms = "<b>Termini di Servizio</b>\n\nUtilizzando questo bot accetti quanto segue:\n\n• Questo bot offre la ricerca inversa di immagini. I risultati dipendono da motori di terze parti e potrebbero non essere sempre accurati.\n• <b>Nessun contenuto illegale.</b> È vietato caricare contenuti illegali, inclusi ma non limitati a CSAM, contenuti che violano le leggi applicabili o contenuti che non hai il diritto di distribuire. Le violazioni comporteranno un ban immediato e permanente.\n• Gli abbonamenti premium non sono rimborsabili. Tutti gli acquisti sono definitivi. Contatta /paysupport per domande sui pagamenti.\n• Il bot è fornito così com'è, senza garanzia.\n• <b>Conservazione dati:</b> Le immagini caricate vengono conservate fino a 30 giorni per fornire la funzionalità di ricerca. Dopo 30 giorni, vengono eliminate automaticamente.\n• L'abuso può comportare un ban.\n• Il supporto Telegram non può aiutare con gli acquisti del bot — usa /paysupport."
+paysupport = "📬 <b>Supporto</b>\n\nPer domande o richieste di rimborso:\n\n• Apri un issue: <a href=\"https://github.com/Nachtalb/reverse_image_search_bot/issues\">GitHub Issues</a>\n• Contatta lo sviluppatore: @Nachtalb"
 

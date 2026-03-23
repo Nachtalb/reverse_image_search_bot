@@ -97,7 +97,7 @@ start = "启动机器人"
 subscribe = "订阅高级版（Telegram Stars）"
 status = "显示订阅状态和剩余配额"
 terms = "服务条款"
-support = "联系客服"
+paysupport = "联系客服"
 
 [fields]
 title = "标题"
@@ -140,10 +140,6 @@ limit_reached = "🔒 您已用完今天的 <b>{limit}</b> 次搜索。UTC午夜
 saucenao_limit = "🔒 SauceNAO 每日限额已达。尝试其他引擎或使用 /subscribe 升级。"
 premium_only_engine = "🔒 <b>{engine}</b> 是高级引擎。使用 /subscribe 解锁！"
 subscribe = "使用 /subscribe 获取高级访问权限（无限搜索和所有引擎）。"
-terms = "<b>服务条款</b>\n\n使用本机器人即表示您同意以下内容：\n\n• 本机器人提供反向图片搜索服务。结果取决于第三方引擎，可能并不总是准确。\n• <b>禁止非法内容。</b>禁止上传非法内容，包括但不限于CSAM、违反适用法律的内容或您无权分发的内容。违规将导致立即永久封禁。\n• 高级订阅不可退款，法律要求除外。退款请求请联系 /support。\n• 机器人按原样提供，不提供保证。\n• <b>数据保留：</b>上传的图片最多保存30天以提供搜索功能。30天后，图片将自动删除。\n• 滥用可能导致封禁。\n• Telegram客服无法协助机器人购买 — 请使用 /support。"
-support = "📬 <b>客服</b>\n\n如有问题或退款请求：\n\n• 提交Issue: <a href=\"https://github.com/Nachtalb/reverse_image_search_bot/issues\">GitHub Issues</a>\n• 联系开发者: @Nachtalb"
-refund_success = "✅ 已退款 <b>{amount} ⭐</b>。您的高级访问权限已撤销。"
-refund_no_subscription = "您没有可退款的活跃订阅。"
-refund_confirm = "确定要退款高级订阅吗？高级访问权限将立即撤销。"
-refund_cancelled = "退款已取消。"
+terms = "<b>服务条款</b>\n\n使用本机器人即表示您同意以下内容：\n\n• 本机器人提供反向图片搜索服务。结果取决于第三方引擎，可能并不总是准确。\n• <b>禁止非法内容。</b>禁止上传非法内容，包括但不限于CSAM、违反适用法律的内容或您无权分发的内容。违规将导致立即永久封禁。\n• 高级订阅不可退款。所有购买均为最终购买。付款相关问题请联系 /paysupport。\n• 机器人按原样提供，不提供保证。\n• <b>数据保留：</b>上传的图片最多保存30天以提供搜索功能。30天后，图片将自动删除。\n• 滥用可能导致封禁。\n• Telegram客服无法协助机器人购买 — 请使用 /paysupport。"
+paysupport = "📬 <b>客服</b>\n\n如有问题或退款请求：\n\n• 提交Issue: <a href=\"https://github.com/Nachtalb/reverse_image_search_bot/issues\">GitHub Issues</a>\n• 联系开发者: @Nachtalb"
 

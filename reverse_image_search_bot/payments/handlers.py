@@ -143,87 +143,113 @@ async def terms_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     )
 
 
-async def support_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /support — show support contact info."""
+async def paysupport_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /paysupport — show payment support contact info (required by Telegram)."""
     assert update.message
-    metrics.commands_total.labels(command="support").inc()
+    metrics.commands_total.labels(command="paysupport").inc()
     L = get_lang(update)
     await update.message.reply_text(
-        t("subscription.support", L), parse_mode=ParseMode.HTML, disable_web_page_preview=True
+        t("subscription.paysupport", L), parse_mode=ParseMode.HTML, disable_web_page_preview=True
     )
 
 
-async def refund_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /refund — offer to refund the last subscription payment."""
-    assert update.message and update.effective_chat
-    metrics.commands_total.labels(command="refund").inc()
-    L = get_lang(update)
-    chat_id = update.effective_chat.id
+async def adminrefund_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /adminrefund <chat_id> (admin only) — refund a user's active subscription."""
+    assert update.message and update.message.text
+    metrics.commands_total.labels(command="adminrefund").inc()
 
-    sub = db.get_active_subscription(chat_id)
-    if not sub:
-        await update.message.reply_text(t("subscription.refund_no_subscription", L), parse_mode=ParseMode.HTML)
+    args = update.message.text.strip().split()
+    if len(args) != 2:
+        await update.message.reply_text(
+            "Usage: <code>/adminrefund &lt;chat_id&gt;</code>",
+            parse_mode=ParseMode.HTML,
+        )
         return
 
-    # Store txn ID in user_data since callback_data has a 64-byte limit
-    context.user_data["pending_refund_txn"] = sub["transaction_id"]  # type: ignore[index]
+    try:
+        target_chat_id = int(args[1])
+    except ValueError:
+        await update.message.reply_text("Invalid chat_id.")
+        return
+
+    sub = db.get_active_subscription(target_chat_id)
+    if not sub:
+        await update.message.reply_text(
+            f"No active subscription for <code>{target_chat_id}</code>.", parse_mode=ParseMode.HTML
+        )
+        return
+
+    # Store in user_data for the confirmation callback
+    context.user_data["admin_refund_target"] = target_chat_id  # type: ignore[index]
+    context.user_data["admin_refund_txn"] = sub["transaction_id"]  # type: ignore[index]
+
+    stars = sub["stars_amount"]
+    end = sub["subscription_end"][:10]
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("✅ Yes, refund", callback_data="refund_confirm"),
-                InlineKeyboardButton("❌ Cancel", callback_data="refund_cancel"),
+                InlineKeyboardButton("✅ Confirm refund", callback_data="adminrefund_confirm"),
+                InlineKeyboardButton("❌ Cancel", callback_data="adminrefund_cancel"),
             ]
         ]
     )
     await update.message.reply_text(
-        t("subscription.refund_confirm", L), parse_mode=ParseMode.HTML, reply_markup=keyboard
+        f"Refund <b>{stars} ⭐</b> to <code>{target_chat_id}</code>?\n"
+        f"Subscription expires: {end}\n"
+        f"Txn: <code>{sub['transaction_id'][:32]}…</code>",
+        parse_mode=ParseMode.HTML,
+        reply_markup=keyboard,
     )
 
 
-async def refund_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle refund confirmation/cancellation callbacks."""
-    assert update.callback_query and update.callback_query.data is not None and update.effective_chat
+async def adminrefund_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle admin refund confirmation/cancellation callbacks."""
+    assert update.callback_query and update.callback_query.data is not None
     query = update.callback_query
     assert query.data is not None
     data: str = query.data
-    L = get_lang(update)
 
-    if data == "refund_cancel":
+    if data == "adminrefund_cancel":
         await query.answer()
         msg = query.message
         if msg and hasattr(msg, "edit_text"):
-            await msg.edit_text(t("subscription.refund_cancelled", L), parse_mode=ParseMode.HTML)  # type: ignore[union-attr]
+            await msg.edit_text("Refund cancelled.", parse_mode=ParseMode.HTML)  # type: ignore[union-attr]
         return
 
-    if data == "refund_confirm":
-        transaction_id = context.user_data.get("pending_refund_txn") if context.user_data else None
-        chat_id = update.effective_chat.id
-        sub = db.get_active_subscription(chat_id)
+    if data == "adminrefund_confirm":
+        target_chat_id = context.user_data.get("admin_refund_target") if context.user_data else None
+        transaction_id = context.user_data.get("admin_refund_txn") if context.user_data else None
 
-        if not sub or not transaction_id or sub["transaction_id"] != transaction_id:
-            await query.answer(t("subscription.refund_no_subscription", L), show_alert=True)
+        if not target_chat_id or not transaction_id:
+            await query.answer("Refund data expired. Try /adminrefund again.", show_alert=True)
+            return
+
+        sub = db.get_active_subscription(target_chat_id)
+        if not sub or sub["transaction_id"] != transaction_id:
+            await query.answer("Subscription no longer active.", show_alert=True)
             return
 
         try:
-            # Telegram Stars refund API
-            user_id = query.from_user.id
-            await context.bot.refund_star_payment(user_id=user_id, telegram_payment_charge_id=transaction_id)
-            db.revoke_subscription(chat_id, transaction_id)
-            invalidate_premium_cache(chat_id)
+            # For Stars refunds, user_id must be the user who paid.
+            # For private chats, chat_id == user_id. For groups, we need the original payer.
+            # Since we don't store payer user_id separately, use target_chat_id (works for private chats).
+            await context.bot.refund_star_payment(user_id=target_chat_id, telegram_payment_charge_id=transaction_id)
+            db.revoke_subscription(target_chat_id, transaction_id)
+            invalidate_premium_cache(target_chat_id)
             metrics.subscription_payments_total.labels(status="refunded").inc()
             metrics.premium_users_total.set(db.count_premium_chats())
 
-            logger.info("Refund processed: chat_id=%d, txn=%s", chat_id, transaction_id)
+            logger.info("Admin refund: chat_id=%d, txn=%s, by=%d", target_chat_id, transaction_id, query.from_user.id)
 
             msg = query.message
             if msg and hasattr(msg, "edit_text"):
                 await msg.edit_text(  # type: ignore[union-attr]
-                    t("subscription.refund_success", L, amount=str(sub["stars_amount"])),
+                    f"✅ Refunded <b>{sub['stars_amount']} ⭐</b> to <code>{target_chat_id}</code>.",
                     parse_mode=ParseMode.HTML,
                 )
             await query.answer()
         except Exception as e:
-            logger.error("Refund failed: chat_id=%d, txn=%s, error=%s", chat_id, transaction_id, e)
+            logger.error("Admin refund failed: chat_id=%d, txn=%s, error=%s", target_chat_id, transaction_id, e)
             await query.answer(f"Refund failed: {e}", show_alert=True)
 
 
