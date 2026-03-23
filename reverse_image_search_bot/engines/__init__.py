@@ -1,5 +1,6 @@
 from .animetrace import AnimeTraceEngine
 from .generic import GenericRISEngine
+from .google import GoogleEngine
 from .saucenao import SauceNaoEngine
 from .trace import TraceEngine
 from .yandex import YandexEngine
@@ -9,15 +10,7 @@ __all__ = ["engines"]
 engines: list[GenericRISEngine] = [
     SauceNaoEngine(),
     AnimeTraceEngine(),
-    GenericRISEngine(
-        "Google",
-        "https://www.google.com/searchbyimage?safe=off&sbisrc=tg&image_url={query_url}",
-        "Google LLC is an American multinational technology company that specializes in Internet-related services and"
-        " products.",
-        "https://google.com/",
-        ["General"],
-        ["Anything SFW", "People and Characters"],
-    ),
+    GoogleEngine(),
     TraceEngine(),
     GenericRISEngine(
         "3D IQDB",

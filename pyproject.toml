@@ -22,6 +22,7 @@ dependencies = [
     "user-agent>=0.1.10",
     "httpx>=0.27,<0.29",
     "PicImageSearch>=3.12.0",
+    "serpapi>=1.0.0",
     "yarl>=1.8.2",
     "setuptools>=65.0.0,<82",
     "prometheus-client>=0.21.0",

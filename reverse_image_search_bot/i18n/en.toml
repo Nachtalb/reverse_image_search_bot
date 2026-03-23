@@ -3,7 +3,8 @@ title = "🔎 Reverse Image Search Bot — Help"
 how_to_use = "🤔 How to use me"
 how_to_use_text = "Send me an image, sticker, video/gif or URL and I will send you direct reverse image search links for SauceNao, Google, Yandex and the like.\nFor anime images I recommend SauceNao, for other images I recommend Google or Yandex."
 commands_title = "🖥️ Commands"
-commands_list = "/help — Show help\n/search — Reply to an image or video to search\n/settings — Configure per-chat behaviour"
+commands_list = "/help — Show help\n/search — Reply to an image or video to search\n/settings — Configure per-chat behaviour\n/subscribe — Get premium access\n/status — Check your quota"
+premium_promo = "\n\n⭐ <b>Premium</b>\n🆓 Free: 20 searches/day, private chats only\n⭐ Premium: 100/day, Google search, group chats &amp; more\n👉 /subscribe"
 
 [commands]
 ban_usage = "Usage: /ban <user_id>"
@@ -75,12 +76,12 @@ min_one_engine = "⚠️ At least one engine must stay enabled."
 
 [start]
 private = "🔎 Send me an image, sticker, or video and I'll find its source."
-group = "🔎 Send me an image, sticker, or video and I'll find its source.\n\n/search · /settings"
+group = "🔎 Send me an image, sticker, or video and I'll find its source.\n\n⭐ Premium features available — /subscribe\n\n/search · /settings"
 opening_settings = "⚙️ Opening settings..."
 
 [onboarding]
 title = "👋 <b>How should I handle images in this group?</b>"
-description = "• <b>Search results only</b> — auto-search images, show results\n• <b>Full</b> — auto-search + show engine buttons\n• <b>Manual</b> — only search when someone replies with /search\n• <b>Settings</b> — configure everything yourself"
+description = "• <b>Search results only</b> — auto-search images, show results\n• <b>Full</b> — auto-search + show engine buttons\n• <b>Manual</b> — only search when someone replies with /search\n• <b>Settings</b> — configure everything yourself\n\n⭐ Group search requires a premium subscription — /subscribe"
 btn_search_only = "🔍 Search results only"
 btn_full = "🔍 Full (results + buttons)"
 btn_manual = "❌ Manual only (/search)"
@@ -89,11 +90,31 @@ done_search_only = "✅ Set to <b>search results only</b>. Change anytime with /
 done_full = "✅ Set to <b>full mode</b> (results + buttons). Change anytime with /settings."
 done_manual = "✅ Set to <b>manual mode</b>. Use /search to search. Change anytime with /settings."
 
+[subscription]
+choose_plan = "⭐ <b>Choose your plan:</b>\n\nAll plans include:\n• Up to 100 searches/day\n• Google (20/day)\n• Group chat support\n• Unlimited monthly searches"
+invoice_title = "Premium Subscription ({period})"
+invoice_description = "Up to 100 searches/day, Google, group chat support, unlimited monthly searches."
+already_premium = "✅ You already have an active premium subscription (expires {end_date})."
+payment_success = "🎉 <b>Payment successful!</b> You now have premium access for {days} days. Enjoy!"
+status_premium = "⭐ <b>Premium</b> — active until {end_date}\nSearches today: <b>{daily_remaining}</b> / {daily_limit}\nGoogle today: <b>{google_remaining}</b> / {google_limit}"
+status_free = "🆓 <b>Free tier</b> (private chats only)\nSearches today: <b>{daily_remaining}</b> / {daily_limit}\nThis month: <b>{monthly_remaining}</b> / {monthly_limit}\n\nUpgrade with /subscribe for more searches, group support, and Google."
+limit_reached = "🔒 Daily search limit reached. Resets at midnight UTC.\nUpgrade to premium with /subscribe for up to 100 searches/day!"
+monthly_limit_reached = "🔒 Monthly search limit reached ({monthly_limit} searches). Resets on the 1st.\nUpgrade to premium with /subscribe for unlimited monthly searches!"
+groups_premium_only = "🔒 Group chat searches require a premium subscription. An admin can subscribe with /subscribe."
+premium_only_engine = "🔒 <b>{engine}</b> is a premium-only engine. Upgrade with /subscribe to unlock it!"
+subscribe = "Use /subscribe to get premium access."
+terms = "<b>Terms of Service</b>\n\nBy using this bot you agree to the following:\n\n• This bot provides reverse image search as a convenience. Results depend on third-party engines and may not always be accurate.\n• <b>No illegal content.</b> You must not upload illegal content, including but not limited to child sexual abuse material (CSAM), content that violates applicable laws, or content you do not have the right to distribute. Violations will result in an immediate and permanent ban.\n• <b>All sales are final.</b> Premium subscriptions are not refundable. Contact /paysupport for payment-related inquiries.\n• The bot is provided as-is without warranty. We are not responsible for any content returned by search engines.\n• <b>Data retention:</b> Uploaded images are stored for up to 30 days to provide the search functionality. After 30 days, images are automatically deleted.\n• Abuse (spam, automated bulk queries) may result in a ban.\n• Telegram Support cannot help with purchases made via this bot — use /paysupport instead."
+paysupport = "📬 <b>Payment Support</b>\n\nFor payment issues or questions:\n\n• Contact the developer: @Nachtalb\n\nPlease note that Telegram Support cannot assist with bot purchases."
+
 [bot_commands]
 search = "Search for image source (reply to image)"
 settings = "Configure bot behaviour for this chat"
 help = "Show help"
 start = "Start the bot"
+subscribe = "Subscribe to premium (Telegram Stars)"
+status = "Show subscription status and remaining quota"
+terms = "Terms of Service"
+paysupport = "Contact support"
 
 [fields]
 title = "Title"

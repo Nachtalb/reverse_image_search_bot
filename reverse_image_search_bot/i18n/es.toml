@@ -4,6 +4,8 @@ how_to_use = "🤔 Cómo usarme"
 how_to_use_text = "Envíame una imagen, sticker, video/GIF o URL y te enviaré enlaces directos de búsqueda inversa en SauceNao, Google, Yandex y más.\nPara imágenes de anime recomiendo SauceNao, para otras imágenes Google o Yandex."
 commands_title = "🖥️ Comandos"
 commands_list = "/help — Mostrar ayuda\n/search — Responde a una imagen para buscar\n/settings — Configuración del chat"
+premium_promo = "\n\n⭐ <b>Premium</b>\n🆓 Free: 20 searches/day, private chats only\n⭐ Premium: 100/day, Google search, group chats &amp; more\n👉 /subscribe"
+
 
 [commands]
 ban_usage = "Uso: /ban <user_id>"
@@ -89,11 +91,32 @@ done_search_only = "✅ Configurado: <b>solo resultados</b>. Cambiar en /setting
 done_full = "✅ Configurado: <b>modo completo</b> (resultados + botones). Cambiar en /settings."
 done_manual = "✅ Configurado: <b>modo manual</b>. Usa /search para buscar. Cambiar en /settings."
 
+[subscription]
+choose_plan = "⭐ <b>Choose your plan:</b>\n\nAll plans include:\n• Up to 100 searches/day\n• Google (20/day)\n• Group chat support\n• Unlimited monthly searches"
+invoice_title = "Premium Subscription ({period})"
+invoice_description = "Up to 100 searches/day, Google, group chat support, unlimited monthly searches."
+already_premium = "✅ You already have an active premium subscription (expires {end_date})."
+payment_success = "🎉 <b>Payment successful!</b> You now have premium access for {days} days. Enjoy!"
+status_premium = "⭐ <b>Premium</b> — active until {end_date}\nSearches today: <b>{daily_remaining}</b> / {daily_limit}\nGoogle today: <b>{google_remaining}</b> / {google_limit}"
+status_free = "🆓 <b>Free tier</b> (private chats only)\nSearches today: <b>{daily_remaining}</b> / {daily_limit}\nThis month: <b>{monthly_remaining}</b> / {monthly_limit}\n\nUpgrade with /subscribe for more searches, group support, and Google."
+limit_reached = "🔒 Daily search limit reached. Resets at midnight UTC.\nUpgrade to premium with /subscribe for up to 100 searches/day!"
+monthly_limit_reached = "🔒 Monthly search limit reached ({monthly_limit} searches). Resets on the 1st.\nUpgrade to premium with /subscribe for unlimited monthly searches!"
+groups_premium_only = "🔒 Group chat searches require a premium subscription. An admin can subscribe with /subscribe."
+premium_only_engine = "🔒 <b>{engine}</b> is a premium-only engine. Upgrade with /subscribe to unlock it!"
+subscribe = "Use /subscribe to get premium access."
+terms = "<b>Terms of Service</b>\n\nBy using this bot you agree to the following:\n\n• This bot provides reverse image search as a convenience. Results depend on third-party engines and may not always be accurate.\n• <b>No illegal content.</b> You must not upload illegal content, including but not limited to child sexual abuse material (CSAM), content that violates applicable laws, or content you do not have the right to distribute. Violations will result in an immediate and permanent ban.\n• <b>All sales are final.</b> Premium subscriptions are not refundable. Contact /paysupport for payment-related inquiries.\n• The bot is provided as-is without warranty. We are not responsible for any content returned by search engines.\n• <b>Data retention:</b> Uploaded images are stored for up to 30 days to provide the search functionality. After 30 days, images are automatically deleted.\n• Abuse (spam, automated bulk queries) may result in a ban.\n• Telegram Support cannot help with purchases made via this bot — use /paysupport instead."
+paysupport = "📬 <b>Payment Support</b>\n\nFor payment issues or questions:\n\n• Contact the developer: @Nachtalb\n\nPlease note that Telegram Support cannot assist with bot purchases."
+
+
 [bot_commands]
 search = "Buscar origen de imagen (responder a imagen)"
 settings = "Configurar el bot para este chat"
 help = "Mostrar ayuda"
 start = "Iniciar el bot"
+subscribe = "Suscribirse a premium (Telegram Stars)"
+status = "Mostrar estado de suscripción y cuota restante"
+terms = "Términos de servicio"
+paysupport = "Contactar soporte"
 
 [fields]
 title = "Título"
@@ -123,3 +146,4 @@ source = "Fuente"
 score = "Puntuación"
 creator = "Creador"
 "created_at" = "Creado el"
+

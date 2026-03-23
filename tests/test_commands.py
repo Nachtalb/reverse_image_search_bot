@@ -809,6 +809,7 @@ class TestFileHandler:
             patch("reverse_image_search_bot.commands.search.general_image_search", new_callable=AsyncMock),
             patch("reverse_image_search_bot.commands.search.best_match", new_callable=AsyncMock) as mock_bm,
             patch("reverse_image_search_bot.commands.search.ChatConfig") as mock_cc,
+            patch("reverse_image_search_bot.commands.search.use_search", return_value=(True, "")),
         ):
             mock_cc.return_value = _mock_chat_config(auto_search_enabled=True)
             await file_handler(update, context)
@@ -834,6 +835,7 @@ class TestFileHandler:
             patch("reverse_image_search_bot.commands.search.general_image_search", new_callable=AsyncMock),
             patch("reverse_image_search_bot.commands.search.best_match", new_callable=AsyncMock) as mock_bm,
             patch("reverse_image_search_bot.commands.search.ChatConfig") as mock_cc,
+            patch("reverse_image_search_bot.commands.search.use_search", return_value=(True, "")),
         ):
             mock_cc.return_value = _mock_chat_config(auto_search_enabled=False)
             await file_handler(update, context)
@@ -873,6 +875,7 @@ class TestFileHandler:
             patch("reverse_image_search_bot.commands.search.general_image_search", new_callable=AsyncMock),
             patch("reverse_image_search_bot.commands.search.best_match", new_callable=AsyncMock),
             patch("reverse_image_search_bot.commands.search.ChatConfig") as mock_cc,
+            patch("reverse_image_search_bot.commands.search.use_search", return_value=(True, "")),
         ):
             mock_cc.return_value = _mock_chat_config(auto_search_enabled=True)
             await file_handler(update, context)
@@ -919,6 +922,7 @@ class TestFileHandler:
             patch("reverse_image_search_bot.commands.search.general_image_search", new_callable=AsyncMock),
             patch("reverse_image_search_bot.commands.search.best_match", new_callable=AsyncMock),
             patch("reverse_image_search_bot.commands.search.ChatConfig") as mock_cc,
+            patch("reverse_image_search_bot.commands.search.use_search", return_value=(True, "")),
         ):
             mock_cc.return_value = _mock_chat_config(auto_search_enabled=True)
             await file_handler(update, context)
@@ -947,6 +951,7 @@ class TestFileHandler:
                 side_effect=RuntimeError("engine exploded"),
             ),
             patch("reverse_image_search_bot.commands.search.ChatConfig") as mock_cc,
+            patch("reverse_image_search_bot.commands.search.use_search", return_value=(True, "")),
         ):
             mock_cc.return_value = _mock_chat_config(auto_search_enabled=True)
             with pytest.raises(RuntimeError, match="engine exploded"):

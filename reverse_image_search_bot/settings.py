@@ -49,6 +49,7 @@ ADMIN_IDS = get_env_list("ADMIN_IDS")
 SAUCENAO_API = required_env("SAUCENAO_API")
 TRACE_API = required_env("TRACE_API")
 ANILIST_TOKEN = os.getenv("ANILIST_TOKEN")
+SERPAPI_KEY = os.getenv("SERPAPI_KEY", "")
 
 MODE_ACTIVE = os.getenv("MODE_ACTIVE", "polling")
 
@@ -78,6 +79,22 @@ PERSISTENCE_PATH = (
     Path(os.getenv("PERSISTENCE_PATH", str(_DEFAULT_CONFIG_DIR / "bot_data.pickle"))).expanduser().absolute()
 )
 
+
+# Subscription / payment limits — Free tier
+FREE_DAILY_LIMIT = int(os.getenv("FREE_DAILY_LIMIT", "20"))
+FREE_MONTHLY_LIMIT = int(os.getenv("FREE_MONTHLY_LIMIT", "200"))
+
+# Subscription / payment limits — Premium tier
+PREMIUM_DAILY_LIMIT = int(os.getenv("PREMIUM_DAILY_LIMIT", "100"))
+PREMIUM_GOOGLE_DAILY_LIMIT = int(os.getenv("PREMIUM_GOOGLE_DAILY_LIMIT", "20"))
+
+# Subscription pricing (Stars): [(label, days, price)]
+SUBSCRIPTION_TIERS: list[tuple[str, int, int]] = [
+    ("1 week", 7, 100),
+    ("1 month", 30, 300),
+    ("6 months", 180, 1500),
+    ("12 months", 365, 3000),
+]
 
 # Prometheus metrics
 METRICS_ENABLED = os.getenv("METRICS_ENABLED", "true").lower() in ("true", "1", "yes")

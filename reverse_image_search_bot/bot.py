@@ -16,6 +16,7 @@ from telegram.ext import (
     ContextTypes,
     MessageHandler,
     PicklePersistence,
+    PreCheckoutQueryHandler,
     filters,
 )
 
@@ -35,6 +36,18 @@ from .commands import (
 )
 from .i18n import available_languages, t
 from .metrics import start_metrics_server
+from .payments import (
+    adminrefund_callback_handler,
+    adminrefund_command,
+    paysupport_command,
+    pre_checkout_handler,
+    status_command,
+    subscribe_callback_handler,
+    subscribe_command,
+    successful_payment_handler,
+    terms_command,
+    transactions_command,
+)
 
 application: Application | None = None
 
@@ -144,6 +157,10 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
 _PUBLIC_COMMANDS = [
     BotCommand("search", t("bot_commands.search")),
     BotCommand("settings", t("bot_commands.settings")),
+    BotCommand("subscribe", t("bot_commands.subscribe")),
+    BotCommand("status", t("bot_commands.status")),
+    BotCommand("terms", t("bot_commands.terms")),
+    BotCommand("paysupport", t("bot_commands.paysupport")),
     BotCommand("help", t("bot_commands.help")),
     BotCommand("start", t("bot_commands.start")),
 ]
@@ -151,6 +168,8 @@ _PUBLIC_COMMANDS = [
 _ADMIN_COMMANDS = [
     *_PUBLIC_COMMANDS,
     BotCommand("ban", "Ban/unban a user by ID"),
+    BotCommand("transactions", "List all Star transactions"),
+    BotCommand("adminrefund", "Refund a user's subscription"),
     BotCommand("id", "Show current chat info"),
 ]
 
@@ -169,6 +188,10 @@ async def _set_bot_commands(app: Application) -> None:
         commands = [
             BotCommand("search", t("bot_commands.search", lang_code)),
             BotCommand("settings", t("bot_commands.settings", lang_code)),
+            BotCommand("subscribe", t("bot_commands.subscribe", lang_code)),
+            BotCommand("status", t("bot_commands.status", lang_code)),
+            BotCommand("terms", t("bot_commands.terms", lang_code)),
+            BotCommand("paysupport", t("bot_commands.paysupport", lang_code)),
             BotCommand("help", t("bot_commands.help", lang_code)),
             BotCommand("start", t("bot_commands.start", lang_code)),
         ]
@@ -240,6 +263,16 @@ def main():
     app.add_handler(CommandHandler("ban", ban_command, filters=ADMIN_FILTER), group=1)
     app.add_handler(CommandHandler("search", search_command))
     app.add_handler(CommandHandler(("settings", "conf", "pref"), settings_command))
+    app.add_handler(CommandHandler("subscribe", subscribe_command))
+    app.add_handler(CommandHandler("status", status_command))
+    app.add_handler(CommandHandler("terms", terms_command))
+    app.add_handler(CommandHandler(("paysupport", "support"), paysupport_command))
+    app.add_handler(CommandHandler("adminrefund", adminrefund_command, filters=ADMIN_FILTER))
+    app.add_handler(CommandHandler("transactions", transactions_command, filters=ADMIN_FILTER))
+    app.add_handler(PreCheckoutQueryHandler(pre_checkout_handler))
+    app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_handler))
+    app.add_handler(CallbackQueryHandler(subscribe_callback_handler, pattern=r"^sub_"))
+    app.add_handler(CallbackQueryHandler(adminrefund_callback_handler, pattern=r"^adminrefund_"))
     app.add_handler(CallbackQueryHandler(settings_callback_handler, pattern=r"^settings:"))
     app.add_handler(CallbackQueryHandler(onboard_callback_handler, pattern=r"^onboard:"))
     app.add_handler(CallbackQueryHandler(callback_query_handler))
@@ -258,6 +291,29 @@ def main():
     )
 
     app.add_error_handler(error_handler)
+
+    # Schedule daily reset of search quotas at midnight UTC
+    from datetime import time as dt_time
+
+    from .payments.subscription import reset_daily_counts, reset_monthly_counts
+
+    async def _daily_reset_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+        reset_daily_counts()
+
+    async def _monthly_reset_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+        reset_monthly_counts()
+
+    if app.job_queue is not None:
+        app.job_queue.run_daily(_daily_reset_job, time=dt_time(hour=0, minute=0, second=0), name="daily_quota_reset")
+        # Monthly reset: run daily at 00:01, but only reset on the 1st
+        app.job_queue.run_monthly(
+            _monthly_reset_job,
+            when=dt_time(hour=0, minute=1, second=0),
+            day=1,
+            name="monthly_quota_reset",
+        )
+    else:
+        logger.warning("JobQueue not available — quota resets will not run automatically")
 
     if settings.MODE["active"] == "webhook":
         logger.info("Starting webhook")

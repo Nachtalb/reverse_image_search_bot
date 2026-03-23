@@ -68,6 +68,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"{t('help.how_to_use_text', L)}\n\n"
         f"<b>{t('help.commands_title', L)}</b>\n"
         f"{t('help.commands_list', L)}"
+        f"{t('help.premium_promo', L)}"
     )
     with _HELP_IMAGE.open("rb") as photo:
         await update.message.reply_photo(
