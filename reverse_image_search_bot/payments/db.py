@@ -143,6 +143,18 @@ def reset_all_daily_usage() -> int:
     return cursor.rowcount
 
 
+def revoke_subscription(chat_id: int, transaction_id: str) -> bool:
+    """Revoke a subscription by setting its end date to now. Returns True if a row was updated."""
+    conn = _get_conn()
+    now = datetime.now(UTC).isoformat()
+    cursor = conn.execute(
+        "UPDATE subscriptions SET subscription_end = ? WHERE chat_id = ? AND transaction_id = ?",
+        (now, chat_id, transaction_id),
+    )
+    conn.commit()
+    return cursor.rowcount > 0
+
+
 def count_premium_chats() -> int:
     """Count chats with an active subscription."""
     conn = _get_conn()

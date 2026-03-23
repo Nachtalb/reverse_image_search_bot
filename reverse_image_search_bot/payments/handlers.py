@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from telegram import LabeledPrice, Update
+import logging
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice, Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
@@ -13,6 +15,8 @@ from reverse_image_search_bot.settings import SUBSCRIPTION_STARS_PRICE
 
 from . import db
 from .subscription import get_remaining_saucenao, get_remaining_searches, invalidate_premium_cache, is_premium
+
+logger = logging.getLogger(__name__)
 
 _SUBSCRIPTION_DAYS = 30
 
@@ -43,9 +47,24 @@ async def subscribe_command(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 
 async def pre_checkout_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Answer pre-checkout queries — always accept valid Star payments."""
+    """Answer pre-checkout queries — validate and accept Star payments."""
     assert update.pre_checkout_query
-    await update.pre_checkout_query.answer(ok=True)
+    query = update.pre_checkout_query
+
+    # Validate payload format
+    payload = query.invoice_payload
+    if not payload.startswith("premium_"):
+        await query.answer(ok=False, error_message="Invalid invoice payload.")
+        metrics.subscription_payments_total.labels(status="failed").inc()
+        return
+
+    # Validate amount
+    if query.total_amount != SUBSCRIPTION_STARS_PRICE:
+        await query.answer(ok=False, error_message="Price mismatch. Please try again.")
+        metrics.subscription_payments_total.labels(status="failed").inc()
+        return
+
+    await query.answer(ok=True)
 
 
 async def successful_payment_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -63,6 +82,8 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
 
     metrics.subscription_payments_total.labels(status="success").inc()
     metrics.premium_users_total.set(db.count_premium_chats())
+
+    logger.info("Payment successful: chat_id=%d, stars=%d, txn=%s", chat_id, stars, transaction_id)
 
     await update.message.reply_text(
         t("subscription.payment_success", L),
@@ -93,3 +114,95 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
 
     await update.message.reply_text(text, parse_mode=ParseMode.HTML)
+
+
+async def terms_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /terms — show terms of service."""
+    assert update.message
+    metrics.commands_total.labels(command="terms").inc()
+    L = get_lang(update)
+    await update.message.reply_text(
+        t("subscription.terms", L), parse_mode=ParseMode.HTML, disable_web_page_preview=True
+    )
+
+
+async def support_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /support — show support contact info."""
+    assert update.message
+    metrics.commands_total.labels(command="support").inc()
+    L = get_lang(update)
+    await update.message.reply_text(
+        t("subscription.support", L), parse_mode=ParseMode.HTML, disable_web_page_preview=True
+    )
+
+
+async def refund_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /refund — offer to refund the last subscription payment."""
+    assert update.message and update.effective_chat
+    metrics.commands_total.labels(command="refund").inc()
+    L = get_lang(update)
+    chat_id = update.effective_chat.id
+
+    sub = db.get_active_subscription(chat_id)
+    if not sub:
+        await update.message.reply_text(t("subscription.refund_no_subscription", L), parse_mode=ParseMode.HTML)
+        return
+
+    keyboard = InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("✅ Yes, refund", callback_data=f"refund_confirm_{sub['transaction_id']}"),
+                InlineKeyboardButton("❌ Cancel", callback_data="refund_cancel"),
+            ]
+        ]
+    )
+    await update.message.reply_text(
+        t("subscription.refund_confirm", L), parse_mode=ParseMode.HTML, reply_markup=keyboard
+    )
+
+
+async def refund_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle refund confirmation/cancellation callbacks."""
+    assert update.callback_query and update.callback_query.data is not None and update.effective_chat
+    query = update.callback_query
+    assert query.data is not None
+    data: str = query.data
+    L = get_lang(update)
+
+    if data == "refund_cancel":
+        await query.answer()
+        msg = query.message
+        if msg and hasattr(msg, "edit_text"):
+            await msg.edit_text(t("subscription.refund_cancelled", L), parse_mode=ParseMode.HTML)  # type: ignore[union-attr]
+        return
+
+    if data.startswith("refund_confirm_"):
+        transaction_id = data.removeprefix("refund_confirm_")
+        chat_id = update.effective_chat.id
+        sub = db.get_active_subscription(chat_id)
+
+        if not sub or sub["transaction_id"] != transaction_id:
+            await query.answer(t("subscription.refund_no_subscription", L), show_alert=True)
+            return
+
+        try:
+            # Telegram Stars refund API
+            user_id = query.from_user.id
+            await context.bot.refund_star_payment(user_id=user_id, telegram_payment_charge_id=transaction_id)
+            db.revoke_subscription(chat_id, transaction_id)
+            invalidate_premium_cache(chat_id)
+            metrics.subscription_payments_total.labels(status="refunded").inc()
+            metrics.premium_users_total.set(db.count_premium_chats())
+
+            logger.info("Refund processed: chat_id=%d, txn=%s", chat_id, transaction_id)
+
+            msg = query.message
+            if msg and hasattr(msg, "edit_text"):
+                await msg.edit_text(  # type: ignore[union-attr]
+                    t("subscription.refund_success", L, amount=str(sub["stars_amount"])),
+                    parse_mode=ParseMode.HTML,
+                )
+            await query.answer()
+        except Exception as e:
+            logger.error("Refund failed: chat_id=%d, txn=%s, error=%s", chat_id, transaction_id, e)
+            await query.answer(f"Refund failed: {e}", show_alert=True)

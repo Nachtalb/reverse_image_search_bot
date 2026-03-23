@@ -101,6 +101,12 @@ limit_reached = "🔒 You've used all <b>{limit}</b> searches for today. Resets 
 saucenao_limit = "🔒 SauceNAO daily limit reached. Try other engines or upgrade with /subscribe."
 premium_only_engine = "🔒 <b>{engine}</b> is a premium-only engine. Upgrade with /subscribe to unlock it!"
 subscribe = "Use /subscribe to get premium access with unlimited searches and all engines."
+terms = "<b>Terms of Service</b>\n\nBy using this bot you agree to the following:\n\n• This bot provides reverse image search as a convenience. Results depend on third-party engines and may not always be accurate.\n• Premium subscriptions are non-refundable except where required by applicable law. Contact /support for refund requests.\n• The bot is provided as-is without warranty. We are not responsible for any content returned by search engines.\n• We do not store your images — they are temporarily uploaded for search purposes only.\n• Abuse (spam, automated bulk queries) may result in a ban.\n• Telegram Support cannot help with purchases made via this bot — use /support instead."
+support = "📬 <b>Support</b>\n\nFor questions, issues, or refund requests:\n\n• Open an issue: <a href=\"https://github.com/Nachtalb/reverse_image_search_bot/issues\">GitHub Issues</a>\n• Contact the developer: @Nachtalb\n\nPlease note that Telegram Support cannot assist with bot purchases."
+refund_success = "✅ Refund of <b>{amount} ⭐</b> processed successfully. Your premium access has been revoked."
+refund_no_subscription = "You don't have any active subscription to refund."
+refund_confirm = "Are you sure you want to refund your premium subscription? This will immediately revoke your premium access."
+refund_cancelled = "Refund cancelled."
 
 [bot_commands]
 search = "Search for image source (reply to image)"
@@ -109,6 +115,8 @@ help = "Show help"
 start = "Start the bot"
 subscribe = "Subscribe to premium (Telegram Stars)"
 status = "Show subscription status and remaining quota"
+terms = "Terms of Service"
+support = "Contact support"
 
 [fields]
 title = "Title"
