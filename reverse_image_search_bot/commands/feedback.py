@@ -69,12 +69,10 @@ async def feedback_reply_handler(update: Update, context: ContextTypes.DEFAULT_T
     if not reply_text:
         return
 
-    admin_name = update.effective_user.full_name if update.effective_user else "Admin"
-
     try:
         await context.bot.send_message(
             user_id,
-            t("feedback.admin_reply", "en", admin=admin_name, reply=reply_text),
+            t("feedback.admin_reply", "en", reply=reply_text),
             parse_mode=ParseMode.HTML,
         )
         await update.message.reply_text(t("feedback.reply_sent", "en"))

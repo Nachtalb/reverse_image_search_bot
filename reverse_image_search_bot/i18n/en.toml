@@ -95,7 +95,7 @@ empty = "Your message seems empty. Please type some feedback or send /cancel to 
 thanks = "✅ Thank you for your feedback! It has been forwarded to the admins."
 cancelled = "Feedback cancelled."
 admin_message = "📬 <b>New Feedback</b>\nFrom: {user} (<code>{user_id}</code>)\n\n{feedback}\n\n💡 <i>Reply to this message to respond to the user.</i>"
-admin_reply = "📩 <b>Reply from {admin}:</b>\n\n{reply}"
+admin_reply = "📩 <b>Reply from admin:</b>\n\n{reply}"
 reply_sent = "✅ Reply sent to user."
 reply_failed = "❌ Failed to send reply to user. They may have blocked the bot."
 
