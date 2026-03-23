@@ -49,6 +49,7 @@ ADMIN_IDS = get_env_list("ADMIN_IDS")
 SAUCENAO_API = required_env("SAUCENAO_API")
 TRACE_API = required_env("TRACE_API")
 ANILIST_TOKEN = os.getenv("ANILIST_TOKEN")
+SERPAPI_KEY = os.getenv("SERPAPI_KEY", "")
 
 MODE_ACTIVE = os.getenv("MODE_ACTIVE", "polling")
 
