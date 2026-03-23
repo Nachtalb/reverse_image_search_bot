@@ -39,6 +39,7 @@ from .commands.feedback import (
     feedback_cancel,
     feedback_command,
     feedback_received,
+    feedback_reply_handler,
 )
 from .i18n import available_languages, t
 from .metrics import start_metrics_server
@@ -263,6 +264,15 @@ def main():
         conversation_timeout=300,  # 5 minute timeout
     )
     app.add_handler(feedback_handler)
+
+    # Admin reply to feedback — forwards the reply back to the original user
+    app.add_handler(
+        MessageHandler(
+            ADMIN_FILTER & filters.REPLY & filters.TEXT & filters.ChatType.PRIVATE,
+            feedback_reply_handler,
+        ),
+        group=2,
+    )
 
     app.add_handler(CallbackQueryHandler(settings_callback_handler, pattern=r"^settings:"))
     app.add_handler(CallbackQueryHandler(onboard_callback_handler, pattern=r"^onboard:"))

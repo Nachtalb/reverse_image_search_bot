@@ -94,7 +94,10 @@ prompt = "💬 Please type your feedback below. Send /cancel to abort."
 empty = "Your message seems empty. Please type some feedback or send /cancel to abort."
 thanks = "✅ Thank you for your feedback! It has been forwarded to the admins."
 cancelled = "Feedback cancelled."
-admin_message = "📬 <b>New Feedback</b>\nFrom: {user} (<code>{user_id}</code>)\n\n{feedback}"
+admin_message = "📬 <b>New Feedback</b>\nFrom: {user} (<code>{user_id}</code>)\n\n{feedback}\n\n💡 <i>Reply to this message to respond to the user.</i>"
+admin_reply = "📩 <b>Reply from {admin}:</b>\n\n{reply}"
+reply_sent = "✅ Reply sent to user."
+reply_failed = "❌ Failed to send reply to user. They may have blocked the bot."
 
 [bot_commands]
 search = "Search for image source (reply to image)"
