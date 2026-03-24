@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import contextlib
 import json
 
 from telegram import KeyboardButton, Message, ReplyKeyboardMarkup, Update
 from telegram.constants import ParseMode
+from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
 from reverse_image_search_bot import metrics
@@ -130,13 +132,17 @@ async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_T
 
     match command:
         case "best_match":
+            with contextlib.suppress(BadRequest):
+                await update.callback_query.answer(show_alert=False)
             await best_match(update, context, values[0])
         case "wait_for":
             await send_wait_for(update, context, values[0])
         case "noop":
-            await update.callback_query.answer()
+            with contextlib.suppress(BadRequest):
+                await update.callback_query.answer()
         case _:
-            await update.callback_query.answer(t("search.something_went_wrong", get_lang(update)))
+            with contextlib.suppress(BadRequest):
+                await update.callback_query.answer(t("search.something_went_wrong", get_lang(update)))
 
 
 async def send_wait_for(update: Update, context: ContextTypes.DEFAULT_TYPE, engine_name: str):

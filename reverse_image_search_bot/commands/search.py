@@ -228,9 +228,6 @@ async def best_match(
     general_done: asyncio.Event | None = None,
 ):
     """Find best matches for an image."""
-    if update.callback_query:
-        await update.callback_query.answer(show_alert=False)
-
     user = update.effective_user
     message = update.effective_message
     assert user and message
