@@ -5,6 +5,7 @@ import logging
 
 from telegram import Update
 from telegram.constants import ParseMode
+from telegram.error import Forbidden, TelegramError
 from telegram.ext import ContextTypes, ConversationHandler
 
 from reverse_image_search_bot import metrics, settings
@@ -52,8 +53,10 @@ async def feedback_received(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             sent = await context.bot.send_message(admin_id, admin_text, parse_mode=ParseMode.HTML)
             # Admin message → points to user so admin can reply
             fmap[f"{admin_id}:{sent.message_id}"] = user.id
-        except Exception:
-            logger.warning("Failed to send feedback to admin %d", admin_id)
+        except Forbidden:
+            logger.warning("Failed to send feedback to admin %d: bot was blocked or never started", admin_id)
+        except TelegramError:
+            logger.exception("Failed to send feedback to admin %d", admin_id)
 
     await update.message.reply_text(t("feedback.thanks", L))
     return ConversationHandler.END
@@ -99,17 +102,30 @@ async def feedback_reply_handler(update: Update, context: ContextTypes.DEFAULT_T
             # Store reverse mapping so user can reply back
             fmap[f"{target_id}:{sent.message_id}"] = chat_id
             await update.message.reply_text(t(success_key, "en"))
-        except Exception:
-            logger.warning("Failed to send feedback reply to user %d", target_id)
-            await update.message.reply_text(t(fail_key, "en"))
+        except Forbidden:
+            logger.warning(
+                "Failed to send feedback reply to user %d: user blocked the bot or never started it", target_id
+            )
+            await update.message.reply_text(
+                t(fail_key, "en") + "\n\n🟠 <i>Reason: user has blocked the bot or never started it.</i>",
+                parse_mode=ParseMode.HTML,
+            )
+        except TelegramError as e:
+            logger.exception("Failed to send feedback reply to user %d", target_id)
+            await update.message.reply_text(
+                t(fail_key, "en") + f"\n\n🔴 <i>Error: {html.escape(str(e))}</i>",
+                parse_mode=ParseMode.HTML,
+            )
     else:
         # User replying — send to all admins
         for admin_id in settings.ADMIN_IDS:
             try:
                 sent = await context.bot.send_message(admin_id, msg_text, parse_mode=ParseMode.HTML)
                 fmap[f"{admin_id}:{sent.message_id}"] = chat_id
-            except Exception:
-                logger.warning("Failed to send user followup to admin %d", admin_id)
+            except Forbidden:
+                logger.warning("Failed to send user followup to admin %d: bot was blocked or never started", admin_id)
+            except TelegramError:
+                logger.exception("Failed to send user followup to admin %d", admin_id)
         await update.message.reply_text(t(success_key, "en"))
 
 
