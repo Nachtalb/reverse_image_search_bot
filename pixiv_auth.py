@@ -9,7 +9,7 @@ from sys import exit
 from urllib.parse import urlencode
 from webbrowser import open as open_url
 
-import requests
+import httpx
 
 from reverse_image_search_bot.config import PixivConfig
 
@@ -72,7 +72,7 @@ def login():
     except (EOFError, KeyboardInterrupt):
         return
 
-    response = requests.post(
+    response = httpx.post(
         AUTH_TOKEN_URL,
         data={
             "client_id": CLIENT_ID,
@@ -90,7 +90,7 @@ def login():
 
 
 def refresh(refresh_token):
-    response = requests.post(
+    response = httpx.post(
         AUTH_TOKEN_URL,
         data={
             "client_id": CLIENT_ID,
