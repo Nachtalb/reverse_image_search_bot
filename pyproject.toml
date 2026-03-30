@@ -16,6 +16,7 @@ dependencies = [
     "cleverdict==1.9.1",
     "paramiko>=3.4.0",
     "pixiv-api==1.0.0",
+    "pixivpy3>=3.7.5",
     "moviepy @ git+https://github.com/Zulko/moviepy.git@7ffa4f00376237137a25fe1c777355c37753e9af",
     "pyopenssl==26.0.0",
     "emoji>=2.2.0",
