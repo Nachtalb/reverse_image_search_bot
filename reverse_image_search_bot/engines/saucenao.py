@@ -153,7 +153,9 @@ class SauceNaoEngine(GenericRISEngine):
             quote_plus(str(url)), f"&api_key={SAUCENAO_API}" if SAUCENAO_API else ""
         )
         try:
+            self.logger.info("Waiting for SauceNAO lock for %s", url)
             async with self._lock:
+                self.logger.info("Acquired SauceNAO lock, requesting %s", url)
                 response = await self._http_client.get(api_link, timeout=5)
         except httpx.ConnectError as e:
             raise SearchError("Error connecting to SauceNAO API") from e

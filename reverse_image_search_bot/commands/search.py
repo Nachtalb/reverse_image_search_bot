@@ -61,6 +61,8 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
         await message.reply_text(t("search.files.banned", L))
         return
 
+    chat_id = message.chat_id
+    logger.info("file_handler: start user=%s chat=%s msg=%s", user.id, chat_id, message.message_id)
     await context.bot.send_chat_action(chat_id=message.chat_id, action=ChatAction.TYPING)
 
     attachment = message.effective_attachment
@@ -136,6 +138,7 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
         try:
             chat_config = ChatConfig(update.effective_chat.id)
             if chat_config.auto_search_enabled:
+                logger.info("file_handler: starting best_match user=%s chat=%s", user.id, chat_id)
                 await best_match(update, context, image_url, general_done)
             else:
                 await general_task
@@ -144,6 +147,8 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
             with contextlib.suppress(asyncio.CancelledError):
                 await general_task
             raise
+        finally:
+            logger.info("file_handler: done user=%s chat=%s msg=%s", user.id, chat_id, message.message_id)
 
     except Exception:
         await message.reply_text(t("search.generic_error", L))
@@ -335,6 +340,13 @@ async def _best_match_search(
     match_found = False
 
     metrics.concurrent_searches.inc()
+    concurrent_val = metrics.concurrent_searches._value.get()
+    logger.info(
+        "_best_match_search: start chat=%s concurrent=%s engines=%s",
+        message.chat_id,
+        concurrent_val,
+        [e.name for e in search_engines],
+    )
     _reply_to_msg_id: int | None = message.message_id
 
     engine_start_times: dict[asyncio.Task, float] = {}
@@ -481,6 +493,7 @@ async def _best_match_search(
         for task in pending:
             task.cancel()
         metrics.concurrent_searches.dec()
+        logger.info("_best_match_search: done chat=%s", message.chat_id)
 
     metrics.search_results_total.labels(has_results=str(match_found).lower()).inc()
     return match_found

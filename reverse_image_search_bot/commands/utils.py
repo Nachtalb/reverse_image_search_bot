@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import io
+import logging
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from time import time
 
 from PIL import Image
 from telegram import Animation, Document, PhotoSize, Sticker, Video
@@ -13,6 +15,8 @@ from yarl import URL
 from reverse_image_search_bot.i18n import t
 from reverse_image_search_bot.uploaders import uploader
 from reverse_image_search_bot.utils import upload_file
+
+logger = logging.getLogger(__name__)
 
 last_used: dict[int, float] = {}
 
@@ -118,14 +122,19 @@ async def video_to_url(attachment: Document | Video | Animation | Sticker) -> UR
             return await image_to_url(attachment.thumbnail)
         raise ValueError(t("search.files.video_too_large"))
 
+    t0 = time()
+    logger.info("video_to_url: downloading file %s", attachment.file_unique_id)
     video_file = await attachment.get_file()
     with NamedTemporaryFile(suffix=".mp4") as tmp:
         await video_file.download_to_drive(tmp.name)
+        logger.info("video_to_url: downloaded in %.1fs, extracting frame", time() - t0)
         loop = asyncio.get_running_loop()
         frame_bytes = await loop.run_in_executor(_process_executor, _extract_video_frame, tmp.name)
 
     with io.BytesIO(frame_bytes) as file:
-        return upload_file(file, filename)
+        url = upload_file(file, filename)
+    logger.info("video_to_url: done in %.1fs -> %s", time() - t0, url)
+    return url
 
 
 async def image_to_url(attachment: PhotoSize | Sticker | Document) -> URL:
@@ -140,12 +149,17 @@ async def image_to_url(attachment: PhotoSize | Sticker | Document) -> URL:
     if uploader.file_exists(filename):
         return uploader.get_url(filename)
 
+    t0 = time()
+    logger.info("image_to_url: downloading file %s", attachment.file_unique_id)
     photo_file = await attachment.get_file()
     with io.BytesIO() as file:
         await photo_file.download_to_memory(file)
+        logger.info("image_to_url: downloaded in %.1fs", time() - t0)
         if extension != "jpg":
             file.seek(0)
             with Image.open(file) as image:
                 file.seek(0)
                 image.save(file, extension)
-        return upload_file(file, filename)
+        url = upload_file(file, filename)
+    logger.info("image_to_url: done in %.1fs -> %s", time() - t0, url)
+    return url
