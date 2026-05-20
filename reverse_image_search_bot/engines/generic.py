@@ -71,7 +71,7 @@ class GenericRISEngine:
             if value is None or value == "":
                 del data[key]
 
-        return data  # type: ignore
+        return data  # ty: ignore[invalid-return-type]
 
     def _clean_meta_data(self, data: MetaData) -> MetaData:
         for button in data.get("buttons", [])[:]:

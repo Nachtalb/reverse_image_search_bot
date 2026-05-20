@@ -106,7 +106,7 @@ def safe_get(dct: dict | list, key_str: str, default: Any = None, none_to_defaul
                 else:
                     return default
                 continue
-            dct = dct[key]  # type: ignore
+            dct = dct[key]  # ty: ignore[invalid-argument-type]
         except KeyError, IndexError, TypeError:
             return default
     return default if dct is None and none_to_default else dct

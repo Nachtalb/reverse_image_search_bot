@@ -43,10 +43,10 @@ class SauceNaoEngine(GenericRISEngine):
         """Anime"""
         if "anilist_id" not in data:
             return None, None
-        return await anilist.provide(data["anilist_id"], data.get("part"))  # type: ignore
+        return await anilist.provide(data["anilist_id"], data.get("part"))  # ty: ignore[invalid-argument-type]
 
     async def _booru_provider(self, data: ResponseData, api: str) -> InternalProviderData:
-        return await booru.provide(api, data[api + "_id"])  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
+        return await booru.provide(api, data[api + "_id"])  # ty: ignore[invalid-argument-type]
 
     async def _9_provider(self, data):
         return await self._booru_provider(data, "danbooru")
@@ -60,7 +60,7 @@ class SauceNaoEngine(GenericRISEngine):
     async def _5_provider(self, data: ResponseData) -> InternalProviderData:
         """Pixiv"""
         try:
-            result, meta = await pixiv.provide(data["pixiv_id"])  # type: ignore
+            result, meta = await pixiv.provide(data["pixiv_id"])  # ty: ignore[invalid-argument-type]
         except Exception as e:
             self.logger.exception(e)
             self.logger.warning("Error in pixiv provider")
@@ -84,7 +84,7 @@ class SauceNaoEngine(GenericRISEngine):
         kwargs = {}
         if chapter_id := data.get("md_id"):
             kwargs["chapter_id"] = chapter_id
-        ext_urls: list[str] = data.get("ext_urls", [])  # type: ignore[assignment]  # ty: ignore[invalid-assignment]
+        ext_urls: list[str] = data.get("ext_urls", [])  # ty: ignore[invalid-assignment]
         mangadex_urls = [url for url in ext_urls if URL(url).host == "mangadex.org"]
         if mangadex_url := next(iter(mangadex_urls), None):
             kwargs["url"] = URL(mangadex_url.strip("/"))
@@ -108,7 +108,7 @@ class SauceNaoEngine(GenericRISEngine):
             if isinstance(value, str) and validators.url(value):
                 buttons.append(url_button(value, text=text))
 
-        for item in data.pop("ext_urls", []):  # type: ignore
+        for item in data.pop("ext_urls", []):  # ty: ignore[not-iterable]
             buttons.append(url_button(item))
 
         result = {}
@@ -120,7 +120,7 @@ class SauceNaoEngine(GenericRISEngine):
                 continue
             match key:
                 case k if k in known:
-                    result[known[key][0]] = known[key][1](value)  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
+                    result[known[key][0]] = known[key][1](value)  # ty: ignore[invalid-argument-type]
                 case k if k.endswith(("_id", "_aid")):
                     continue
                 case k if k.endswith("_url"):
@@ -132,12 +132,12 @@ class SauceNaoEngine(GenericRISEngine):
                         result.pop(alt_key.replace("_", " ").title(), None)
                     buttons.append(url_button(str(value), text=name))
                 case "twitter_user_handle":
-                    result["Poster"] = value.title()  # type: ignore
-                    buttons.append(url_button(f"https://twitter.com/{value}", text=value.title()))  # type: ignore
+                    result["Poster"] = value.title()  # ty: ignore[unresolved-attribute]
+                    buttons.append(url_button(f"https://twitter.com/{value}", text=value.title()))  # ty: ignore[unresolved-attribute]
                 case _:
                     result[key.replace("_", " ").title()] = value
 
-        return result, meta  # type: ignore
+        return result, meta  # ty: ignore[invalid-return-type]
 
     @async_cached(GenericRISEngine._best_match_cache)
     async def best_match(self, url: str | URL) -> ProviderData:

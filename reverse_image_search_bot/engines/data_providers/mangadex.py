@@ -42,14 +42,14 @@ class MangadexProvider(BaseProvider):
     @async_provider_cache
     async def chapter(self, chapter_id: str) -> dict | None:
         if chapter_id.isdigit():
-            chapter_id = await self.legacy_mapping(int(chapter_id), "chapter")  # type: ignore
+            chapter_id = await self.legacy_mapping(int(chapter_id), "chapter")  # ty: ignore[invalid-assignment]
             if not chapter_id:
                 return None
-        return await self._request(f"chapter/{chapter_id}")  # type: ignore
+        return await self._request(f"chapter/{chapter_id}")  # ty: ignore[invalid-return-type]
 
     @async_provider_cache
     async def manga(self, manga_id: str) -> dict | None:
-        return await self._request(f"manga/{manga_id}", {"includes[]": ["artist", "cover_art", "author"]})  # type: ignore
+        return await self._request(f"manga/{manga_id}", {"includes[]": ["artist", "cover_art", "author"]})  # ty: ignore[invalid-return-type]
 
     async def provide(
         self, url: str | URL | None = None, chapter_id: str | None = None, manga_id: str | None = None
@@ -59,12 +59,12 @@ class MangadexProvider(BaseProvider):
         if not url and not chapter_id and not manga_id:
             return {}, {}
         elif url and (url := URL(url)):
-            if len(url.parts) != 3:  # ('/', 'chapter' | 'manga', '...') # type: ignore[union-attr]
+            if len(url.parts) != 3:  # ('/', 'chapter' | 'manga', '...')
                 return {}, {}
-            elif url.parts[0] == "manga":  # type: ignore[union-attr]
-                manga_id = url.parts[-1]  # type: ignore[union-attr]
-            elif url.parts[0] == "chapter":  # type: ignore[union-attr]
-                chapter_id = url.parts[-1]  # type: ignore[union-attr]
+            elif url.parts[0] == "manga":
+                manga_id = url.parts[-1]
+            elif url.parts[0] == "chapter":
+                chapter_id = url.parts[-1]
         if not chapter_id and not manga_id:
             return {}, {}
 
