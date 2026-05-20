@@ -119,6 +119,7 @@ class TestAnilistPost:
         with patch("reverse_image_search_bot.engines.animetrace._anilist_client") as mock_client:
             mock_client.post = AsyncMock(return_value=mock_resp)
             result = await _anilist_post({"query": "test", "variables": {}})
+        assert result is not None
         assert result["data"]["Character"]["name"]["full"] == "Test"
 
     async def test_429_retries(self):
@@ -375,8 +376,10 @@ class TestAnimeTraceExtract:
             result, _meta = await engine._extract([mock_item])
 
         assert "Also possible" in result
-        assert "Alt1 EN" in result["Also possible"]
-        assert "Alt2 EN" in result["Also possible"]
+        also_possible = result["Also possible"]
+        assert isinstance(also_possible, str)
+        assert "Alt1 EN" in also_possible
+        assert "Alt2 EN" in also_possible
 
     async def test_single_item_with_buttons_from_anilist(self):
         """Test that buttons from anilist are combined with character button."""
@@ -409,9 +412,10 @@ class TestAnimeTraceExtract:
 
         assert "buttons" in meta
         # Should have char button + anilist button
-        assert len(meta["buttons"]) == 2
-        assert any("character/42" in b.url for b in meta["buttons"])
-        assert any("anilist.co" in b.url for b in meta["buttons"])
+        buttons = meta["buttons"]
+        assert len(buttons) == 2
+        assert any(b.url and "character/42" in b.url for b in buttons)
+        assert any(b.url and "anilist.co" in b.url for b in buttons)
 
     async def test_single_item_no_media_id(self):
         _anilist_resolve_cache.clear()
@@ -433,7 +437,7 @@ class TestAnimeTraceExtract:
 
         assert result["Character"] == "Solo EN"
         assert "buttons" in meta
-        assert any("character/5" in b.url for b in meta["buttons"])
+        assert any(b.url and "character/5" in b.url for b in meta["buttons"])
 
     async def test_multiple_confident_items(self):
         _anilist_resolve_cache.clear()
@@ -454,8 +458,10 @@ class TestAnimeTraceExtract:
             result, _meta = await engine._extract(items)
 
         assert "Characters" in result
-        assert "Char1 EN" in result["Characters"]
-        assert "Char2 EN" in result["Characters"]
+        characters = result["Characters"]
+        assert isinstance(characters, str)
+        assert "Char1 EN" in characters
+        assert "Char2 EN" in characters
 
     async def test_multiple_items_no_characters(self):
         _anilist_resolve_cache.clear()

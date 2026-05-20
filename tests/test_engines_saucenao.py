@@ -412,7 +412,7 @@ class TestDefaultProvider:
         result, meta = engine._default_provider(data)
         assert result["Poster"] == "Elonmusk"
         buttons = meta.get("buttons", [])
-        assert any("twitter.com/elonmusk" in b.url for b in buttons)
+        assert any(b.url and "twitter.com/elonmusk" in b.url for b in buttons)
 
     def test_generic_field_fallback(self):
         engine = SauceNaoEngine()

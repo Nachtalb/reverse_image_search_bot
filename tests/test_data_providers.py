@@ -1,5 +1,6 @@
 """Tests for reverse_image_search_bot.engines.data_providers — all providers mocked HTTP."""
 
+import re
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -443,8 +444,10 @@ class TestBooruProvider:
         # The id_reg uses re.match which anchors at start — can never match a full URL.
         # This is dead code (line 124). Verify the regex itself works if it matched:
         matcher = provider.urls["gelbooru"]["id_reg"]
-        assert matcher.match("id=67890") is not None
-        assert matcher.match("id=67890").groups()[0] == "67890"
+        assert isinstance(matcher, re.Pattern)
+        match = matcher.match("id=67890")
+        assert match is not None
+        assert match.groups()[0] == "67890"
 
 
 # ---------------------------------------------------------------------------
@@ -915,8 +918,10 @@ class TestMangadexProvider:
         with patch.object(provider._http_client, "get", new_callable=AsyncMock, return_value=mock_resp):
             result, _meta = await provider.provide(manga_id="trunc-test")
 
-        assert result["Description"].endswith("...")
-        assert len(result["Description"]) == 150
+        desc = result["Description"]
+        assert isinstance(desc, str)
+        assert desc.endswith("...")
+        assert len(desc) == 150
 
 
 # ---------------------------------------------------------------------------
