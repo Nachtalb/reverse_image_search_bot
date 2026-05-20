@@ -9,7 +9,7 @@ from reverse_image_search_bot.utils.async_cache import async_cached
 from reverse_image_search_bot.utils.url import url_button
 
 from .errors import SearchError
-from .generic import GenericRISEngine
+from .generic import GenericRISEngine, _classproperty
 from .types import InternalProviderData, MetaData, ProviderData
 
 __all__ = ["PicImageSearchEngine"]
@@ -27,8 +27,7 @@ class PicImageSearchEngine(GenericRISEngine):
 
     pic_engine_class = None  # e.g. PicImageSearch.Yandex
 
-    @classmethod
-    @property
+    @_classproperty
     def best_match_implemented(cls):
         return True
 

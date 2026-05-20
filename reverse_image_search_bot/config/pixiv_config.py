@@ -23,7 +23,7 @@ class PixivConfig:
         if PIXIV_CONFIG.is_file():
             try:
                 self._config.update(CleverDict.from_json(file_path=PIXIV_CONFIG))
-            except (json.JSONDecodeError, ValueError):
+            except json.JSONDecodeError, ValueError:
                 logger.warning("Invalid pixiv config at %s, using defaults", PIXIV_CONFIG)
         self._config.save_path = PIXIV_CONFIG
         self._config.autosave(fullcopy=True)

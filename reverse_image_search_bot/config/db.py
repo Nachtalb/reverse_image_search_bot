@@ -205,7 +205,7 @@ def migrate_json_files(config_dir: Path) -> int:
                 save_config(chat_id, data)
                 count += 1
                 migrated_files.append(f)
-        except (ValueError, json.JSONDecodeError):
+        except ValueError, json.JSONDecodeError:
             continue
 
     # User configs: {user_id}.json — for private chats (user_id == chat_id),
@@ -224,7 +224,7 @@ def migrate_json_files(config_dir: Path) -> int:
                 save_field(user_id, "auto_search_enabled", False)
                 count += 1
             migrated_files.append(f)
-        except (ValueError, json.JSONDecodeError):
+        except ValueError, json.JSONDecodeError:
             continue
 
     # Rename migrated files to .bak so migration doesn't re-run

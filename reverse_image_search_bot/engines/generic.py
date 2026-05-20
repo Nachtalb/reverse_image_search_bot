@@ -14,6 +14,20 @@ from .types import InternalResultData, MetaData, ProviderData, ResultData
 __all__ = ["GenericRISEngine", "PreWorkEngine"]
 
 
+class _classproperty:
+    """Read-only classmethod-property descriptor.
+
+    Replaces ``@classmethod`` + ``@property`` stacking, which was deprecated in
+    Python 3.11 and removed in 3.13.
+    """
+
+    def __init__(self, fget):
+        self.fget = fget
+
+    def __get__(self, instance, owner):
+        return self.fget(owner)
+
+
 class GenericRISEngine:
     _best_match_cache = TTLCache(maxsize=1e4, ttl=24 * 60 * 60)
     name: str = "GenericRISEngine"
@@ -68,8 +82,7 @@ class GenericRISEngine:
     def _clean_best_match(self, result: InternalResultData, meta: MetaData) -> tuple[ResultData, MetaData]:
         return self._clean_privider_data(result), self._clean_meta_data(meta)
 
-    @classmethod
-    @property
+    @_classproperty
     def best_match_implemented(cls):
         return "best_match" in cls.__dict__ and cls is not GenericRISEngine
 
