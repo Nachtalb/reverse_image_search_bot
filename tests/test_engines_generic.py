@@ -7,6 +7,7 @@ from telegram import InlineKeyboardButton
 from yarl import URL
 
 from reverse_image_search_bot.engines.generic import GenericRISEngine, PreWorkEngine
+from reverse_image_search_bot.engines.types import MetaData
 
 
 class TestGenericRISEngine:
@@ -78,14 +79,14 @@ class TestCleanMetaData:
         invalid = MagicMock(spec=InlineKeyboardButton)
         invalid.url = "not-a-url"
 
-        meta = {"buttons": [valid, invalid]}
+        meta: MetaData = {"buttons": [valid, invalid]}
         result = engine._clean_meta_data(meta)
         assert valid in result["buttons"]
         assert invalid not in result["buttons"]
 
     def test_empty_buttons(self):
         engine = GenericRISEngine()
-        meta = {"buttons": []}
+        meta: MetaData = {"buttons": []}
         result = engine._clean_meta_data(meta)
         assert result["buttons"] == []
 

@@ -91,6 +91,7 @@ class TestSaveAndLoad:
         save_config(100, {"show_buttons": True})
         save_field(100, "show_buttons", False)
         loaded = load_config(100)
+        assert loaded is not None
         assert loaded["show_buttons"] is False
 
     def test_save_field_creates_row(self):
@@ -113,6 +114,7 @@ class TestSaveAndLoad:
         engines = ["SauceNAO", "Google", "Yandex"]
         save_config(400, {"auto_search_engines": engines})
         loaded = load_config(400)
+        assert loaded is not None
         assert loaded["auto_search_engines"] == engines
 
     def test_engine_empty_counts_roundtrip(self):
@@ -121,6 +123,7 @@ class TestSaveAndLoad:
         counts = {"SauceNAO": 3, "Yandex": 1}
         save_config(500, {"engine_empty_counts": counts})
         loaded = load_config(500)
+        assert loaded is not None
         assert loaded["engine_empty_counts"] == counts
 
 

@@ -1,5 +1,6 @@
 """Tests for reverse_image_search_bot.config.chat_config."""
 
+from typing import Any, cast
 from unittest.mock import patch
 
 import pytest
@@ -15,7 +16,7 @@ def _isolated_chat_config():
     """
     from reverse_image_search_bot.config.chat_config import ChatConfig
 
-    real_cls = ChatConfig.__closure__[0].cell_contents
+    real_cls = cast(Any, ChatConfig).__closure__[0].cell_contents
     real_cls._loaded_chats = {}
     yield
     real_cls._loaded_chats = {}
@@ -110,7 +111,7 @@ class TestSingleChatDecorator:
         ):
             from reverse_image_search_bot.config.chat_config import ChatConfig
 
-            real_cls = ChatConfig.__closure__[0].cell_contents
+            real_cls = cast(Any, ChatConfig).__closure__[0].cell_contents
             real_cls._loaded_chats = {}
 
             for idx in range(500):
@@ -143,7 +144,7 @@ class TestSingleChatDecorator:
         ):
             from reverse_image_search_bot.config.chat_config import ChatConfig
 
-            real_cls = ChatConfig.__closure__[0].cell_contents
+            real_cls = cast(Any, ChatConfig).__closure__[0].cell_contents
             # Delete _loaded_chats to trigger the hasattr branch
             if hasattr(real_cls, "_loaded_chats"):
                 delattr(real_cls, "_loaded_chats")

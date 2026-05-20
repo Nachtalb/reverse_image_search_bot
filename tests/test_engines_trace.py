@@ -13,7 +13,6 @@ def engine():
     e = TraceEngine()
     e._best_match_cache.clear()
     e._use_api_key = False
-    e.limit_reached = None
     return e
 
 
