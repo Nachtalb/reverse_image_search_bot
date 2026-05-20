@@ -24,7 +24,7 @@ def async_cached(cache, key=hashkey):
                 cache[k] = result
             return result
 
-        wrapper.cache = cache  # type: ignore[attr-defined]
+        wrapper.cache = cache  # ty: ignore[unresolved-attribute]
         return wrapper
 
     return decorator

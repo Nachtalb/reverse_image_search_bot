@@ -24,8 +24,8 @@ class SSHUploader(UploaderBase):
     _mandatory_configuration = {"host": str, "user": str, "password": str, "upload_dir": str}
 
     def __init__(self, configuration: dict, connect: bool = False):
-        self.ssh: paramiko.SSHClient = None  # type: ignore
-        self.sftp: paramiko.SFTPClient = None  # type: ignore
+        self.ssh: paramiko.SSHClient = None  # ty: ignore[invalid-assignment]
+        self.sftp: paramiko.SFTPClient = None  # ty: ignore[invalid-assignment]
         super().__init__(configuration, connect)
 
     def connect(self):

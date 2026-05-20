@@ -19,7 +19,7 @@ from reverse_image_search_bot.commands import (
     file_handler,
     settings_callback_handler,
 )
-from reverse_image_search_bot.engines.types import MetaData
+from reverse_image_search_bot.engines.types import MetaData, ResultData
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -289,7 +289,7 @@ class TestTrackEngineResult:
 
 class TestBuildReply:
     def test_basic_reply(self):
-        result = {"Title": "My Image", "Artist": "Nobody"}
+        result: ResultData = {"Title": "My Image", "Artist": "Nobody"}
         meta: MetaData = {
             "provider": "SauceNAO",
             "provider_url": URL("https://saucenao.com"),
@@ -304,7 +304,7 @@ class TestBuildReply:
         assert media is None
 
     def test_with_similarity(self):
-        result = {"Title": "Test"}
+        result: ResultData = {"Title": "Test"}
         meta: MetaData = {
             "provider": "SauceNAO",
             "provider_url": URL("https://saucenao.com"),
@@ -314,7 +314,7 @@ class TestBuildReply:
         assert "92.5% similarity" in reply
 
     def test_with_provided_via(self):
-        result = {"Title": "Test"}
+        result: ResultData = {"Title": "Test"}
         meta: MetaData = {
             "provider": "SauceNAO",
             "provider_url": URL("https://saucenao.com"),
@@ -324,7 +324,7 @@ class TestBuildReply:
         assert "with <b >Anilist</b>" in reply
 
     def test_with_provided_via_url(self):
-        result = {"Title": "Test"}
+        result: ResultData = {"Title": "Test"}
         meta: MetaData = {
             "provider": "SauceNAO",
             "provider_url": URL("https://saucenao.com"),
@@ -335,7 +335,7 @@ class TestBuildReply:
         assert '<a href="https://anilist.co"><b >Anilist</b></a>' in reply
 
     def test_thumbnail_url_becomes_hidden_anchor(self):
-        result = {"Title": "Test"}
+        result: ResultData = {"Title": "Test"}
         meta: MetaData = {
             "provider": "Test",
             "provider_url": URL("https://test.com"),
@@ -347,7 +347,7 @@ class TestBuildReply:
 
     def test_thumbnail_list_becomes_media_group(self):
         urls = [URL("https://img.test.com/1.jpg"), URL("https://img.test.com/2.jpg")]
-        result = {"Title": "Test"}
+        result: ResultData = {"Title": "Test"}
         meta: MetaData = {
             "provider": "Test",
             "provider_url": URL("https://test.com"),
@@ -359,7 +359,7 @@ class TestBuildReply:
         assert all(isinstance(m, InputMediaPhoto) for m in media)
 
     def test_set_value_in_result(self):
-        result = {"Tags": {"cat", "dog"}}
+        result: ResultData = {"Tags": {"cat", "dog"}}
         meta: MetaData = {"provider": "Test", "provider_url": URL("https://test.com")}
         reply, _media = build_reply(result, meta)
         # Sets are comma-joined (order may vary)
@@ -367,14 +367,14 @@ class TestBuildReply:
         assert "dog" in reply
 
     def test_list_value_in_result(self):
-        result = {"Tags": ["cat", "dog"]}
+        result: ResultData = {"Tags": ["cat", "dog"]}
         meta: MetaData = {"provider": "Test", "provider_url": URL("https://test.com")}
         reply, _media = build_reply(result, meta)
         assert "<code >cat</code>" in reply
         assert "<code >dog</code>" in reply
 
     def test_html_escaping(self):
-        result = {"Title": "<script>alert('xss')</script>"}
+        result: ResultData = {"Title": "<script>alert('xss')</script>"}
         meta: MetaData = {"provider": "Test", "provider_url": URL("https://test.com")}
         reply, _media = build_reply(result, meta)
         assert "<script>" not in reply

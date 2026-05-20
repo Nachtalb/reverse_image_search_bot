@@ -194,7 +194,7 @@ class TestAnilistProvider:
 
 
 def _mock_booru_response(api, post_id):
-    base = {
+    base: dict = {
         "tag_string_general": "cat dog",
         "tag_string_character": "naruto",
         "tag_string_artist": "artist1",
