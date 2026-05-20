@@ -115,7 +115,7 @@ async def _anilist_resolve(
     clean = _clean_name(char_name)
     try:
         data = await _anilist_post({"query": _ANILIST_QUERY, "variables": {"name": clean}})
-        char = data["data"]["Character"]  # type: ignore[index]
+        char = data["data"]["Character"]  # type: ignore[index]  # ty: ignore[not-subscriptable]
         char_name_data = char["name"]
         if user_lang == "ja":
             # Prefer native name (usually Japanese) for Japanese users

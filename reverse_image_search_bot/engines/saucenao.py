@@ -46,7 +46,7 @@ class SauceNaoEngine(GenericRISEngine):
         return await anilist.provide(data["anilist_id"], data.get("part"))  # type: ignore
 
     async def _booru_provider(self, data: ResponseData, api: str) -> InternalProviderData:
-        return await booru.provide(api, data[api + "_id"])  # type: ignore[arg-type]
+        return await booru.provide(api, data[api + "_id"])  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
 
     async def _9_provider(self, data):
         return await self._booru_provider(data, "danbooru")
@@ -84,7 +84,7 @@ class SauceNaoEngine(GenericRISEngine):
         kwargs = {}
         if chapter_id := data.get("md_id"):
             kwargs["chapter_id"] = chapter_id
-        ext_urls: list[str] = data.get("ext_urls", [])  # type: ignore[assignment]
+        ext_urls: list[str] = data.get("ext_urls", [])  # type: ignore[assignment]  # ty: ignore[invalid-assignment]
         mangadex_urls = [url for url in ext_urls if URL(url).host == "mangadex.org"]
         if mangadex_url := next(iter(mangadex_urls), None):
             kwargs["url"] = URL(mangadex_url.strip("/"))
@@ -120,7 +120,7 @@ class SauceNaoEngine(GenericRISEngine):
                 continue
             match key:
                 case k if k in known:
-                    result[known[key][0]] = known[key][1](value)  # type: ignore[arg-type]
+                    result[known[key][0]] = known[key][1](value)  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
                 case k if k.endswith(("_id", "_aid")):
                     continue
                 case k if k.endswith("_url"):

@@ -8,6 +8,8 @@ import pytest
 from reverse_image_search_bot.engines.errors import RateLimitError, SearchError
 from reverse_image_search_bot.engines.saucenao import SauceNaoEngine
 
+ResponseData = SauceNaoEngine.ResponseData
+
 
 @pytest.fixture
 def engine():
@@ -350,7 +352,7 @@ class TestDefaultProvider:
 
     def test_known_fields(self):
         engine = SauceNaoEngine()
-        data = {"characters": "Naruto, Sasuke", "material": "Manga", "creator": "Kishimoto"}
+        data: ResponseData = {"characters": "Naruto, Sasuke", "material": "Manga", "creator": "Kishimoto"}
         result, _meta = engine._default_provider(data)
         # tagify returns a set of hashtags
         assert isinstance(result["Character"], set)
@@ -362,7 +364,7 @@ class TestDefaultProvider:
 
     def test_source_url_button(self):
         engine = SauceNaoEngine()
-        data = {"source": "https://example.com/source"}
+        data: ResponseData = {"source": "https://example.com/source"}
         _result, meta = engine._default_provider(data)
         buttons = meta.get("buttons", [])
         # url_button prefixes with 🌐
@@ -370,21 +372,21 @@ class TestDefaultProvider:
 
     def test_source_non_url_ignored(self):
         engine = SauceNaoEngine()
-        data = {"source": "not a url"}
+        data: ResponseData = {"source": "not a url"}
         _result, meta = engine._default_provider(data)
         buttons = meta.get("buttons", [])
         assert not any(b.text == "Source" for b in buttons)
 
     def test_ext_urls(self):
         engine = SauceNaoEngine()
-        data = {"ext_urls": ["https://example.com/a", "https://example.com/b"]}
+        data: ResponseData = {"ext_urls": ["https://example.com/a", "https://example.com/b"]}
         _result, meta = engine._default_provider(data)
         buttons = meta.get("buttons", [])
         assert len(buttons) == 2
 
     def test_id_fields_skipped(self):
         engine = SauceNaoEngine()
-        data = {"pixiv_id": 123, "danbooru_aid": 456, "title": "Test"}
+        data: ResponseData = {"pixiv_id": 123, "danbooru_aid": 456, "title": "Test"}
         result, _meta = engine._default_provider(data)
         assert "Pixiv Id" not in result
         assert "Danbooru Aid" not in result
@@ -392,7 +394,7 @@ class TestDefaultProvider:
 
     def test_url_field_with_name(self):
         engine = SauceNaoEngine()
-        data = {"artist_url": "https://example.com/artist", "artist_name": "Bob"}
+        data: ResponseData = {"artist_url": "https://example.com/artist", "artist_name": "Bob"}
         result, meta = engine._default_provider(data)
         buttons = meta.get("buttons", [])
         assert any("Artist" in b.text for b in buttons)
@@ -401,14 +403,14 @@ class TestDefaultProvider:
 
     def test_url_field_without_name(self):
         engine = SauceNaoEngine()
-        data = {"source_url": "https://example.com/src"}
+        data: ResponseData = {"source_url": "https://example.com/src"}
         _result, meta = engine._default_provider(data)
         buttons = meta.get("buttons", [])
         assert any(b.url == "https://example.com/src" for b in buttons)
 
     def test_twitter_user_handle(self):
         engine = SauceNaoEngine()
-        data = {"twitter_user_handle": "elonmusk"}
+        data: ResponseData = {"twitter_user_handle": "elonmusk"}
         result, meta = engine._default_provider(data)
         assert result["Poster"] == "Elonmusk"
         buttons = meta.get("buttons", [])
@@ -416,6 +418,6 @@ class TestDefaultProvider:
 
     def test_generic_field_fallback(self):
         engine = SauceNaoEngine()
-        data = {"some_random_key": "value123"}
+        data: ResponseData = {"some_random_key": "value123"}
         result, _meta = engine._default_provider(data)
         assert result["Some Random Key"] == "value123"

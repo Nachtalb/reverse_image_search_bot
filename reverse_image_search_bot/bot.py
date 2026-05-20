@@ -253,17 +253,17 @@ def main():
 
     # Feedback conversation handler
     feedback_handler = ConversationHandler(
-        entry_points=[CommandHandler("feedback", feedback_command)],
+        entry_points=[CommandHandler("feedback", feedback_command)],  # ty: ignore[invalid-argument-type]
         states={
             WAITING_FOR_FEEDBACK: [
                 CommandHandler("cancel", feedback_cancel),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, feedback_received),
             ],
-        },
-        fallbacks=[CommandHandler("cancel", feedback_cancel)],
+        },  # ty: ignore[invalid-argument-type]
+        fallbacks=[CommandHandler("cancel", feedback_cancel)],  # ty: ignore[invalid-argument-type]
         conversation_timeout=300,  # 5 minute timeout
     )
-    app.add_handler(feedback_handler)
+    app.add_handler(feedback_handler)  # ty: ignore[invalid-argument-type]
 
     # Feedback reply handler — allows admins and users to reply back and forth
     app.add_handler(
