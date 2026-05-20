@@ -8,6 +8,7 @@ import logging
 import os
 import threading
 import time
+from datetime import timedelta
 
 from prometheus_client import Counter, Gauge, Histogram, start_http_server
 
@@ -232,14 +233,12 @@ def track_write_forbidden(chat) -> None:
     ).inc()
 
 
-def track_retry_after(retry_after: "int | float | __import__('datetime').timedelta") -> None:
+def track_retry_after(retry_after: int | float | timedelta) -> None:
     """Record a RetryAfter rate limit hit.
 
     Args:
         retry_after: The delay Telegram requested (seconds or timedelta).
     """
-    from datetime import timedelta
-
     seconds = retry_after.total_seconds() if isinstance(retry_after, timedelta) else float(retry_after)
     retry_after_total.inc()
     retry_after_seconds.observe(seconds)
@@ -255,7 +254,7 @@ def _collect_process_metrics():
             with open("/proc/self/statm") as f:
                 pages = int(f.read().split()[1])
                 memory_bytes.set(pages * os.sysconf("SC_PAGE_SIZE"))
-        except (OSError, ValueError):
+        except OSError, ValueError:
             pass
         if _first_run:
             time.sleep(5)  # let engines/providers initialize
