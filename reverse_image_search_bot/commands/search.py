@@ -393,7 +393,7 @@ async def _best_match_search(
                         identifier = meta.get("identifier")
                         thumbnail_identifier = meta.get("thumbnail_identifier")
                         if identifier in identifiers and thumbnail_identifier not in thumbnail_identifiers:
-                            result = {}
+                            result: ResultData = {}
                             result[t("search.results.duplicate_result", L)] = ""
                         elif identifier not in identifiers and thumbnail_identifier in thumbnail_identifiers:
                             result[t("search.results.duplicate_thumbnail", L)] = ""
