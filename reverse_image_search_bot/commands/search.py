@@ -278,7 +278,7 @@ async def best_match(
         if chat_config.failures_in_a_row > 4 and chat_config.auto_search_enabled:
             chat_config.auto_search_enabled = False
             await message.reply_text(t("search.auto_disable.message", L))
-        # ponytail: user may have deleted the "searching…" message mid-search
+        # User may have deleted the "searching…" message mid-search
         with contextlib.suppress(BadRequest):
             await search_message.edit_text(
                 t("search.no_results", L, engines=engines_used_html),
