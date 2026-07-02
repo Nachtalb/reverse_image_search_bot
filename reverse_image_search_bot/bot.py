@@ -15,6 +15,7 @@ from telegram.ext import (
     CommandHandler,
     ContextTypes,
     ConversationHandler,
+    Defaults,
     MessageHandler,
     PicklePersistence,
     filters,
@@ -237,6 +238,9 @@ def main():
     builder = Application.builder().token(settings.TELEGRAM_API_TOKEN)
     builder.persistence(persistence)
     builder.concurrent_updates(settings.CONCURRENT_UPDATES)
+    # Users delete their message mid-search — send the reply standalone
+    # instead of failing with "Message to be replied not found".
+    builder.defaults(Defaults(allow_sending_without_reply=True))
     builder.post_init(post_init)
     app = builder.build()
     application = app

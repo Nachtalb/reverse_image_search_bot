@@ -27,7 +27,7 @@ from yarl import URL
 from reverse_image_search_bot import metrics
 from reverse_image_search_bot.config import ChatConfig
 from reverse_image_search_bot.engines import engines
-from reverse_image_search_bot.engines.errors import EngineError, RateLimitError
+from reverse_image_search_bot.engines.errors import EngineError, RateLimitError, is_transient
 from reverse_image_search_bot.engines.generic import GenericRISEngine, PreWorkEngine
 from reverse_image_search_bot.engines.types import MetaData, ResultData
 from reverse_image_search_bot.i18n import lang as get_lang
@@ -278,19 +278,22 @@ async def best_match(
         if chat_config.failures_in_a_row > 4 and chat_config.auto_search_enabled:
             chat_config.auto_search_enabled = False
             await message.reply_text(t("search.auto_disable.message", L))
-        await search_message.edit_text(
-            t("search.no_results", L, engines=engines_used_html),
-            ParseMode.HTML,
-        )
+        # ponytail: user may have deleted the "searching…" message mid-search
+        with contextlib.suppress(BadRequest):
+            await search_message.edit_text(
+                t("search.no_results", L, engines=engines_used_html),
+                ParseMode.HTML,
+            )
     else:
         chat_config.failures_in_a_row = 0
         result_text = t("search.results_found", L, engines=engines_used_html)
         if not chat_config.auto_search_enabled:
             result_text += t("search.results_found_reenable", L)
-        await search_message.edit_text(
-            result_text,
-            ParseMode.HTML,
-        )
+        with contextlib.suppress(BadRequest):
+            await search_message.edit_text(
+                result_text,
+                ParseMode.HTML,
+            )
 
 
 _AUTO_DISABLE_THRESHOLD = 5
@@ -476,9 +479,16 @@ async def _best_match_search(
                         )
                 except EngineError as engine_err:
                     metrics.provider_results_total.labels(provider=engine.name, status="error").inc()
-                    logger.exception("Engine error [%s]", engine.name, exc_info=engine_err)
+                    if getattr(engine_err, "report", True) and not is_transient(engine_err):
+                        logger.exception("Engine error [%s]", engine.name, exc_info=engine_err)
+                    else:
+                        # Transient network blip or muted known-broken upstream — keep out of error tracking.
+                        logger.info("Engine error (not reported) [%s]: %s", engine.name, engine_err)
                 except Exception as error:
                     metrics.provider_results_total.labels(provider=engine.name, status="error").inc()
+                    if is_transient(error):
+                        logger.info("Transient error [%s]: %s", engine.name, type(error).__name__)
+                        continue
                     user = update.effective_user
                     user_info = f"{user.full_name} (tg://user?id={user.id})" if user else "Unknown"
                     logger.error(

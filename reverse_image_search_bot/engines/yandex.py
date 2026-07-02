@@ -13,6 +13,11 @@ class YandexEngine(PicImageSearchEngine):
     recommendation = ["Anything SFW and NSFW", "Image to Text (OCR)", "Anything Russian"]
     url = "https://yandex.com/images/search?url={query_url}&rpt=imageview"
 
+    # PicImageSearch's Yandex parser is broken upstream ('data-state' extraction
+    # fails since Yandex changed their markup). Flip back to True once we update
+    # to a PicImageSearch release that fixes it.
+    report_parsing_errors = False
+
     def __init__(self, *args, **kwargs):
         from PicImageSearch import Yandex
 

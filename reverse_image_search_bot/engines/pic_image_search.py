@@ -27,6 +27,11 @@ class PicImageSearchEngine(GenericRISEngine):
 
     pic_engine_class = None  # e.g. PicImageSearch.Yandex
 
+    #: Hardcoded kill-switch for ParsingError reporting to error tracking.
+    #: Set False on a subclass when the upstream parser is known-broken
+    #: (e.g. site markup changed) and flip back once PicImageSearch ships a fix.
+    report_parsing_errors = True
+
     @_classproperty
     def best_match_implemented(cls):
         return True
@@ -74,9 +79,13 @@ class PicImageSearchEngine(GenericRISEngine):
         except Exception as e:
             from PicImageSearch.exceptions import ParsingError
 
+            from .errors import is_transient
+
             if isinstance(e, ParsingError):
-                raise SearchError(f"ParsingError: {e}") from e
-            raise SearchError(f"Search failed: {e}") from e
+                raise SearchError(f"ParsingError: {e}", report=self.report_parsing_errors) from e
+            # str() of httpx timeouts is often empty — keep the type name.
+            detail = str(e) or type(e).__name__
+            raise SearchError(f"Search failed: {detail}", report=not is_transient(e)) from e
 
         if not getattr(result_obj, "raw", None):
             self.logger.debug("Done: no results")

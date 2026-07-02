@@ -42,6 +42,9 @@ _LANG_NAMES: dict[str, str] = {
 # Telegram Bot API file download limit (20 MB)
 MAX_TELEGRAM_FILE_SIZE = 20 * 1024 * 1024
 
+# getFile/download timeout — PTB's 5s default read timeout is too tight for media.
+_FILE_TIMEOUT = 10.0
+
 
 def _extract_video_frame(video_path: str) -> bytes:
     """Extract the first frame from a video as JPEG bytes. Runs in a separate process."""
@@ -124,9 +127,10 @@ async def video_to_url(attachment: Document | Video | Animation | Sticker) -> UR
 
     t0 = time()
     logger.info("video_to_url: downloading file %s", attachment.file_unique_id)
-    video_file = await attachment.get_file()
+    # PTB's default 5s read timeout is too tight for media — bump to 10s max.
+    video_file = await attachment.get_file(read_timeout=_FILE_TIMEOUT, connect_timeout=_FILE_TIMEOUT)
     with NamedTemporaryFile(suffix=".mp4") as tmp:
-        await video_file.download_to_drive(tmp.name)
+        await video_file.download_to_drive(tmp.name, read_timeout=_FILE_TIMEOUT, connect_timeout=_FILE_TIMEOUT)
         logger.info("video_to_url: downloaded in %.1fs, extracting frame", time() - t0)
         loop = asyncio.get_running_loop()
         frame_bytes = await loop.run_in_executor(_process_executor, _extract_video_frame, tmp.name)
@@ -151,9 +155,9 @@ async def image_to_url(attachment: PhotoSize | Sticker | Document) -> URL:
 
     t0 = time()
     logger.info("image_to_url: downloading file %s", attachment.file_unique_id)
-    photo_file = await attachment.get_file()
+    photo_file = await attachment.get_file(read_timeout=_FILE_TIMEOUT, connect_timeout=_FILE_TIMEOUT)
     with io.BytesIO() as file:
-        await photo_file.download_to_memory(file)
+        await photo_file.download_to_memory(file, read_timeout=_FILE_TIMEOUT, connect_timeout=_FILE_TIMEOUT)
         logger.info("image_to_url: downloaded in %.1fs", time() - t0)
         if extension != "jpg":
             file.seek(0)
