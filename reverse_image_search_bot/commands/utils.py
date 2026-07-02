@@ -130,7 +130,7 @@ async def video_to_url(attachment: Document | Video | Animation | Sticker) -> UR
     # PTB's default 5s read timeout is too tight for media — bump to 10s max.
     video_file = await attachment.get_file(read_timeout=_FILE_TIMEOUT, connect_timeout=_FILE_TIMEOUT)
     with NamedTemporaryFile(suffix=".mp4") as tmp:
-        await video_file.download_to_drive(tmp.name, read_timeout=_FILE_TIMEOUT, connect_timeout=_FILE_TIMEOUT)
+        await video_file.download_to_drive(tmp.name)
         logger.info("video_to_url: downloaded in %.1fs, extracting frame", time() - t0)
         loop = asyncio.get_running_loop()
         frame_bytes = await loop.run_in_executor(_process_executor, _extract_video_frame, tmp.name)
@@ -157,7 +157,7 @@ async def image_to_url(attachment: PhotoSize | Sticker | Document) -> URL:
     logger.info("image_to_url: downloading file %s", attachment.file_unique_id)
     photo_file = await attachment.get_file(read_timeout=_FILE_TIMEOUT, connect_timeout=_FILE_TIMEOUT)
     with io.BytesIO() as file:
-        await photo_file.download_to_memory(file, read_timeout=_FILE_TIMEOUT, connect_timeout=_FILE_TIMEOUT)
+        await photo_file.download_to_memory(file)
         logger.info("image_to_url: downloaded in %.1fs", time() - t0)
         if extension != "jpg":
             file.seek(0)
