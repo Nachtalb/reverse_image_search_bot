@@ -116,7 +116,10 @@ async def _send_to_user_or_chat(
 
 async def feedback_reply_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle replies to feedback messages — forwards between admin and user."""
-    assert update.message and update.effective_chat and update.message.reply_to_message
+    # The REPLY filter also matches edited messages, where update.message is None
+    # (the payload is update.edited_message). Ignore those rather than asserting.
+    if not (update.message and update.effective_chat and update.message.reply_to_message):
+        return
 
     reply_to = update.message.reply_to_message
     chat_id = update.effective_chat.id
