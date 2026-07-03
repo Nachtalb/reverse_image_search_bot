@@ -955,3 +955,19 @@ class TestFileHandler:
             # Should have sent error message before re-raising
             update.effective_message.reply_text.assert_awaited()
             assert "error" in update.effective_message.reply_text.call_args[0][0].lower()
+
+
+@pytest.mark.asyncio
+async def test_feedback_reply_handler_ignores_edited_message():
+    """An edited reply matches the REPLY filter but carries update.message=None
+    (the payload is update.edited_message). The handler must return quietly,
+    not raise AssertionError (which floods error tracking)."""
+    from reverse_image_search_bot.commands.feedback import feedback_reply_handler
+
+    update = MagicMock()
+    update.message = None  # edited-message update
+    update.effective_chat = MagicMock(id=123)
+    context = MagicMock()
+
+    # Previously raised AssertionError → must now be a no-op.
+    await feedback_reply_handler(update, context)
