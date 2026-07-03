@@ -77,12 +77,18 @@ class PicImageSearchEngine(GenericRISEngine):
         except KeyError as e:
             raise SearchError(f"Parsing key missing: {e}") from e
         except Exception as e:
+            import json
+
             from PicImageSearch.exceptions import ParsingError
 
             from .errors import is_transient
 
             if isinstance(e, ParsingError):
                 raise SearchError(f"ParsingError: {e}", report=self.report_parsing_errors) from e
+            if isinstance(e, json.JSONDecodeError):
+                # Provider returned an empty / non-JSON body (rate-limit page, 5xx
+                # HTML, truncated response) — an upstream hiccup, not our bug.
+                raise SearchError(f"Bad response body: {e}", report=False) from e
             # str() of httpx timeouts is often empty — keep the type name.
             detail = str(e) or type(e).__name__
             raise SearchError(f"Search failed: {detail}", report=not is_transient(e)) from e

@@ -33,3 +33,24 @@ def test_yandex_parsing_reporting_disabled():
     from reverse_image_search_bot.engines.yandex import YandexEngine
 
     assert YandexEngine.report_parsing_errors is False
+
+
+@pytest.mark.asyncio
+async def test_json_decode_from_provider_is_not_reported(monkeypatch):
+    """An empty/non-JSON provider body (JSONDecodeError) must be caught as a
+    non-reported SearchError, not shipped to error tracking as a bug."""
+    import json
+
+    from reverse_image_search_bot.engines.yandex import YandexEngine
+
+    engine = YandexEngine()
+
+    async def _boom(_url):
+        json.loads("")  # raises JSONDecodeError
+
+    monkeypatch.setattr(engine, "_search", _boom)
+
+    with pytest.raises(SearchError) as exc_info:
+        await engine.best_match("https://example.com/x.jpg")
+    assert exc_info.value.report is False
+    assert isinstance(exc_info.value.__cause__, json.JSONDecodeError)
