@@ -13,6 +13,7 @@ os.environ.setdefault("UPLOADER_URL", "https://ris-test-uploads.naa.gg")
 os.environ.setdefault("SAUCENAO_API", "test-saucenao-key")
 os.environ.setdefault("TRACE_API", "test-trace-key")
 os.environ.setdefault("CONFIG_DB_PATH", "/tmp/ris_test_config.db")
+os.environ.setdefault("TRACKING_DB_PATH", "/tmp/ris_test_tracking.db")
 
 import pytest
 
