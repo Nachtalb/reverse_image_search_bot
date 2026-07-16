@@ -26,8 +26,8 @@ def _context(banned=None):
 @pytest.mark.asyncio
 async def test_ban_writes_both_memory_and_db(monkeypatch):
     calls = []
-    monkeypatch.setattr("reverse_image_search_bot.bot.tracking.set_banned", lambda uid, b: calls.append((uid, b)))
-    monkeypatch.setattr("reverse_image_search_bot.bot.tracking.has_report", lambda uid: False)
+    monkeypatch.setattr("reverse_image_search_bot.bot.abuse.set_banned", lambda uid, b: calls.append((uid, b)))
+    monkeypatch.setattr("reverse_image_search_bot.bot.abuse.has_report", lambda uid: False)
     update = _update("/ban 12345")
     ctx = _context()
     await ban_command(update, ctx)
@@ -38,8 +38,8 @@ async def test_ban_writes_both_memory_and_db(monkeypatch):
 @pytest.mark.asyncio
 async def test_unban_toggles_both(monkeypatch):
     calls = []
-    monkeypatch.setattr("reverse_image_search_bot.bot.tracking.set_banned", lambda uid, b: calls.append((uid, b)))
-    monkeypatch.setattr("reverse_image_search_bot.bot.tracking.has_report", lambda uid: False)
+    monkeypatch.setattr("reverse_image_search_bot.bot.abuse.set_banned", lambda uid, b: calls.append((uid, b)))
+    monkeypatch.setattr("reverse_image_search_bot.bot.abuse.has_report", lambda uid: False)
     update = _update("/ban 12345")
     ctx = _context(banned=[12345])
     await ban_command(update, ctx)
@@ -49,7 +49,7 @@ async def test_unban_toggles_both(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_ban_no_arg_lists_with_report_flag(monkeypatch):
-    monkeypatch.setattr("reverse_image_search_bot.bot.tracking.has_report", lambda uid: uid == 111)
+    monkeypatch.setattr("reverse_image_search_bot.bot.abuse.has_report", lambda uid: uid == 111)
     update = _update("/ban")
     ctx = _context(banned=[111, 222])
     await ban_command(update, ctx)
@@ -69,9 +69,9 @@ async def test_ban_no_arg_empty(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_check_by_user_id(monkeypatch):
-    monkeypatch.setattr("reverse_image_search_bot.bot.tracking.count_files", lambda uid: 4)
-    monkeypatch.setattr("reverse_image_search_bot.bot.tracking.get_user", lambda uid: {"username": "bob"})
-    monkeypatch.setattr("reverse_image_search_bot.bot.tracking.has_report", lambda uid: False)
+    monkeypatch.setattr("reverse_image_search_bot.bot.abuse.count_files", lambda uid: 4)
+    monkeypatch.setattr("reverse_image_search_bot.bot.abuse.get_user", lambda uid: {"username": "bob"})
+    monkeypatch.setattr("reverse_image_search_bot.bot.abuse.has_report", lambda uid: False)
     update = _update("/check 777")
     ctx = _context()
     await check_command(update, ctx)
@@ -81,10 +81,10 @@ async def test_check_by_user_id(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_check_by_filename_resolves_user(monkeypatch):
-    monkeypatch.setattr("reverse_image_search_bot.bot.tracking.find_user_by_filename", lambda f: 888)
-    monkeypatch.setattr("reverse_image_search_bot.bot.tracking.count_files", lambda uid: 2)
-    monkeypatch.setattr("reverse_image_search_bot.bot.tracking.get_user", lambda uid: None)
-    monkeypatch.setattr("reverse_image_search_bot.bot.tracking.has_report", lambda uid: False)
+    monkeypatch.setattr("reverse_image_search_bot.bot.abuse.find_user_by_filename", lambda f: 888)
+    monkeypatch.setattr("reverse_image_search_bot.bot.abuse.count_files", lambda uid: 2)
+    monkeypatch.setattr("reverse_image_search_bot.bot.abuse.get_user", lambda uid: None)
+    monkeypatch.setattr("reverse_image_search_bot.bot.abuse.has_report", lambda uid: False)
     update = _update("/check AQADxyz.jpg")
     ctx = _context()
     await check_command(update, ctx)
@@ -94,7 +94,7 @@ async def test_check_by_filename_resolves_user(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_check_filename_not_found(monkeypatch):
-    monkeypatch.setattr("reverse_image_search_bot.bot.tracking.find_user_by_filename", lambda f: None)
+    monkeypatch.setattr("reverse_image_search_bot.bot.abuse.find_user_by_filename", lambda f: None)
     update = _update("/check missing.jpg")
     ctx = _context()
     await check_command(update, ctx)

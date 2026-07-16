@@ -42,7 +42,7 @@ from .commands.feedback import (
     feedback_received,
     feedback_reply_handler,
 )
-from .config import tracking
+from .config import abuse
 from .i18n import available_languages, t
 from .metrics import start_metrics_server
 
@@ -122,7 +122,7 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         lines = ["<b>Banned users:</b>"]
         for uid in banned:
-            flag = " 🚩 reported" if tracking.has_report(uid) else ""
+            flag = " 🚩 reported" if abuse.has_report(uid) else ""
             lines.append(f"<code>{uid}</code>{flag}")
         # Telegram caps messages at 4096 chars — chunk on line boundaries.
         chunk = ""
@@ -143,11 +143,11 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if user_id in banned:
         banned.remove(user_id)
-        tracking.set_banned(user_id, False)
+        abuse.set_banned(user_id, False)
         text = f"Removed user {user_id=} from banned users"
     else:
         banned.append(user_id)
-        tracking.set_banned(user_id, True)
+        abuse.set_banned(user_id, True)
         text = f"banned user {user_id=}"
     await update.message.reply_text(text)
 
@@ -156,7 +156,7 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Report how many files a user has uploaded. Accepts a user ID or a filename.
 
     ``/check <user_id>`` counts directly; ``/check <filename>`` resolves the
-    uploader from the tracking DB first (for Cloudflare abuse reports, which
+    uploader from the abuse DB first (for Cloudflare abuse reports, which
     only give the on-disk filename).
     """
     assert update.message and update.message.text
@@ -171,20 +171,20 @@ async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id: int | None = int(arg)
         source = f"user <code>{user_id}</code>"
     else:
-        user_id = tracking.find_user_by_filename(arg)
+        user_id = abuse.find_user_by_filename(arg)
         if user_id is None:
             await update.message.reply_text(f"No uploader found for file: {arg}")
             return
         source = f"file <code>{html.escape(arg)}</code> → user <code>{user_id}</code>"
 
-    count = tracking.count_files(user_id)
-    user = tracking.get_user(user_id)
+    count = abuse.count_files(user_id)
+    user = abuse.get_user(user_id)
     banned = user_id in context.bot_data.get("banned_users", [])
     parts = [f"{source}", f"Uploaded files: <b>{count}</b>"]
     if user and user.get("username"):
         parts.append(f"Username: @{html.escape(user['username'])}")
     parts.append(f"Banned: {'yes' if banned else 'no'}")
-    if tracking.has_report(user_id):
+    if abuse.has_report(user_id):
         parts.append("🚩 Has a filed report")
     await update.message.reply_html("\n".join(parts))
 
@@ -277,12 +277,12 @@ async def post_init(app: Application) -> None:
         except Exception:
             logger.warning("Failed to migrate banned_users.json", exc_info=True)
 
-    # Sync durable ban list from the tracking DB into bot_data. Redundancy guard:
+    # Sync durable ban list from the abuse DB into bot_data. Redundancy guard:
     # if bot_data ever loses banned_users (e.g. a cleared pickle), the DB restores
     # it on the next start. Union of both sources — neither shrinks the other.
     try:
         banned: list[int] = app.bot_data.setdefault("banned_users", [])
-        db_banned = tracking.banned_user_ids()
+        db_banned = abuse.banned_user_ids()
         added = 0
         for uid in db_banned:
             if uid not in banned:
@@ -291,10 +291,10 @@ async def post_init(app: Application) -> None:
         # Also push any bot_data-only bans back into the DB so they're durable.
         for uid in banned:
             if uid not in db_banned:
-                tracking.set_banned(uid, True)
-        logger.info("Synced ban list from tracking DB (%d in DB, %d restored to memory)", len(db_banned), added)
+                abuse.set_banned(uid, True)
+        logger.info("Synced ban list from abuse DB (%d in DB, %d restored to memory)", len(db_banned), added)
     except Exception:
-        logger.warning("Failed to sync ban list from tracking DB", exc_info=True)
+        logger.warning("Failed to sync ban list from abuse DB", exc_info=True)
 
     await _set_bot_commands(app)
 

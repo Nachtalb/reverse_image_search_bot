@@ -25,7 +25,7 @@ from telegram.ext import ContextTypes
 from yarl import URL
 
 from reverse_image_search_bot import metrics
-from reverse_image_search_bot.config import ChatConfig, tracking
+from reverse_image_search_bot.config import ChatConfig, abuse
 from reverse_image_search_bot.engines import engines
 from reverse_image_search_bot.engines.errors import EngineError, RateLimitError, is_transient
 from reverse_image_search_bot.engines.generic import GenericRISEngine, PreWorkEngine
@@ -126,14 +126,14 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
         # Record uploader + file provenance for abuse handling. The on-disk
         # filename is the last path segment of image_url (<file_unique_id>.<ext>).
         with contextlib.suppress(Exception):
-            tracking.record_user(
+            abuse.record_user(
                 user.id,
                 username=user.username,
                 first_name=user.first_name,
                 last_name=user.last_name,
                 language_code=getattr(user, "language_code", None),
             )
-            tracking.record_file(
+            abuse.record_file(
                 getattr(attachment, "file_unique_id", "") or URL(str(image_url)).name,
                 saved_filename=URL(str(image_url)).name,
                 user_id=user.id,

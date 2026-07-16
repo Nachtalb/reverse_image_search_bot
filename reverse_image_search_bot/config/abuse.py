@@ -1,9 +1,11 @@
-"""Insert-only SQLite tracking of uploaders and uploaded files.
+"""Insert-only SQLite record of uploaders and uploaded files.
 
-Separate from :mod:`reverse_image_search_bot.config.db` (chat settings). This
-database exists for abuse handling: it records who uploaded which file so a
-Cloudflare CSAM report (which only gives us the on-disk filename) can be traced
-back to a Telegram user, and so the ban list survives a cleared ``bot_data``.
+This exists to make a **proper NCMEC / abuse report** possible: it links an
+uploaded file back to the Telegram user who sent it (name, username, upload
+time) and preserves file provenance so a Cloudflare CSAM report — which only
+gives us the on-disk filename — can be traced to an account and filed with the
+required reporter/uploader details. It also keeps a durable, redundant copy of
+the ban list that survives a cleared ``bot_data`` pickle.
 
 Design:
 - ``users``  — one row per Telegram user. Profile fields are upserted
@@ -24,7 +26,7 @@ import sqlite3
 import threading
 import time
 
-from reverse_image_search_bot.settings import TRACKING_DB_PATH
+from reverse_image_search_bot.settings import ABUSE_DB_PATH
 
 _local = threading.local()
 _all_connections: list[sqlite3.Connection] = []
@@ -34,8 +36,8 @@ _conn_lock = threading.Lock()
 def _get_conn() -> sqlite3.Connection:
     """Return a thread-local SQLite connection with WAL mode + schema ensured."""
     if not hasattr(_local, "conn") or _local.conn is None:
-        TRACKING_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(TRACKING_DB_PATH))
+        ABUSE_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(str(ABUSE_DB_PATH))
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=5000")
