@@ -214,3 +214,4 @@ log/
 tmp/
 .pixiv_auth
 config_data/
+redis_data/

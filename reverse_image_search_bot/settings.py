@@ -74,6 +74,10 @@ PIXIV_CONFIG = Path(os.getenv("PIXIV_CONFIG", str(_DEFAULT_CONFIG_DIR / "pixiv.j
 
 CONFIG_DB_PATH = Path(os.getenv("CONFIG_DB_PATH", str(_DEFAULT_CONFIG_DIR / "config.db"))).expanduser().absolute()
 
+# Abuse tracking DB (uploader/file provenance + durable ban list). Separate file
+# so it can be handled/backed-up independently of chat settings.
+TRACKING_DB_PATH = Path(os.getenv("TRACKING_DB_PATH", str(_DEFAULT_CONFIG_DIR / "tracking.db"))).expanduser().absolute()
+
 PERSISTENCE_PATH = (
     Path(os.getenv("PERSISTENCE_PATH", str(_DEFAULT_CONFIG_DIR / "bot_data.pickle"))).expanduser().absolute()
 )
