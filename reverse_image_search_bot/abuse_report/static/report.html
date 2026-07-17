@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Abuse Report</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #17181c; color: #e8e8ea; font-size: 15px; line-height: 1.45;
+  }
+  header { padding: 16px; border-bottom: 1px solid #2a2c33; position: sticky; top: 0; background: #17181c; z-index: 5; }
+  h1 { font-size: 17px; margin: 0 0 4px; }
+  .sub { color: #9a9ba2; font-size: 13px; }
+  main { padding: 16px; }
+  .card { background: #1f2128; border: 1px solid #2a2c33; border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+  label { display: block; font-size: 13px; color: #9a9ba2; margin-bottom: 6px; }
+  input[type=password], input[type=text] {
+    width: 100%; padding: 11px 12px; border-radius: 9px; border: 1px solid #363842;
+    background: #14151a; color: #e8e8ea; font-size: 15px;
+  }
+  button {
+    border: none; border-radius: 9px; padding: 11px 16px; font-size: 15px; font-weight: 600;
+    cursor: pointer; background: #3a6df0; color: #fff;
+  }
+  button.secondary { background: #2a2c33; color: #e8e8ea; }
+  button.danger { background: #c0392b; }
+  button.ghost { background: transparent; color: #9a9ba2; border: 1px solid #363842; }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .kv { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #23252c; }
+  .kv:last-child { border: none; }
+  .kv b { color: #fff; font-weight: 600; }
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; margin-top: 8px; }
+  .thumb { position: relative; border: 2px solid #2a2c33; border-radius: 10px; overflow: hidden; background: #101116; aspect-ratio: 1; }
+  .thumb.selected { border-color: #3a6df0; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb .lock { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #5a5c66; font-size: 12px; text-align: center; padding: 8px; }
+  .thumb .cls { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.72); padding: 4px; display: flex; gap: 3px; justify-content: center; }
+  .thumb .cls span { font-size: 11px; padding: 2px 5px; border-radius: 5px; background: #2a2c33; cursor: pointer; }
+  .thumb .cls span.on { background: #3a6df0; color: #fff; }
+  .status { padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
+  .status.preparing, .status.submitting { background: #4a3a10; color: #f0c674; }
+  .status.ready, .status.review { background: #103a2a; color: #7fd6a2; }
+  .status.filed { background: #0f2f5a; color: #8ab4ff; }
+  .status.error, .status.cancelled, .status.retracted { background: #4a1010; color: #f08a8a; }
+  .hidden { display: none; }
+  .muted { color: #9a9ba2; font-size: 12px; }
+  details { margin: 10px 0; }
+  summary { cursor: pointer; color: #9a9ba2; font-size: 13px; }
+  .cls-legend { font-size: 12px; color: #9a9ba2; margin-top: 8px; }
+  .cls-legend code { background: #2a2c33; padding: 1px 5px; border-radius: 4px; color: #e8e8ea; }
+</style>
+</head>
+<body>
+<header>
+  <h1>NCMEC Abuse Report</h1>
+  <div class="sub" id="hdr-sub">Locked</div>
+</header>
+<main>
+  <!-- Unlock (P2) -->
+  <div class="card" id="unlock-card">
+    <label for="p2">Report page password</label>
+    <input type="password" id="p2" autocomplete="off" placeholder="Enter the report password">
+    <div style="height:10px"></div>
+    <button id="unlock-btn">Unlock report</button>
+    <div class="muted" id="unlock-err" style="color:#f08a8a;margin-top:8px"></div>
+  </div>
+
+  <!-- Report body -->
+  <div id="report-body" class="hidden">
+    <div class="status" id="status-banner"></div>
+
+    <div class="card">
+      <div class="kv"><span>User ID</span><b id="u-id"></b></div>
+      <div class="kv"><span>Username</span><b id="u-name"></b></div>
+      <div class="kv"><span>Full name</span><b id="u-full"></b></div>
+      <div class="kv"><span>Banned</span><b id="u-ban"></b></div>
+      <div class="kv"><span>Report created</span><b id="r-created"></b></div>
+      <div class="kv"><span>NCMEC report id</span><b id="r-ncmec">—</b></div>
+    </div>
+
+    <!-- Decrypt (P1) -->
+    <div class="card" id="decrypt-card">
+      <label for="p1">Image decryption key</label>
+      <input type="password" id="p1" autocomplete="off" placeholder="Enter the image key to reveal thumbnails">
+      <div style="height:10px"></div>
+      <button id="decrypt-btn">Decrypt &amp; show images</button>
+      <div class="muted" id="decrypt-err" style="color:#f08a8a;margin-top:8px"></div>
+    </div>
+
+    <div class="card" id="gallery-card">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <b>Images</b>
+        <span class="muted" id="sel-count">0 selected</span>
+      </div>
+      <div class="gallery" id="gallery"></div>
+      <div class="cls-legend">
+        Select the bad images and set an industry classification for each:
+        <code>A1</code> prepubescent · sex act &nbsp; <code>A2</code> prepubescent · lascivious &nbsp;
+        <code>B1</code> pubescent · sex act &nbsp; <code>B2</code> pubescent · lascivious
+        <details><summary>Full NCMEC definitions</summary>
+          <div class="muted" style="margin-top:6px">
+            <b>A</b> Prepubescent minor · <b>B</b> Pubescent minor.<br>
+            <b>1 — Sex Act:</b> imagery depicting sexual intercourse (genital, oral, anal, or bestiality),
+            masturbation, sadistic/masochistic abuse, or degradation lacking serious literary, artistic,
+            political, or scientific value.<br>
+            <b>2 — Lascivious Exhibition:</b> imagery depicting the lascivious exhibition of the anus,
+            genitals, or pubic area, intended to elicit a sexual response in the viewer.
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <button id="submit-btn">Submit to NCMEC</button>
+        <button id="cancel-btn" class="ghost">Cancel &amp; delete everything</button>
+      </div>
+      <div class="muted" id="action-err" style="color:#f08a8a;margin-top:8px"></div>
+    </div>
+
+    <!-- Final review (after submit) -->
+    <div class="card hidden" id="review-card">
+      <b>Final review</b>
+      <div class="muted" style="margin:6px 0 12px">
+        The report is staged with NCMEC (report id <span id="review-ncmec"></span>).
+        Review once more, then <b>Finish</b> to file it (irreversible) or <b>Retract</b> to cancel it.
+      </div>
+      <div class="row">
+        <button id="finish-btn">Finish &amp; file report</button>
+        <button id="retract-btn" class="danger">Retract</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+const TG = window.Telegram && window.Telegram.WebApp;
+if (TG) { TG.ready(); TG.expand(); }
+const UUID = location.pathname.split("/").filter(Boolean).pop();
+const INIT = (TG && TG.initData) || "";
+const PBKDF2_ITER = 200000, P1_SALT = new TextEncoder().encode("ris-abuse-report-p1-v1");
+
+let P2 = "", P1KEY = null, META = null;
+const sel = {}; // blobId -> classification (A1/A2/B1/B2)
+
+const $ = id => document.getElementById(id);
+const api = async (path, opts = {}) => {
+  const headers = Object.assign({ "X-Init-Data": INIT }, opts.headers || {});
+  if (P2) headers["X-Page-Secret"] = P2;
+  const r = await fetch(`/report/${UUID}${path}`, Object.assign({}, opts, { headers }));
+  if (!r.ok) throw new Error((await r.text()) || r.status);
+  return r;
+};
+
+async function deriveKey(p1) {
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(p1), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt: P1_SALT, iterations: PBKDF2_ITER, hash: "SHA-256" },
+    base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+}
+
+$("unlock-btn").onclick = async () => {
+  P2 = $("p2").value;
+  $("unlock-err").textContent = "";
+  try {
+    const r = await api("/api/unlock", { method: "POST" });
+    META = await r.json();
+    $("unlock-card").classList.add("hidden");
+    $("report-body").classList.remove("hidden");
+    renderMeta();
+    pollStatus();
+  } catch (e) { $("unlock-err").textContent = "" + e.message; P2 = ""; }
+};
+
+function fmtTs(ts) { return ts ? new Date(ts * 1000).toLocaleString() : "—"; }
+
+function renderMeta() {
+  $("hdr-sub").textContent = "Report " + UUID.slice(0, 8);
+  $("u-id").textContent = META.user.id;
+  $("u-name").textContent = META.user.username ? "@" + META.user.username : "—";
+  $("u-full").textContent = [META.user.first_name, META.user.last_name].filter(Boolean).join(" ") || "—";
+  $("u-ban").textContent = META.user.banned_at ? "yes" : "no";
+  $("r-created").textContent = fmtTs(META.created_at);
+  $("r-ncmec").textContent = META.ncmec_report_id || "—";
+  renderGallery();
+  applyStatus(META.status, META.status_detail);
+}
+
+function renderGallery() {
+  const g = $("gallery"); g.innerHTML = "";
+  for (const b of META.blobs) {
+    const d = document.createElement("div");
+    d.className = "thumb"; d.dataset.id = b.id;
+    d.innerHTML = `<div class="lock">🔒 locked<br><span class="muted">${b.saved_filename}</span></div>`;
+    g.appendChild(d);
+    if (b.selected) sel[b.id] = b.classification;
+  }
+  updateSelCount();
+}
+
+$("decrypt-btn").onclick = async () => {
+  $("decrypt-err").textContent = "";
+  try {
+    P1KEY = await deriveKey($("p1").value);
+    for (const b of META.blobs) await decryptThumb(b);
+    $("decrypt-card").classList.add("hidden");
+  } catch (e) { $("decrypt-err").textContent = "Decryption failed — wrong key?"; P1KEY = null; }
+};
+
+async function decryptThumb(b) {
+  const r = await api(`/api/blob/${b.id}`);
+  const buf = new Uint8Array(await r.arrayBuffer());
+  const nonce = buf.slice(0, 12), ct = buf.slice(12);
+  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce }, P1KEY, ct);
+  const blob = new Blob([plain]);
+  const url = URL.createObjectURL(blob);
+  const el = document.querySelector(`.thumb[data-id="${b.id}"]`);
+  el.innerHTML = `<img src="${url}" alt="">` + clsBar(b.id);
+  el.querySelector("img").onclick = () => toggleSelect(b.id);
+  if (sel[b.id] !== undefined) el.classList.add("selected");
+  wireCls(b.id);
+}
+
+function clsBar(id) {
+  const cur = sel[id];
+  return `<div class="cls">` + ["A1", "A2", "B1", "B2"].map(c =>
+    `<span data-cls="${c}" class="${cur === c ? "on" : ""}">${c}</span>`).join("") + `</div>`;
+}
+
+function wireCls(id) {
+  const el = document.querySelector(`.thumb[data-id="${id}"]`);
+  el.querySelectorAll(".cls span").forEach(s => {
+    s.onclick = (ev) => {
+      ev.stopPropagation();
+      const c = s.dataset.cls;
+      sel[id] = c;
+      el.classList.add("selected");
+      el.querySelectorAll(".cls span").forEach(x => x.classList.toggle("on", x.dataset.cls === c));
+      updateSelCount();
+    };
+  });
+}
+
+function toggleSelect(id) {
+  const el = document.querySelector(`.thumb[data-id="${id}"]`);
+  if (sel[id] !== undefined) { delete sel[id]; el.classList.remove("selected"); el.querySelectorAll(".cls span").forEach(x => x.classList.remove("on")); }
+  else { sel[id] = sel[id] || null; el.classList.add("selected"); }
+  updateSelCount();
+}
+
+function updateSelCount() {
+  const n = Object.keys(sel).length;
+  $("sel-count").textContent = n + " selected";
+}
+
+async function saveSelection() {
+  await api("/api/select", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ selections: sel }),
+  });
+}
+
+$("submit-btn").onclick = async () => {
+  $("action-err").textContent = "";
+  const ids = Object.keys(sel);
+  if (!ids.length) { $("action-err").textContent = "Select at least one image."; return; }
+  for (const id of ids) if (!sel[id]) { $("action-err").textContent = "Every selected image needs a classification (A1/A2/B1/B2)."; return; }
+  if (!P1KEY) { $("action-err").textContent = "Decrypt the images first (the image key is needed to submit)."; return; }
+  if (!confirm("Submit " + ids.length + " image(s) to NCMEC?")) return;
+  try {
+    await saveSelection();
+    applyStatus("submitting");
+    const r = await api("/api/submit", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image_key: $("p1").value }),
+    });
+    const j = await r.json();
+    META.ncmec_report_id = j.ncmec_report_id;
+    $("r-ncmec").textContent = j.ncmec_report_id;
+    applyStatus("review");
+  } catch (e) { $("action-err").textContent = "" + e.message; applyStatus("ready"); }
+};
+
+$("cancel-btn").onclick = async () => {
+  if (!confirm("Cancel this report and delete all images/blobs? This cannot be undone.")) return;
+  try { await api("/api/cancel", { method: "POST" }); applyStatus("cancelled"); }
+  catch (e) { $("action-err").textContent = "" + e.message; }
+};
+
+$("finish-btn").onclick = async () => {
+  if (!confirm("FILE this report with NCMEC? This is irreversible.")) return;
+  try { await api("/api/finish", { method: "POST" }); applyStatus("filed"); }
+  catch (e) { $("action-err").textContent = "" + e.message; }
+};
+
+$("retract-btn").onclick = async () => {
+  if (!confirm("Retract the submitted report?")) return;
+  try { await api("/api/retract", { method: "POST" }); applyStatus("retracted"); }
+  catch (e) { $("action-err").textContent = "" + e.message; }
+};
+
+function applyStatus(status, detail) {
+  const b = $("status-banner");
+  b.className = "status " + status;
+  const labels = {
+    preparing: "Preparing — encrypting files…", ready: "Ready for review",
+    submitting: "Submitting to NCMEC…", review: "Staged with NCMEC — final review",
+    filed: "✓ Filed with NCMEC", retracted: "Retracted", cancelled: "Cancelled — data deleted",
+    error: "Error",
+  };
+  b.textContent = (labels[status] || status) + (detail ? " — " + detail : "");
+  const terminal = ["filed", "cancelled", "retracted"].includes(status);
+  $("review-card").classList.toggle("hidden", status !== "review");
+  if (status === "review") $("review-ncmec").textContent = META.ncmec_report_id || "";
+  $("submit-btn").disabled = terminal || status === "review" || status === "submitting";
+  $("cancel-btn").disabled = terminal;
+  if (terminal) { $("decrypt-card").classList.add("hidden"); }
+}
+
+async function pollStatus() {
+  try {
+    const r = await api("/api/status");
+    const j = await r.json();
+    if (META && j.ncmec_report_id) { META.ncmec_report_id = j.ncmec_report_id; $("r-ncmec").textContent = j.ncmec_report_id; }
+    if (j.status) applyStatus(j.status, j.status_detail);
+    if (!["filed", "cancelled", "retracted"].includes(j.status)) setTimeout(pollStatus, 3000);
+  } catch (e) { setTimeout(pollStatus, 5000); }
+}
+</script>
+</body>
+</html>
