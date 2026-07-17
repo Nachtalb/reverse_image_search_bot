@@ -86,6 +86,42 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_files_user ON files(user_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_files_saved ON files(saved_filename)")
+
+    # A report round for one user. `report_uuid` is the URL token; `page_secret_hash`
+    # gates the report page (P2, stored hashed — the image key P1 is NEVER stored).
+    # `status` drives the live UI: preparing -> ready -> submitting -> filed / retracted
+    #   / cancelled / error. `ncmec_report_id` is assigned by NCMEC on submit.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS reports (
+            report_uuid      TEXT PRIMARY KEY,
+            user_id          INTEGER NOT NULL REFERENCES users(user_id),
+            page_secret_hash TEXT NOT NULL,
+            status           TEXT NOT NULL DEFAULT 'preparing',
+            created_at       INTEGER NOT NULL,
+            updated_at       INTEGER NOT NULL,
+            ncmec_report_id  INTEGER,
+            status_detail    TEXT,
+            finished_at      INTEGER
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_reports_user ON reports(user_id)")
+
+    # Encrypted image blobs for a report (AES-GCM, key derived from P1 which is
+    # never stored). Purged on finish/cancel. One row per file in the round.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS report_blobs (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            report_uuid     TEXT NOT NULL REFERENCES reports(report_uuid),
+            file_unique_id  TEXT NOT NULL,
+            saved_filename  TEXT NOT NULL,
+            nonce           BLOB NOT NULL,
+            ciphertext      BLOB NOT NULL,
+            plaintext_sha256 TEXT NOT NULL,
+            selected        INTEGER NOT NULL DEFAULT 0,
+            classification  TEXT
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_blobs_report ON report_blobs(report_uuid)")
     conn.commit()
 
 
@@ -203,17 +239,168 @@ def find_user_by_filename(filename: str) -> int | None:
 
 
 def has_report(user_id: int) -> bool:
-    """True if a filed report exists for this user.
-
-    The ``reports`` table is created in Phase 2 (the report webview). Until then
-    this returns False gracefully so the ban list / check command work now.
-    """
+    """True if a filed (finished) report exists for this user."""
     conn = _get_conn()
     try:
         row = conn.execute(
-            "SELECT 1 FROM reports WHERE user_id = ? AND status = 'finished' LIMIT 1",
+            "SELECT 1 FROM reports WHERE user_id = ? AND status = 'filed' LIMIT 1",
             (user_id,),
         ).fetchone()
     except sqlite3.OperationalError:
         return False  # reports table not created yet
     return row is not None
+
+
+# --- Reports & encrypted blobs -------------------------------------------------
+
+# Report lifecycle states.
+REPORT_PREPARING = "preparing"  # encrypting files into blobs
+REPORT_READY = "ready"  # blobs ready, admin reviewing on the page
+REPORT_SUBMITTING = "submitting"  # NCMEC submit/upload/file_info in progress
+REPORT_REVIEW = "review"  # uploaded to NCMEC, awaiting final finish/retract
+REPORT_FILED = "filed"  # finish() succeeded — report is with NCMEC
+REPORT_RETRACTED = "retracted"  # retract() called
+REPORT_CANCELLED = "cancelled"  # admin cancelled the whole round, blobs purged
+REPORT_ERROR = "error"  # something failed; status_detail carries the message
+
+
+def create_report(report_uuid: str, user_id: int, page_secret_hash: str) -> None:
+    conn = _get_conn()
+    now = _now()
+    conn.execute(
+        """
+        INSERT INTO reports (report_uuid, user_id, page_secret_hash, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (report_uuid, user_id, page_secret_hash, REPORT_PREPARING, now, now),
+    )
+    conn.commit()
+
+
+def add_report_blob(
+    report_uuid: str,
+    *,
+    file_unique_id: str,
+    saved_filename: str,
+    nonce: bytes,
+    ciphertext: bytes,
+    plaintext_sha256: str,
+) -> None:
+    conn = _get_conn()
+    conn.execute(
+        """
+        INSERT INTO report_blobs
+            (report_uuid, file_unique_id, saved_filename, nonce, ciphertext, plaintext_sha256)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (report_uuid, file_unique_id, saved_filename, nonce, ciphertext, plaintext_sha256),
+    )
+    conn.commit()
+
+
+def get_report(report_uuid: str) -> dict | None:
+    conn = _get_conn()
+    row = conn.execute("SELECT * FROM reports WHERE report_uuid = ?", (report_uuid,)).fetchone()
+    return dict(row) if row else None
+
+
+def set_report_status(report_uuid: str, status: str, detail: str | None = None) -> None:
+    conn = _get_conn()
+    conn.execute(
+        "UPDATE reports SET status = ?, status_detail = ?, updated_at = ? WHERE report_uuid = ?",
+        (status, detail, _now(), report_uuid),
+    )
+    conn.commit()
+
+
+def set_report_ncmec_id(report_uuid: str, ncmec_report_id: int) -> None:
+    conn = _get_conn()
+    conn.execute(
+        "UPDATE reports SET ncmec_report_id = ?, updated_at = ? WHERE report_uuid = ?",
+        (ncmec_report_id, _now(), report_uuid),
+    )
+    conn.commit()
+
+
+def mark_report_filed(report_uuid: str) -> None:
+    conn = _get_conn()
+    conn.execute(
+        "UPDATE reports SET status = ?, finished_at = ?, updated_at = ? WHERE report_uuid = ?",
+        (REPORT_FILED, _now(), _now(), report_uuid),
+    )
+    conn.commit()
+
+
+def report_blobs(report_uuid: str, *, selected_only: bool = False) -> list[dict]:
+    conn = _get_conn()
+    sql = "SELECT * FROM report_blobs WHERE report_uuid = ?"
+    if selected_only:
+        sql += " AND selected = 1"
+    sql += " ORDER BY id"
+    return [dict(r) for r in conn.execute(sql, (report_uuid,)).fetchall()]
+
+
+def blob_meta(report_uuid: str) -> list[dict]:
+    """Blob metadata WITHOUT ciphertext (for the gallery listing / status)."""
+    conn = _get_conn()
+    rows = conn.execute(
+        "SELECT id, file_unique_id, saved_filename, plaintext_sha256, selected, classification "
+        "FROM report_blobs WHERE report_uuid = ? ORDER BY id",
+        (report_uuid,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_blob_cipher(report_uuid: str, blob_id: int) -> dict | None:
+    """Nonce + ciphertext for one blob (for the browser to decrypt)."""
+    conn = _get_conn()
+    row = conn.execute(
+        "SELECT id, nonce, ciphertext FROM report_blobs WHERE report_uuid = ? AND id = ?",
+        (report_uuid, blob_id),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def set_blob_selection(report_uuid: str, selections: dict[int, str | None]) -> None:
+    """Apply the admin's per-blob selection + classification.
+
+    ``selections`` maps blob id -> classification (``"A1"``/``"A2"``/``"B1"``/
+    ``"B2"`` when selected, ``None`` when deselected). Blobs absent from the map
+    are deselected.
+    """
+    conn = _get_conn()
+    # Reset all to unselected first, then apply the given selections.
+    conn.execute("UPDATE report_blobs SET selected = 0, classification = NULL WHERE report_uuid = ?", (report_uuid,))
+    for blob_id, classification in selections.items():
+        conn.execute(
+            "UPDATE report_blobs SET selected = 1, classification = ? WHERE report_uuid = ? AND id = ?",
+            (classification, report_uuid, blob_id),
+        )
+    conn.commit()
+
+
+def purge_report_blobs(report_uuid: str) -> int:
+    """Delete all encrypted blobs for a report. Returns count deleted."""
+    conn = _get_conn()
+    cur = conn.execute("DELETE FROM report_blobs WHERE report_uuid = ?", (report_uuid,))
+    conn.commit()
+    return cur.rowcount
+
+
+def active_report_for_user(user_id: int) -> dict | None:
+    """The most recent non-terminal report for a user (preparing/ready/review/submitting)."""
+    conn = _get_conn()
+    row = conn.execute(
+        "SELECT * FROM reports WHERE user_id = ? AND status IN (?, ?, ?, ?) ORDER BY created_at DESC LIMIT 1",
+        (user_id, REPORT_PREPARING, REPORT_READY, REPORT_REVIEW, REPORT_SUBMITTING),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def all_reports() -> list[dict]:
+    """All reports, newest first — for the admin overview command."""
+    conn = _get_conn()
+    rows = conn.execute(
+        "SELECT r.*, u.username FROM reports r LEFT JOIN users u ON u.user_id = r.user_id ORDER BY r.created_at DESC"
+    ).fetchall()
+    return [dict(r) for r in rows]
