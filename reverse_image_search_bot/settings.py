@@ -74,6 +74,10 @@ PIXIV_CONFIG = Path(os.getenv("PIXIV_CONFIG", str(_DEFAULT_CONFIG_DIR / "pixiv.j
 
 CONFIG_DB_PATH = Path(os.getenv("CONFIG_DB_PATH", str(_DEFAULT_CONFIG_DIR / "config.db"))).expanduser().absolute()
 
+# Abuse-report DB (uploader/file provenance for NCMEC reports + durable ban
+# list). Separate file so it can be handled/backed-up independently of settings.
+ABUSE_DB_PATH = Path(os.getenv("ABUSE_DB_PATH", str(_DEFAULT_CONFIG_DIR / "abuse.db"))).expanduser().absolute()
+
 PERSISTENCE_PATH = (
     Path(os.getenv("PERSISTENCE_PATH", str(_DEFAULT_CONFIG_DIR / "bot_data.pickle"))).expanduser().absolute()
 )
@@ -82,6 +86,27 @@ PERSISTENCE_PATH = (
 # Prometheus metrics
 METRICS_ENABLED = os.getenv("METRICS_ENABLED", "true").lower() in ("true", "1", "yes")
 METRICS_PORT = int(os.getenv("RIS_METRICS_PORT", "9100"))
+
+
+# --- Abuse-report webview (NCMEC) ---------------------------------------------
+# The report page is served by an aiohttp app; the admin opens it via a Telegram
+# Mini App menu button. All of these are optional — when unset the /report
+# command and web server stay dormant (Phase 1 features keep working).
+REPORT_SERVER_ENABLED = os.getenv("REPORT_SERVER_ENABLED", "false").lower() in ("true", "1", "yes")
+REPORT_SERVER_HOST = os.getenv("REPORT_SERVER_HOST", "0.0.0.0")
+REPORT_SERVER_PORT = int(os.getenv("REPORT_SERVER_PORT", "9200"))
+# Public base URL the Mini App is reachable at, e.g. https://ris.naa.gg/report
+REPORT_BASE_URL = os.getenv("REPORT_BASE_URL", "").rstrip("/")
+
+# NCMEC CyberTipline credentials (production). Report filing is disabled if unset.
+NCMEC_USERNAME = os.getenv("NCMEC_USERNAME")
+NCMEC_PASSWORD = os.getenv("NCMEC_PASSWORD")
+NCMEC_TESTING = os.getenv("NCMEC_TESTING", "false").lower() in ("true", "1", "yes")
+# Reporter identity stamped on every NCMEC report.
+NCMEC_REPORTER_FIRST_NAME = os.getenv("NCMEC_REPORTER_FIRST_NAME", "")
+NCMEC_REPORTER_LAST_NAME = os.getenv("NCMEC_REPORTER_LAST_NAME", "")
+NCMEC_REPORTER_EMAIL = os.getenv("NCMEC_REPORTER_EMAIL", "")
+NCMEC_ESP_NAME = os.getenv("NCMEC_ESP_NAME", "")
 
 log = logging.getLogger("config")
 log.info(f"UPLOADER: {json.dumps(UPLOADER, indent=2)}")

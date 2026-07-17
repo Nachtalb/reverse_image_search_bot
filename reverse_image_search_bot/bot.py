@@ -6,7 +6,15 @@ import logging
 from pathlib import Path
 
 from emoji import emojize
-from telegram import Bot, BotCommand, BotCommandScopeChat, BotCommandScopeDefault, Update
+from telegram import (
+    Bot,
+    BotCommand,
+    BotCommandScopeChat,
+    BotCommandScopeDefault,
+    MenuButtonWebApp,
+    Update,
+    WebAppInfo,
+)
 from telegram.constants import ParseMode
 from telegram.error import BadRequest, Forbidden, RetryAfter
 from telegram.ext import (
@@ -42,6 +50,8 @@ from .commands.feedback import (
     feedback_received,
     feedback_reply_handler,
 )
+from .commands.report import report_command, reports_command
+from .config import abuse
 from .i18n import available_languages, t
 from .metrics import start_metrics_server
 
@@ -111,19 +121,81 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     assert update.message and update.message.text
     metrics.commands_total.labels(command="ban").inc()
     args = update.message.text.strip("/").split(" ")
-    if len(args) != 2:
-        await update.message.reply_text(t("commands.ban_usage"))
-        return
-    user_id = int(args[1])
 
     banned: list[int] = context.bot_data.setdefault("banned_users", [])
+
+    # No argument → list currently banned users, flagging any who have a filed report.
+    if len(args) < 2 or not args[1].strip():
+        if not banned:
+            await update.message.reply_text("No users are currently banned.")
+            return
+        lines = ["<b>Banned users:</b>"]
+        for uid in banned:
+            flag = " 🚩 reported" if abuse.has_report(uid) else ""
+            lines.append(f"<code>{uid}</code>{flag}")
+        # Telegram caps messages at 4096 chars — chunk on line boundaries.
+        chunk = ""
+        for line in lines:
+            if len(chunk) + len(line) + 1 > 4000:
+                await update.message.reply_html(chunk)
+                chunk = ""
+            chunk += line + "\n"
+        if chunk:
+            await update.message.reply_html(chunk)
+        return
+
+    try:
+        user_id = int(args[1])
+    except ValueError:
+        await update.message.reply_text(t("commands.ban_usage"))
+        return
+
     if user_id in banned:
         banned.remove(user_id)
+        abuse.set_banned(user_id, False)
         text = f"Removed user {user_id=} from banned users"
     else:
         banned.append(user_id)
+        abuse.set_banned(user_id, True)
         text = f"banned user {user_id=}"
     await update.message.reply_text(text)
+
+
+async def check_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Report how many files a user has uploaded. Accepts a user ID or a filename.
+
+    ``/check <user_id>`` counts directly; ``/check <filename>`` resolves the
+    uploader from the abuse DB first (for Cloudflare abuse reports, which
+    only give the on-disk filename).
+    """
+    assert update.message and update.message.text
+    metrics.commands_total.labels(command="check").inc()
+    args = update.message.text.strip("/").split(" ")
+    if len(args) < 2 or not args[1].strip():
+        await update.message.reply_text("Usage: /check <user_id | filename>")
+        return
+
+    arg = args[1].strip()
+    if arg.isdigit():
+        user_id: int | None = int(arg)
+        source = f"user <code>{user_id}</code>"
+    else:
+        user_id = abuse.find_user_by_filename(arg)
+        if user_id is None:
+            await update.message.reply_text(f"No uploader found for file: {arg}")
+            return
+        source = f"file <code>{html.escape(arg)}</code> → user <code>{user_id}</code>"
+
+    count = abuse.count_files(user_id)
+    user = abuse.get_user(user_id)
+    banned = user_id in context.bot_data.get("banned_users", [])
+    parts = [f"{source}", f"Uploaded files: <b>{count}</b>"]
+    if user and user.get("username"):
+        parts.append(f"Username: @{html.escape(user['username'])}")
+    parts.append(f"Banned: {'yes' if banned else 'no'}")
+    if abuse.has_report(user_id):
+        parts.append("🚩 Has a filed report")
+    await update.message.reply_html("\n".join(parts))
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
@@ -160,7 +232,10 @@ _PUBLIC_COMMANDS = [
 
 _ADMIN_COMMANDS = [
     *_PUBLIC_COMMANDS,
-    BotCommand("ban", "Ban/unban a user by ID"),
+    BotCommand("ban", "Ban/unban a user by ID, or list banned users"),
+    BotCommand("check", "Count a user's uploads (by user ID or filename)"),
+    BotCommand("report", "Prepare an encrypted NCMEC report for a user"),
+    BotCommand("reports", "List all abuse reports and their status"),
     BotCommand("id", "Show current chat info"),
 ]
 
@@ -213,13 +288,65 @@ async def post_init(app: Application) -> None:
         except Exception:
             logger.warning("Failed to migrate banned_users.json", exc_info=True)
 
+    # Sync durable ban list from the abuse DB into bot_data. Redundancy guard:
+    # if bot_data ever loses banned_users (e.g. a cleared pickle), the DB restores
+    # it on the next start. Union of both sources — neither shrinks the other.
+    try:
+        banned: list[int] = app.bot_data.setdefault("banned_users", [])
+        db_banned = abuse.banned_user_ids()
+        added = 0
+        for uid in db_banned:
+            if uid not in banned:
+                banned.append(uid)
+                added += 1
+        # Also push any bot_data-only bans back into the DB so they're durable.
+        for uid in banned:
+            if uid not in db_banned:
+                abuse.set_banned(uid, True)
+        logger.info("Synced ban list from abuse DB (%d in DB, %d restored to memory)", len(db_banned), added)
+    except Exception:
+        logger.warning("Failed to sync ban list from abuse DB", exc_info=True)
+
     await _set_bot_commands(app)
+    await _setup_report_menu_button(app)
 
     for admin_id in settings.ADMIN_IDS:
         try:
             await app.bot.send_message(admin_id, t("commands.bot_started"))
         except Exception:
             logger.warning("Failed to notify admin %d of startup", admin_id)
+
+
+async def _setup_report_menu_button(app: Application) -> None:
+    """Set an admin-only Mini App menu button for the report webview.
+
+    Regular users keep the default menu button; only admins get the Web App
+    launcher pointing at the report base URL. Also starts the aiohttp report
+    server if enabled.
+    """
+    if settings.REPORT_SERVER_ENABLED:
+        try:
+            from .abuse_report.server import start_report_server
+
+            runner = await start_report_server()
+            if runner is not None:
+                app.bot_data["_report_runner"] = runner
+        except Exception:
+            logger.warning("Failed to start report server", exc_info=True)
+
+    if not settings.REPORT_BASE_URL:
+        return
+    for admin_id in settings.ADMIN_IDS:
+        try:
+            await app.bot.set_chat_menu_button(
+                chat_id=admin_id,
+                menu_button=MenuButtonWebApp(
+                    text="Reports",
+                    web_app=WebAppInfo(url=f"{settings.REPORT_BASE_URL}/report/"),
+                ),
+            )
+        except Exception:
+            logger.warning("Failed to set report menu button for admin %d", admin_id, exc_info=True)
 
 
 def main():
@@ -252,6 +379,9 @@ def main():
     id_filter = filters.Regex(r"^/id(?:@\S+)?$") & (filters.UpdateType.MESSAGES | filters.UpdateType.CHANNEL_POST)
     app.add_handler(MessageHandler(id_filter, id_command))
     app.add_handler(CommandHandler("ban", ban_command, filters=ADMIN_FILTER), group=1)
+    app.add_handler(CommandHandler("check", check_command, filters=ADMIN_FILTER), group=1)
+    app.add_handler(CommandHandler("report", report_command, filters=ADMIN_FILTER), group=1)
+    app.add_handler(CommandHandler("reports", reports_command, filters=ADMIN_FILTER), group=1)
     app.add_handler(CommandHandler("search", search_command))
     app.add_handler(CommandHandler(("settings", "conf", "pref"), settings_command))
 
