@@ -264,10 +264,15 @@ async def api_retract(request: web.Request) -> web.Response:
 
 
 async def api_cancel(request: web.Request) -> web.Response:
-    """Cancel the whole round (before/without NCMEC) and purge blobs.
+    """Cancel the whole round (before/without NCMEC).
 
     Distinct from retract: this is the top-level 'abandon this report' button. If
     the report was already submitted to NCMEC, retract it first.
+
+    Cancelling means the user did nothing wrong, so we KEEP the user's original
+    files on disk and the filename->user (files table) relation untouched. Only
+    the report's encrypted blobs + the report row's status are affected. Disk
+    deletion happens ONLY on finish (_cleanup_after_finish), never here.
     """
     _require_admin(request)
     rep = _report_or_404(request.match_info["uuid"])
@@ -278,6 +283,7 @@ async def api_cancel(request: web.Request) -> web.Response:
         except Exception:
             logger.warning("retract during cancel failed for %s", rep["report_uuid"], exc_info=True)
     abuse.set_report_status(rep["report_uuid"], abuse.REPORT_CANCELLED)
+    # Blobs only — NOT the files table, NOT disk files.
     abuse.purge_report_blobs(rep["report_uuid"])
     return web.json_response({"ok": True, "status": abuse.REPORT_CANCELLED})
 
