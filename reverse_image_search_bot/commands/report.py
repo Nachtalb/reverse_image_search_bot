@@ -10,11 +10,12 @@ opens the Mini App to review, classify, and file with NCMEC.
 
 from __future__ import annotations
 
+import contextlib
 import html
 import logging
 from pathlib import Path
 
-from telegram import Update
+from telegram import MenuButtonWebApp, Update, WebAppInfo
 from telegram.ext import ContextTypes
 
 from reverse_image_search_bot import metrics, settings
@@ -31,7 +32,7 @@ def _upload_dir() -> Path | None:
 
 async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Start an encrypted NCMEC report round for a user (by id or filename)."""
-    assert update.message and update.message.text
+    assert update.message and update.message.text and update.effective_user
     metrics.commands_total.labels(command="report").inc()
     args = update.message.text.strip("/").split(" ")
     if len(args) < 2 or not args[1].strip():
@@ -105,17 +106,31 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     abuse.set_report_status(report_uuid, abuse.REPORT_READY)
     url = f"{settings.REPORT_BASE_URL}/report/{report_uuid}"
 
+    # Point THIS admin's menu button at THIS report, so tapping it launches the
+    # report as a Mini App with signed initData (which the webview validates).
+    menu_button_set = False
+    with contextlib.suppress(Exception):
+        await context.bot.set_chat_menu_button(
+            chat_id=update.effective_user.id,
+            menu_button=MenuButtonWebApp(text="Open report", web_app=WebAppInfo(url=url)),
+        )
+        menu_button_set = True
+
     user = abuse.get_user(user_id) or {}
     uname = f"@{user['username']}" if user.get("username") else "—"
+    launch = (
+        "Tap the <b>Open report</b> menu button (bottom-left ⊞) to open it."
+        if menu_button_set
+        else f"Open via the report menu button: {html.escape(url)}"
+    )
     await update.message.reply_html(
         f"<b>Report prepared</b> for user <code>{user_id}</code> ({html.escape(uname)})\n"
         f"Encrypted <b>{encrypted}</b> file(s).\n\n"
-        f"<b>URL:</b> {html.escape(url)}\n"
         f"<b>Page password (P2):</b> <code>{html.escape(p2)}</code>\n"
         f"<b>Image key (P1):</b> <code>{html.escape(p1)}</code>\n\n"
+        f"{launch}\n\n"
         f"<i>P1 is not stored. If you lose it the thumbnails can't be shown "
-        f"(the files still exist on disk until you file/cancel). Open the URL via "
-        f"the report menu button.</i>",
+        f"(the files still exist on disk until you file/cancel).</i>",
         disable_web_page_preview=True,
     )
 
