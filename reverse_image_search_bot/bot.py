@@ -11,9 +11,7 @@ from telegram import (
     BotCommand,
     BotCommandScopeChat,
     BotCommandScopeDefault,
-    MenuButtonWebApp,
     Update,
-    WebAppInfo,
 )
 from telegram.constants import ParseMode
 from telegram.error import BadRequest, Forbidden, RetryAfter
@@ -308,7 +306,7 @@ async def post_init(app: Application) -> None:
         logger.warning("Failed to sync ban list from abuse DB", exc_info=True)
 
     await _set_bot_commands(app)
-    await _setup_report_menu_button(app)
+    await _start_report_server(app)
 
     for admin_id in settings.ADMIN_IDS:
         try:
@@ -317,36 +315,23 @@ async def post_init(app: Application) -> None:
             logger.warning("Failed to notify admin %d of startup", admin_id)
 
 
-async def _setup_report_menu_button(app: Application) -> None:
-    """Set an admin-only Mini App menu button for the report webview.
+async def _start_report_server(app: Application) -> None:
+    """Start the aiohttp report webview server if enabled.
 
-    Regular users keep the default menu button; only admins get the Web App
-    launcher pointing at the report base URL. Also starts the aiohttp report
-    server if enabled.
+    The admin-only Mini App menu button is NOT set here — it is set per-report by
+    the /report command (set_chat_menu_button to that specific report's URL), so
+    tapping it launches the report as a Mini App with signed initData.
     """
-    if settings.REPORT_SERVER_ENABLED:
-        try:
-            from .abuse_report.server import start_report_server
-
-            runner = await start_report_server()
-            if runner is not None:
-                app.bot_data["_report_runner"] = runner
-        except Exception:
-            logger.warning("Failed to start report server", exc_info=True)
-
-    if not settings.REPORT_BASE_URL:
+    if not settings.REPORT_SERVER_ENABLED:
         return
-    for admin_id in settings.ADMIN_IDS:
-        try:
-            await app.bot.set_chat_menu_button(
-                chat_id=admin_id,
-                menu_button=MenuButtonWebApp(
-                    text="Reports",
-                    web_app=WebAppInfo(url=f"{settings.REPORT_BASE_URL}/report/"),
-                ),
-            )
-        except Exception:
-            logger.warning("Failed to set report menu button for admin %d", admin_id, exc_info=True)
+    try:
+        from .abuse_report.server import start_report_server
+
+        runner = await start_report_server()
+        if runner is not None:
+            app.bot_data["_report_runner"] = runner
+    except Exception:
+        logger.warning("Failed to start report server", exc_info=True)
 
 
 def main():
