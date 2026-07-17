@@ -6,7 +6,15 @@ import logging
 from pathlib import Path
 
 from emoji import emojize
-from telegram import Bot, BotCommand, BotCommandScopeChat, BotCommandScopeDefault, Update
+from telegram import (
+    Bot,
+    BotCommand,
+    BotCommandScopeChat,
+    BotCommandScopeDefault,
+    MenuButtonWebApp,
+    Update,
+    WebAppInfo,
+)
 from telegram.constants import ParseMode
 from telegram.error import BadRequest, Forbidden, RetryAfter
 from telegram.ext import (
@@ -42,6 +50,7 @@ from .commands.feedback import (
     feedback_received,
     feedback_reply_handler,
 )
+from .commands.report import report_command, reports_command
 from .config import abuse
 from .i18n import available_languages, t
 from .metrics import start_metrics_server
@@ -225,6 +234,8 @@ _ADMIN_COMMANDS = [
     *_PUBLIC_COMMANDS,
     BotCommand("ban", "Ban/unban a user by ID, or list banned users"),
     BotCommand("check", "Count a user's uploads (by user ID or filename)"),
+    BotCommand("report", "Prepare an encrypted NCMEC report for a user"),
+    BotCommand("reports", "List all abuse reports and their status"),
     BotCommand("id", "Show current chat info"),
 ]
 
@@ -297,12 +308,45 @@ async def post_init(app: Application) -> None:
         logger.warning("Failed to sync ban list from abuse DB", exc_info=True)
 
     await _set_bot_commands(app)
+    await _setup_report_menu_button(app)
 
     for admin_id in settings.ADMIN_IDS:
         try:
             await app.bot.send_message(admin_id, t("commands.bot_started"))
         except Exception:
             logger.warning("Failed to notify admin %d of startup", admin_id)
+
+
+async def _setup_report_menu_button(app: Application) -> None:
+    """Set an admin-only Mini App menu button for the report webview.
+
+    Regular users keep the default menu button; only admins get the Web App
+    launcher pointing at the report base URL. Also starts the aiohttp report
+    server if enabled.
+    """
+    if settings.REPORT_SERVER_ENABLED:
+        try:
+            from .abuse_report.server import start_report_server
+
+            runner = await start_report_server()
+            if runner is not None:
+                app.bot_data["_report_runner"] = runner
+        except Exception:
+            logger.warning("Failed to start report server", exc_info=True)
+
+    if not settings.REPORT_BASE_URL:
+        return
+    for admin_id in settings.ADMIN_IDS:
+        try:
+            await app.bot.set_chat_menu_button(
+                chat_id=admin_id,
+                menu_button=MenuButtonWebApp(
+                    text="Reports",
+                    web_app=WebAppInfo(url=f"{settings.REPORT_BASE_URL}/report/"),
+                ),
+            )
+        except Exception:
+            logger.warning("Failed to set report menu button for admin %d", admin_id, exc_info=True)
 
 
 def main():
@@ -336,6 +380,8 @@ def main():
     app.add_handler(MessageHandler(id_filter, id_command))
     app.add_handler(CommandHandler("ban", ban_command, filters=ADMIN_FILTER), group=1)
     app.add_handler(CommandHandler("check", check_command, filters=ADMIN_FILTER), group=1)
+    app.add_handler(CommandHandler("report", report_command, filters=ADMIN_FILTER), group=1)
+    app.add_handler(CommandHandler("reports", reports_command, filters=ADMIN_FILTER), group=1)
     app.add_handler(CommandHandler("search", search_command))
     app.add_handler(CommandHandler(("settings", "conf", "pref"), settings_command))
 
