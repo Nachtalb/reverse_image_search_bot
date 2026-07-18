@@ -1,8 +1,9 @@
 """Admin commands for the abuse-report pipeline: /report and /reports.
 
 ``/report <user_id|filename>`` gathers a user's still-on-disk files, encrypts
-each into a DB blob with a one-time image key (P1), creates a report row gated by
-a page secret (P2), and DMs the admin the report URL + P1 + P2. The admin then
+each into a DB blob with a one-time image key (P1), creates a report row, and DMs
+the admin the report launch button + P1. The report page itself is gated by a
+single global page password (``REPORT_PAGE_PASSWORD``, in Proton Pass). The admin
 opens the Mini App to review, classify, and file with NCMEC.
 
 ``/reports`` lists all reports with their status.
@@ -76,14 +77,14 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         return
 
-    # Generate the two secrets. P1 (image key) and P2 (page secret) are shown
-    # ONCE here and never stored in plaintext.
+    # Generate the image key P1 — shown ONCE here and never stored. The page
+    # password is a single global secret (REPORT_PAGE_PASSWORD, in Proton Pass),
+    # so it is NOT generated or DMed per-report.
     p1 = crypto.gen_password()
-    p2 = crypto.gen_password()
     report_uuid = crypto.gen_report_uuid()
     key = crypto.derive_key(p1)
 
-    abuse.create_report(report_uuid, user_id, crypto.hash_page_secret(p2))
+    abuse.create_report(report_uuid, user_id, "")
 
     encrypted = 0
     for f, fp in present:
@@ -126,11 +127,11 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await update.message.reply_html(
         f"<b>Report prepared</b> for user <code>{user_id}</code> ({html.escape(uname)})\n"
         f"Encrypted <b>{encrypted}</b> file(s).\n\n"
-        f"<b>Page password (P2):</b> <code>{html.escape(p2)}</code>\n"
         f"<b>Image key (P1):</b> <code>{html.escape(p1)}</code>\n\n"
         f"{launch}\n\n"
-        f"<i>P1 is not stored. If you lose it the thumbnails can't be shown "
-        f"(the files still exist on disk until you file/cancel).</i>",
+        f"<i>Use the global page password to open the report, then P1 to decrypt "
+        f"the images. P1 is not stored — if you lose it the thumbnails can't be "
+        f"shown (the files still exist on disk until you file/cancel).</i>",
         disable_web_page_preview=True,
     )
 

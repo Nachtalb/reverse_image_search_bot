@@ -48,12 +48,14 @@ async def test_unlock_requires_admin(abuse, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_unlock_wrong_page_secret(abuse, monkeypatch):
-    from reverse_image_search_bot.abuse_report import crypto, server
+async def test_unlock_wrong_page_password(abuse, monkeypatch):
+    from reverse_image_search_bot import settings
+    from reverse_image_search_bot.abuse_report import server
 
+    monkeypatch.setattr(settings, "REPORT_PAGE_PASSWORD", "correct")
     monkeypatch.setattr(server, "_admin_from_request", lambda req: 42)
     abuse.record_user(1, username="x")
-    abuse.create_report("u", 1, crypto.hash_page_secret("correct"))
+    abuse.create_report("u", 1, "")
     req = _req(headers={"X-Page-Secret": "wrong"}, match={"uuid": "u"})
     with pytest.raises(web.HTTPForbidden):
         await server.api_unlock(req)
@@ -61,11 +63,13 @@ async def test_unlock_wrong_page_secret(abuse, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_unlock_ok_returns_meta(abuse, monkeypatch):
-    from reverse_image_search_bot.abuse_report import crypto, server
+    from reverse_image_search_bot import settings
+    from reverse_image_search_bot.abuse_report import server
 
+    monkeypatch.setattr(settings, "REPORT_PAGE_PASSWORD", "pw")
     monkeypatch.setattr(server, "_admin_from_request", lambda req: 42)
     abuse.record_user(7, username="baduser", first_name="Bad")
-    abuse.create_report("u", 7, crypto.hash_page_secret("pw"))
+    abuse.create_report("u", 7, "")
     abuse.add_report_blob(
         "u", file_unique_id="A", saved_filename="A.jpg", nonce=b"n", ciphertext=b"c", plaintext_sha256="1"
     )
@@ -95,11 +99,11 @@ async def test_status_needs_admin_but_not_secret(abuse, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_select_persists(abuse, monkeypatch):
-    from reverse_image_search_bot.abuse_report import crypto, server
+    from reverse_image_search_bot.abuse_report import server
 
     monkeypatch.setattr(server, "_admin_from_request", lambda req: 42)
     abuse.record_user(1)
-    abuse.create_report("u", 1, crypto.hash_page_secret("pw"))
+    abuse.create_report("u", 1, "")
     abuse.add_report_blob(
         "u", file_unique_id="A", saved_filename="A.jpg", nonce=b"n", ciphertext=b"c", plaintext_sha256="1"
     )
@@ -111,19 +115,38 @@ async def test_select_persists(abuse, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_cancel_purges_blobs(abuse, monkeypatch):
-    from reverse_image_search_bot.abuse_report import crypto, server
+async def test_cancel_purges_blobs_but_keeps_files_and_relation(abuse, monkeypatch, tmp_path):
+    """Cancel = user did nothing wrong: keep disk files + filename->user relation.
+
+    Only the encrypted blobs and the report status change; the original file on
+    disk and the files-table row (find_user_by_filename) must survive.
+    """
+    from reverse_image_search_bot import settings
+    from reverse_image_search_bot.abuse_report import server
+
+    updir = tmp_path / "uploads"
+    updir.mkdir()
+    (updir / "A.jpg").write_bytes(b"plaintext image")
+    monkeypatch.setattr(settings, "UPLOADER", {"configuration": {"path": str(updir)}})
 
     monkeypatch.setattr(server, "_admin_from_request", lambda req: 42)
     abuse.record_user(1)
-    abuse.create_report("u", 1, crypto.hash_page_secret("pw"))
+    # provenance relation: filename -> user
+    abuse.record_file(file_unique_id="A", saved_filename="A.jpg", original_filename="orig.jpg", user_id=1)
+    abuse.create_report("u", 1, "")
     abuse.add_report_blob(
         "u", file_unique_id="A", saved_filename="A.jpg", nonce=b"n", ciphertext=b"c", plaintext_sha256="1"
     )
     req = _req(headers={"X-Page-Secret": "pw"}, match={"uuid": "u"})
     await server.api_cancel(req)
+
+    # report cancelled, blobs gone
     assert abuse.get_report("u")["status"] == abuse.REPORT_CANCELLED
     assert abuse.blob_meta("u") == []
+    # BUT: disk file kept, filename->user relation kept, user kept
+    assert (updir / "A.jpg").exists()
+    assert abuse.find_user_by_filename("A.jpg") == 1
+    assert abuse.get_user(1) is not None
 
 
 def test_cleanup_after_finish_deletes_disk(abuse, monkeypatch, tmp_path):

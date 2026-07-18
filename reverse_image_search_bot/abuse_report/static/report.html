@@ -61,7 +61,7 @@
   <div class="sub" id="hdr-sub">Locked</div>
 </header>
 <main>
-  <!-- Unlock (P2) -->
+  <!-- Global page password gate -->
   <div class="card" id="unlock-card">
     <label for="p2">Report page password</label>
     <input type="password" id="p2" autocomplete="off" placeholder="Enter the report password">
@@ -118,7 +118,7 @@
     <div class="card">
       <div class="row">
         <button id="submit-btn">Submit to NCMEC</button>
-        <button id="cancel-btn" class="ghost">Cancel &amp; delete everything</button>
+        <button id="cancel-btn" class="ghost">Cancel report (keep user's files)</button>
       </div>
       <div class="muted" id="action-err" style="color:#f08a8a;margin-top:8px"></div>
     </div>
@@ -287,7 +287,7 @@ $("submit-btn").onclick = async () => {
 };
 
 $("cancel-btn").onclick = async () => {
-  if (!confirm("Cancel this report and delete all images/blobs? This cannot be undone.")) return;
+  if (!confirm("Cancel this report? The encrypted blobs and this report are deleted, but the user's original files and records are KEPT (cancelling means no wrongdoing).")) return;
   try { await api("/api/cancel", { method: "POST" }); applyStatus("cancelled"); }
   catch (e) { $("action-err").textContent = "" + e.message; }
 };
@@ -310,7 +310,7 @@ function applyStatus(status, detail) {
   const labels = {
     preparing: "Preparing — encrypting files…", ready: "Ready for review",
     submitting: "Submitting to NCMEC…", review: "Staged with NCMEC — final review",
-    filed: "✓ Filed with NCMEC", retracted: "Retracted", cancelled: "Cancelled — data deleted",
+    filed: "✓ Filed with NCMEC", retracted: "Retracted", cancelled: "Cancelled — user's files kept",
     error: "Error",
   };
   b.textContent = (labels[status] || status) + (detail ? " — " + detail : "");

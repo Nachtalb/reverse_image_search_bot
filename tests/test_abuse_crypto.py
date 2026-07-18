@@ -37,6 +37,18 @@ def test_page_secret_hash_verify():
     assert not crypto.verify_page_secret("s3cret", "garbage-no-dollar")
 
 
+def test_verify_global_page_password():
+    # correct password matches
+    assert crypto.verify_global_page_password("swordfish", "swordfish")
+    # wrong password rejected
+    assert not crypto.verify_global_page_password("nope", "swordfish")
+    # empty entered against a set password is rejected
+    assert not crypto.verify_global_page_password("", "swordfish")
+    # when no global password configured, the gate is open
+    assert crypto.verify_global_page_password("anything", "")
+    assert crypto.verify_global_page_password("", "")
+
+
 def test_gen_password_unique():
     assert crypto.gen_password() != crypto.gen_password()
     assert len(crypto.gen_report_uuid()) > 10

@@ -97,6 +97,11 @@ REPORT_SERVER_HOST = os.getenv("REPORT_SERVER_HOST", "0.0.0.0")
 REPORT_SERVER_PORT = int(os.getenv("REPORT_SERVER_PORT", "9200"))
 # Public base URL the Mini App is reachable at, e.g. https://ris.naa.gg/report
 REPORT_BASE_URL = os.getenv("REPORT_BASE_URL", "").rstrip("/")
+# Single global page password gating the report webview (same for every report,
+# stored in Proton Pass). Combined with the per-report image key (P1), this is
+# the second of the two secrets. When unset the page gate is effectively open to
+# any authenticated admin (initData still required).
+REPORT_PAGE_PASSWORD = os.getenv("REPORT_PAGE_PASSWORD", "")
 
 # NCMEC CyberTipline credentials (production). Report filing is disabled if unset.
 NCMEC_USERNAME = os.getenv("NCMEC_USERNAME")
