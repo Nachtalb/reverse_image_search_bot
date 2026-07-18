@@ -88,6 +88,10 @@
 <script>
 const TG = window.Telegram && window.Telegram.WebApp;
 if (TG) { TG.ready(); TG.expand(); }
+// This IS the overview — clear the "came from console" flag and hide any Back
+// button Telegram may still be showing from a previous report page.
+try { sessionStorage.removeItem("ris_from_console"); } catch (e) {}
+if (TG && TG.BackButton) TG.BackButton.hide();
 const INIT = (TG && TG.initData) || "";
 let P2 = "";
 
@@ -122,8 +126,12 @@ $("unlock-btn").onclick = async () => {
 function fmtTs(ts) { return ts ? new Date(ts * 1000).toLocaleString() : "—"; }
 
 function openReport(uuid) {
-  // Persist the page password so the report page auto-unlocks on arrival.
-  try { sessionStorage.setItem("ris_report_pw", P2); } catch (e) {}
+  // Persist the page password so the report page auto-unlocks on arrival, and
+  // flag that we came from the console so the report shows a Back button.
+  try {
+    sessionStorage.setItem("ris_report_pw", P2);
+    sessionStorage.setItem("ris_from_console", "1");
+  } catch (e) {}
   location.href = `/report/${uuid}`;
 }
 

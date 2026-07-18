@@ -157,6 +157,18 @@
 <script>
 const TG = window.Telegram && window.Telegram.WebApp;
 if (TG) { TG.ready(); TG.expand(); }
+
+// If we arrived from the reports console, show Telegram's native Back button to
+// return there (a Mini App has no browser chrome / back arrow of its own).
+(function wireBackButton() {
+  let fromConsole = "";
+  try { fromConsole = sessionStorage.getItem("ris_from_console") || ""; } catch (e) {}
+  if (!(TG && TG.BackButton && fromConsole)) return;
+  const goBack = () => { location.href = "/report/console"; };
+  TG.BackButton.show();
+  TG.BackButton.onClick(goBack);
+})();
+
 const UUID = location.pathname.split("/").filter(Boolean).pop();
 const INIT = (TG && TG.initData) || "";
 const PBKDF2_ITER = 200000, P1_SALT = new TextEncoder().encode("ris-abuse-report-p1-v1");
