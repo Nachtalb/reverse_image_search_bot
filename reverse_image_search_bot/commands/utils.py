@@ -3,11 +3,13 @@ from __future__ import annotations
 import asyncio
 import io
 import logging
-from concurrent.futures import ProcessPoolExecutor
+import subprocess
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from time import time
 
+import httpx
+import imageio_ffmpeg
 from PIL import Image
 from telegram import Animation, Document, PhotoSize, Sticker, Video
 from yarl import URL
@@ -20,7 +22,23 @@ logger = logging.getLogger(__name__)
 
 last_used: dict[int, float] = {}
 
-_process_executor = ProcessPoolExecutor(max_workers=2)
+# ffmpeg binary (bundled via imageio-ffmpeg on glibc). Resolved once.
+_FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
+
+# Shared client for streaming video downloads off Telegram's file server.
+# No read timeout — large files stream progressively; we stop them ourselves.
+_dl_client = httpx.AsyncClient(timeout=httpx.Timeout(_FILE_TIMEOUT := 10.0, read=None))
+
+# JPEG magic — a valid extracted frame starts with these three bytes.
+_JPEG_MAGIC = b"\xff\xd8\xff"
+
+# Download in 64 KiB chunks off Telegram's file server.
+_DL_CHUNK = 64 * 1024
+
+# Buffer thresholds at which to attempt an early decode (complete-prefix + EOF).
+# Doubling keeps the number of ffmpeg spawns logarithmic in file size; streamable
+# mp4/webm/mkv decode by ~1 MiB, so most uploads stop after 3 tries at ~6-7%.
+_TRY_AT_BYTES = [256 * 1024, 512 * 1024, 1024 * 1024, 2 * 1024**2, 4 * 1024**2, 8 * 1024**2, 16 * 1024**2]
 
 _LOCAL = Path(__file__).parent.parent
 _HELP_IMAGE = _LOCAL / "images/help.jpg"
@@ -42,20 +60,106 @@ _LANG_NAMES: dict[str, str] = {
 # Telegram Bot API file download limit (20 MB)
 MAX_TELEGRAM_FILE_SIZE = 20 * 1024 * 1024
 
-# getFile/download timeout — PTB's 5s default read timeout is too tight for media.
-_FILE_TIMEOUT = 10.0
+
+def _extract_frame_from_file(video_path: str) -> bytes:
+    """Extract frame 0 from a seekable local file as JPEG bytes (fallback path).
+
+    Used only when progressive streaming can't decode the file — i.e. an mp4
+    with its moov atom at the end, which a non-seekable pipe cannot handle.
+    """
+    proc = subprocess.run(
+        [
+            _FFMPEG,
+            "-nostdin",
+            "-loglevel",
+            "error",
+            "-i",
+            video_path,
+            "-frames:v",
+            "1",
+            "-f",
+            "image2pipe",
+            "-c:v",
+            "mjpeg",
+            "-",
+        ],
+        capture_output=True,
+    )
+    if proc.returncode != 0 or not proc.stdout:
+        detail = proc.stderr.decode("utf-8", "replace")[:500]
+        raise RuntimeError(f"ffmpeg frame extraction failed (rc={proc.returncode}): {detail}")
+    return proc.stdout
 
 
-def _extract_video_frame(video_path: str) -> bytes:
-    """Extract the first frame from a video as JPEG bytes. Runs in a separate process."""
-    from moviepy.video.io.VideoFileClip import VideoFileClip
-    from PIL import Image
+async def _try_decode_prefix(data: bytes) -> bytes | None:
+    """Feed a complete byte prefix + EOF to a fresh ffmpeg and return the JPEG,
+    or None if these bytes aren't enough to decode frame 0 yet.
 
-    with VideoFileClip(video_path, audio=False) as clip:
-        frame = clip.get_frame(0)
-    buf = io.BytesIO()
-    Image.fromarray(frame, "RGB").save(buf, "jpeg")
-    return buf.getvalue()
+    Complete-prefix-plus-EOF is the trick: it forces ffmpeg to decode from
+    exactly `data` instead of greedily reading ahead on an open pipe (which
+    pulled 75% of the file). Streamable mp4/webm/mkv decode from ~6-7%.
+    """
+    proc = await asyncio.create_subprocess_exec(
+        _FFMPEG,
+        "-nostdin",
+        "-loglevel",
+        "error",
+        "-i",
+        "pipe:0",
+        "-frames:v",
+        "1",
+        "-f",
+        "image2pipe",
+        "-c:v",
+        "mjpeg",
+        "pipe:1",
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    out, _ = await proc.communicate(data)  # write all + EOF, read to completion
+    return out if out[:3] == _JPEG_MAGIC else None
+
+
+async def _extract_frame_streaming(url: str) -> bytes:
+    """Extract frame 0 while downloading only as much of `url` as ffmpeg needs.
+
+    One download connection feeds a growing buffer. Each time the buffer crosses
+    a size threshold we spawn a fresh ffmpeg on the buffer-so-far (with EOF),
+    forcing an early decode attempt. The first success stops the download — so a
+    faststart-mp4/webm/mkv typically transfers ~6-7% of the file, never touching
+    disk. A moov-at-end mp4 can't decode from a pipe at all (the index sits at
+    the end and ffmpeg must seek back to it), so it consumes the full stream and
+    falls back to the already-buffered bytes via a seekable temp file — no second
+    download.
+    """
+    buf = bytearray()
+    thresholds = list(_TRY_AT_BYTES)
+
+    async with _dl_client.stream("GET", url) as resp:
+        resp.raise_for_status()
+        async for chunk in resp.aiter_bytes(_DL_CHUNK):
+            buf.extend(chunk)
+            if thresholds and len(buf) >= thresholds[0]:
+                thresholds.pop(0)
+                jpeg = await _try_decode_prefix(bytes(buf))
+                if jpeg:
+                    logger.info("streamed frame after %d KB (partial)", len(buf) // 1024)
+                    return jpeg
+
+    # Stream exhausted. One last pipe attempt on the whole file...
+    jpeg = await _try_decode_prefix(bytes(buf))
+    if jpeg:
+        logger.info("streamed frame after %d KB (full file)", len(buf) // 1024)
+        return jpeg
+
+    # ...still nothing: moov-at-end mp4. Decode the buffered bytes from a
+    # seekable temp file — no second download.
+    logger.info("pipe undecodable (moov@end); seekable-temp fallback (%d KB)", len(buf) // 1024)
+    with NamedTemporaryFile(suffix=".mp4") as tmp:
+        tmp.write(buf)
+        tmp.flush()
+        return await asyncio.get_running_loop().run_in_executor(None, _extract_frame_from_file, tmp.name)
 
 
 def _detect_file_type(attachment) -> str:
@@ -126,14 +230,15 @@ async def video_to_url(attachment: Document | Video | Animation | Sticker) -> UR
         raise ValueError(t("search.files.video_too_large"))
 
     t0 = time()
-    logger.info("video_to_url: downloading file %s", attachment.file_unique_id)
-    # PTB's default 5s read timeout is too tight for media — bump to 10s max.
+    logger.info("video_to_url: streaming frame from file %s", attachment.file_unique_id)
+    # get_file() is a small metadata call; File.file_path is the full HTTPS URL on
+    # Telegram's file server. We stream that ourselves and stop once ffmpeg has the
+    # first frame — typically ~6-7% of the file for mp4/webm/mkv, no disk, no full DL.
     video_file = await attachment.get_file(read_timeout=_FILE_TIMEOUT, connect_timeout=_FILE_TIMEOUT)
-    with NamedTemporaryFile(suffix=".mp4") as tmp:
-        await video_file.download_to_drive(tmp.name)
-        logger.info("video_to_url: downloaded in %.1fs, extracting frame", time() - t0)
-        loop = asyncio.get_running_loop()
-        frame_bytes = await loop.run_in_executor(_process_executor, _extract_video_frame, tmp.name)
+    if not video_file.file_path:
+        raise ValueError("Telegram returned no file_path for the video")
+    frame_bytes = await _extract_frame_streaming(video_file.file_path)
+    logger.info("video_to_url: got frame in %.1fs", time() - t0)
 
     with io.BytesIO(frame_bytes) as file:
         url = upload_file(file, filename)

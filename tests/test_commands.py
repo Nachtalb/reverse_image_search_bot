@@ -8,7 +8,7 @@ from yarl import URL
 
 from reverse_image_search_bot.commands import (
     _button_count,
-    _extract_video_frame,
+    _extract_frame_from_file,
     _is_group,
     _settings_engines_keyboard,
     _settings_main_keyboard,
@@ -382,33 +382,48 @@ class TestBuildReply:
 
 
 # ---------------------------------------------------------------------------
-# _extract_video_frame
+# _extract_frame_from_file (seekable-file fallback path)
 # ---------------------------------------------------------------------------
 
 
-class TestExtractVideoFrame:
+class TestExtractFrameFromFile:
+    def _make_video(self, path):
+        """Generate a tiny real video via the bundled ffmpeg (no moviepy)."""
+        import subprocess
+
+        import imageio_ffmpeg
+
+        exe = imageio_ffmpeg.get_ffmpeg_exe()
+        subprocess.run(
+            [
+                exe,
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc=size=64x48:rate=5:duration=1",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:v",
+                "libx264",
+                str(path),
+                "-y",
+            ],
+            check=True,
+            capture_output=True,
+        )
+
     def test_extracts_jpeg_bytes(self, tmp_path):
-        """Create a minimal video with moviepy, extract first frame."""
-        try:
-            from moviepy.video.VideoClip import ColorClip
-        except ImportError:
-            pytest.skip("moviepy/numpy not available")
-
-        # Create a 1-second red video
         video_path = str(tmp_path / "test.mp4")
-        clip = ColorClip(size=(64, 64), color=(255, 0, 0), duration=0.5)
-        clip.write_videofile(video_path, fps=10, logger=None)
-        clip.close()
+        self._make_video(video_path)
 
-        frame_bytes = _extract_video_frame(video_path)
+        frame_bytes = _extract_frame_from_file(video_path)
         assert isinstance(frame_bytes, bytes)
         assert len(frame_bytes) > 0
-        # JPEG magic bytes
-        assert frame_bytes[:2] == b"\xff\xd8"
+        assert frame_bytes[:3] == b"\xff\xd8\xff"  # JPEG magic
 
     def test_invalid_path_raises(self, tmp_path):
-        with pytest.raises(OSError):
-            _extract_video_frame(str(tmp_path / "nonexistent.mp4"))
+        with pytest.raises(RuntimeError):
+            _extract_frame_from_file(str(tmp_path / "nonexistent.mp4"))
 
 
 # ---------------------------------------------------------------------------
