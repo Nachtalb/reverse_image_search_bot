@@ -29,6 +29,7 @@ from aiohttp import web
 
 from reverse_image_search_bot import settings
 from reverse_image_search_bot.abuse_report import crypto, ncmec
+from reverse_image_search_bot.abuse_report.prepare import prepare_report, resolve_user
 from reverse_image_search_bot.config import abuse
 
 logger = logging.getLogger("abuse.server")
@@ -109,6 +110,71 @@ def _require_page_secret(request: web.Request, rep: dict) -> None:
 
 
 # --- routes -------------------------------------------------------------------
+
+
+async def reports_index(request: web.Request) -> web.StreamResponse:
+    """Serve the reports-list Mini App shell. Auth happens via API calls."""
+    return web.FileResponse(_STATIC / "reports.html")
+
+
+async def api_reports_list(request: web.Request) -> web.Response:
+    """List all reports (admin + global page password gated)."""
+    _require_admin(request)
+    if not crypto.verify_global_page_password(request.headers.get("X-Page-Secret", ""), settings.REPORT_PAGE_PASSWORD):
+        raise web.HTTPForbidden(text="page password incorrect")
+    reports = abuse.all_reports()
+    return web.json_response(
+        {
+            "reports": [
+                {
+                    "uuid": r["report_uuid"],
+                    "user_id": r["user_id"],
+                    "username": r.get("username"),
+                    "status": r["status"],
+                    "ncmec_report_id": r["ncmec_report_id"],
+                    "created_at": r["created_at"],
+                }
+                for r in reports
+            ]
+        }
+    )
+
+
+async def api_reports_create(request: web.Request) -> web.Response:
+    """Create a new report from a target token (user id, @username, or filename).
+
+    Returns the new report's uuid + the one-time image key (P1), which is shown
+    once and never stored — the caller must surface it immediately.
+    """
+    _require_admin(request)
+    if not crypto.verify_global_page_password(request.headers.get("X-Page-Secret", ""), settings.REPORT_PAGE_PASSWORD):
+        raise web.HTTPForbidden(text="page password incorrect")
+    payload = await request.json()
+    target = (payload.get("target") or "").strip()
+    if not target:
+        raise web.HTTPBadRequest(text="target (user id, @username, or filename) required")
+    user_id = resolve_user(target)
+    if user_id is None:
+        raise web.HTTPNotFound(text=f"no uploader found for: {target}")
+
+    result = prepare_report(user_id)
+    if not result.ok:
+        # An existing active report is a 409 carrying its uuid so the UI can jump to it.
+        if result.existing_uuid:
+            return web.json_response(
+                {"ok": False, "error": result.error, "existing_uuid": result.existing_uuid}, status=409
+            )
+        raise web.HTTPBadRequest(text=result.error or "could not prepare report")
+
+    return web.json_response(
+        {
+            "ok": True,
+            "uuid": result.report_uuid,
+            "user_id": user_id,
+            "p1": result.p1,
+            "encrypted": result.encrypted,
+        }
+    )
 
 
 async def index(request: web.Request) -> web.StreamResponse:
@@ -238,7 +304,7 @@ async def api_submit(request: web.Request) -> web.Response:
 
     abuse.set_report_ncmec_id(rep["report_uuid"], report_id)
     abuse.mark_report_filed(rep["report_uuid"])
-    _delete_disk_files(rep)
+    _cleanup_after_finish(rep)
     return web.json_response({"ok": True, "ncmec_report_id": report_id, "status": abuse.REPORT_FILED})
 
 
@@ -263,25 +329,32 @@ def _public_file_url(saved_filename: str) -> str:
     return f"{base}/{saved_filename}" if base else saved_filename
 
 
-def _delete_disk_files(rep: dict) -> None:
-    """On finish: delete the plaintext files from disk ONLY.
+def _cleanup_after_finish(rep: dict) -> None:
+    """On finish: delete reported plaintext from disk + drop non-reported blobs.
 
-    The encrypted ``report_blobs`` are intentionally KEPT and stay linked to the
-    finished report, so the material remains available for further inspection or
-    a report to local law enforcement. The user row, ban, and report record are
-    also kept. Only the plaintext PVC files (named by ``saved_filename``) go.
+    Retention rules:
+    - The REPORTED (selected) files: their plaintext is deleted from disk, but
+      their encrypted ``report_blobs`` are KEPT and stay linked to the filed
+      report, so the material remains available for further inspection or a
+      report to local law enforcement.
+    - The NON-reported (unselected) files: the admin decided they are not part of
+      the report, so their encrypted blobs are purged from the DB. Their
+      plaintext on disk is left untouched (nothing was filed about them).
+
+    The user row, ban, and report record are always kept.
     """
-    blobs = abuse.report_blobs(rep["report_uuid"])
+    reported = abuse.report_blobs(rep["report_uuid"], selected_only=True)
     upload_path = settings.UPLOADER.get("configuration", {}).get("path")
-    if not upload_path:
-        return
-    for b in blobs:
-        try:
-            fp = Path(upload_path) / b["saved_filename"]
-            if fp.is_file():
-                fp.unlink()
-        except Exception:
-            logger.warning("failed to delete plaintext %s", b["saved_filename"], exc_info=True)
+    if upload_path:
+        for b in reported:
+            try:
+                fp = Path(upload_path) / b["saved_filename"]
+                if fp.is_file():
+                    fp.unlink()
+            except Exception:
+                logger.warning("failed to delete plaintext %s", b["saved_filename"], exc_info=True)
+    # Drop only the non-reported blobs; keep the reported ones linked to the report.
+    abuse.purge_unselected_blobs(rep["report_uuid"])
 
 
 async def healthz(request: web.Request) -> web.Response:
@@ -290,6 +363,9 @@ async def healthz(request: web.Request) -> web.Response:
 
 def build_app() -> web.Application:
     app = web.Application(client_max_size=64 * 1024 * 1024)
+    app.router.add_get("/reports", reports_index)
+    app.router.add_get("/reports/api/list", api_reports_list)
+    app.router.add_post("/reports/api/create", api_reports_create)
     app.router.add_get("/report/{uuid}", index)
     app.router.add_post("/report/{uuid}/api/unlock", api_unlock)
     app.router.add_get("/report/{uuid}/api/blob/{blob_id}", api_blob)

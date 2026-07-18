@@ -187,11 +187,19 @@ $("unlock-btn").onclick = async () => {
   try {
     const r = await api("/api/unlock", { method: "POST" });
     META = await r.json();
+    try { sessionStorage.setItem("ris_report_pw", P2); } catch (e) {}
     $("unlock-card").classList.add("hidden");
     $("report-body").classList.remove("hidden");
     renderMeta();
   } catch (e) { $("unlock-err").textContent = "" + e.message; P2 = ""; }
 };
+
+// Auto-unlock if we arrived from the reports list (page password in sessionStorage).
+(function tryAutoUnlock() {
+  let saved = "";
+  try { saved = sessionStorage.getItem("ris_report_pw") || ""; } catch (e) {}
+  if (saved) { $("p2").value = saved; $("unlock-btn").click(); }
+})();
 
 function fmtTs(ts) { return ts ? new Date(ts * 1000).toLocaleString() : "—"; }
 
@@ -380,7 +388,8 @@ function applyFinalState(status, reportId) {
     ? "✓ Filed with NCMEC — report id " + (reportId || META.ncmec_report_id || "")
     : "Cancelled — user's files kept";
   b.classList.remove("hidden");
-  $("decrypt-card").classList.add("hidden");
+  // Keep the decrypt card + gallery available after filing so the reported
+  // images can still be inspected; only the submit/cancel actions are removed.
   $("action-card").classList.add("hidden");
 }
 </script>
