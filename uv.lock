@@ -704,15 +704,15 @@ wheels = [
 
 [[package]]
 name = "ncmec-cybertip"
-version = "0.1.0"
+version = "0.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
     { name = "pydantic-xml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f4/8f/c606c5d1049d782bff27288e5bd40e59d4f7c7cf7193515777f473906320/ncmec_cybertip-0.1.0.tar.gz", hash = "sha256:96a7eb8b37e580a0f1a18acd5f953130046a1603575c96eb619a2a35863e6127", size = 42326, upload-time = "2026-07-16T21:25:47.033Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/42/08/f1f1d0319624730ed2d4323253e48194943bb10b27573647bfd3c7a35cd1/ncmec_cybertip-0.1.1.tar.gz", hash = "sha256:69081c827dac648ebe1800e67ba1f8832e8181434babe1ba4791793892d03dad", size = 42824, upload-time = "2026-07-18T08:50:33.917Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/89/64/d1d6789e5c23d2931a13011c20a35b943c1d98056a4cf4554476ec987120/ncmec_cybertip-0.1.0-py3-none-any.whl", hash = "sha256:977292b2a38eac6747c1278499d69a48bf8de92f73576a6f7d1ec41a9af43cbd", size = 20232, upload-time = "2026-07-16T21:25:45.816Z" },
+    { url = "https://files.pythonhosted.org/packages/84/f7/aa82b0bd7f65d9bd7b09b45a810d33076aca85708f5ce707225deb95a4ab/ncmec_cybertip-0.1.1-py3-none-any.whl", hash = "sha256:868736e9834f21811d3fc277fd5c60a98ad89bb145c20c968788a45f5b706c70", size = 20351, upload-time = "2026-07-18T08:50:32.87Z" },
 ]
 
 [[package]]
@@ -1296,7 +1296,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "lxml", specifier = ">=6.1" },
     { name = "moviepy", git = "https://github.com/Zulko/moviepy.git?rev=7ffa4f00376237137a25fe1c777355c37753e9af" },
-    { name = "ncmec-cybertip", specifier = ">=0.1.0" },
+    { name = "ncmec-cybertip", specifier = ">=0.1.1" },
     { name = "paramiko", specifier = ">=3.4.0" },
     { name = "picimagesearch", specifier = ">=3.12.0" },
     { name = "pillow", specifier = ">=10.0.0" },
