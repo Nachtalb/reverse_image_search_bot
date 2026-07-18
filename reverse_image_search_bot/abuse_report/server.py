@@ -6,8 +6,9 @@ App (menu button). Auth is two-layer:
 1. **Telegram initData** — every API request carries the Mini App's signed
    ``initData``; we HMAC-verify it against the bot token and require the sender
    to be an admin. This proves the request came from an admin's Telegram session.
-2. **Page secret (P2)** — a per-report password gating the specific report,
-   entered on the page and verified against the stored hash.
+2. **Page password** — a single global password (same for every report, stored
+   in Proton Pass as ``REPORT_PAGE_PASSWORD``), entered on the page and checked
+   against the configured value.
 
 The encrypted image blobs are served to the browser, which decrypts them locally
 with the image key (P1) via WebCrypto — the server never returns plaintext for
@@ -98,10 +99,13 @@ def _report_or_404(uuid: str) -> dict:
 
 
 def _require_page_secret(request: web.Request, rep: dict) -> None:
-    """P2 gate — from header on API calls."""
-    p2 = request.headers.get("X-Page-Secret", "")
-    if not crypto.verify_page_secret(p2, rep["page_secret_hash"]):
-        raise web.HTTPForbidden(text="page secret incorrect")
+    """Page-password gate — a single global password (same for every report),
+    supplied in the ``X-Page-Secret`` header, checked against the configured
+    ``REPORT_PAGE_PASSWORD``. ``rep`` is unused now but kept for call-site parity.
+    """
+    entered = request.headers.get("X-Page-Secret", "")
+    if not crypto.verify_global_page_password(entered, settings.REPORT_PAGE_PASSWORD):
+        raise web.HTTPForbidden(text="page password incorrect")
 
 
 # --- routes -------------------------------------------------------------------

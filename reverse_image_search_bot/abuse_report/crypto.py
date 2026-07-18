@@ -77,5 +77,17 @@ def verify_page_secret(p2: str, stored: str) -> bool:
     return hmac.compare_digest(calc, digest)
 
 
+def verify_global_page_password(entered: str, configured: str) -> bool:
+    """Constant-time check of the typed page password against the global one.
+
+    The page password is a single global secret (same for every report, stored
+    in Proton Pass). If no global password is configured, the gate is open
+    (initData admin auth still applies).
+    """
+    if not configured:
+        return True
+    return hmac.compare_digest(entered.encode("utf-8"), configured.encode("utf-8"))
+
+
 def sha256_hex(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
