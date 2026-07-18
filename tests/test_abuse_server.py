@@ -26,11 +26,12 @@ def abuse(tmp_path, monkeypatch):
     return ab
 
 
-def _req(headers=None, match=None, json_body=None):
+def _req(headers=None, match=None, json_body=None, app=None):
     r = MagicMock(spec=web.Request)
     r.headers = headers or {}
     r.query = {}
     r.match_info = match or {}
+    r.app = app if app is not None else {"bot": None}
     if json_body is not None:
         r.json = AsyncMock(return_value=json_body)
     return r
@@ -292,6 +293,65 @@ async def test_reports_create_by_username(abuse, monkeypatch, tmp_path):
     assert data["p1"]  # one-time key returned
     # a ready report now exists for the user
     assert abuse.active_report_for_user(55)["report_uuid"] == data["uuid"]
+
+
+@pytest.mark.asyncio
+async def test_reports_create_dms_p1(abuse, monkeypatch, tmp_path):
+    """Creating a report via the app DMs the admin the P1 image key."""
+    from reverse_image_search_bot import settings
+    from reverse_image_search_bot.abuse_report import server
+
+    updir = tmp_path / "uploads"
+    updir.mkdir()
+    (updir / "A.jpg").write_bytes(b"img")
+    monkeypatch.setattr(settings, "UPLOADER", {"configuration": {"path": str(updir)}, "url": "https://x/f"})
+    monkeypatch.setattr(settings, "REPORT_PAGE_PASSWORD", "")
+    monkeypatch.setattr(settings, "REPORT_BASE_URL", "https://ris.naa.gg")
+    monkeypatch.setattr(server, "_admin_from_request", lambda req: 4242)
+
+    abuse.record_user(55, username="badguy")
+    abuse.record_file("A", saved_filename="A.jpg", user_id=55)
+
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+    req = _req(headers={"X-Page-Secret": ""}, json_body={"target": "55"}, app={"bot": bot})
+    resp = await server.api_reports_create(req)
+    import json
+
+    data = json.loads(resp.text or "")
+    bot.send_message.assert_awaited_once()
+    args, _kwargs = bot.send_message.call_args
+    assert args[0] == 4242  # DMed the requesting admin
+    assert data["p1"] in args[1]  # the P1 key is in the message body
+
+
+@pytest.mark.asyncio
+async def test_reports_create_already_filed_message(abuse, monkeypatch, tmp_path):
+    """Creating for a user whose files were already filed points at the NCMEC report."""
+    from reverse_image_search_bot import settings
+    from reverse_image_search_bot.abuse_report import server
+
+    updir = tmp_path / "uploads"
+    updir.mkdir()  # empty — no files on disk
+    monkeypatch.setattr(settings, "UPLOADER", {"configuration": {"path": str(updir)}, "url": "https://x/f"})
+    monkeypatch.setattr(settings, "REPORT_PAGE_PASSWORD", "")
+    monkeypatch.setattr(settings, "REPORT_BASE_URL", "https://ris.naa.gg")
+    monkeypatch.setattr(server, "_admin_from_request", lambda req: 42)
+
+    abuse.record_user(55, username="badguy")
+    abuse.record_file("A", saved_filename="A.jpg", user_id=55)  # recorded but not on disk
+    # a prior FILED report with a kept blob
+    abuse.create_report("old", 55, "")
+    abuse.add_report_blob(
+        "old", file_unique_id="A", saved_filename="A.jpg", nonce=b"n", ciphertext=b"c", plaintext_sha256="1"
+    )
+    abuse.set_report_ncmec_id("old", 700200)
+    abuse.mark_report_filed("old")
+
+    req = _req(headers={"X-Page-Secret": ""}, json_body={"target": "A.jpg"})
+    with pytest.raises(web.HTTPBadRequest) as exc:
+        await server.api_reports_create(req)
+    assert "700200" in (exc.value.text or "")  # points at the NCMEC report id
 
 
 @pytest.mark.asyncio
