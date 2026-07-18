@@ -164,6 +164,19 @@ def test_source_chats_for_user(abuse):
     assert abuse.source_chats_for_user(8) == []
 
 
+def test_count_and_uploaders_for_chat(abuse):
+    abuse.record_user(7)
+    abuse.record_user(9)
+    abuse.record_chat(-100123, "group", title="G")
+    abuse.record_file("F1", saved_filename="F1.jpg", user_id=7, group_id=-100123)
+    abuse.record_file("F2", saved_filename="F2.jpg", user_id=9, group_id=-100123)
+    abuse.record_file("F3", saved_filename="F3.jpg", user_id=7)  # not via the group
+    assert abuse.count_files_for_chat(-100123) == 2
+    assert sorted(abuse.uploaders_for_chat(-100123)) == [7, 9]
+    assert abuse.count_files_for_chat(-999) == 0
+    assert abuse.uploaders_for_chat(-999) == []
+
+
 def test_migration_adds_group_channel_columns(tmp_path, monkeypatch):
     """A files table created WITHOUT group_id/channel_id gets them added."""
     import importlib

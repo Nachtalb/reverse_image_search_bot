@@ -302,6 +302,25 @@ def source_chats_for_user(user_id: int) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def count_files_for_chat(chat_id: int) -> int:
+    """Number of files uploaded through a given group/channel chat."""
+    conn = _get_conn()
+    return conn.execute(
+        "SELECT COUNT(*) FROM files WHERE group_id = ? OR channel_id = ?",
+        (chat_id, chat_id),
+    ).fetchone()[0]
+
+
+def uploaders_for_chat(chat_id: int) -> list[int]:
+    """Distinct user ids who uploaded files through a given group/channel."""
+    conn = _get_conn()
+    rows = conn.execute(
+        "SELECT DISTINCT user_id FROM files WHERE group_id = ? OR channel_id = ?",
+        (chat_id, chat_id),
+    ).fetchall()
+    return [r["user_id"] for r in rows]
+
+
 def get_user(user_id: int) -> dict | None:
     conn = _get_conn()
     row = conn.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
