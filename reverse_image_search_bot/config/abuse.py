@@ -348,6 +348,19 @@ def find_user_by_filename(filename: str) -> int | None:
     return row["user_id"] if row else None
 
 
+def find_user_by_username(username: str) -> int | None:
+    """Resolve a user id from a @username (case-insensitive; leading @ optional)."""
+    uname = username.lstrip("@").strip()
+    if not uname:
+        return None
+    conn = _get_conn()
+    row = conn.execute(
+        "SELECT user_id FROM users WHERE username = ? COLLATE NOCASE",
+        (uname,),
+    ).fetchone()
+    return row["user_id"] if row else None
+
+
 def has_report(user_id: int) -> bool:
     """True if a filed (finished) report exists for this user."""
     conn = _get_conn()
@@ -493,6 +506,19 @@ def purge_report_blobs(report_uuid: str) -> int:
     """Delete all encrypted blobs for a report. Returns count deleted."""
     conn = _get_conn()
     cur = conn.execute("DELETE FROM report_blobs WHERE report_uuid = ?", (report_uuid,))
+    conn.commit()
+    return cur.rowcount
+
+
+def purge_unselected_blobs(report_uuid: str) -> int:
+    """Delete only the NON-reported (unselected) blobs for a report.
+
+    Used on finish: the reported files' encrypted blobs are KEPT (linked to the
+    filed report for later inspection), while the ones the admin did not report
+    are removed. Returns count deleted.
+    """
+    conn = _get_conn()
+    cur = conn.execute("DELETE FROM report_blobs WHERE report_uuid = ? AND selected = 0", (report_uuid,))
     conn.commit()
     return cur.rowcount
 
