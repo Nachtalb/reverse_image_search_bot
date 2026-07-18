@@ -108,7 +108,7 @@ async def reports_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             await context.bot.set_chat_menu_button(
                 chat_id=update.effective_user.id,
                 menu_button=MenuButtonWebApp(
-                    text="Reports", web_app=WebAppInfo(url=f"{settings.REPORT_BASE_URL}/reports")
+                    text="Reports", web_app=WebAppInfo(url=f"{settings.REPORT_BASE_URL}/report/console")
                 ),
             )
             menu_button_set = True

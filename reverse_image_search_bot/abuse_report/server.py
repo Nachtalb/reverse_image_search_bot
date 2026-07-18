@@ -363,9 +363,9 @@ async def healthz(request: web.Request) -> web.Response:
 
 def build_app() -> web.Application:
     app = web.Application(client_max_size=64 * 1024 * 1024)
-    app.router.add_get("/reports", reports_index)
-    app.router.add_get("/reports/api/list", api_reports_list)
-    app.router.add_post("/reports/api/create", api_reports_create)
+    app.router.add_get("/report/console", reports_index)
+    app.router.add_get("/report/console/api/list", api_reports_list)
+    app.router.add_post("/report/console/api/create", api_reports_create)
     app.router.add_get("/report/{uuid}", index)
     app.router.add_post("/report/{uuid}/api/unlock", api_unlock)
     app.router.add_get("/report/{uuid}/api/blob/{blob_id}", api_blob)
