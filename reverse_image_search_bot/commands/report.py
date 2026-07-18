@@ -143,7 +143,9 @@ async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE, user_
         f"{launch}\n\n"
         f"<i>Use the global page password to open the report, then P1 to decrypt "
         f"the images. P1 is not stored — if you lose it the thumbnails can't be "
-        f"shown (the files still exist on disk until you file/cancel).</i>",
+        f"shown (the files still exist on disk until you file/cancel). On filing, "
+        f"the plaintext files are deleted from disk but the encrypted copies stay "
+        f"in the DB, linked to the report, for further inspection.</i>",
         disable_web_page_preview=True,
     )
 
