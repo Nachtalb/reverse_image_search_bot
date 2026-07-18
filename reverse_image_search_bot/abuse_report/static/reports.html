@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Abuse Reports</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #17181c; color: #e8e8ea; font-size: 15px; line-height: 1.45;
+  }
+  header { padding: 16px; border-bottom: 1px solid #2a2c33; position: sticky; top: 0; background: #17181c; z-index: 5; }
+  h1 { font-size: 17px; margin: 0 0 4px; }
+  .sub { color: #9a9ba2; font-size: 13px; }
+  main { padding: 16px; }
+  .card { background: #1f2128; border: 1px solid #2a2c33; border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+  label { display: block; font-size: 13px; color: #9a9ba2; margin-bottom: 6px; }
+  input[type=password], input[type=text] {
+    width: 100%; padding: 11px 12px; border-radius: 9px; border: 1px solid #363842;
+    background: #14151a; color: #e8e8ea; font-size: 15px;
+  }
+  button {
+    border: none; border-radius: 9px; padding: 11px 16px; font-size: 15px; font-weight: 600;
+    cursor: pointer; background: #3a6df0; color: #fff;
+  }
+  button.ghost { background: transparent; color: #9a9ba2; border: 1px solid #363842; }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .muted { color: #9a9ba2; font-size: 12px; }
+  .hidden { display: none; }
+  .rep {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    padding: 11px 12px; border: 1px solid #2a2c33; border-radius: 10px; margin-bottom: 8px;
+    background: #1b1d23; cursor: pointer;
+  }
+  .rep:hover { border-color: #3a6df0; }
+  .rep .who { font-weight: 600; }
+  .rep .meta { font-size: 12px; color: #9a9ba2; }
+  .badge { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; }
+  .badge.ready, .badge.preparing { background: #103a2a; color: #7fd6a2; }
+  .badge.submitting { background: #4a3a10; color: #f0c674; }
+  .badge.filed { background: #0f2f5a; color: #8ab4ff; }
+  .badge.cancelled, .badge.error, .badge.retracted, .badge.review { background: #3a1c1c; color: #f0a0a0; }
+  .err { color: #f08a8a; font-size: 13px; margin-top: 8px; }
+  code { background: #2a2c33; padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Abuse Reports</h1>
+  <div class="sub" id="hdr-sub">Locked</div>
+</header>
+<main>
+  <!-- Global page password gate -->
+  <div class="card" id="unlock-card">
+    <input type="password" id="p2" autocomplete="off" placeholder="Report page password">
+    <div style="height:10px"></div>
+    <button id="unlock-btn">Unlock</button>
+    <div class="err" id="unlock-err"></div>
+  </div>
+
+  <div id="body" class="hidden">
+    <!-- Create a new report -->
+    <div class="card">
+      <label for="target">Create a new report</label>
+      <div class="row">
+        <input type="text" id="target" placeholder="user id, @username, or filename" style="flex:1;min-width:180px">
+        <button id="create-btn">Create</button>
+      </div>
+      <div class="err" id="create-err"></div>
+      <div id="create-ok" class="hidden" style="margin-top:10px"></div>
+    </div>
+
+    <!-- Report list -->
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <b>All reports</b>
+        <button class="ghost" id="refresh-btn">Refresh</button>
+      </div>
+      <div id="list" style="margin-top:10px"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const TG = window.Telegram && window.Telegram.WebApp;
+if (TG) { TG.ready(); TG.expand(); }
+const INIT = (TG && TG.initData) || "";
+let P2 = "";
+
+const $ = id => document.getElementById(id);
+const api = async (path, opts = {}) => {
+  const headers = Object.assign({ "X-Init-Data": INIT }, opts.headers || {});
+  if (P2) headers["X-Page-Secret"] = P2;
+  const r = await fetch(`/reports${path}`, Object.assign({}, opts, { headers }));
+  if (!r.ok && r.status !== 409) throw new Error((await r.text()) || r.status);
+  return r;
+};
+
+$("unlock-btn").onclick = async () => {
+  P2 = $("p2").value;
+  $("unlock-err").textContent = "";
+  try {
+    await loadList();  // doubles as the password check
+    try { sessionStorage.setItem("ris_report_pw", P2); } catch (e) {}
+    $("unlock-card").classList.add("hidden");
+    $("body").classList.remove("hidden");
+    $("hdr-sub").textContent = "Unlocked";
+  } catch (e) { $("unlock-err").textContent = "" + e.message; P2 = ""; }
+};
+
+// Auto-unlock from a previous session's saved password.
+(function tryAutoUnlock() {
+  let saved = "";
+  try { saved = sessionStorage.getItem("ris_report_pw") || ""; } catch (e) {}
+  if (saved) { $("p2").value = saved; $("unlock-btn").click(); }
+})();
+
+function fmtTs(ts) { return ts ? new Date(ts * 1000).toLocaleString() : "—"; }
+
+function openReport(uuid) {
+  // Persist the page password so the report page auto-unlocks on arrival.
+  try { sessionStorage.setItem("ris_report_pw", P2); } catch (e) {}
+  location.href = `/report/${uuid}`;
+}
+
+async function loadList() {
+  const r = await api("/api/list");
+  const j = await r.json();
+  const list = $("list");
+  list.innerHTML = "";
+  if (!j.reports.length) { list.innerHTML = `<div class="muted">No reports yet.</div>`; return; }
+  for (const rep of j.reports) {
+    const who = rep.username ? "@" + rep.username : String(rep.user_id);
+    const ncmec = rep.ncmec_report_id ? ` · NCMEC #${rep.ncmec_report_id}` : "";
+    const el = document.createElement("div");
+    el.className = "rep";
+    el.innerHTML =
+      `<div><div class="who">${escapeHtml(who)}</div>` +
+      `<div class="meta"><code>${rep.uuid.slice(0, 8)}</code> · ${fmtTs(rep.created_at)}${ncmec}</div></div>` +
+      `<span class="badge ${rep.status}">${rep.status}</span>`;
+    el.onclick = () => openReport(rep.uuid);
+    list.appendChild(el);
+  }
+}
+
+$("refresh-btn").onclick = () => loadList().catch(e => { $("create-err").textContent = "" + e.message; });
+
+$("create-btn").onclick = async () => {
+  $("create-err").textContent = "";
+  $("create-ok").classList.add("hidden");
+  const target = $("target").value.trim();
+  if (!target) { $("create-err").textContent = "Enter a user id, @username, or filename."; return; }
+  try {
+    const r = await api("/api/create", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target }),
+    });
+    const j = await r.json();
+    if (r.status === 409 && j.existing_uuid) {
+      // Active report already exists — offer to open it.
+      const ok = $("create-ok");
+      ok.classList.remove("hidden");
+      ok.innerHTML = `<div class="muted">${escapeHtml(j.error || "Active report already exists.")}</div>` +
+        `<div style="height:8px"></div><button id="goto-existing">Open existing report</button>`;
+      $("goto-existing").onclick = () => openReport(j.existing_uuid);
+      return;
+    }
+    // Success — show the one-time image key (P1) and an open button.
+    const ok = $("create-ok");
+    ok.classList.remove("hidden");
+    ok.innerHTML =
+      `<div>Report created — encrypted <b>${j.encrypted}</b> file(s).</div>` +
+      `<div style="margin:6px 0">Image key (P1): <code>${escapeHtml(j.p1)}</code> ` +
+      `<span class="muted">(shown once — copy it)</span></div>` +
+      `<button id="goto-new">Open report</button>`;
+    $("goto-new").onclick = () => openReport(j.uuid);
+    $("target").value = "";
+    loadList().catch(() => {});
+  } catch (e) { $("create-err").textContent = "" + e.message; }
+};
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+</script>
+</body>
+</html>
