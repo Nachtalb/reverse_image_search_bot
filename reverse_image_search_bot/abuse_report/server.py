@@ -149,6 +149,7 @@ async def api_reports_create(request: web.Request) -> web.Response:
     _require_admin(request)
     if not crypto.verify_global_page_password(request.headers.get("X-Page-Secret", ""), settings.REPORT_PAGE_PASSWORD):
         raise web.HTTPForbidden(text="page password incorrect")
+    admin_id = _admin_from_request(request)
     payload = await request.json()
     target = (payload.get("target") or "").strip()
     if not target:
@@ -166,6 +167,10 @@ async def api_reports_create(request: web.Request) -> web.Response:
             )
         raise web.HTTPBadRequest(text=result.error or "could not prepare report")
 
+    # DM the requesting admin the one-time image key (P1) + launch link, so it is
+    # delivered as a normal message (the page never shows P1 again after this).
+    await _dm_report_created(request.app.get("bot"), admin_id, user_id, result)
+
     return web.json_response(
         {
             "ok": True,
@@ -175,6 +180,30 @@ async def api_reports_create(request: web.Request) -> web.Response:
             "encrypted": result.encrypted,
         }
     )
+
+
+async def _dm_report_created(bot, admin_id: int | None, user_id: int, result) -> None:
+    """DM the admin the P1 image key + report link for an app-created report."""
+    if bot is None or not admin_id:
+        return
+    import html as _html
+
+    user = abuse.get_user(user_id) or {}
+    uname = f"@{user['username']}" if user.get("username") else "—"
+    url = f"{settings.REPORT_BASE_URL}/report/{result.report_uuid}" if settings.REPORT_BASE_URL else result.report_uuid
+    try:
+        await bot.send_message(
+            admin_id,
+            f"<b>Report prepared</b> for user <code>{user_id}</code> ({_html.escape(uname)})\n"
+            f"Encrypted <b>{result.encrypted}</b> file(s).\n\n"
+            f"<b>Image key (P1):</b> <code>{_html.escape(result.p1 or '')}</code>\n\n"
+            f"Open it from the reports console, or: {_html.escape(url)}\n\n"
+            f"<i>P1 is not stored — keep it to decrypt the images.</i>",
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+        )
+    except Exception:
+        logger.warning("failed to DM P1 for app-created report %s", result.report_uuid, exc_info=True)
 
 
 async def index(request: web.Request) -> web.StreamResponse:
@@ -361,8 +390,9 @@ async def healthz(request: web.Request) -> web.Response:
     return web.Response(text="ok")
 
 
-def build_app() -> web.Application:
+def build_app(bot=None) -> web.Application:
     app = web.Application(client_max_size=64 * 1024 * 1024)
+    app["bot"] = bot  # PTB Bot for out-of-band DMs (report-created notification)
     app.router.add_get("/report/console", reports_index)
     app.router.add_get("/report/console/api/list", api_reports_list)
     app.router.add_post("/report/console/api/create", api_reports_create)
@@ -377,12 +407,12 @@ def build_app() -> web.Application:
     return app
 
 
-async def start_report_server() -> web.AppRunner | None:
+async def start_report_server(bot=None) -> web.AppRunner | None:
     """Start the aiohttp server if enabled. Returns the runner (for shutdown)."""
     if not settings.REPORT_SERVER_ENABLED:
         logger.info("Report server disabled (REPORT_SERVER_ENABLED not set)")
         return None
-    app = build_app()
+    app = build_app(bot=bot)
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, settings.REPORT_SERVER_HOST, settings.REPORT_SERVER_PORT)

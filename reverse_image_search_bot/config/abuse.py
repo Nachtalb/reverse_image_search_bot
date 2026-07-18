@@ -374,6 +374,31 @@ def has_report(user_id: int) -> bool:
     return row is not None
 
 
+def latest_filed_report_for_user(user_id: int) -> dict | None:
+    """Most recent FILED report for a user, with its reported-file count.
+
+    Used to explain "nothing on disk" — the files were already filed with NCMEC
+    and deleted. Returns the report row plus ``reported_files`` (count of blobs
+    that were part of that report, i.e. the ones kept), newest first.
+    """
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT * FROM reports WHERE user_id = ? AND status = 'filed' "
+            "ORDER BY finished_at DESC, created_at DESC LIMIT 1",
+            (user_id,),
+        ).fetchone()
+    except sqlite3.OperationalError:
+        return None
+    if not row:
+        return None
+    rep = dict(row)
+    rep["reported_files"] = conn.execute(
+        "SELECT COUNT(*) FROM report_blobs WHERE report_uuid = ?", (rep["report_uuid"],)
+    ).fetchone()[0]
+    return rep
+
+
 # --- Reports & encrypted blobs -------------------------------------------------
 
 # Report lifecycle states.
