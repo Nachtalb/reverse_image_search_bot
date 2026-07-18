@@ -81,6 +81,11 @@ def _extract_frame_from_file(video_path: str) -> bytes:
             "image2pipe",
             "-c:v",
             "mjpeg",
+            # Near-lossless JPEG (1=best). ffmpeg's mjpeg default (~q5) is
+            # visibly lossier than the old PIL q75 encode — search engines
+            # deserve the best frame we can give them.
+            "-q:v",
+            "2",
             "-",
         ],
         capture_output=True,
@@ -112,6 +117,8 @@ async def _try_decode_prefix(data: bytes) -> bytes | None:
         "image2pipe",
         "-c:v",
         "mjpeg",
+        "-q:v",
+        "2",
         "pipe:1",
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
