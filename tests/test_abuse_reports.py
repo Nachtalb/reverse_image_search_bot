@@ -114,6 +114,32 @@ def test_get_blob_cipher(abuse):
     assert bytes(row["ciphertext"]) == b"CIPHER"
 
 
+def test_find_user_by_username(abuse):
+    abuse.record_user(42, username="BadGuy")
+    # case-insensitive, leading @ optional
+    assert abuse.find_user_by_username("badguy") == 42
+    assert abuse.find_user_by_username("@BadGuy") == 42
+    assert abuse.find_user_by_username("@BADGUY") == 42
+    assert abuse.find_user_by_username("nobody") is None
+    assert abuse.find_user_by_username("") is None
+
+
+def test_purge_unselected_blobs(abuse):
+    abuse.record_user(1)
+    abuse.create_report("p", 1, "h")
+    abuse.add_report_blob(
+        "p", file_unique_id="A", saved_filename="A.jpg", nonce=b"n", ciphertext=b"c", plaintext_sha256="1"
+    )
+    abuse.add_report_blob(
+        "p", file_unique_id="B", saved_filename="B.jpg", nonce=b"n", ciphertext=b"c", plaintext_sha256="2"
+    )
+    ids = {m["file_unique_id"]: m["id"] for m in abuse.blob_meta("p")}
+    abuse.set_blob_selection("p", {ids["A"]: "A1"})
+    assert abuse.purge_unselected_blobs("p") == 1  # only B removed
+    remaining = {b["file_unique_id"] for b in abuse.report_blobs("p")}
+    assert remaining == {"A"}
+
+
 # --- group / channel provenance ----------------------------------------------
 
 

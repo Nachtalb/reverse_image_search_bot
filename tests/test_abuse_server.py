@@ -149,19 +149,17 @@ async def test_cancel_purges_blobs_but_keeps_files_and_relation(abuse, monkeypat
     assert abuse.get_user(1) is not None
 
 
-def test_delete_disk_files_keeps_blobs(abuse, monkeypatch, tmp_path):
-    """On finish: plaintext files go from disk, but encrypted blobs are KEPT.
-
-    New retention rule — the encrypted copies stay in the DB linked to the
-    finished report (for further inspection / law enforcement); only the
-    plaintext PVC files are unlinked.
+def test_cleanup_after_finish_keeps_reported_purges_unselected(abuse, monkeypatch, tmp_path):
+    """On finish: reported files' plaintext deleted from disk, their blobs KEPT;
+    non-reported files' blobs purged, their disk plaintext left alone.
     """
     from reverse_image_search_bot import settings
     from reverse_image_search_bot.abuse_report import server
 
     updir = tmp_path / "uploads"
     updir.mkdir()
-    (updir / "A.jpg").write_bytes(b"plaintext image")
+    (updir / "A.jpg").write_bytes(b"reported image")
+    (updir / "B.jpg").write_bytes(b"not reported image")
     monkeypatch.setattr(settings, "UPLOADER", {"configuration": {"path": str(updir)}})
 
     abuse.record_user(1)
@@ -169,10 +167,22 @@ def test_delete_disk_files_keeps_blobs(abuse, monkeypatch, tmp_path):
     abuse.add_report_blob(
         "u", file_unique_id="A", saved_filename="A.jpg", nonce=b"n", ciphertext=b"c", plaintext_sha256="1"
     )
+    abuse.add_report_blob(
+        "u", file_unique_id="B", saved_filename="B.jpg", nonce=b"n", ciphertext=b"c", plaintext_sha256="2"
+    )
+    # Report only A.
+    ids = {m["file_unique_id"]: m["id"] for m in abuse.blob_meta("u")}
+    abuse.set_blob_selection("u", {ids["A"]: "A1"})
+
     rep = abuse.get_report("u")
-    server._delete_disk_files(rep)
-    assert not (updir / "A.jpg").exists()  # plaintext deleted from disk
-    assert len(abuse.blob_meta("u")) == 1  # encrypted blob KEPT in the DB
+    server._cleanup_after_finish(rep)
+
+    # A: plaintext deleted from disk, encrypted blob KEPT
+    assert not (updir / "A.jpg").exists()
+    kept = {b["file_unique_id"] for b in abuse.report_blobs("u")}
+    assert kept == {"A"}
+    # B: blob purged, disk plaintext left untouched (not part of the report)
+    assert (updir / "B.jpg").exists()
     # user + report survive
     assert abuse.get_user(1) is not None
     assert abuse.get_report("u") is not None
@@ -232,3 +242,80 @@ async def test_submit_files_and_finishes_and_keeps_blobs(abuse, monkeypatch, tmp
     assert rep["ncmec_report_id"] == 987654
     assert not (updir / "A.jpg").exists()
     assert len(abuse.blob_meta("u")) == 1
+
+
+@pytest.mark.asyncio
+async def test_reports_list(abuse, monkeypatch):
+    from reverse_image_search_bot import settings
+    from reverse_image_search_bot.abuse_report import server
+
+    monkeypatch.setattr(settings, "REPORT_PAGE_PASSWORD", "")
+    monkeypatch.setattr(server, "_admin_from_request", lambda req: 42)
+    abuse.record_user(1, username="bad")
+    abuse.create_report("u1", 1, "")
+    abuse.set_report_status("u1", abuse.REPORT_CANCELLED)  # cancelled reports still listed
+    abuse.create_report("u2", 1, "")
+
+    resp = await server.api_reports_list(_req(headers={"X-Page-Secret": ""}))
+    import json
+
+    data = json.loads(resp.text or "")
+    uuids = {r["uuid"]: r["status"] for r in data["reports"]}
+    assert uuids["u1"] == abuse.REPORT_CANCELLED
+    assert uuids["u2"] == abuse.REPORT_PREPARING
+
+
+@pytest.mark.asyncio
+async def test_reports_create_by_username(abuse, monkeypatch, tmp_path):
+    from reverse_image_search_bot import settings
+    from reverse_image_search_bot.abuse_report import server
+
+    updir = tmp_path / "uploads"
+    updir.mkdir()
+    (updir / "A.jpg").write_bytes(b"img")
+    monkeypatch.setattr(settings, "UPLOADER", {"configuration": {"path": str(updir)}, "url": "https://x/f"})
+    monkeypatch.setattr(settings, "REPORT_PAGE_PASSWORD", "")
+    monkeypatch.setattr(settings, "REPORT_BASE_URL", "https://ris.naa.gg")
+    monkeypatch.setattr(server, "_admin_from_request", lambda req: 42)
+
+    abuse.record_user(55, username="BadGuy")
+    abuse.record_file("A", saved_filename="A.jpg", user_id=55)
+
+    req = _req(headers={"X-Page-Secret": ""}, json_body={"target": "@badguy"})  # case-insensitive
+    resp = await server.api_reports_create(req)
+    import json
+
+    data = json.loads(resp.text or "")
+    assert data["ok"] is True
+    assert data["user_id"] == 55
+    assert data["encrypted"] == 1
+    assert data["p1"]  # one-time key returned
+    # a ready report now exists for the user
+    assert abuse.active_report_for_user(55)["report_uuid"] == data["uuid"]
+
+
+@pytest.mark.asyncio
+async def test_reports_create_existing_returns_409(abuse, monkeypatch, tmp_path):
+    from reverse_image_search_bot import settings
+    from reverse_image_search_bot.abuse_report import server
+
+    updir = tmp_path / "uploads"
+    updir.mkdir()
+    (updir / "A.jpg").write_bytes(b"img")
+    monkeypatch.setattr(settings, "UPLOADER", {"configuration": {"path": str(updir)}, "url": "https://x/f"})
+    monkeypatch.setattr(settings, "REPORT_PAGE_PASSWORD", "")
+    monkeypatch.setattr(settings, "REPORT_BASE_URL", "https://ris.naa.gg")
+    monkeypatch.setattr(server, "_admin_from_request", lambda req: 42)
+
+    abuse.record_user(55, username="badguy")
+    abuse.record_file("A", saved_filename="A.jpg", user_id=55)
+    abuse.create_report("existing", 55, "")
+    abuse.set_report_status("existing", abuse.REPORT_READY)
+
+    req = _req(headers={"X-Page-Secret": ""}, json_body={"target": "55"})
+    resp = await server.api_reports_create(req)
+    import json
+
+    assert resp.status == 409
+    data = json.loads(resp.text or "")
+    assert data["existing_uuid"] == "existing"
