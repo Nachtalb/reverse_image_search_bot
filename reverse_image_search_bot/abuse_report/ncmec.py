@@ -24,6 +24,7 @@ from ncmec_cybertip import (
     IndustryClassification,
     InternetDetails,
     Person,
+    PersonOrUserReported,
     Report,
     Reporter,
     WebPageIncident,
@@ -66,7 +67,51 @@ def _reporter() -> Reporter:
     )
 
 
-def build_report(*, incident_urls: list[str]) -> Report:
+def build_reported_subject(
+    reported_user: dict | None,
+    source_chats: list[dict] | None,
+) -> PersonOrUserReported | None:
+    """Build the reported suspect (the uploader) + any group/channel context.
+
+    The uploader is the reported person: their Telegram id becomes the ESP
+    identifier, username/name the screen/display name. Groups and channels the
+    files were uploaded through are attached as ``groupIdentifier`` /
+    ``associatedAccount`` so NCMEC sees the full source context.
+    """
+    if not reported_user and not source_chats:
+        return None
+
+    reported_user = reported_user or {}
+    display: list[str] = []
+    full = " ".join(x for x in (reported_user.get("first_name"), reported_user.get("last_name")) if x).strip()
+    if full:
+        display.append(full)
+    profile_urls: list[str] = []
+    if reported_user.get("username"):
+        profile_urls.append(f"https://t.me/{reported_user['username']}")
+
+    # Group/channel context → groupIdentifier text + associatedAccount rows.
+    group_bits: list[str] = []
+    for c in source_chats or []:
+        label = c.get("title") or (f"@{c['username']}" if c.get("username") else str(c.get("chat_id")))
+        group_bits.append(f"{c.get('chat_type', 'chat')}: {label} (id {c.get('chat_id')})")
+
+    return PersonOrUserReported(
+        esp_identifier=str(reported_user["user_id"]) if reported_user.get("user_id") else None,
+        esp_service=settings.NCMEC_ESP_NAME or "Reverse Image Search Bot",
+        screen_name=(f"@{reported_user['username']}" if reported_user.get("username") else None),
+        display_name=display,
+        profile_url=profile_urls,
+        group_identifier="; ".join(group_bits) or None,
+    )
+
+
+def build_report(
+    *,
+    incident_urls: list[str],
+    reported_user: dict | None = None,
+    source_chats: list[dict] | None = None,
+) -> Report:
     """Build the report envelope. One report per user round."""
     return Report(
         incident_summary=IncidentSummary(
@@ -77,6 +122,7 @@ def build_report(*, incident_urls: list[str]) -> Report:
             InternetDetails(web_page_incident=WebPageIncident(url=incident_urls or ["https://ris.naa.gg/"]))
         ],
         reporter=_reporter(),
+        person_or_user_reported=build_reported_subject(reported_user, source_chats),
     )
 
 
@@ -84,19 +130,26 @@ async def submit_report(
     selected_files: list[dict],
     *,
     incident_urls: list[str],
+    reported_user: dict | None = None,
+    source_chats: list[dict] | None = None,
 ) -> tuple[int, list[str]]:
     """Open a report and upload every selected file with its classification.
 
     ``selected_files`` is a list of dicts with keys: ``plaintext`` (decrypted
     bytes), ``filename``, ``classification`` (A1/A2/B1/B2 or None), ``uploaded_at``
-    (unix ts or None). Returns ``(ncmec_report_id, [file_id, ...])``.
+    (unix ts or None). ``reported_user`` is the uploader profile and
+    ``source_chats`` the group/channel chats their files came through — both are
+    stamped onto the report as the reported subject. Returns
+    ``(ncmec_report_id, [file_id, ...])``.
 
     Does NOT finish the report — the admin does a final review, then calls
     :func:`finish_report` or :func:`retract_report`.
     """
     async with _client() as client:
         await client.status()  # verify connectivity + auth up front
-        opened = await client.submit(build_report(incident_urls=incident_urls))
+        opened = await client.submit(
+            build_report(incident_urls=incident_urls, reported_user=reported_user, source_chats=source_chats)
+        )
         report_id = opened.report_id
         if report_id is None:
             raise RuntimeError(f"NCMEC submit returned no report_id: {opened!r}")

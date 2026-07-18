@@ -125,7 +125,27 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
 
         # Record uploader + file provenance for abuse handling. The on-disk
         # filename is the last path segment of image_url (<file_unique_id>.<ext>).
+        # A message can involve a user and optionally a group (the chat it was
+        # sent in) and/or a channel (sender_chat, e.g. a linked channel or a
+        # post forwarded on behalf of a channel) — capture all that are present.
         with contextlib.suppress(Exception):
+            eff_chat = update.effective_chat
+            group_id: int | None = None
+            channel_id: int | None = None
+            if eff_chat is not None and eff_chat.type in ("group", "supergroup"):
+                group_id = eff_chat.id
+                abuse.record_chat(eff_chat.id, "group", title=eff_chat.title, username=eff_chat.username)
+            elif eff_chat is not None and eff_chat.type == "channel":
+                channel_id = eff_chat.id
+                abuse.record_chat(eff_chat.id, "channel", title=eff_chat.title, username=eff_chat.username)
+            sender_chat = getattr(message, "sender_chat", None)
+            if sender_chat is not None:
+                if sender_chat.type == "channel":
+                    channel_id = sender_chat.id
+                    abuse.record_chat(sender_chat.id, "channel", title=sender_chat.title, username=sender_chat.username)
+                elif sender_chat.type in ("group", "supergroup"):
+                    group_id = sender_chat.id
+                    abuse.record_chat(sender_chat.id, "group", title=sender_chat.title, username=sender_chat.username)
             abuse.record_user(
                 user.id,
                 username=user.username,
@@ -139,6 +159,8 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
                 user_id=user.id,
                 original_filename=getattr(attachment, "file_name", None),
                 file_type=file_type,
+                group_id=group_id,
+                channel_id=channel_id,
             )
 
         # Track usage metrics

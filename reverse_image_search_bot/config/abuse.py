@@ -61,6 +61,13 @@ def _close_all_connections() -> None:
 atexit.register(_close_all_connections)
 
 
+def _add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, decl: str) -> None:
+    """Idempotently add a column to an existing table (simple forward migration)."""
+    cols = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+    if column not in cols:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+
+
 def _ensure_schema(conn: sqlite3.Connection) -> None:
     conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
@@ -81,11 +88,36 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             original_filename TEXT,
             file_type         TEXT,
             upload_time       INTEGER NOT NULL,
-            user_id           INTEGER NOT NULL REFERENCES users(user_id)
+            user_id           INTEGER NOT NULL REFERENCES users(user_id),
+            group_id          INTEGER,
+            channel_id        INTEGER
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_files_user ON files(user_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_files_saved ON files(saved_filename)")
+
+    # A chat (group/supergroup or channel) a file was uploaded through. Groups and
+    # channels are reportable subjects too, so we keep their identity/profile the
+    # same insert-or-update way as users. `chat_type` is 'group' or 'channel'.
+    # `banned_at` mirrors the users table so a chat can be banned/flagged as well.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS chats (
+            chat_id    INTEGER PRIMARY KEY,
+            chat_type  TEXT NOT NULL,
+            title      TEXT,
+            username   TEXT,
+            first_seen INTEGER NOT NULL,
+            last_seen  INTEGER NOT NULL,
+            banned_at  INTEGER
+        )
+    """)
+
+    # --- migrations for DBs created before group/channel support (must run
+    # BEFORE any index referencing the new columns) -------------------------
+    _add_column_if_missing(conn, "files", "group_id", "INTEGER")
+    _add_column_if_missing(conn, "files", "channel_id", "INTEGER")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_files_group ON files(group_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_files_channel ON files(channel_id)")
 
     # A report round for one user. `report_uuid` is the URL token; `page_secret_hash`
     # gates the report page (P2, stored hashed — the image key P1 is NEVER stored).
@@ -163,18 +195,59 @@ def record_file(
     user_id: int,
     original_filename: str | None = None,
     file_type: str | None = None,
+    group_id: int | None = None,
+    channel_id: int | None = None,
 ) -> None:
-    """Insert-only record of an uploaded file. Existing rows are left untouched."""
+    """Insert-only record of an uploaded file. Existing rows are left untouched.
+
+    ``group_id`` / ``channel_id`` capture the chat the file was uploaded through
+    (a message can involve a user and optionally a group and/or a channel).
+    """
     conn = _get_conn()
     conn.execute(
         """
         INSERT OR IGNORE INTO files
-            (file_unique_id, saved_filename, original_filename, file_type, upload_time, user_id)
-        VALUES (?, ?, ?, ?, ?, ?)
+            (file_unique_id, saved_filename, original_filename, file_type, upload_time, user_id, group_id, channel_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (file_unique_id, saved_filename, original_filename, file_type, _now(), user_id),
+        (file_unique_id, saved_filename, original_filename, file_type, _now(), user_id, group_id, channel_id),
     )
     conn.commit()
+
+
+def record_chat(
+    chat_id: int,
+    chat_type: str,
+    *,
+    title: str | None = None,
+    username: str | None = None,
+) -> None:
+    """Insert or update a chat (group/channel) profile (last-seen wins).
+
+    ``chat_type`` is 'group' (groups + supergroups) or 'channel'. Never touches
+    ``banned_at``.
+    """
+    conn = _get_conn()
+    now = _now()
+    conn.execute(
+        """
+        INSERT INTO chats (chat_id, chat_type, title, username, first_seen, last_seen)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(chat_id) DO UPDATE SET
+            chat_type = excluded.chat_type,
+            title     = excluded.title,
+            username  = excluded.username,
+            last_seen = excluded.last_seen
+        """,
+        (chat_id, chat_type, title, username, now, now),
+    )
+    conn.commit()
+
+
+def get_chat(chat_id: int) -> dict | None:
+    conn = _get_conn()
+    row = conn.execute("SELECT * FROM chats WHERE chat_id = ?", (chat_id,)).fetchone()
+    return dict(row) if row else None
 
 
 def set_banned(user_id: int, banned: bool) -> None:
@@ -209,6 +282,24 @@ def count_files(user_id: int) -> int:
     """Number of files recorded for a user."""
     conn = _get_conn()
     return conn.execute("SELECT COUNT(*) FROM files WHERE user_id = ?", (user_id,)).fetchone()[0]
+
+
+def source_chats_for_user(user_id: int) -> list[dict]:
+    """Distinct group/channel chats a user's files were uploaded through.
+
+    Returns chat rows (with ``chat_type``) for every distinct group_id/channel_id
+    referenced by the user's files — the reportable group/channel subjects.
+    """
+    conn = _get_conn()
+    rows = conn.execute(
+        """
+        SELECT DISTINCT c.* FROM chats c
+        JOIN files f ON c.chat_id = f.group_id OR c.chat_id = f.channel_id
+        WHERE f.user_id = ?
+        """,
+        (user_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def get_user(user_id: int) -> dict | None:

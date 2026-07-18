@@ -216,8 +216,15 @@ async def api_submit(request: web.Request) -> web.Response:
 
     incident_urls = [_public_file_url(b["saved_filename"]) for b in selected]
     abuse.set_report_status(rep["report_uuid"], abuse.REPORT_SUBMITTING)
+    reported_user = abuse.get_user(rep["user_id"])
+    source_chats = abuse.source_chats_for_user(rep["user_id"])
     try:
-        report_id, _file_ids = await ncmec.submit_report(files, incident_urls=incident_urls)
+        report_id, _file_ids = await ncmec.submit_report(
+            files,
+            incident_urls=incident_urls,
+            reported_user=reported_user,
+            source_chats=source_chats,
+        )
     except ncmec.NcmecNotConfigured as e:
         abuse.set_report_status(rep["report_uuid"], abuse.REPORT_ERROR, str(e))
         raise web.HTTPServiceUnavailable(text=f"NCMEC not configured: {e}") from e
