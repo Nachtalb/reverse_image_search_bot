@@ -1,4 +1,6 @@
-# Dev/test data
+# Build-context hygiene — keep the image lean and secret-free.
+
+# Dev/test data (original entries — do not drop)
 config_data/
 redis_data/
 *.session
@@ -7,7 +9,29 @@ redis_data/
 .git
 .github
 .gitignore
+.dockerignore
+Dockerfile
+docker-compose*.yml
 
-# Docs & misc
+# Python cruft
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Tests & docs (not needed at runtime)
+tests/
 README.md
 *.md
+
+# Local state / secrets / editor junk
+.env
+.env.*
+*.pickle
+*.db
+.vscode/
+.idea/

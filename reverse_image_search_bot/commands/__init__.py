@@ -18,11 +18,11 @@ from .settings import (
     settings_callback_handler,
     settings_command,
 )
-from .utils import _extract_video_frame
+from .utils import _extract_frame_from_file
 
 __all__ = [
     "_button_count",
-    "_extract_video_frame",
+    "_extract_frame_from_file",
     "_is_group",
     "_settings_engines_keyboard",
     "_settings_main_keyboard",
