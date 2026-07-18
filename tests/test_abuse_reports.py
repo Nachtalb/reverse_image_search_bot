@@ -114,6 +114,110 @@ def test_get_blob_cipher(abuse):
     assert bytes(row["ciphertext"]) == b"CIPHER"
 
 
+# --- group / channel provenance ----------------------------------------------
+
+
+def test_record_chat_and_get(abuse):
+    abuse.record_chat(-100123, "group", title="Bad Group", username="badgrp")
+    abuse.record_chat(-100999, "channel", title="Bad Channel")
+    g = abuse.get_chat(-100123)
+    c = abuse.get_chat(-100999)
+    assert g["chat_type"] == "group" and g["title"] == "Bad Group" and g["username"] == "badgrp"
+    assert c["chat_type"] == "channel" and c["title"] == "Bad Channel"
+    assert abuse.get_chat(-1) is None
+
+
+def test_record_chat_upsert_last_seen_wins(abuse):
+    abuse.record_chat(-100123, "group", title="Old")
+    abuse.record_chat(-100123, "group", title="New", username="grp")
+    g = abuse.get_chat(-100123)
+    assert g["title"] == "New" and g["username"] == "grp"
+
+
+def test_record_file_with_group_and_channel(abuse):
+    abuse.record_user(7)
+    abuse.record_chat(-100123, "group", title="G")
+    abuse.record_chat(-100999, "channel", title="C")
+    abuse.record_file("F1", saved_filename="F1.jpg", user_id=7, group_id=-100123, channel_id=-100999)
+    files = abuse.files_for_user(7)
+    assert len(files) == 1
+    assert files[0]["group_id"] == -100123
+    assert files[0]["channel_id"] == -100999
+
+
+def test_source_chats_for_user(abuse):
+    abuse.record_user(7)
+    abuse.record_chat(-100123, "group", title="G")
+    abuse.record_chat(-100999, "channel", title="C")
+    # one file via a group, one via a channel, one direct (no chat)
+    abuse.record_file("F1", saved_filename="F1.jpg", user_id=7, group_id=-100123)
+    abuse.record_file("F2", saved_filename="F2.jpg", user_id=7, channel_id=-100999)
+    abuse.record_file("F3", saved_filename="F3.jpg", user_id=7)
+    chats = abuse.source_chats_for_user(7)
+    kinds = sorted(c["chat_type"] for c in chats)
+    ids = sorted(c["chat_id"] for c in chats)
+    assert kinds == ["channel", "group"]
+    assert ids == [-100999, -100123]
+    # a user with no chat-sourced files yields nothing
+    abuse.record_user(8)
+    abuse.record_file("F4", saved_filename="F4.jpg", user_id=8)
+    assert abuse.source_chats_for_user(8) == []
+
+
+def test_count_and_uploaders_for_chat(abuse):
+    abuse.record_user(7)
+    abuse.record_user(9)
+    abuse.record_chat(-100123, "group", title="G")
+    abuse.record_file("F1", saved_filename="F1.jpg", user_id=7, group_id=-100123)
+    abuse.record_file("F2", saved_filename="F2.jpg", user_id=9, group_id=-100123)
+    abuse.record_file("F3", saved_filename="F3.jpg", user_id=7)  # not via the group
+    assert abuse.count_files_for_chat(-100123) == 2
+    assert sorted(abuse.uploaders_for_chat(-100123)) == [7, 9]
+    assert abuse.count_files_for_chat(-999) == 0
+    assert abuse.uploaders_for_chat(-999) == []
+
+
+def test_migration_adds_group_channel_columns(tmp_path, monkeypatch):
+    """A files table created WITHOUT group_id/channel_id gets them added."""
+    import importlib
+    import sqlite3
+
+    import reverse_image_search_bot.settings as settings
+
+    db_path = tmp_path / "old_abuse.db"
+    # Simulate an old-schema DB: files table lacking the new columns.
+    conn = sqlite3.connect(str(db_path))
+    conn.execute("CREATE TABLE users (user_id INTEGER PRIMARY KEY, first_seen INTEGER, last_seen INTEGER)")
+    conn.execute(
+        "CREATE TABLE files (file_unique_id TEXT PRIMARY KEY, saved_filename TEXT NOT NULL, "
+        "original_filename TEXT, file_type TEXT, upload_time INTEGER NOT NULL, "
+        "user_id INTEGER NOT NULL REFERENCES users(user_id))"
+    )
+    conn.execute("INSERT INTO users VALUES (5, 0, 0)")
+    conn.execute("INSERT INTO files VALUES ('OLD', 'OLD.jpg', NULL, NULL, 0, 5)")
+    conn.commit()
+    conn.close()
+
+    monkeypatch.setattr(settings, "ABUSE_DB_PATH", db_path)
+    import reverse_image_search_bot.config.abuse as ab
+
+    ab._local.__dict__.clear()
+    ab._all_connections.clear()
+    importlib.reload(ab)
+    monkeypatch.setattr(ab, "ABUSE_DB_PATH", db_path)
+    ab._local.__dict__.clear()
+    ab._all_connections.clear()
+
+    # Opening the DB runs _ensure_schema → migration adds the columns.
+    cols = {r["name"] for r in ab._get_conn().execute("PRAGMA table_info(files)")}
+    assert "group_id" in cols and "channel_id" in cols
+    # Existing row survived; new inserts with chat context work.
+    ab.record_file("NEW", saved_filename="NEW.jpg", user_id=5, group_id=-100123)
+    files = {f["file_unique_id"]: f for f in ab.files_for_user(5)}
+    assert files["OLD"]["group_id"] is None
+    assert files["NEW"]["group_id"] == -100123
+
+
 # --- initData validation ------------------------------------------------------
 
 

@@ -40,12 +40,6 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text("Usage: /report <user_id | filename>")
         return
 
-    if not settings.REPORT_BASE_URL:
-        await update.message.reply_text(
-            "Report server is not configured (REPORT_BASE_URL unset). Cannot create a report."
-        )
-        return
-
     arg = args[1].strip()
     if arg.isdigit():
         user_id: int | None = int(arg)
@@ -54,6 +48,24 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         if user_id is None:
             await update.message.reply_text(f"No uploader found for file: {arg}")
             return
+
+    await start_report(update, context, user_id)
+
+
+async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int) -> None:
+    """Create an encrypted report round for an already-resolved ``user_id``.
+
+    Reusable seam: callers (the public ``/report`` command, or a deploy-side
+    reply/#uid wrapper) resolve the target user id however they like, then hand
+    it here for the file-gather → encrypt → DM flow.
+    """
+    assert update.message and update.effective_user
+
+    if not settings.REPORT_BASE_URL:
+        await update.message.reply_text(
+            "Report server is not configured (REPORT_BASE_URL unset). Cannot create a report."
+        )
+        return
 
     existing = abuse.active_report_for_user(user_id)
     if existing:
