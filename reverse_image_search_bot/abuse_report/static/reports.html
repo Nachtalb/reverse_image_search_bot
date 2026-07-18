@@ -95,7 +95,7 @@ const $ = id => document.getElementById(id);
 const api = async (path, opts = {}) => {
   const headers = Object.assign({ "X-Init-Data": INIT }, opts.headers || {});
   if (P2) headers["X-Page-Secret"] = P2;
-  const r = await fetch(`/reports${path}`, Object.assign({}, opts, { headers }));
+  const r = await fetch(`/report/console${path}`, Object.assign({}, opts, { headers }));
   if (!r.ok && r.status !== 409) throw new Error((await r.text()) || r.status);
   return r;
 };
