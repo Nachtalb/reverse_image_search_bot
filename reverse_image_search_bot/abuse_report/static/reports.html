@@ -142,12 +142,12 @@ async function loadList() {
   list.innerHTML = "";
   if (!j.reports.length) { list.innerHTML = `<div class="muted">No reports yet.</div>`; return; }
   for (const rep of j.reports) {
-    const who = rep.username ? "@" + rep.username : String(rep.user_id);
+    const who = rep.username ? "@" + rep.username : "(no username)";
     const ncmec = rep.ncmec_report_id ? ` · NCMEC #${rep.ncmec_report_id}` : "";
     const el = document.createElement("div");
     el.className = "rep";
     el.innerHTML =
-      `<div><div class="who">${escapeHtml(who)}</div>` +
+      `<div><div class="who">${escapeHtml(who)} · <span class="muted">${rep.user_id}</span></div>` +
       `<div class="meta"><code>${rep.uuid.slice(0, 8)}</code> · ${fmtTs(rep.created_at)}${ncmec}</div></div>` +
       `<span class="badge ${rep.status}">${rep.status}</span>`;
     el.onclick = () => openReport(rep.uuid);

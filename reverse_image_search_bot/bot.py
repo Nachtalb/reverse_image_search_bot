@@ -327,7 +327,7 @@ async def _start_report_server(app: Application) -> None:
     try:
         from .abuse_report.server import start_report_server
 
-        runner = await start_report_server()
+        runner = await start_report_server(bot=app.bot)
         if runner is not None:
             app.bot_data["_report_runner"] = runner
     except Exception:

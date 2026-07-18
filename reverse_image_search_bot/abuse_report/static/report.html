@@ -42,6 +42,7 @@
   .thumb .cls { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.72); padding: 5px; display: flex; gap: 4px; justify-content: center; }
   .thumb .cls span { font-size: 14px; font-weight: 700; padding: 5px 9px; border-radius: 6px; background: #2a2c33; cursor: pointer; }
   .thumb .cls span.on { background: #3a6df0; color: #fff; }
+  .thumb .fname { position: absolute; top: 0; left: 0; right: 0; background: rgba(0,0,0,.72); color: #cfd0d6; font-size: 10px; padding: 3px 5px; word-break: break-all; line-height: 1.2; }
   .status { padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
   .status.preparing, .status.submitting { background: #4a3a10; color: #f0c674; }
   .status.ready { background: #103a2a; color: #7fd6a2; }
@@ -63,9 +64,10 @@
   #viewer img { display: block; max-width: 96vw; max-height: 88vh; border-radius: 10px; }
   #viewer .dlg-body { padding: 8px; }
   .preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; margin: 10px 0; }
-  .preview-item { position: relative; border-radius: 8px; overflow: hidden; background: #101116; aspect-ratio: 1; }
-  .preview-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .preview-item .tag { position: absolute; bottom: 0; left: 0; right: 0; text-align: center; font-size: 11px; font-weight: 700; background: rgba(58,109,240,.9); color: #fff; padding: 2px; }
+  .preview-item { position: relative; border-radius: 8px; overflow: hidden; background: #101116; }
+  .preview-item img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+  .preview-item .tag { position: absolute; top: 0; right: 0; font-size: 11px; font-weight: 700; background: rgba(58,109,240,.9); color: #fff; padding: 2px 5px; border-bottom-left-radius: 6px; }
+  .preview-item .fn { font-size: 9px; color: #9a9ba2; padding: 3px 4px; word-break: break-all; line-height: 1.15; }
   .spinner { width: 34px; height: 34px; border: 3px solid #363842; border-top-color: #3a6df0; border-radius: 50%; animation: spin .8s linear infinite; margin: 12px auto; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .center { text-align: center; }
@@ -134,6 +136,7 @@
 <dialog id="viewer">
   <div class="dlg-body">
     <img id="viewer-img" src="" alt="">
+    <div id="viewer-name" class="muted" style="text-align:center;margin-top:6px;word-break:break-all"></div>
   </div>
 </dialog>
 
@@ -176,6 +179,7 @@ const PBKDF2_ITER = 200000, P1_SALT = new TextEncoder().encode("ris-abuse-report
 let P2 = "", P1KEY = null, META = null;
 const sel = {};       // blobId -> classification (A1/A2/B1/B2)
 const thumbUrls = {}; // blobId -> object URL (for viewer + preview)
+const blobNames = {}; // blobId -> saved_filename
 
 const $ = id => document.getElementById(id);
 const api = async (path, opts = {}) => {
@@ -255,12 +259,18 @@ async function decryptThumb(b) {
   const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce }, P1KEY, ct);
   const url = URL.createObjectURL(new Blob([plain]));
   thumbUrls[b.id] = url;
+  blobNames[b.id] = b.saved_filename;
   const el = document.querySelector(`.thumb[data-id="${b.id}"]`);
-  el.innerHTML = `<img src="${url}" alt="">` + clsBar(b.id);
+  const fname = `<div class="fname">${escapeHtml(b.saved_filename)}</div>`;
+  el.innerHTML = `<img src="${url}" alt="">` + fname + clsBar(b.id);
   // Clicking the image opens the full-size viewer (not select).
-  el.querySelector("img").onclick = () => openViewer(url);
+  el.querySelector("img").onclick = () => openViewer(url, b.saved_filename);
   if (sel[b.id] !== undefined) el.classList.add("selected");
   wireCls(b.id);
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
 function clsBar(id) {
@@ -297,7 +307,11 @@ function updateSelCount() {
 
 // --- viewer dialog -----------------------------------------------------------
 const viewer = $("viewer");
-function openViewer(url) { $("viewer-img").src = url; viewer.showModal(); }
+function openViewer(url, name) {
+  $("viewer-img").src = url;
+  $("viewer-name").textContent = name || "";
+  viewer.showModal();
+}
 viewer.onclick = () => viewer.close();
 
 // --- persist selection -------------------------------------------------------
@@ -332,7 +346,8 @@ function buildConfirm(ids) {
   for (const id of ids) {
     const item = document.createElement("div");
     item.className = "preview-item";
-    item.innerHTML = `<img src="${thumbUrls[id]}" alt=""><div class="tag">${sel[id]}</div>`;
+    item.innerHTML = `<img src="${thumbUrls[id]}" alt=""><div class="tag">${sel[id]}</div>` +
+      `<div class="fn">${escapeHtml(blobNames[id] || "")}</div>`;
     grid.appendChild(item);
   }
   // reset dialog to its default (button) state

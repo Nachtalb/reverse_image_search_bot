@@ -94,6 +94,18 @@ def prepare_report(user_id: int) -> PrepareResult:
             if fp.is_file():
                 present.append((f, fp))
     if not present:
+        filed = abuse.latest_filed_report_for_user(user_id)
+        if filed and filed.get("ncmec_report_id"):
+            n = filed.get("reported_files", 0)
+            others = f" along with {n - 1} other file(s)" if n and n > 1 else ""
+            return PrepareResult(
+                error=(
+                    f"User {user_id} was already filed with NCMEC in report "
+                    f"#{filed['ncmec_report_id']}{others}. The plaintext files were "
+                    f"deleted from disk after filing (the encrypted copies are kept "
+                    f"in that report) — nothing new to report."
+                )
+            )
         return PrepareResult(
             error=f"User {user_id} has {len(files)} recorded file(s) but none are still on disk — nothing to report."
         )
