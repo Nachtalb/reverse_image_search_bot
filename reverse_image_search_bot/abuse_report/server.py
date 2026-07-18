@@ -186,10 +186,13 @@ async def api_select(request: web.Request) -> web.Response:
 
 
 async def api_submit(request: web.Request) -> web.Response:
-    """Submit to NCMEC: decrypt selected blobs with P1, upload + classify.
+    """Submit to NCMEC AND finish the report in one shot (irreversible).
 
-    The admin supplies P1 (image key) + NCMEC creds are server-side. This does
-    submit -> upload -> file_info, then parks in 'review' for the final finish.
+    The console double-checks the selection in a client-side preview before this
+    is called, so there is no separate review/finish step. Decrypt selected blobs
+    with P1, upload + classify + finish, then delete the plaintext files from
+    disk. The encrypted blobs are KEPT in the DB, linked to the finished report,
+    so the files remain available for further inspection / law-enforcement.
     """
     _require_admin(request)
     rep = _report_or_404(request.match_info["uuid"])
@@ -219,7 +222,7 @@ async def api_submit(request: web.Request) -> web.Response:
     reported_user = abuse.get_user(rep["user_id"])
     source_chats = abuse.source_chats_for_user(rep["user_id"])
     try:
-        report_id, _file_ids = await ncmec.submit_report(
+        report_id, _file_ids = await ncmec.submit_and_finish(
             files,
             incident_urls=incident_urls,
             reported_user=reported_user,
@@ -229,70 +232,26 @@ async def api_submit(request: web.Request) -> web.Response:
         abuse.set_report_status(rep["report_uuid"], abuse.REPORT_ERROR, str(e))
         raise web.HTTPServiceUnavailable(text=f"NCMEC not configured: {e}") from e
     except Exception as e:
-        logger.exception("NCMEC submit failed for report %s", rep["report_uuid"])
+        logger.exception("NCMEC submit+finish failed for report %s", rep["report_uuid"])
         abuse.set_report_status(rep["report_uuid"], abuse.REPORT_ERROR, str(e))
         raise web.HTTPBadGateway(text=f"NCMEC submit failed: {e}") from e
 
     abuse.set_report_ncmec_id(rep["report_uuid"], report_id)
-    abuse.set_report_status(rep["report_uuid"], abuse.REPORT_REVIEW)
-    return web.json_response({"ok": True, "ncmec_report_id": report_id, "status": abuse.REPORT_REVIEW})
-
-
-async def api_finish(request: web.Request) -> web.Response:
-    """Final finish: file the report with NCMEC (irreversible), then clean up."""
-    _require_admin(request)
-    rep = _report_or_404(request.match_info["uuid"])
-    _require_page_secret(request, rep)
-    if not rep["ncmec_report_id"]:
-        raise web.HTTPBadRequest(text="report not submitted yet")
-    try:
-        await ncmec.finish_report(rep["ncmec_report_id"])
-    except Exception as e:
-        logger.exception("NCMEC finish failed for report %s", rep["report_uuid"])
-        abuse.set_report_status(rep["report_uuid"], abuse.REPORT_ERROR, str(e))
-        raise web.HTTPBadGateway(text=f"NCMEC finish failed: {e}") from e
-
     abuse.mark_report_filed(rep["report_uuid"])
-    _cleanup_after_finish(rep)
-    return web.json_response({"ok": True, "status": abuse.REPORT_FILED})
-
-
-async def api_retract(request: web.Request) -> web.Response:
-    """Retract the submitted (unfinished) NCMEC report, then clean up blobs."""
-    _require_admin(request)
-    rep = _report_or_404(request.match_info["uuid"])
-    _require_page_secret(request, rep)
-    if rep["ncmec_report_id"]:
-        try:
-            await ncmec.retract_report(rep["ncmec_report_id"])
-        except Exception as e:
-            logger.exception("NCMEC retract failed for report %s", rep["report_uuid"])
-            abuse.set_report_status(rep["report_uuid"], abuse.REPORT_ERROR, str(e))
-            raise web.HTTPBadGateway(text=f"NCMEC retract failed: {e}") from e
-    abuse.set_report_status(rep["report_uuid"], abuse.REPORT_RETRACTED)
-    abuse.purge_report_blobs(rep["report_uuid"])
-    return web.json_response({"ok": True, "status": abuse.REPORT_RETRACTED})
+    _delete_disk_files(rep)
+    return web.json_response({"ok": True, "ncmec_report_id": report_id, "status": abuse.REPORT_FILED})
 
 
 async def api_cancel(request: web.Request) -> web.Response:
-    """Cancel the whole round (before/without NCMEC).
-
-    Distinct from retract: this is the top-level 'abandon this report' button. If
-    the report was already submitted to NCMEC, retract it first.
+    """Cancel the whole round (nothing filed with NCMEC).
 
     Cancelling means the user did nothing wrong, so we KEEP the user's original
     files on disk and the filename->user (files table) relation untouched. Only
-    the report's encrypted blobs + the report row's status are affected. Disk
-    deletion happens ONLY on finish (_cleanup_after_finish), never here.
+    the report's encrypted blobs + the report row's status are affected.
     """
     _require_admin(request)
     rep = _report_or_404(request.match_info["uuid"])
     _require_page_secret(request, rep)
-    if rep["ncmec_report_id"] and rep["status"] == abuse.REPORT_REVIEW:
-        try:
-            await ncmec.retract_report(rep["ncmec_report_id"])
-        except Exception:
-            logger.warning("retract during cancel failed for %s", rep["report_uuid"], exc_info=True)
     abuse.set_report_status(rep["report_uuid"], abuse.REPORT_CANCELLED)
     # Blobs only — NOT the files table, NOT disk files.
     abuse.purge_report_blobs(rep["report_uuid"])
@@ -304,23 +263,25 @@ def _public_file_url(saved_filename: str) -> str:
     return f"{base}/{saved_filename}" if base else saved_filename
 
 
-def _cleanup_after_finish(rep: dict) -> None:
-    """On finish: purge encrypted blobs + delete plaintext files from disk.
+def _delete_disk_files(rep: dict) -> None:
+    """On finish: delete the plaintext files from disk ONLY.
 
-    Keeps the user row, ban, and the report record. Files on the PVC named by
-    saved_filename are removed.
+    The encrypted ``report_blobs`` are intentionally KEPT and stay linked to the
+    finished report, so the material remains available for further inspection or
+    a report to local law enforcement. The user row, ban, and report record are
+    also kept. Only the plaintext PVC files (named by ``saved_filename``) go.
     """
     blobs = abuse.report_blobs(rep["report_uuid"])
     upload_path = settings.UPLOADER.get("configuration", {}).get("path")
-    if upload_path:
-        for b in blobs:
-            try:
-                fp = Path(upload_path) / b["saved_filename"]
-                if fp.is_file():
-                    fp.unlink()
-            except Exception:
-                logger.warning("failed to delete plaintext %s", b["saved_filename"], exc_info=True)
-    abuse.purge_report_blobs(rep["report_uuid"])
+    if not upload_path:
+        return
+    for b in blobs:
+        try:
+            fp = Path(upload_path) / b["saved_filename"]
+            if fp.is_file():
+                fp.unlink()
+        except Exception:
+            logger.warning("failed to delete plaintext %s", b["saved_filename"], exc_info=True)
 
 
 async def healthz(request: web.Request) -> web.Response:
@@ -335,8 +296,6 @@ def build_app() -> web.Application:
     app.router.add_get("/report/{uuid}/api/status", api_status)
     app.router.add_post("/report/{uuid}/api/select", api_select)
     app.router.add_post("/report/{uuid}/api/submit", api_submit)
-    app.router.add_post("/report/{uuid}/api/finish", api_finish)
-    app.router.add_post("/report/{uuid}/api/retract", api_retract)
     app.router.add_post("/report/{uuid}/api/cancel", api_cancel)
     app.router.add_get("/healthz", healthz)
     return app

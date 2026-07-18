@@ -126,24 +126,19 @@ def build_report(
     )
 
 
-async def submit_report(
+async def submit_and_finish(
     selected_files: list[dict],
     *,
     incident_urls: list[str],
     reported_user: dict | None = None,
     source_chats: list[dict] | None = None,
 ) -> tuple[int, list[str]]:
-    """Open a report and upload every selected file with its classification.
+    """Open, populate, AND finish a report in one shot (irreversible).
 
-    ``selected_files`` is a list of dicts with keys: ``plaintext`` (decrypted
-    bytes), ``filename``, ``classification`` (A1/A2/B1/B2 or None), ``uploaded_at``
-    (unix ts or None). ``reported_user`` is the uploader profile and
-    ``source_chats`` the group/channel chats their files came through — both are
-    stamped onto the report as the reported subject. Returns
+    The report console double-checks everything client-side before this is
+    called, so there is no separate review/finish step: submit -> upload each
+    file -> file_info -> finish, all under one client session. Returns
     ``(ncmec_report_id, [file_id, ...])``.
-
-    Does NOT finish the report — the admin does a final review, then calls
-    :func:`finish_report` or :func:`retract_report`.
     """
     async with _client() as client:
         await client.status()  # verify connectivity + auth up front
@@ -174,17 +169,5 @@ async def submit_report(
             )
             await client.file_info(details)
 
+        await client.finish(report_id)
         return report_id, file_ids
-
-
-async def finish_report(report_id: int) -> int:
-    """Finish (file) the report with NCMEC. Irreversible."""
-    async with _client() as client:
-        done = await client.finish(report_id)
-        return done.report_id or report_id
-
-
-async def retract_report(report_id: int) -> None:
-    """Retract an unfinished report."""
-    async with _client() as client:
-        await client.retract(report_id)

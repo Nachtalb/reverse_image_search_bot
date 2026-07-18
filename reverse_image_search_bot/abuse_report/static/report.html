@@ -37,22 +37,39 @@
   .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; margin-top: 8px; }
   .thumb { position: relative; border: 2px solid #2a2c33; border-radius: 10px; overflow: hidden; background: #101116; aspect-ratio: 1; }
   .thumb.selected { border-color: #3a6df0; }
-  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: zoom-in; }
   .thumb .lock { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #5a5c66; font-size: 12px; text-align: center; padding: 8px; }
-  .thumb .cls { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.72); padding: 4px; display: flex; gap: 3px; justify-content: center; }
-  .thumb .cls span { font-size: 11px; padding: 2px 5px; border-radius: 5px; background: #2a2c33; cursor: pointer; }
+  .thumb .cls { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.72); padding: 5px; display: flex; gap: 4px; justify-content: center; }
+  .thumb .cls span { font-size: 14px; font-weight: 700; padding: 5px 9px; border-radius: 6px; background: #2a2c33; cursor: pointer; }
   .thumb .cls span.on { background: #3a6df0; color: #fff; }
   .status { padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
   .status.preparing, .status.submitting { background: #4a3a10; color: #f0c674; }
-  .status.ready, .status.review { background: #103a2a; color: #7fd6a2; }
+  .status.ready { background: #103a2a; color: #7fd6a2; }
   .status.filed { background: #0f2f5a; color: #8ab4ff; }
-  .status.error, .status.cancelled, .status.retracted { background: #4a1010; color: #f08a8a; }
+  .status.error, .status.cancelled { background: #4a1010; color: #f08a8a; }
   .hidden { display: none; }
   .muted { color: #9a9ba2; font-size: 12px; }
-  details { margin: 10px 0; }
-  summary { cursor: pointer; color: #9a9ba2; font-size: 13px; }
-  .cls-legend { font-size: 12px; color: #9a9ba2; margin-top: 8px; }
+  .cls-legend { font-size: 12px; color: #9a9ba2; margin-bottom: 10px; }
   .cls-legend code { background: #2a2c33; padding: 1px 5px; border-radius: 4px; color: #e8e8ea; }
+  .cls-legend .defs { margin-top: 6px; }
+  /* dialogs */
+  dialog {
+    border: 1px solid #2a2c33; border-radius: 14px; background: #1f2128; color: #e8e8ea;
+    padding: 0; max-width: 92vw; width: 460px;
+  }
+  dialog::backdrop { background: rgba(0,0,0,.72); }
+  dialog .dlg-body { padding: 16px; }
+  dialog h2 { font-size: 16px; margin: 0 0 10px; }
+  #viewer { width: auto; max-width: 96vw; }
+  #viewer img { display: block; max-width: 96vw; max-height: 88vh; border-radius: 10px; }
+  #viewer .dlg-body { padding: 8px; }
+  .preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; margin: 10px 0; }
+  .preview-item { position: relative; border-radius: 8px; overflow: hidden; background: #101116; aspect-ratio: 1; }
+  .preview-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .preview-item .tag { position: absolute; bottom: 0; left: 0; right: 0; text-align: center; font-size: 11px; font-weight: 700; background: rgba(58,109,240,.9); color: #fff; padding: 2px; }
+  .spinner { width: 34px; height: 34px; border: 3px solid #363842; border-top-color: #3a6df0; border-radius: 50%; animation: spin .8s linear infinite; margin: 12px auto; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .center { text-align: center; }
 </style>
 </head>
 <body>
@@ -63,8 +80,7 @@
 <main>
   <!-- Global page password gate -->
   <div class="card" id="unlock-card">
-    <label for="p2">Report page password</label>
-    <input type="password" id="p2" autocomplete="off" placeholder="Enter the report password">
+    <input type="password" id="p2" autocomplete="off" placeholder="Report page password">
     <div style="height:10px"></div>
     <button id="unlock-btn">Unlock report</button>
     <div class="muted" id="unlock-err" style="color:#f08a8a;margin-top:8px"></div>
@@ -72,7 +88,7 @@
 
   <!-- Report body -->
   <div id="report-body" class="hidden">
-    <div class="status" id="status-banner"></div>
+    <div class="status hidden" id="status-banner"></div>
 
     <div class="card">
       <div class="kv"><span>User ID</span><b id="u-id"></b></div>
@@ -93,50 +109,59 @@
     </div>
 
     <div class="card" id="gallery-card">
+      <div class="cls-legend">
+        Select the bad images and set an industry classification for each:
+        <code>A1</code> prepubescent · sex act &nbsp; <code>A2</code> prepubescent · lascivious &nbsp;
+        <code>B1</code> pubescent · sex act &nbsp; <code>B2</code> pubescent · lascivious
+        <div class="defs">
+          <b>A</b> Prepubescent minor · <b>B</b> Pubescent minor.<br>
+          <b>1 — Sex Act:</b> imagery depicting sexual intercourse (genital, oral, anal, or bestiality),
+          masturbation, sadistic/masochistic abuse, or degradation lacking serious literary, artistic,
+          political, or scientific value.<br>
+          <b>2 — Lascivious Exhibition:</b> imagery depicting the lascivious exhibition of the anus,
+          genitals, or pubic area, intended to elicit a sexual response in the viewer.
+        </div>
+      </div>
       <div class="row" style="justify-content:space-between;align-items:center">
         <b>Images</b>
         <span class="muted" id="sel-count">0 selected</span>
       </div>
       <div class="gallery" id="gallery"></div>
-      <div class="cls-legend">
-        Select the bad images and set an industry classification for each:
-        <code>A1</code> prepubescent · sex act &nbsp; <code>A2</code> prepubescent · lascivious &nbsp;
-        <code>B1</code> pubescent · sex act &nbsp; <code>B2</code> pubescent · lascivious
-        <details><summary>Full NCMEC definitions</summary>
-          <div class="muted" style="margin-top:6px">
-            <b>A</b> Prepubescent minor · <b>B</b> Pubescent minor.<br>
-            <b>1 — Sex Act:</b> imagery depicting sexual intercourse (genital, oral, anal, or bestiality),
-            masturbation, sadistic/masochistic abuse, or degradation lacking serious literary, artistic,
-            political, or scientific value.<br>
-            <b>2 — Lascivious Exhibition:</b> imagery depicting the lascivious exhibition of the anus,
-            genitals, or pubic area, intended to elicit a sexual response in the viewer.
-          </div>
-        </details>
-      </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="action-card">
       <div class="row">
-        <button id="submit-btn">Submit to NCMEC</button>
-        <button id="cancel-btn" class="ghost">Cancel report (keep user's files)</button>
+        <button id="review-btn">Review</button>
+        <button id="cancel-btn" class="ghost">Cancel</button>
       </div>
       <div class="muted" id="action-err" style="color:#f08a8a;margin-top:8px"></div>
     </div>
-
-    <!-- Final review (after submit) -->
-    <div class="card hidden" id="review-card">
-      <b>Final review</b>
-      <div class="muted" style="margin:6px 0 12px">
-        The report is staged with NCMEC (report id <span id="review-ncmec"></span>).
-        Review once more, then <b>Finish</b> to file it (irreversible) or <b>Retract</b> to cancel it.
-      </div>
-      <div class="row">
-        <button id="finish-btn">Finish &amp; file report</button>
-        <button id="retract-btn" class="danger">Retract</button>
-      </div>
-    </div>
   </div>
 </main>
+
+<!-- Full-size image viewer -->
+<dialog id="viewer">
+  <div class="dlg-body">
+    <img id="viewer-img" src="" alt="">
+  </div>
+</dialog>
+
+<!-- Final review / confirm dialog -->
+<dialog id="confirm">
+  <div class="dlg-body" id="confirm-content">
+    <h2>Confirm submission</h2>
+    <div id="confirm-summary"></div>
+    <div class="preview-grid" id="confirm-grid"></div>
+    <div class="muted" style="margin-bottom:12px">
+      Submits this report to NCMEC and finishes it immediately. This is irreversible.
+    </div>
+    <div class="row" id="confirm-actions">
+      <button id="confirm-submit-btn">Submit</button>
+      <button id="confirm-cancel-btn" class="ghost">Cancel</button>
+    </div>
+    <div class="muted" id="confirm-err" style="color:#f08a8a;margin-top:8px"></div>
+  </div>
+</dialog>
 
 <script>
 const TG = window.Telegram && window.Telegram.WebApp;
@@ -146,7 +171,8 @@ const INIT = (TG && TG.initData) || "";
 const PBKDF2_ITER = 200000, P1_SALT = new TextEncoder().encode("ris-abuse-report-p1-v1");
 
 let P2 = "", P1KEY = null, META = null;
-const sel = {}; // blobId -> classification (A1/A2/B1/B2)
+const sel = {};       // blobId -> classification (A1/A2/B1/B2)
+const thumbUrls = {}; // blobId -> object URL (for viewer + preview)
 
 const $ = id => document.getElementById(id);
 const api = async (path, opts = {}) => {
@@ -173,7 +199,6 @@ $("unlock-btn").onclick = async () => {
     $("unlock-card").classList.add("hidden");
     $("report-body").classList.remove("hidden");
     renderMeta();
-    pollStatus();
   } catch (e) { $("unlock-err").textContent = "" + e.message; P2 = ""; }
 };
 
@@ -188,7 +213,7 @@ function renderMeta() {
   $("r-created").textContent = fmtTs(META.created_at);
   $("r-ncmec").textContent = META.ncmec_report_id || "—";
   renderGallery();
-  applyStatus(META.status, META.status_detail);
+  if (["filed", "cancelled"].includes(META.status)) applyFinalState(META.status, META.ncmec_report_id);
 }
 
 function renderGallery() {
@@ -217,11 +242,12 @@ async function decryptThumb(b) {
   const buf = new Uint8Array(await r.arrayBuffer());
   const nonce = buf.slice(0, 12), ct = buf.slice(12);
   const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce }, P1KEY, ct);
-  const blob = new Blob([plain]);
-  const url = URL.createObjectURL(blob);
+  const url = URL.createObjectURL(new Blob([plain]));
+  thumbUrls[b.id] = url;
   const el = document.querySelector(`.thumb[data-id="${b.id}"]`);
   el.innerHTML = `<img src="${url}" alt="">` + clsBar(b.id);
-  el.querySelector("img").onclick = () => toggleSelect(b.id);
+  // Clicking the image opens the full-size viewer (not select).
+  el.querySelector("img").onclick = () => openViewer(url);
   if (sel[b.id] !== undefined) el.classList.add("selected");
   wireCls(b.id);
 }
@@ -232,32 +258,38 @@ function clsBar(id) {
     `<span data-cls="${c}" class="${cur === c ? "on" : ""}">${c}</span>`).join("") + `</div>`;
 }
 
+// The A1–B2 buttons select the image AND set its classification. Tapping the
+// active class again deselects the image entirely.
 function wireCls(id) {
   const el = document.querySelector(`.thumb[data-id="${id}"]`);
   el.querySelectorAll(".cls span").forEach(s => {
     s.onclick = (ev) => {
       ev.stopPropagation();
       const c = s.dataset.cls;
-      sel[id] = c;
-      el.classList.add("selected");
-      el.querySelectorAll(".cls span").forEach(x => x.classList.toggle("on", x.dataset.cls === c));
+      if (sel[id] === c) {
+        delete sel[id];
+        el.classList.remove("selected");
+        el.querySelectorAll(".cls span").forEach(x => x.classList.remove("on"));
+      } else {
+        sel[id] = c;
+        el.classList.add("selected");
+        el.querySelectorAll(".cls span").forEach(x => x.classList.toggle("on", x.dataset.cls === c));
+      }
       updateSelCount();
     };
   });
 }
 
-function toggleSelect(id) {
-  const el = document.querySelector(`.thumb[data-id="${id}"]`);
-  if (sel[id] !== undefined) { delete sel[id]; el.classList.remove("selected"); el.querySelectorAll(".cls span").forEach(x => x.classList.remove("on")); }
-  else { sel[id] = sel[id] || null; el.classList.add("selected"); }
-  updateSelCount();
-}
-
 function updateSelCount() {
-  const n = Object.keys(sel).length;
-  $("sel-count").textContent = n + " selected";
+  $("sel-count").textContent = Object.keys(sel).length + " selected";
 }
 
+// --- viewer dialog -----------------------------------------------------------
+const viewer = $("viewer");
+function openViewer(url) { $("viewer-img").src = url; viewer.showModal(); }
+viewer.onclick = () => viewer.close();
+
+// --- persist selection -------------------------------------------------------
 async function saveSelection() {
   await api("/api/select", {
     method: "POST", headers: { "Content-Type": "application/json" },
@@ -265,71 +297,100 @@ async function saveSelection() {
   });
 }
 
-$("submit-btn").onclick = async () => {
+// --- Review: client-side preview only ---------------------------------------
+const confirmDlg = $("confirm");
+$("review-btn").onclick = () => {
   $("action-err").textContent = "";
   const ids = Object.keys(sel);
   if (!ids.length) { $("action-err").textContent = "Select at least one image."; return; }
   for (const id of ids) if (!sel[id]) { $("action-err").textContent = "Every selected image needs a classification (A1/A2/B1/B2)."; return; }
   if (!P1KEY) { $("action-err").textContent = "Decrypt the images first (the image key is needed to submit)."; return; }
-  if (!confirm("Submit " + ids.length + " image(s) to NCMEC?")) return;
+  buildConfirm(ids);
+  confirmDlg.showModal();
+};
+
+function buildConfirm(ids) {
+  const uname = META.user.username ? "@" + META.user.username : "—";
+  const full = [META.user.first_name, META.user.last_name].filter(Boolean).join(" ") || "—";
+  $("confirm-summary").innerHTML =
+    `<div class="kv"><span>User ID</span><b>${META.user.id}</b></div>` +
+    `<div class="kv"><span>Username</span><b>${uname}</b></div>` +
+    `<div class="kv"><span>Full name</span><b>${full}</b></div>` +
+    `<div class="kv"><span>Images</span><b>${ids.length}</b></div>`;
+  const grid = $("confirm-grid"); grid.innerHTML = "";
+  for (const id of ids) {
+    const item = document.createElement("div");
+    item.className = "preview-item";
+    item.innerHTML = `<img src="${thumbUrls[id]}" alt=""><div class="tag">${sel[id]}</div>`;
+    grid.appendChild(item);
+  }
+  // reset dialog to its default (button) state
+  $("confirm-actions").classList.remove("hidden");
+  $("confirm-err").textContent = "";
+}
+
+$("confirm-cancel-btn").onclick = () => confirmDlg.close();
+
+// Confirm-Submit: submit to NCMEC AND finish, in one shot.
+$("confirm-submit-btn").onclick = async () => {
+  $("confirm-err").textContent = "";
+  // Replace the preview + buttons with a loading spinner.
+  $("confirm-grid").classList.add("hidden");
+  $("confirm-summary").classList.add("hidden");
+  $("confirm-actions").classList.add("hidden");
+  $("confirm-content").querySelector("h2").textContent = "Filing report…";
+  const spin = document.createElement("div");
+  spin.className = "spinner"; spin.id = "confirm-spinner";
+  $("confirm-content").appendChild(spin);
   try {
     await saveSelection();
-    applyStatus("submitting");
     const r = await api("/api/submit", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ image_key: $("p1").value }),
     });
     const j = await r.json();
-    META.ncmec_report_id = j.ncmec_report_id;
-    $("r-ncmec").textContent = j.ncmec_report_id;
-    applyStatus("review");
-  } catch (e) { $("action-err").textContent = "" + e.message; applyStatus("ready"); }
+    showSuccess(j.ncmec_report_id);
+  } catch (e) {
+    // Restore the dialog so the admin can retry / cancel.
+    spin.remove();
+    $("confirm-content").querySelector("h2").textContent = "Confirm submission";
+    $("confirm-grid").classList.remove("hidden");
+    $("confirm-summary").classList.remove("hidden");
+    $("confirm-actions").classList.remove("hidden");
+    $("confirm-err").textContent = "" + e.message;
+  }
 };
 
-$("cancel-btn").onclick = async () => {
-  if (!confirm("Cancel this report? The encrypted blobs and this report are deleted, but the user's original files and records are KEPT (cancelling means no wrongdoing).")) return;
-  try { await api("/api/cancel", { method: "POST" }); applyStatus("cancelled"); }
-  catch (e) { $("action-err").textContent = "" + e.message; }
-};
-
-$("finish-btn").onclick = async () => {
-  if (!confirm("FILE this report with NCMEC? This is irreversible.")) return;
-  try { await api("/api/finish", { method: "POST" }); applyStatus("filed"); }
-  catch (e) { $("action-err").textContent = "" + e.message; }
-};
-
-$("retract-btn").onclick = async () => {
-  if (!confirm("Retract the submitted report?")) return;
-  try { await api("/api/retract", { method: "POST" }); applyStatus("retracted"); }
-  catch (e) { $("action-err").textContent = "" + e.message; }
-};
-
-function applyStatus(status, detail) {
-  const b = $("status-banner");
-  b.className = "status " + status;
-  const labels = {
-    preparing: "Preparing — encrypting files…", ready: "Ready for review",
-    submitting: "Submitting to NCMEC…", review: "Staged with NCMEC — final review",
-    filed: "✓ Filed with NCMEC", retracted: "Retracted", cancelled: "Cancelled — user's files kept",
-    error: "Error",
-  };
-  b.textContent = (labels[status] || status) + (detail ? " — " + detail : "");
-  const terminal = ["filed", "cancelled", "retracted"].includes(status);
-  $("review-card").classList.toggle("hidden", status !== "review");
-  if (status === "review") $("review-ncmec").textContent = META.ncmec_report_id || "";
-  $("submit-btn").disabled = terminal || status === "review" || status === "submitting";
-  $("cancel-btn").disabled = terminal;
-  if (terminal) { $("decrypt-card").classList.add("hidden"); }
+function showSuccess(reportId) {
+  const spin = $("confirm-spinner"); if (spin) spin.remove();
+  $("confirm-content").querySelector("h2").textContent = "✓ Report filed";
+  const done = document.createElement("div");
+  done.innerHTML =
+    `<div class="center" style="margin:8px 0 16px">Filed with NCMEC.<br>` +
+    `<b>Report id:</b> <code>${reportId}</code></div>` +
+    `<div class="row"><button id="ok-btn">OK</button></div>`;
+  $("confirm-content").appendChild(done);
+  $("ok-btn").onclick = () => { confirmDlg.close(); applyFinalState("filed", reportId); };
 }
 
-async function pollStatus() {
-  try {
-    const r = await api("/api/status");
-    const j = await r.json();
-    if (META && j.ncmec_report_id) { META.ncmec_report_id = j.ncmec_report_id; $("r-ncmec").textContent = j.ncmec_report_id; }
-    if (j.status) applyStatus(j.status, j.status_detail);
-    if (!["filed", "cancelled", "retracted"].includes(j.status)) setTimeout(pollStatus, 3000);
-  } catch (e) { setTimeout(pollStatus, 5000); }
+// --- Cancel (nothing filed) --------------------------------------------------
+$("cancel-btn").onclick = async () => {
+  if (!confirm("Cancel this report? The encrypted blobs and this report are discarded, but the user's original files and records are KEPT.")) return;
+  try { await api("/api/cancel", { method: "POST" }); applyFinalState("cancelled"); }
+  catch (e) { $("action-err").textContent = "" + e.message; }
+};
+
+// --- terminal state ----------------------------------------------------------
+function applyFinalState(status, reportId) {
+  if (reportId) { $("r-ncmec").textContent = reportId; }
+  const b = $("status-banner");
+  b.className = "status " + status;
+  b.textContent = status === "filed"
+    ? "✓ Filed with NCMEC — report id " + (reportId || META.ncmec_report_id || "")
+    : "Cancelled — user's files kept";
+  b.classList.remove("hidden");
+  $("decrypt-card").classList.add("hidden");
+  $("action-card").classList.add("hidden");
 }
 </script>
 </body>
