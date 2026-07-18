@@ -149,7 +149,13 @@ async def test_cancel_purges_blobs_but_keeps_files_and_relation(abuse, monkeypat
     assert abuse.get_user(1) is not None
 
 
-def test_cleanup_after_finish_deletes_disk(abuse, monkeypatch, tmp_path):
+def test_delete_disk_files_keeps_blobs(abuse, monkeypatch, tmp_path):
+    """On finish: plaintext files go from disk, but encrypted blobs are KEPT.
+
+    New retention rule — the encrypted copies stay in the DB linked to the
+    finished report (for further inspection / law enforcement); only the
+    plaintext PVC files are unlinked.
+    """
     from reverse_image_search_bot import settings
     from reverse_image_search_bot.abuse_report import server
 
@@ -164,9 +170,65 @@ def test_cleanup_after_finish_deletes_disk(abuse, monkeypatch, tmp_path):
         "u", file_unique_id="A", saved_filename="A.jpg", nonce=b"n", ciphertext=b"c", plaintext_sha256="1"
     )
     rep = abuse.get_report("u")
-    server._cleanup_after_finish(rep)
-    assert not (updir / "A.jpg").exists()  # plaintext deleted
-    assert abuse.blob_meta("u") == []  # blobs purged
+    server._delete_disk_files(rep)
+    assert not (updir / "A.jpg").exists()  # plaintext deleted from disk
+    assert len(abuse.blob_meta("u")) == 1  # encrypted blob KEPT in the DB
     # user + report survive
     assert abuse.get_user(1) is not None
     assert abuse.get_report("u") is not None
+
+
+@pytest.mark.asyncio
+async def test_submit_files_and_finishes_and_keeps_blobs(abuse, monkeypatch, tmp_path):
+    """/api/submit does submit+finish in one shot, deletes disk, keeps blobs.
+
+    NCMEC is mocked; the encryption round-trips a real blob so the P1 decrypt +
+    hash-verify path is exercised.
+    """
+    from reverse_image_search_bot import settings
+    from reverse_image_search_bot.abuse_report import crypto, ncmec, server
+
+    updir = tmp_path / "uploads"
+    updir.mkdir()
+    plaintext = b"the bad image bytes"
+    (updir / "A.jpg").write_bytes(plaintext)
+    monkeypatch.setattr(settings, "UPLOADER", {"configuration": {"path": str(updir)}})
+
+    monkeypatch.setattr(server, "_admin_from_request", lambda req: 42)
+    monkeypatch.setattr(settings, "REPORT_PAGE_PASSWORD", "")  # gate open
+
+    # NCMEC filed → returns a report id + hex file ids
+    submitted = AsyncMock(return_value=(987654, ["3a1d4fd4106b82499b7c93442aa7dca4"]))
+    monkeypatch.setattr(ncmec, "submit_and_finish", submitted)
+
+    p1 = "test-image-key"
+    key = crypto.derive_key(p1)
+    nonce, ct = crypto.encrypt_file(plaintext, key)
+
+    abuse.record_user(1, username="bad")
+    abuse.create_report("u", 1, "")
+    abuse.add_report_blob(
+        "u",
+        file_unique_id="A",
+        saved_filename="A.jpg",
+        nonce=nonce,
+        ciphertext=ct,
+        plaintext_sha256=crypto.sha256_hex(plaintext),
+    )
+    bid = abuse.blob_meta("u")[0]["id"]
+    abuse.set_blob_selection("u", {bid: "A1"})
+
+    req = _req(headers={"X-Page-Secret": ""}, match={"uuid": "u"}, json_body={"image_key": p1})
+    resp = await server.api_submit(req)
+    import json
+
+    data = json.loads(resp.text or "")
+    assert data["status"] == abuse.REPORT_FILED
+    assert data["ncmec_report_id"] == 987654
+    submitted.assert_awaited_once()
+    # report is filed, disk file gone, encrypted blob KEPT
+    rep = abuse.get_report("u")
+    assert rep["status"] == abuse.REPORT_FILED
+    assert rep["ncmec_report_id"] == 987654
+    assert not (updir / "A.jpg").exists()
+    assert len(abuse.blob_meta("u")) == 1
