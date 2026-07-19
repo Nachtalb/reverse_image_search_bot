@@ -113,6 +113,7 @@
       <div class="kv"><span>User ID</span><b id="u-id"></b></div>
       <div class="kv"><span>Username</span><b id="u-name"></b></div>
       <div class="kv"><span>Full name</span><b id="u-full"></b></div>
+      <div class="kv"><span>Language</span><b id="u-lang"></b></div>
       <div class="kv"><span>Banned</span><b id="u-ban"></b></div>
       <div class="kv"><span>Report created</span><b id="r-created"></b></div>
       <div class="kv"><span>NCMEC report id</span><b id="r-ncmec">—</b></div>
@@ -253,11 +254,23 @@ $("unlock-btn").onclick = async () => {
 
 function fmtTs(ts) { return ts ? new Date(ts * 1000).toLocaleString() : "—"; }
 
+// Human-readable language from an IETF tag (e.g. "de" → "German (de)", "pt-BR"
+// → "Portuguese (pt-BR)"). Falls back to the raw tag, or "—" when unknown.
+function fmtLang(code) {
+  if (!code) return "—";
+  try {
+    const dn = new Intl.DisplayNames([navigator.language || "en"], { type: "language" });
+    const name = dn.of(code);
+    return name && name.toLowerCase() !== code.toLowerCase() ? `${name} (${code})` : code;
+  } catch (e) { return code; }
+}
+
 function renderMeta() {
   $("hdr-sub").textContent = "Report " + UUID.slice(0, 8);
   $("u-id").textContent = META.user.id;
   $("u-name").textContent = META.user.username ? "@" + META.user.username : "—";
   $("u-full").textContent = [META.user.first_name, META.user.last_name].filter(Boolean).join(" ") || "—";
+  $("u-lang").textContent = fmtLang(META.user.language_code);
   $("u-ban").textContent = META.user.banned_at ? "yes" : "no";
   $("r-created").textContent = fmtTs(META.created_at);
   $("r-ncmec").textContent = META.ncmec_report_id || "—";

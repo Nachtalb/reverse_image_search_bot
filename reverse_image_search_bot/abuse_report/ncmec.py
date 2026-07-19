@@ -96,6 +96,13 @@ def build_reported_subject(
         label = c.get("title") or (f"@{c['username']}" if c.get("username") else str(c.get("chat_id")))
         group_bits.append(f"{c.get('chat_type', 'chat')}: {label} (id {c.get('chat_id')})")
 
+    # NCMEC has no dedicated language field, so the uploader's Telegram UI
+    # language (IETF tag reported by the client) goes into additionalInfo.
+    info_bits: list[str] = []
+    lang = reported_user.get("language_code")
+    if lang:
+        info_bits.append(f"Telegram UI language (IETF tag): {lang}")
+
     return PersonOrUserReported(
         esp_identifier=str(reported_user["user_id"]) if reported_user.get("user_id") else None,
         esp_service=settings.NCMEC_ESP_NAME or "Reverse Image Search Bot",
@@ -103,6 +110,7 @@ def build_reported_subject(
         display_name=display,
         profile_url=profile_urls,
         group_identifier="; ".join(group_bits) or None,
+        additional_info="\n".join(info_bits) or None,
     )
 
 

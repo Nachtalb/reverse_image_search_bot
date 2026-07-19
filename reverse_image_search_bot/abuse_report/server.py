@@ -141,6 +141,18 @@ async def api_reports_list(request: web.Request) -> web.Response:
     )
 
 
+async def api_reports_stats(request: web.Request) -> web.Response:
+    """Filed-only report records for the statistics dashboard (admin + pw gated).
+
+    Returns the raw per-report records; the client does all aggregation and
+    period filtering so year/month dropdowns switch instantly with no re-fetch.
+    """
+    _require_admin(request)
+    if not crypto.verify_global_page_password(request.headers.get("X-Page-Secret", ""), settings.REPORT_PAGE_PASSWORD):
+        raise web.HTTPForbidden(text="page password incorrect")
+    return web.json_response({"records": abuse.filed_report_stats()})
+
+
 async def api_reports_create(request: web.Request) -> web.Response:
     """Create a new report from a target token (user id, @username, or filename).
 
@@ -233,6 +245,7 @@ async def api_unlock(request: web.Request) -> web.Response:
                 "username": user.get("username"),
                 "first_name": user.get("first_name"),
                 "last_name": user.get("last_name"),
+                "language_code": user.get("language_code"),
                 "banned_at": user.get("banned_at"),
             },
             "blobs": abuse.blob_meta(rep["report_uuid"]),
@@ -530,6 +543,7 @@ def build_app(bot=None, bot_data=None) -> web.Application:
     app["bot_data"] = bot_data
     app.router.add_get("/report/console", reports_index)
     app.router.add_get("/report/console/api/list", api_reports_list)
+    app.router.add_get("/report/console/api/stats", api_reports_stats)
     app.router.add_post("/report/console/api/create", api_reports_create)
     app.router.add_get("/report/{uuid}", index)
     app.router.add_post("/report/{uuid}/api/unlock", api_unlock)

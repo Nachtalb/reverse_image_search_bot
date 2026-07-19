@@ -46,6 +46,29 @@
   .badge.cancelled, .badge.error, .badge.retracted, .badge.review { background: #3a1c1c; color: #f0a0a0; }
   .err { color: #f08a8a; font-size: 13px; margin-top: 8px; }
   code { background: #2a2c33; padding: 1px 5px; border-radius: 4px; }
+  /* Tabs */
+  .tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+  .tab { flex: 1; text-align: center; padding: 10px; border-radius: 9px; background: #1f2128; border: 1px solid #2a2c33; color: #9a9ba2; cursor: pointer; font-weight: 600; }
+  .tab.active { background: #3a6df0; color: #fff; border-color: #3a6df0; }
+  /* Status filter dropdown */
+  select { padding: 9px 11px; border-radius: 9px; border: 1px solid #363842; background: #14151a; color: #e8e8ea; font-size: 14px; }
+  /* Stats */
+  .stat-counter { font-size: 44px; font-weight: 800; line-height: 1; color: #8ab4ff; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .stat-box { background: #1b1d23; border: 1px solid #2a2c33; border-radius: 10px; padding: 14px; }
+  .stat-box .n { font-size: 28px; font-weight: 800; color: #8ab4ff; }
+  .stat-box .l { font-size: 12px; color: #9a9ba2; margin-top: 2px; }
+  .bar-row { display: flex; align-items: center; gap: 8px; margin: 5px 0; font-size: 13px; }
+  .bar-row .lbl { width: 92px; flex-shrink: 0; color: #cfd0d6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar-row .bar { height: 16px; background: #3a6df0; border-radius: 4px; min-width: 2px; }
+  .bar-row .val { color: #9a9ba2; font-size: 12px; }
+  /* Heatmap: 7 rows (Sun–Sat) × 24 hour cols */
+  .heat { overflow-x: auto; }
+  .heat table { border-collapse: collapse; }
+  .heat td, .heat th { width: 15px; height: 15px; text-align: center; font-size: 9px; color: #6a6c76; padding: 0; }
+  .heat th.hh { font-size: 8px; }
+  .heat td.cell { border-radius: 2px; outline: 1px solid #14151a; }
+  .heat td.day { width: 30px; color: #9a9ba2; font-size: 10px; text-align: right; padding-right: 5px; }
 </style>
 </head>
 <body>
@@ -63,24 +86,79 @@
   </div>
 
   <div id="body" class="hidden">
-    <!-- Create a new report -->
-    <div class="card">
-      <label for="target">Create a new report</label>
-      <div class="row">
-        <input type="text" id="target" placeholder="user id, @username, or filename" style="flex:1;min-width:180px">
-        <button id="create-btn">Create</button>
-      </div>
-      <div class="err" id="create-err"></div>
-      <div id="create-ok" class="hidden" style="margin-top:10px"></div>
+    <div class="tabs">
+      <div class="tab active" id="tab-reports" data-tab="reports">Reports</div>
+      <div class="tab" id="tab-stats" data-tab="stats">Statistics</div>
     </div>
 
-    <!-- Report list -->
-    <div class="card">
-      <div class="row" style="justify-content:space-between">
-        <b>All reports</b>
-        <button class="ghost" id="refresh-btn">Refresh</button>
+    <!-- ============ REPORTS TAB ============ -->
+    <div id="pane-reports">
+      <!-- Create a new report -->
+      <div class="card">
+        <label for="target">Create a new report</label>
+        <div class="row">
+          <input type="text" id="target" placeholder="user id, @username, or filename" style="flex:1;min-width:180px">
+          <button id="create-btn">Create</button>
+        </div>
+        <div class="err" id="create-err"></div>
+        <div id="create-ok" class="hidden" style="margin-top:10px"></div>
       </div>
-      <div id="list" style="margin-top:10px"></div>
+
+      <!-- Report list -->
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <b>All reports</b>
+          <div class="row">
+            <select id="status-filter" title="Filter by status">
+              <option value="">All statuses</option>
+              <option value="filed">Filed</option>
+              <option value="ready">Ready</option>
+              <option value="preparing">Preparing</option>
+              <option value="review">Review</option>
+              <option value="submitting">Submitting</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="retracted">Retracted</option>
+              <option value="error">Error</option>
+            </select>
+            <button class="ghost" id="refresh-btn">Refresh</button>
+          </div>
+        </div>
+        <div id="list" style="margin-top:10px"></div>
+      </div>
+    </div>
+
+    <!-- ============ STATISTICS TAB ============ -->
+    <div id="pane-stats" class="hidden">
+      <div class="card">
+        <div class="row" style="justify-content:space-between;align-items:flex-end">
+          <div>
+            <div class="muted">Filed reports (cancelled excluded)</div>
+            <div class="stat-counter" id="st-counter">—</div>
+          </div>
+          <div class="row">
+            <select id="st-year" title="Year"></select>
+            <select id="st-month" title="Month"></select>
+          </div>
+        </div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-box"><div class="n" id="st-reports">—</div><div class="l">Reports filed</div></div>
+        <div class="stat-box"><div class="n" id="st-users">—</div><div class="l">Unique users reported</div></div>
+      </div>
+
+      <div class="card">
+        <b>By language</b>
+        <div id="st-lang" style="margin-top:10px"></div>
+      </div>
+
+      <div class="card">
+        <b>When posted — weekday × hour</b>
+        <div class="muted" style="margin:4px 0 10px">All reported files, by original upload time (local). Sun–Sat × 0–23h.</div>
+        <div class="heat" id="st-heat"></div>
+      </div>
+
+      <div class="err" id="st-err"></div>
     </div>
   </div>
 </main>
@@ -138,10 +216,22 @@ function openReport(uuid) {
 async function loadList() {
   const r = await api("/api/list");
   const j = await r.json();
+  ALL_REPORTS = j.reports;
+  renderList();
+}
+
+let ALL_REPORTS = [];
+
+function renderList() {
+  const filter = $("status-filter").value;
+  const reports = filter ? ALL_REPORTS.filter(r => r.status === filter) : ALL_REPORTS;
   const list = $("list");
   list.innerHTML = "";
-  if (!j.reports.length) { list.innerHTML = `<div class="muted">No reports yet.</div>`; return; }
-  for (const rep of j.reports) {
+  if (!reports.length) {
+    list.innerHTML = `<div class="muted">${ALL_REPORTS.length ? "No reports match this filter." : "No reports yet."}</div>`;
+    return;
+  }
+  for (const rep of reports) {
     const who = rep.username ? "@" + rep.username : "(no username)";
     const ncmec = rep.ncmec_report_id ? ` · NCMEC #${rep.ncmec_report_id}` : "";
     const el = document.createElement("div");
@@ -154,6 +244,8 @@ async function loadList() {
     list.appendChild(el);
   }
 }
+
+$("status-filter").onchange = renderList;
 
 $("refresh-btn").onclick = () => loadList().catch(e => { $("create-err").textContent = "" + e.message; });
 
@@ -193,6 +285,128 @@ $("create-btn").onclick = async () => {
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// ============ Tabs ============
+document.querySelectorAll(".tab").forEach(t => {
+  t.onclick = () => {
+    document.querySelectorAll(".tab").forEach(x => x.classList.toggle("active", x === t));
+    const isStats = t.dataset.tab === "stats";
+    $("pane-reports").classList.toggle("hidden", isStats);
+    $("pane-stats").classList.toggle("hidden", !isStats);
+    if (isStats) loadStats().catch(e => { $("st-err").textContent = "" + e.message; });
+  };
+});
+
+// ============ Statistics ============
+let STATS = null;  // raw records from the server (filed only)
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function fmtLang(code) {
+  if (!code) return "Unknown";
+  try {
+    const dn = new Intl.DisplayNames([navigator.language || "en"], { type: "language" });
+    const name = dn.of(code);
+    return name && name.toLowerCase() !== code.toLowerCase() ? `${name} (${code})` : code;
+  } catch (e) { return code; }
+}
+
+async function loadStats() {
+  $("st-err").textContent = "";
+  if (!STATS) {
+    const r = await api("/api/stats");
+    STATS = (await r.json()).records || [];
+    buildPeriodDropdowns();
+  }
+  renderStats();
+}
+
+// Year dropdown = every year that has a filed report (desc). Month dropdown =
+// "Full year" + Jan..current (current year capped at this month; past years all 12).
+function buildPeriodDropdowns() {
+  const now = new Date();
+  const years = [...new Set(STATS.map(r => new Date(r.finished_at * 1000).getFullYear()))].sort((a, b) => b - a);
+  if (!years.includes(now.getFullYear())) years.unshift(now.getFullYear());
+  const ysel = $("st-year");
+  ysel.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join("");
+  ysel.value = String(years[0]);
+  ysel.onchange = () => { buildMonthDropdown(); renderStats(); };
+  buildMonthDropdown();
+}
+
+function buildMonthDropdown() {
+  const now = new Date();
+  const year = parseInt($("st-year").value, 10);
+  const lastMonth = year === now.getFullYear() ? now.getMonth() : 11;  // cap current year
+  let opts = `<option value="all">Full year</option>`;
+  for (let m = 0; m <= lastMonth; m++) opts += `<option value="${m}">${MONTHS[m]}</option>`;
+  $("st-month").innerHTML = opts;
+  $("st-month").value = "all";
+  $("st-month").onchange = renderStats;
+}
+
+// Records filtered to the selected year + (optional) month, by filing date.
+function selectedRecords() {
+  const year = parseInt($("st-year").value, 10);
+  const month = $("st-month").value;
+  return STATS.filter(r => {
+    const d = new Date(r.finished_at * 1000);
+    if (d.getFullYear() !== year) return false;
+    if (month !== "all" && d.getMonth() !== parseInt(month, 10)) return false;
+    return true;
+  });
+}
+
+function renderStats() {
+  const recs = selectedRecords();
+  $("st-counter").textContent = recs.length;
+  $("st-reports").textContent = recs.length;
+  $("st-users").textContent = new Set(recs.map(r => r.user_id)).size;
+  renderLangBars(recs);
+  renderHeatmap(recs);
+}
+
+function renderLangBars(recs) {
+  const counts = {};
+  for (const r of recs) { const k = r.language || ""; counts[k] = (counts[k] || 0) + 1; }
+  const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const box = $("st-lang");
+  if (!rows.length) { box.innerHTML = `<div class="muted">No data for this period.</div>`; return; }
+  const max = rows[0][1];
+  box.innerHTML = rows.map(([code, n]) =>
+    `<div class="bar-row"><span class="lbl" title="${escapeHtml(fmtLang(code))}">${escapeHtml(fmtLang(code))}</span>` +
+    `<span class="bar" style="width:${Math.round((n / max) * 160)}px"></span>` +
+    `<span class="val">${n}</span></div>`
+  ).join("");
+}
+
+// Weekday×hour heatmap of ALL reported files' upload times in the selected period.
+function renderHeatmap(recs) {
+  const grid = Array.from({ length: 7 }, () => new Array(24).fill(0));
+  let max = 0;
+  for (const r of recs) {
+    for (const ts of r.upload_times || []) {
+      const d = new Date(ts * 1000);
+      const v = ++grid[d.getDay()][d.getHours()];
+      if (v > max) max = v;
+    }
+  }
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  let html = "<table><tr><td class='day'></td>";
+  for (let h = 0; h < 24; h++) html += `<th class="hh">${h}</th>`;
+  html += "</tr>";
+  for (let d = 0; d < 7; d++) {
+    html += `<tr><td class="day">${days[d]}</td>`;
+    for (let h = 0; h < 24; h++) {
+      const n = grid[d][h];
+      const alpha = max ? 0.12 + 0.88 * (n / max) : 0;
+      const bg = n ? `rgba(58,109,240,${alpha.toFixed(3)})` : "#1b1d23";
+      html += `<td class="cell" style="background:${bg}" title="${days[d]} ${h}:00 — ${n}"></td>`;
+    }
+    html += "</tr>";
+  }
+  html += "</table>";
+  $("st-heat").innerHTML = max ? html : `<div class="muted">No upload-time data for this period.</div>`;
 }
 </script>
 </body>

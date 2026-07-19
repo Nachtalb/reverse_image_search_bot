@@ -399,3 +399,93 @@ async def test_reports_create_existing_returns_409(abuse, monkeypatch, tmp_path)
     assert resp.status == 409
     data = json.loads(resp.text or "")
     assert data["existing_uuid"] == "existing"
+
+
+def test_filed_report_stats_filed_only_with_language_and_times(abuse):
+    """Stats are FILED-only, carry the user's language + reported files' upload times."""
+    import time
+
+    # User A (lang 'en') → one filed report over two files. User B (lang 'de') →
+    # a CANCELLED report (must be excluded). User C (no lang) → filed.
+    abuse.record_user(1, username="a", language_code="en")
+    abuse.record_user(2, username="b", language_code="de")
+    abuse.record_user(3, username="c")
+    for uid, fid in [(1, "f1"), (1, "f2"), (2, "f3"), (3, "f4")]:
+        abuse.record_file(fid, saved_filename=f"{fid}.jpg", user_id=uid)
+
+    conn = abuse._get_conn()
+    # Deterministic upload_time per file so the heatmap has known inputs.
+    base = int(time.time())
+    for fid, t in [("f1", base), ("f2", base + 10), ("f3", base + 20), ("f4", base + 30)]:
+        conn.execute("UPDATE files SET upload_time = ? WHERE file_unique_id = ?", (t, fid))
+    conn.commit()
+
+    # Filed report for user 1 with two blobs.
+    abuse.create_report("rA", 1, "")
+    for fid in ("f1", "f2"):
+        abuse.add_report_blob(
+            "rA", file_unique_id=fid, saved_filename=f"{fid}.jpg", nonce=b"n", ciphertext=b"c", plaintext_sha256="h"
+        )
+    abuse.mark_report_filed("rA")
+    # CANCELLED report for user 2 (excluded).
+    abuse.create_report("rB", 2, "")
+    abuse.add_report_blob(
+        "rB", file_unique_id="f3", saved_filename="f3.jpg", nonce=b"n", ciphertext=b"c", plaintext_sha256="h"
+    )
+    abuse.set_report_status("rB", abuse.REPORT_CANCELLED)
+    # Filed report for user 3.
+    abuse.create_report("rC", 3, "")
+    abuse.add_report_blob(
+        "rC", file_unique_id="f4", saved_filename="f4.jpg", nonce=b"n", ciphertext=b"c", plaintext_sha256="h"
+    )
+    abuse.mark_report_filed("rC")
+
+    recs = abuse.filed_report_stats()
+    by_user = {r["user_id"]: r for r in recs}
+    # Only the two FILED reports — the cancelled one is gone.
+    assert set(by_user) == {1, 3}
+    assert len(recs) == 2
+    assert by_user[1]["language"] == "en"
+    assert by_user[3]["language"] is None
+    # User 1's report carries BOTH reported files' upload times.
+    assert sorted(by_user[1]["upload_times"]) == [base, base + 10]
+    assert by_user[3]["upload_times"] == [base + 30]
+    # finished_at is populated (drives the year/month dropdowns).
+    assert by_user[1]["finished_at"] and by_user[3]["finished_at"]
+
+
+@pytest.mark.asyncio
+async def test_api_stats_gated_and_shaped(abuse, monkeypatch):
+    from reverse_image_search_bot import settings
+    from reverse_image_search_bot.abuse_report import server
+
+    monkeypatch.setattr(settings, "REPORT_PAGE_PASSWORD", "")
+    monkeypatch.setattr(server, "_admin_from_request", lambda req: 42)
+    abuse.record_user(1, username="a", language_code="en")
+    abuse.record_file("f1", saved_filename="f1.jpg", user_id=1)
+    abuse.create_report("rA", 1, "")
+    abuse.add_report_blob(
+        "rA", file_unique_id="f1", saved_filename="f1.jpg", nonce=b"n", ciphertext=b"c", plaintext_sha256="h"
+    )
+    abuse.mark_report_filed("rA")
+
+    resp = await server.api_reports_stats(_req(headers={"X-Page-Secret": ""}))
+    import json
+
+    data = json.loads(resp.text or "")
+    assert len(data["records"]) == 1
+    assert data["records"][0]["language"] == "en"
+
+
+def test_report_meta_includes_language(abuse, tmp_path, monkeypatch):
+    """The report page meta payload surfaces the uploader's language_code."""
+    from reverse_image_search_bot import settings
+    from reverse_image_search_bot.abuse_report import server
+
+    monkeypatch.setattr(settings, "REPORT_PAGE_PASSWORD", "")
+    monkeypatch.setattr(server, "_admin_from_request", lambda req: 42)
+    abuse.record_user(77, username="x", language_code="pt-BR")
+    abuse.create_report("rM", 77, "")
+
+    user = abuse.get_user(77)
+    assert user["language_code"] == "pt-BR"

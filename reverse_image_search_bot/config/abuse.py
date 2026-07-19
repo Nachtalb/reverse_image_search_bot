@@ -664,3 +664,59 @@ def all_reports() -> list[dict]:
         "SELECT r.*, u.username FROM reports r LEFT JOIN users u ON u.user_id = r.user_id ORDER BY r.created_at DESC"
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+def filed_report_stats() -> list[dict]:
+    """Per-filed-report records for the statistics dashboard (FILED only).
+
+    Cancelled/errored/in-flight reports are excluded — only successfully filed
+    NCMEC reports count. Each record carries what the stats view needs to do all
+    its own aggregation + period filtering client-side:
+
+      * ``user_id``       — for the unique-user count
+      * ``language``      — the uploader's Telegram UI language (may be None)
+      * ``finished_at``   — when it was filed (drives year/month dropdowns); falls
+                            back to ``updated_at`` then ``created_at`` for old rows
+                            filed before ``finished_at`` was recorded
+      * ``upload_times``  — unix ts of each reported file's ORIGINAL upload, for the
+                            weekday×hour "when were they posted" heatmap
+
+    The reported files' encrypted blobs and their ``files`` rows are kept after
+    filing, so the upload times remain resolvable.
+    """
+    conn = _get_conn()
+    try:
+        reps = conn.execute(
+            "SELECT r.report_uuid, r.user_id, "
+            "COALESCE(r.finished_at, r.updated_at, r.created_at) AS reported_at, "
+            "u.language_code AS language "
+            "FROM reports r LEFT JOIN users u ON u.user_id = r.user_id "
+            "WHERE r.status = 'filed'"
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return []  # reports table not created yet
+    if not reps:
+        return []
+
+    # Upload times of each report's reported files, grouped by report_uuid.
+    uuids = [r["report_uuid"] for r in reps]
+    placeholders = ",".join("?" * len(uuids))
+    times: dict[str, list[int]] = {u: [] for u in uuids}
+    rows = conn.execute(
+        f"SELECT b.report_uuid, f.upload_time "
+        f"FROM report_blobs b JOIN files f ON f.file_unique_id = b.file_unique_id "
+        f"WHERE b.report_uuid IN ({placeholders}) AND f.upload_time IS NOT NULL",
+        uuids,
+    ).fetchall()
+    for row in rows:
+        times[row["report_uuid"]].append(row["upload_time"])
+
+    return [
+        {
+            "user_id": r["user_id"],
+            "language": r["language"],
+            "finished_at": r["reported_at"],
+            "upload_times": times.get(r["report_uuid"], []),
+        }
+        for r in reps
+    ]

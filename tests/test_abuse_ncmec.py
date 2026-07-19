@@ -25,6 +25,22 @@ def test_build_reported_subject_user_only(monkeypatch):
     assert subj.group_identifier is None
 
 
+def test_build_reported_subject_language_in_additional_info(monkeypatch):
+    """The uploader's Telegram UI language is recorded in additionalInfo."""
+    from reverse_image_search_bot import settings
+    from reverse_image_search_bot.abuse_report import ncmec
+
+    monkeypatch.setattr(settings, "NCMEC_ESP_NAME", "")
+    subj = ncmec.build_reported_subject({"user_id": 5, "username": "u", "language_code": "de"}, [])
+    assert subj is not None
+    assert subj.additional_info is not None
+    assert "de" in subj.additional_info
+    # No language → no additionalInfo noise.
+    subj2 = ncmec.build_reported_subject({"user_id": 6, "username": "v"}, [])
+    assert subj2 is not None
+    assert subj2.additional_info is None
+
+
 def test_build_reported_subject_with_group_and_channel(monkeypatch):
     from reverse_image_search_bot import settings
     from reverse_image_search_bot.abuse_report import ncmec
