@@ -78,7 +78,8 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             language_code TEXT,
             first_seen    INTEGER NOT NULL,
             last_seen     INTEGER NOT NULL,
-            banned_at     INTEGER
+            banned_at     INTEGER,
+            created_at    INTEGER
         )
     """)
     conn.execute("""
@@ -91,7 +92,8 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             user_id           INTEGER NOT NULL REFERENCES users(user_id),
             group_id          INTEGER,
             channel_id        INTEGER,
-            file_id           TEXT
+            file_id           TEXT,
+            created_at        INTEGER
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_files_user ON files(user_id)")
@@ -109,7 +111,8 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             username   TEXT,
             first_seen INTEGER NOT NULL,
             last_seen  INTEGER NOT NULL,
-            banned_at  INTEGER
+            banned_at  INTEGER,
+            created_at INTEGER
         )
     """)
 
@@ -120,6 +123,15 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     _add_column_if_missing(conn, "files", "file_id", "TEXT")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_files_group ON files(group_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_files_channel ON files(channel_id)")
+
+    # created_at on every table (reports already has one). Backfill existing rows
+    # from the closest pre-existing timestamp so old rows aren't left NULL.
+    _add_column_if_missing(conn, "users", "created_at", "INTEGER")
+    _add_column_if_missing(conn, "chats", "created_at", "INTEGER")
+    _add_column_if_missing(conn, "files", "created_at", "INTEGER")
+    conn.execute("UPDATE users SET created_at = first_seen WHERE created_at IS NULL")
+    conn.execute("UPDATE chats SET created_at = first_seen WHERE created_at IS NULL")
+    conn.execute("UPDATE files SET created_at = upload_time WHERE created_at IS NULL")
 
     # A report round for one user. `report_uuid` is the URL token; `page_secret_hash`
     # gates the report page (P2, stored hashed — the image key P1 is NEVER stored).
@@ -156,7 +168,8 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             video_path      TEXT,
             video_nonce     BLOB,
             video_sha256    TEXT,
-            video_filename  TEXT
+            video_filename  TEXT,
+            created_at      INTEGER
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_blobs_report ON report_blobs(report_uuid)")
@@ -165,6 +178,7 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     _add_column_if_missing(conn, "report_blobs", "video_nonce", "BLOB")
     _add_column_if_missing(conn, "report_blobs", "video_sha256", "TEXT")
     _add_column_if_missing(conn, "report_blobs", "video_filename", "TEXT")
+    _add_column_if_missing(conn, "report_blobs", "created_at", "INTEGER")
     conn.commit()
 
 
@@ -185,8 +199,8 @@ def record_user(
     now = _now()
     conn.execute(
         """
-        INSERT INTO users (user_id, username, first_name, last_name, language_code, first_seen, last_seen)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO users (user_id, username, first_name, last_name, language_code, first_seen, last_seen, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(user_id) DO UPDATE SET
             username      = excluded.username,
             first_name    = excluded.first_name,
@@ -194,7 +208,7 @@ def record_user(
             language_code = excluded.language_code,
             last_seen     = excluded.last_seen
         """,
-        (user_id, username, first_name, last_name, language_code, now, now),
+        (user_id, username, first_name, last_name, language_code, now, now, now),
     )
     conn.commit()
 
@@ -220,14 +234,26 @@ def record_file(
     to report the actual uploaded media, not just a still frame.
     """
     conn = _get_conn()
+    now = _now()
     conn.execute(
         """
         INSERT OR IGNORE INTO files
             (file_unique_id, saved_filename, original_filename, file_type,
-             upload_time, user_id, group_id, channel_id, file_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             upload_time, user_id, group_id, channel_id, file_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (file_unique_id, saved_filename, original_filename, file_type, _now(), user_id, group_id, channel_id, file_id),
+        (
+            file_unique_id,
+            saved_filename,
+            original_filename,
+            file_type,
+            now,
+            user_id,
+            group_id,
+            channel_id,
+            file_id,
+            now,
+        ),
     )
     conn.commit()
 
@@ -248,15 +274,15 @@ def record_chat(
     now = _now()
     conn.execute(
         """
-        INSERT INTO chats (chat_id, chat_type, title, username, first_seen, last_seen)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO chats (chat_id, chat_type, title, username, first_seen, last_seen, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(chat_id) DO UPDATE SET
             chat_type = excluded.chat_type,
             title     = excluded.title,
             username  = excluded.username,
             last_seen = excluded.last_seen
         """,
-        (chat_id, chat_type, title, username, now, now),
+        (chat_id, chat_type, title, username, now, now, now),
     )
     conn.commit()
 
@@ -273,11 +299,11 @@ def set_banned(user_id: int, banned: bool) -> None:
     now = _now() if banned else None
     conn.execute(
         """
-        INSERT INTO users (user_id, first_seen, last_seen, banned_at)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO users (user_id, first_seen, last_seen, banned_at, created_at)
+        VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(user_id) DO UPDATE SET banned_at = excluded.banned_at
         """,
-        (user_id, _now(), _now(), now),
+        (user_id, _now(), _now(), now, _now()),
     )
     conn.commit()
 
@@ -463,10 +489,10 @@ def add_report_blob(
     cur = conn.execute(
         """
         INSERT INTO report_blobs
-            (report_uuid, file_unique_id, saved_filename, nonce, ciphertext, plaintext_sha256)
-        VALUES (?, ?, ?, ?, ?, ?)
+            (report_uuid, file_unique_id, saved_filename, nonce, ciphertext, plaintext_sha256, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        (report_uuid, file_unique_id, saved_filename, nonce, ciphertext, plaintext_sha256),
+        (report_uuid, file_unique_id, saved_filename, nonce, ciphertext, plaintext_sha256, _now()),
     )
     conn.commit()
     return int(cur.lastrowid or 0)

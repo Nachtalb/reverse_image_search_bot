@@ -46,6 +46,10 @@
   .thumb .reported-cls b { color: #fff; font-weight: 700; }
   .thumb .fname { position: absolute; top: 0; left: 0; right: 0; background: rgba(0,0,0,.72); color: #cfd0d6; font-size: 10px; padding: 3px 5px; word-break: break-all; line-height: 1.2; }
   .thumb .vmark { position: absolute; top: 3px; right: 3px; font-size: 15px; filter: drop-shadow(0 1px 2px #000); pointer-events: none; }
+  /* Centered play-triangle overlay marking a video-backed thumbnail. */
+  .thumb .playicon { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+  .thumb .playicon::after { content: ""; width: 0; height: 0; border-style: solid; border-width: 11px 0 11px 19px; border-color: transparent transparent transparent rgba(255,255,255,.92); filter: drop-shadow(0 0 3px rgba(0,0,0,.8)); margin-left: 3px; }
+  .thumb .playicon .disc { position: absolute; width: 42px; height: 42px; border-radius: 50%; background: rgba(0,0,0,.45); }
   .status { padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
   .status.preparing, .status.submitting { background: #4a3a10; color: #f0c674; }
   .status.ready { background: #103a2a; color: #7fd6a2; }
@@ -139,7 +143,7 @@
 <dialog id="viewer">
   <div class="dlg-body">
     <img id="viewer-img" src="" alt="">
-    <video id="viewer-vid" class="hidden" controls playsinline style="display:block;max-width:96vw;max-height:88vh;border-radius:10px"></video>
+    <video id="viewer-vid" class="hidden" controls muted autoplay playsinline style="display:block;max-width:96vw;max-height:88vh;border-radius:10px"></video>
     <div id="viewer-name" class="muted" style="text-align:center;margin-top:6px;word-break:break-all"></div>
     <div class="row" id="viewer-actions" style="justify-content:center;margin-top:8px"></div>
     <div class="muted center" id="viewer-msg" style="margin-top:6px;color:#f0c674"></div>
@@ -280,8 +284,8 @@ async function decryptThumb(b) {
   hasVideo[b.id] = !!b.has_video;
   const el = document.querySelector(`.thumb[data-id="${b.id}"]`);
   const fname = `<div class="fname">${escapeHtml(b.saved_filename)}</div>`;
-  // A 🎬 marker flags images that have (or can fetch) a source video.
-  const vmark = b.has_video ? `<div class="vmark" title="has source video">🎬</div>` : "";
+  // A centered play-triangle overlay flags images that have a source video.
+  const vmark = b.has_video ? `<div class="playicon"><span class="disc"></span></div>` : "";
   // After filing the report is immutable — show the reported category as a
   // read-only badge (like the review preview) instead of the interactive selector.
   const filed = META.status === "filed";
@@ -350,41 +354,41 @@ function openViewer(blobId) {
   img.src = thumbUrls[blobId]; img.classList.remove("hidden");
   $("viewer-name").textContent = blobNames[blobId] || "";
   $("viewer-msg").textContent = "";
-  const actions = $("viewer-actions"); actions.innerHTML = "";
-  if (hasVideo[blobId]) {
-    const b = document.createElement("button");
-    b.textContent = videoUrls[blobId] ? "▶ Play source video" : "🎬 Load source video";
-    b.onclick = () => showVideo(blobId, b);
-    actions.appendChild(b);
-  }
+  $("viewer-actions").innerHTML = "";
   viewer.showModal();
+  // Video-backed thumbnails auto-load and autoplay (muted) — no extra click.
+  if (hasVideo[blobId]) showVideo(blobId);
 }
 
-async function showVideo(blobId, btn) {
+async function showVideo(blobId) {
   const vid = $("viewer-vid"), img = $("viewer-img"), msg = $("viewer-msg");
-  // Already decrypted this session? Just swap it in.
-  if (videoUrls[blobId]) { img.classList.add("hidden"); vid.src = videoUrls[blobId]; vid.classList.remove("hidden"); return; }
+  const play = () => {
+    img.classList.add("hidden");
+    vid.src = videoUrls[blobId];
+    vid.muted = true;              // sound off
+    vid.classList.remove("hidden");
+    vid.play().catch(() => {});    // autoplay (muted autoplay is allowed)
+  };
+  if (videoUrls[blobId]) { play(); return; }
   if (!P1KEY) { msg.textContent = "Decrypt the images first (the key is needed for the video)."; return; }
-  btn.disabled = true; msg.textContent = "Fetching video…";
+  msg.textContent = "Loading video…";
   try {
-    // Ask the server to lazily download + encrypt the original video (best-effort).
+    // Lazily download + encrypt the original video server-side (best-effort).
     const fr = await api(`/api/blob/${blobId}/fetch_video`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ image_key: $("p1").value }),
     });
     const fj = await fr.json();
-    if (!fj.ok) { msg.textContent = "Video unavailable: " + (fj.reason || "unknown"); btn.disabled = false; return; }
-    // Fetch the encrypted video, decrypt locally.
+    if (!fj.ok) { msg.textContent = "Video unavailable: " + (fj.reason || "unknown"); return; }
     const r = await api(`/api/blob/${blobId}/video`);
     const buf = new Uint8Array(await r.arrayBuffer());
     const nonce = buf.slice(0, 12), ct = buf.slice(12);
     const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce }, P1KEY, ct);
-    const url = URL.createObjectURL(new Blob([plain]));
-    videoUrls[blobId] = url;
-    img.classList.add("hidden"); vid.src = url; vid.classList.remove("hidden");
+    videoUrls[blobId] = URL.createObjectURL(new Blob([plain]));
     msg.textContent = "";
+    play();
   } catch (e) {
-    msg.textContent = "Video load failed: " + e.message; btn.disabled = false;
+    msg.textContent = "Video load failed: " + e.message;
   }
 }
 

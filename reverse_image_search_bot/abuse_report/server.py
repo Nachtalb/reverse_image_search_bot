@@ -344,6 +344,17 @@ async def api_submit(request: web.Request) -> web.Response:
     if not selected:
         raise web.HTTPBadRequest(text="no images selected")
 
+    # Ensure EVERY selected video is fetched — not just the ones the admin opened
+    # in the viewer. Any selected blob whose upload was a video but has no video
+    # yet is lazily fetched now (best-effort; failures degrade to frame-only).
+    bot = request.app.get("bot")
+    if bot is not None:
+        for b in selected:
+            if not b.get("video_path"):
+                await abuse_video.fetch_and_encrypt_video(bot, b, p1)
+        # Re-read so the freshly-fetched video columns are visible below.
+        selected = abuse.report_blobs(rep["report_uuid"], selected_only=True)
+
     key = crypto.derive_key(p1)
     files = []
     base = settings.UPLOADER.get("configuration", {}).get("path")

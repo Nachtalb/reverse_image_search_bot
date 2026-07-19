@@ -31,14 +31,17 @@ def test_files_table_has_file_id_after_migration(tmp_path, monkeypatch):
     """Old files table (no file_id) migrates cleanly, keeping existing rows."""
     db = tmp_path / "old.db"
     c = sqlite3.connect(str(db))
-    c.execute("CREATE TABLE users(user_id INTEGER PRIMARY KEY, banned_at INTEGER)")
+    c.execute(
+        "CREATE TABLE users(user_id INTEGER PRIMARY KEY, username TEXT, first_name TEXT, last_name TEXT, "
+        "language_code TEXT, first_seen INTEGER NOT NULL, last_seen INTEGER NOT NULL, banned_at INTEGER)"
+    )
     c.execute(
         "CREATE TABLE files(file_unique_id TEXT PRIMARY KEY, saved_filename TEXT NOT NULL, "
         "original_filename TEXT, file_type TEXT, upload_time INTEGER NOT NULL, user_id INTEGER NOT NULL, "
         "group_id INTEGER, channel_id INTEGER)"
     )
-    c.execute("INSERT INTO users VALUES (7, NULL)")
-    c.execute("INSERT INTO files VALUES ('u1','u1.jpg',NULL,'photo',1,7,NULL,NULL)")
+    c.execute("INSERT INTO users VALUES (7, 'u', 'U', NULL, NULL, 1000, 2000, NULL)")
+    c.execute("INSERT INTO files VALUES ('u1','u1.jpg',NULL,'photo',1500,7,NULL,NULL)")
     c.commit()
     c.close()
     import reverse_image_search_bot.settings as settings
@@ -66,6 +69,7 @@ def test_record_file_stores_file_id(abuse):
     rec = abuse.file_by_unique_id("v1")
     assert rec["file_id"] == "BAADvid"
     assert rec["file_type"] == "video"
+    assert rec["created_at"] is not None and rec["created_at"] > 0
 
 
 def test_blob_video_attach_and_meta(abuse):
