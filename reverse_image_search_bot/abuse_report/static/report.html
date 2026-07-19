@@ -42,6 +42,8 @@
   .thumb .cls { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.72); padding: 5px; display: flex; gap: 4px; justify-content: center; }
   .thumb .cls span { font-size: 14px; font-weight: 700; padding: 5px 9px; border-radius: 6px; background: #2a2c33; cursor: pointer; }
   .thumb .cls span.on { background: #3a6df0; color: #fff; }
+  .thumb .reported-cls { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(15,47,90,.92); color: #8ab4ff; font-size: 11px; font-weight: 600; padding: 4px 6px; text-align: center; line-height: 1.2; }
+  .thumb .reported-cls b { color: #fff; font-weight: 700; }
   .thumb .fname { position: absolute; top: 0; left: 0; right: 0; background: rgba(0,0,0,.72); color: #cfd0d6; font-size: 10px; padding: 3px 5px; word-break: break-all; line-height: 1.2; }
   .status { padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
   .status.preparing, .status.submitting { background: #4a3a10; color: #f0c674; }
@@ -271,11 +273,15 @@ async function decryptThumb(b) {
   blobNames[b.id] = b.saved_filename;
   const el = document.querySelector(`.thumb[data-id="${b.id}"]`);
   const fname = `<div class="fname">${escapeHtml(b.saved_filename)}</div>`;
-  el.innerHTML = `<img src="${url}" alt="">` + fname + clsBar(b.id);
+  // After filing the report is immutable — show the reported category as a
+  // read-only badge (like the review preview) instead of the interactive selector.
+  const filed = META.status === "filed";
+  const clsMarkup = filed ? reportedTag(b.id) : clsBar(b.id);
+  el.innerHTML = `<img src="${url}" alt="">` + fname + clsMarkup;
   // Clicking the image opens the full-size viewer (not select).
   el.querySelector("img").onclick = () => openViewer(url, b.saved_filename);
   if (sel[b.id] !== undefined) el.classList.add("selected");
-  wireCls(b.id);
+  if (!filed) wireCls(b.id);
 }
 
 function escapeHtml(s) {
@@ -286,6 +292,19 @@ function clsBar(id) {
   const cur = sel[id];
   return `<div class="cls">` + ["A1", "A2", "B1", "B2"].map(c =>
     `<span data-cls="${c}" class="${cur === c ? "on" : ""}">${c}</span>`).join("") + `</div>`;
+}
+
+// Read-only reported-category badge for a filed report (immutable). Shows the
+// class code + its meaning, mirroring how the review preview labels each image.
+const CLS_LABEL = {
+  A1: "prepubescent · sex act", A2: "prepubescent · lascivious",
+  B1: "pubescent · sex act", B2: "pubescent · lascivious",
+};
+function reportedTag(id) {
+  const c = sel[id];
+  if (!c) return "";
+  return `<div class="reported-cls" title="Reported as ${c} — ${CLS_LABEL[c]}">` +
+    `<b>${c}</b> ${escapeHtml(CLS_LABEL[c] || "")}</div>`;
 }
 
 // The A1–B2 buttons select the image AND set its classification. Tapping the
