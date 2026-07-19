@@ -56,12 +56,18 @@ class PrepareResult:
         encrypted: int = 0,
         error: str | None = None,
         existing_uuid: str | None = None,
+        filed_uuid: str | None = None,
+        filed_ncmec_id: int | None = None,
     ) -> None:
         self.report_uuid = report_uuid
         self.p1 = p1
         self.encrypted = encrypted
         self.error = error
         self.existing_uuid = existing_uuid
+        # Set when the failure is "already filed with NCMEC" so the caller can
+        # show the filed report id + link to it instead of re-parsing the prose.
+        self.filed_uuid = filed_uuid
+        self.filed_ncmec_id = filed_ncmec_id
 
     @property
     def ok(self) -> bool:
@@ -104,7 +110,9 @@ def prepare_report(user_id: int) -> PrepareResult:
                     f"#{filed['ncmec_report_id']}{others}. The plaintext files were "
                     f"deleted from disk after filing (the encrypted copies are kept "
                     f"in that report) — nothing new to report."
-                )
+                ),
+                filed_uuid=filed["report_uuid"],
+                filed_ncmec_id=filed["ncmec_report_id"],
             )
         return PrepareResult(
             error=f"User {user_id} has {len(files)} recorded file(s) but none are still on disk — nothing to report."
