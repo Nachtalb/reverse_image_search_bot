@@ -48,7 +48,7 @@ from .commands.feedback import (
     feedback_received,
     feedback_reply_handler,
 )
-from .commands.report import report_command, reports_command
+from .commands.report import bulk_report_command, report_command, reports_command
 from .config import abuse
 from .i18n import available_languages, t
 from .metrics import start_metrics_server
@@ -367,6 +367,7 @@ def main():
     app.add_handler(CommandHandler("check", check_command, filters=ADMIN_FILTER), group=1)
     app.add_handler(CommandHandler("report", report_command, filters=ADMIN_FILTER), group=1)
     app.add_handler(CommandHandler("reports", reports_command, filters=ADMIN_FILTER), group=1)
+    app.add_handler(CommandHandler("bulkreport", bulk_report_command, filters=ADMIN_FILTER), group=1)
     app.add_handler(CommandHandler("search", search_command))
     app.add_handler(CommandHandler(("settings", "conf", "pref"), settings_command))
 

@@ -15,6 +15,7 @@ from __future__ import annotations
 import contextlib
 import html
 import logging
+import re
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, MenuButtonWebApp, Update, WebAppInfo
 from telegram.ext import ContextTypes
@@ -24,6 +25,12 @@ from reverse_image_search_bot.abuse_report.prepare import prepare_report, resolv
 from reverse_image_search_bot.config import abuse
 
 logger = logging.getLogger("abuse.commands")
+
+# Cloudflare CSAM reports list our public file URLs like
+#   https://ris.naa.gg/f/AQADsAxrG35d6EZ9.jpg
+# (often defanged: hxxps://ris.naa[.]gg/f/…). The /f/<file> path segment is never
+# defanged, so match the filename right after /f/. Case-insensitive extension.
+_CF_FILE_RE = re.compile(r"/f/([A-Za-z0-9_\-]+\.[A-Za-z0-9]+)")
 
 
 async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -42,6 +49,106 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     await start_report(update, context, user_id)
+
+
+async def bulk_report_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Bulk-check pasted Cloudflare file URLs and open a report per new uploader.
+
+    Paste the ``URLs:`` line from a Cloudflare CSAM report (defanged or not). We
+    regex out every ``/f/<file>`` name, resolve each to its uploader, and for each
+    UNIQUE user with files still on disk create one encrypted report round —
+    then DM a combined list of the new reports with each user's image key (P1).
+    Users whose files were already filed (or already have an active report) are
+    listed as skipped, so you can see at a glance what's new vs already handled.
+    """
+    assert update.message and update.message.text and update.effective_user
+    metrics.commands_total.labels(command="bulk_report").inc()
+
+    text = update.message.text
+    filenames = list(dict.fromkeys(_CF_FILE_RE.findall(text)))  # de-dup, keep order
+    if not filenames:
+        await update.message.reply_text(
+            "No file URLs found. Paste the Cloudflare report's URLs line, e.g.\n"
+            "/bulkreport URLs: https://ris.naa.gg/f/AQAD….jpg, https://ris.naa.gg/f/AgAD….jpg"
+        )
+        return
+
+    # Map each file → uploader. Group filenames per user; track files with no
+    # known uploader separately.
+    users_files: dict[int, list[str]] = {}
+    unknown: list[str] = []
+    for fn in filenames:
+        uid = abuse.find_user_by_filename(fn)
+        if uid is None:
+            unknown.append(fn)
+        else:
+            users_files.setdefault(uid, []).append(fn)
+
+    created: list[dict] = []  # {user_id, username, p1, uuid, encrypted}
+    skipped: list[str] = []  # human-readable lines
+
+    for uid in users_files:
+        user = abuse.get_user(uid) or {}
+        uname = f"@{user['username']}" if user.get("username") else "—"
+        result = prepare_report(uid)
+        if result.ok:
+            created.append(
+                {
+                    "user_id": uid,
+                    "username": uname,
+                    "p1": result.p1 or "",
+                    "uuid": result.report_uuid,
+                    "encrypted": result.encrypted,
+                }
+            )
+        else:
+            # Already-filed / active-report / nothing-on-disk — surface the reason.
+            reason = (result.error or "could not prepare").split("\n")[0]
+            skipped.append(f"• <code>{uid}</code> ({html.escape(uname)}) — {html.escape(reason)}")
+
+    # Point the admin's menu button at the reports console so they can open the
+    # new reports (each unlocked with the global page password + its P1 below).
+    console_url = f"{settings.REPORT_BASE_URL}/report/console" if settings.REPORT_BASE_URL else None
+    if console_url:
+        with contextlib.suppress(Exception):
+            await context.bot.set_chat_menu_button(
+                chat_id=update.effective_user.id,
+                menu_button=MenuButtonWebApp(text="Reports", web_app=WebAppInfo(url=console_url)),
+            )
+
+    # Build the combined report. Header stats first.
+    lines = [
+        f"<b>Bulk report</b> — {len(filenames)} file(s), {len(users_files)} uploader(s).",
+        f"<b>New reports:</b> {len(created)} · <b>Skipped:</b> {len(skipped)} · <b>Unknown files:</b> {len(unknown)}",
+    ]
+    if created:
+        lines.append("")
+        lines.append("<b>🆕 New reports (open via the Reports menu button):</b>")
+        for c in created:
+            url = f"{settings.REPORT_BASE_URL}/report/{c['uuid']}" if settings.REPORT_BASE_URL else ""
+            lines.append(
+                f"• <code>{c['user_id']}</code> ({html.escape(c['username'])}) — "
+                f"{c['encrypted']} file(s)\n"
+                f"  <b>P1:</b> <code>{html.escape(c['p1'])}</code>" + (f"\n  {html.escape(url)}" if url else "")
+            )
+    if skipped:
+        lines.append("")
+        lines.append("<b>⏭ Skipped (already filed / active / nothing on disk):</b>")
+        lines.extend(skipped)
+    if unknown:
+        lines.append("")
+        lines.append("<b>❓ Unknown files (no uploader on record):</b>")
+        lines.append(html.escape(", ".join(unknown)))
+
+    # 4096-char safe chunking on line boundaries.
+    chunk = ""
+    for line in lines:
+        if len(chunk) + len(line) + 1 > 4000:
+            await update.message.reply_html(chunk, disable_web_page_preview=True)
+            chunk = ""
+        chunk += line + "\n"
+    if chunk:
+        await update.message.reply_html(chunk, disable_web_page_preview=True)
 
 
 async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int) -> None:
