@@ -420,6 +420,7 @@ async def api_submit(request: web.Request) -> web.Response:
     abuse.set_report_ncmec_id(rep["report_uuid"], report_id)
     abuse.mark_report_filed(rep["report_uuid"])
     _cleanup_after_finish(rep)
+    _ban_reported_user(request.app.get("bot_data"), rep["user_id"])
     return web.json_response({"ok": True, "ncmec_report_id": report_id, "status": abuse.REPORT_FILED})
 
 
@@ -453,6 +454,29 @@ async def api_cancel(request: web.Request) -> web.Response:
 def _public_file_url(saved_filename: str) -> str:
     base = settings.UPLOADER.get("url", "").rstrip("/")
     return f"{base}/{saved_filename}" if base else saved_filename
+
+
+def _ban_reported_user(bot_data, user_id: int) -> None:
+    """Ban the reported uploader on filing: DB + live in-memory list.
+
+    Mirrors /ban's dual-write so the ban takes effect immediately without a
+    restart. ``set_banned`` is the durable record (survives a cleared pickle,
+    restored on the next startup sync); appending to ``bot_data['banned_users']``
+    is what the live search handler actually checks. ``bot_data`` may be None in
+    tests / when the server runs bot-less — the DB write still happens.
+    """
+    try:
+        abuse.set_banned(user_id, True)
+    except Exception:
+        logger.warning("failed to set DB ban for reported user %s", user_id, exc_info=True)
+    if bot_data is None:
+        return
+    try:
+        banned = bot_data.setdefault("banned_users", [])
+        if user_id not in banned:
+            banned.append(user_id)
+    except Exception:
+        logger.warning("failed to live-ban reported user %s", user_id, exc_info=True)
 
 
 def _cleanup_after_finish(rep: dict) -> None:
@@ -497,9 +521,13 @@ async def healthz(request: web.Request) -> web.Response:
     return web.Response(text="ok")
 
 
-def build_app(bot=None) -> web.Application:
+def build_app(bot=None, bot_data=None) -> web.Application:
     app = web.Application(client_max_size=64 * 1024 * 1024)
     app["bot"] = bot  # PTB Bot for out-of-band DMs (report-created notification)
+    # The live Application.bot_data dict — same object handlers read via
+    # context.bot_data. Lets the report server live-ban a user on filing (append
+    # to banned_users) with no restart, matching /ban's dual-write.
+    app["bot_data"] = bot_data
     app.router.add_get("/report/console", reports_index)
     app.router.add_get("/report/console/api/list", api_reports_list)
     app.router.add_post("/report/console/api/create", api_reports_create)
@@ -516,12 +544,12 @@ def build_app(bot=None) -> web.Application:
     return app
 
 
-async def start_report_server(bot=None) -> web.AppRunner | None:
+async def start_report_server(bot=None, bot_data=None) -> web.AppRunner | None:
     """Start the aiohttp server if enabled. Returns the runner (for shutdown)."""
     if not settings.REPORT_SERVER_ENABLED:
         logger.info("Report server disabled (REPORT_SERVER_ENABLED not set)")
         return None
-    app = build_app(bot=bot)
+    app = build_app(bot=bot, bot_data=bot_data)
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, settings.REPORT_SERVER_HOST, settings.REPORT_SERVER_PORT)

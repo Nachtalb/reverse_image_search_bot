@@ -232,7 +232,14 @@ async def test_submit_files_and_finishes_and_keeps_blobs(abuse, monkeypatch, tmp
     bid = abuse.blob_meta("u")[0]["id"]
     abuse.set_blob_selection("u", {bid: "A1"})
 
-    req = _req(headers={"X-Page-Secret": ""}, match={"uuid": "u"}, json_body={"image_key": p1})
+    # Pass a live bot_data so the finish path can live-ban the uploader.
+    bot_data: dict = {}
+    req = _req(
+        headers={"X-Page-Secret": ""},
+        match={"uuid": "u"},
+        json_body={"image_key": p1},
+        app={"bot": None, "bot_data": bot_data},
+    )
     resp = await server.api_submit(req)
     import json
 
@@ -253,6 +260,9 @@ async def test_submit_files_and_finishes_and_keeps_blobs(abuse, monkeypatch, tmp
     assert rep["ncmec_report_id"] == 987654
     assert not (updir / "A.jpg").exists()
     assert len(abuse.blob_meta("u")) == 1
+    # Filing auto-bans the uploader: durable DB record AND the live in-memory list.
+    assert abuse.is_banned(1)
+    assert 1 in bot_data["banned_users"]
 
 
 @pytest.mark.asyncio

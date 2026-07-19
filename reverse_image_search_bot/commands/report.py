@@ -16,7 +16,7 @@ import contextlib
 import html
 import logging
 
-from telegram import MenuButtonWebApp, Update, WebAppInfo
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, MenuButtonWebApp, Update, WebAppInfo
 from telegram.ext import ContextTypes
 
 from reverse_image_search_bot import metrics, settings
@@ -114,27 +114,23 @@ async def reports_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             menu_button_set = True
 
     reports = abuse.all_reports()
-    header = (
-        "Tap the <b>Reports</b> menu button (bottom-left ⊞) to open the reports console "
-        "(list, open a report, or create a new one)."
-        if menu_button_set
-        else "Reports console:"
-    )
-    if not reports:
-        await update.message.reply_html(f"{header}\n\nNo reports on file yet.")
+    count = len(reports)
+    if menu_button_set:
+        summary = "No reports on file yet." if not count else f"{count} report{'s' if count != 1 else ''} on file."
+        await update.message.reply_html(
+            f"{summary} Tap the <b>Reports</b> menu button (bottom-left ⊞) to open the reports console "
+            "(list, open a report, or create a new one)."
+        )
         return
 
-    lines = [header, "", "<b>Abuse reports:</b>"]
-    for r in reports:
-        uname = f"@{r['username']}" if r.get("username") else str(r["user_id"])
-        ncmec = f" · NCMEC #{r['ncmec_report_id']}" if r.get("ncmec_report_id") else ""
-        lines.append(f"• <code>{r['report_uuid'][:8]}</code> {html.escape(uname)} — <b>{r['status']}</b>{ncmec}")
-    # 4096-char safe chunking
-    chunk = ""
-    for line in lines:
-        if len(chunk) + len(line) + 1 > 4000:
-            await update.message.reply_html(chunk)
-            chunk = ""
-        chunk += line + "\n"
-    if chunk:
-        await update.message.reply_html(chunk)
+    # Fallback when no menu button could be set (no REPORT_BASE_URL): give a link.
+    url = f"{settings.REPORT_BASE_URL}/report/console" if settings.REPORT_BASE_URL else None
+    if url:
+        await update.message.reply_html(
+            f"{count} report{'s' if count != 1 else ''} on file.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Open reports console", url=url)]]),
+        )
+    else:
+        await update.message.reply_html(
+            f"{count} report{'s' if count != 1 else ''} on file. (Reports console URL not configured.)"
+        )
