@@ -32,6 +32,11 @@ _local = threading.local()
 _all_connections: list[sqlite3.Connection] = []
 _conn_lock = threading.Lock()
 
+# Telegram media types whose upload can carry a source video/animation. Photos
+# never do. Used to offer the video in the report viewer before any fetch and to
+# gate the lazy video-fetch path.
+VIDEO_CAPABLE_FILE_TYPES = ("video", "gif", "sticker", "document")
+
 
 def _get_conn() -> sqlite3.Connection:
     """Return a thread-local SQLite connection with WAL mode + schema ensured."""
@@ -571,20 +576,24 @@ def report_blobs(report_uuid: str, *, selected_only: bool = False) -> list[dict]
 def blob_meta(report_uuid: str) -> list[dict]:
     """Blob metadata WITHOUT ciphertext (for the gallery listing / status).
 
-    ``has_video`` tells the browser to offer the video in the viewer; the
-    ciphertext itself (image in DB, video on disk) is fetched via the blob
-    endpoints only after the admin supplies P1.
+    ``has_video`` tells the browser to offer the video in the viewer. It is true
+    if the video was already fetched (``video_filename`` set) OR the source upload
+    is a video-capable type — so the viewer offers the video from the very first
+    open, not only after a fetch has happened. The ciphertext itself (image in DB,
+    video on disk) is fetched via the blob endpoints only after the admin supplies P1.
     """
     conn = _get_conn()
     rows = conn.execute(
-        "SELECT id, file_unique_id, saved_filename, plaintext_sha256, selected, classification, video_filename "
-        "FROM report_blobs WHERE report_uuid = ? ORDER BY id",
+        "SELECT b.id, b.file_unique_id, b.saved_filename, b.plaintext_sha256, b.selected, "
+        "b.classification, b.video_filename, f.file_type "
+        "FROM report_blobs b LEFT JOIN files f ON f.file_unique_id = b.file_unique_id "
+        "WHERE b.report_uuid = ? ORDER BY b.id",
         (report_uuid,),
     ).fetchall()
     out = []
     for r in rows:
         d = dict(r)
-        d["has_video"] = bool(d.get("video_filename"))
+        d["has_video"] = bool(d.get("video_filename")) or (d.pop("file_type", None) in VIDEO_CAPABLE_FILE_TYPES)
         out.append(d)
     return out
 

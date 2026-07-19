@@ -93,6 +93,30 @@ def test_blob_video_attach_and_meta(abuse):
     assert row["video_sha256"] == "vh"
 
 
+def test_blob_meta_has_video_from_file_type_before_fetch(abuse):
+    """A video-typed upload flags has_video from the start — no fetch required.
+
+    Regression: the viewer needs has_video True on first open (to auto-load), but
+    video_filename is only set AFTER a fetch. has_video must therefore also derive
+    from the source files.file_type via the LEFT JOIN.
+    """
+    abuse.record_user(9, username="v")
+    abuse.record_file("v1", saved_filename="v1.jpg", user_id=9, file_type="video", file_id="BAADvid")
+    abuse.record_file("p1", saved_filename="p1.jpg", user_id=9, file_type="photo", file_id="BAADpho")
+    abuse.create_report("r1", 9, "")
+    abuse.add_report_blob(
+        "r1", file_unique_id="v1", saved_filename="v1.jpg", nonce=b"n" * 12, ciphertext=b"c", plaintext_sha256="h"
+    )
+    abuse.add_report_blob(
+        "r1", file_unique_id="p1", saved_filename="p1.jpg", nonce=b"n" * 12, ciphertext=b"c", plaintext_sha256="h2"
+    )
+    meta = {m["file_unique_id"]: m for m in abuse.blob_meta("r1")}
+    assert meta["v1"]["has_video"] is True  # video upload → offered before any fetch
+    assert meta["p1"]["has_video"] is False  # photo upload → never a source video
+    # file_type is an internal join column, not part of the browser payload.
+    assert "file_type" not in meta["v1"]
+
+
 @pytest.mark.asyncio
 async def test_fetch_and_encrypt_video_roundtrip(abuse, monkeypatch, tmp_path):
     """The happy path: bot returns a small video, it gets encrypted on disk and

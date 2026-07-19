@@ -57,7 +57,7 @@ async def fetch_and_encrypt_video(bot, blob: dict, p1: str) -> VideoFetchResult:
     rec = abuse.file_by_unique_id(blob["file_unique_id"])
     if not rec or not rec.get("file_id"):
         return VideoFetchResult(ok=False, reason="no file_id recorded for this upload")
-    if (rec.get("file_type") or "") not in ("video", "gif", "sticker", "document"):
+    if (rec.get("file_type") or "") not in abuse.VIDEO_CAPABLE_FILE_TYPES:
         # Only media that can be a video/animation. Photos have no source video.
         return VideoFetchResult(ok=False, reason="upload is not a video")
 

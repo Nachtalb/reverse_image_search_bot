@@ -55,7 +55,7 @@
   .status.ready { background: #103a2a; color: #7fd6a2; }
   .status.filed { background: #0f2f5a; color: #8ab4ff; }
   .status.error, .status.cancelled { background: #4a1010; color: #f08a8a; }
-  .hidden { display: none; }
+  .hidden { display: none !important; }
   .muted { color: #9a9ba2; font-size: 12px; }
   .cls-legend { font-size: 12px; color: #9a9ba2; margin-bottom: 10px; }
   .cls-legend code { background: #2a2c33; padding: 1px 5px; border-radius: 4px; color: #e8e8ea; }
@@ -254,12 +254,17 @@ function renderMeta() {
 
 function renderGallery() {
   const g = $("gallery"); g.innerHTML = "";
+  const filed = META.status === "filed";
   for (const b of META.blobs) {
     const d = document.createElement("div");
     d.className = "thumb"; d.dataset.id = b.id;
-    d.innerHTML = `<div class="lock">🔒 locked<br><span class="muted">${b.saved_filename}</span></div>`;
-    g.appendChild(d);
     if (b.selected) sel[b.id] = b.classification;
+    // A filed report is immutable: show the reported category on the still-locked
+    // thumbnail from the start, so it's visible without decrypting the images.
+    const badge = filed && b.selected ? reportedTag(b.id) : "";
+    if (badge) d.classList.add("selected");
+    d.innerHTML = `<div class="lock">🔒 locked<br><span class="muted">${escapeHtml(b.saved_filename)}</span></div>` + badge;
+    g.appendChild(d);
   }
   updateSelCount();
 }
