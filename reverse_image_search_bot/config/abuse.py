@@ -680,6 +680,9 @@ def filed_report_stats() -> list[dict]:
                             filed before ``finished_at`` was recorded
       * ``upload_times``  — unix ts of each reported file's ORIGINAL upload, for the
                             weekday×hour "when were they posted" heatmap
+      * ``file_types``    — {file_type: count} of the reported files by their ACTUAL
+                            recorded Telegram type (photo/video/sticker/gif/document/
+                            unknown) — NOT forced into an image/video binary
 
     The reported files' encrypted blobs and their ``files`` rows are kept after
     filing, so the upload times remain resolvable.
@@ -698,18 +701,26 @@ def filed_report_stats() -> list[dict]:
     if not reps:
         return []
 
-    # Upload times of each report's reported files, grouped by report_uuid.
+    # Per-report reported files: upload times (heatmap) + a breakdown by the file's
+    # ACTUAL recorded type. We do NOT infer "video" from capability flags — a
+    # sticker is usually a static image, a document can be anything, so forcing
+    # them into a video bucket would be wrong. Missing/NULL type → "unknown".
     uuids = [r["report_uuid"] for r in reps]
     placeholders = ",".join("?" * len(uuids))
     times: dict[str, list[int]] = {u: [] for u in uuids}
+    file_types: dict[str, dict[str, int]] = {u: {} for u in uuids}
     rows = conn.execute(
-        f"SELECT b.report_uuid, f.upload_time "
-        f"FROM report_blobs b JOIN files f ON f.file_unique_id = b.file_unique_id "
-        f"WHERE b.report_uuid IN ({placeholders}) AND f.upload_time IS NOT NULL",
+        f"SELECT b.report_uuid, f.file_type, f.upload_time "
+        f"FROM report_blobs b LEFT JOIN files f ON f.file_unique_id = b.file_unique_id "
+        f"WHERE b.report_uuid IN ({placeholders})",
         uuids,
     ).fetchall()
     for row in rows:
-        times[row["report_uuid"]].append(row["upload_time"])
+        u = row["report_uuid"]
+        if row["upload_time"] is not None:
+            times[u].append(row["upload_time"])
+        ftype = row["file_type"] or "unknown"
+        file_types[u][ftype] = file_types[u].get(ftype, 0) + 1
 
     return [
         {
@@ -717,6 +728,7 @@ def filed_report_stats() -> list[dict]:
             "language": r["language"],
             "finished_at": r["reported_at"],
             "upload_times": times.get(r["report_uuid"], []),
+            "file_types": file_types.get(r["report_uuid"], {}),
         }
         for r in reps
     ]

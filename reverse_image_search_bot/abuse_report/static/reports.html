@@ -58,6 +58,12 @@
   .stat-box { background: #1b1d23; border: 1px solid #2a2c33; border-radius: 10px; padding: 14px; }
   .stat-box .n { font-size: 28px; font-weight: 800; color: #8ab4ff; }
   .stat-box .l { font-size: 12px; color: #9a9ba2; margin-top: 2px; }
+  .n2 { font-size: 22px; font-weight: 700; color: #cfd0d6; }
+  /* Language pie + toggle chips */
+  #st-pie path { cursor: default; transition: opacity .12s; }
+  .lang-chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 999px; font-size: 13px; font-weight: 700; cursor: pointer; border: none; color: #fff; user-select: none; }
+  .lang-chip.off { opacity: .32; }
+  .lang-chip .tick { font-size: 12px; }
   .bar-row { display: flex; align-items: center; gap: 8px; margin: 5px 0; font-size: 13px; }
   .bar-row .lbl { width: 92px; flex-shrink: 0; color: #cfd0d6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .bar-row .bar { height: 16px; background: #3a6df0; border-radius: 4px; min-width: 2px; }
@@ -132,8 +138,9 @@
       <div class="card">
         <div class="row" style="justify-content:space-between;align-items:flex-end">
           <div>
-            <div class="muted">Filed reports (cancelled excluded)</div>
+            <div class="muted">Total files reported</div>
             <div class="stat-counter" id="st-counter">—</div>
+            <div class="row" id="st-filebreak" style="gap:0;margin-top:8px;align-items:center;flex-wrap:wrap"></div>
           </div>
           <div class="row">
             <select id="st-year" title="Year"></select>
@@ -148,14 +155,16 @@
       </div>
 
       <div class="card">
-        <b>By language</b>
-        <div id="st-lang" style="margin-top:10px"></div>
+        <b>Languages</b>
+        <div id="st-pie-wrap" style="display:flex;justify-content:center;margin:12px 0">
+          <svg id="st-pie" viewBox="0 0 200 200" width="220" height="220" role="img"></svg>
+        </div>
+        <div class="row" id="st-lang-chips" style="justify-content:center"></div>
       </div>
 
       <div class="card">
-        <b>When posted — weekday × hour</b>
-        <div class="muted" style="margin:4px 0 10px">All reported files, by original upload time (local). Sun–Sat × 0–23h.</div>
-        <div class="heat" id="st-heat"></div>
+        <b>Posting Time</b>
+        <div class="heat" id="st-heat" style="margin-top:10px"></div>
       </div>
 
       <div class="err" id="st-err"></div>
@@ -190,7 +199,7 @@ $("unlock-btn").onclick = async () => {
     try { sessionStorage.setItem("ris_report_pw", P2); } catch (e) {}
     $("unlock-card").classList.add("hidden");
     $("body").classList.remove("hidden");
-    $("hdr-sub").textContent = "Unlocked";
+    $("hdr-sub").classList.add("hidden");
   } catch (e) { $("unlock-err").textContent = "" + e.message; P2 = ""; }
 };
 
@@ -359,25 +368,111 @@ function selectedRecords() {
 
 function renderStats() {
   const recs = selectedRecords();
-  $("st-counter").textContent = recs.length;
+  // Aggregate file counts by their ACTUAL type (no forcing).
+  const byType = {};
+  let total = 0;
+  for (const r of recs) {
+    for (const [t, n] of Object.entries(r.file_types || {})) { byType[t] = (byType[t] || 0) + n; total += n; }
+  }
+  $("st-counter").textContent = total;
+  renderFileBreakdown(byType);
   $("st-reports").textContent = recs.length;
   $("st-users").textContent = new Set(recs.map(r => r.user_id)).size;
-  renderLangBars(recs);
+  renderLangPie(recs);
   renderHeatmap(recs);
 }
 
-function renderLangBars(recs) {
+// Nice labels for the recorded Telegram file types.
+const FILE_TYPE_LABEL = { photo: "Photos", video: "Videos", sticker: "Stickers", gif: "GIFs", document: "Documents", unknown: "Unknown" };
+
+// One cell per file type actually present, separated by a thin divider line.
+function renderFileBreakdown(byType) {
+  const box = $("st-filebreak");
+  box.innerHTML = "";
+  const order = ["photo", "video", "sticker", "gif", "document", "unknown"];
+  const types = order.filter(t => byType[t]).concat(Object.keys(byType).filter(t => !order.includes(t)));
+  if (!types.length) { box.innerHTML = `<span class="muted">No files.</span>`; return; }
+  types.forEach((t, i) => {
+    if (i) box.insertAdjacentHTML("beforeend", `<div style="width:1px;height:34px;background:#363842;margin:0 14px"></div>`);
+    box.insertAdjacentHTML("beforeend",
+      `<div style="text-align:center"><div class="n2">${byType[t]}</div>` +
+      `<div class="l">${escapeHtml(FILE_TYPE_LABEL[t] || t)}</div></div>`);
+  });
+}
+
+// Palette for language slices (cycled). Toggling a chip drops that language from
+// the pie and the percentages recompute over the remaining visible languages.
+const PIE_COLORS = ["#54a0ff", "#3a6df0", "#8ac926", "#ffca3a", "#ff6b6b", "#a78bfa", "#26c6da", "#ff9f43", "#c44dff", "#95a5a6"];
+let LANG_OFF = null;  // Set of language codes toggled off (persists across period changes)
+
+function renderLangPie(recs) {
   const counts = {};
   for (const r of recs) { const k = r.language || ""; counts[k] = (counts[k] || 0) + 1; }
-  const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  const box = $("st-lang");
-  if (!rows.length) { box.innerHTML = `<div class="muted">No data for this period.</div>`; return; }
-  const max = rows[0][1];
-  box.innerHTML = rows.map(([code, n]) =>
-    `<div class="bar-row"><span class="lbl" title="${escapeHtml(fmtLang(code))}">${escapeHtml(fmtLang(code))}</span>` +
-    `<span class="bar" style="width:${Math.round((n / max) * 160)}px"></span>` +
-    `<span class="val">${n}</span></div>`
-  ).join("");
+  // Stable order: biggest first, so colors stay put as the period changes.
+  const langs = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+  const color = {};
+  langs.forEach((k, i) => { color[k] = PIE_COLORS[i % PIE_COLORS.length]; });
+  if (LANG_OFF === null) LANG_OFF = new Set();
+
+  // Chips (toggle) — one per language present in this period.
+  const chips = $("st-lang-chips");
+  chips.innerHTML = "";
+  if (!langs.length) { chips.innerHTML = `<div class="muted">No data for this period.</div>`; }
+  for (const k of langs) {
+    const off = LANG_OFF.has(k);
+    const chip = document.createElement("button");
+    chip.className = "lang-chip" + (off ? " off" : "");
+    chip.style.background = color[k];
+    chip.innerHTML = `<span class="tick">${off ? "" : "✓"}</span>${escapeHtml(fmtLang(k))}`;
+    chip.onclick = () => { if (LANG_OFF.has(k)) LANG_OFF.delete(k); else LANG_OFF.add(k); drawPie(counts, langs, color); paintChips(langs, color); };
+    chips.appendChild(chip);
+  }
+  drawPie(counts, langs, color);
+}
+
+function paintChips(langs, color) {
+  const chips = [...$("st-lang-chips").querySelectorAll(".lang-chip")];
+  langs.forEach((k, i) => {
+    const off = LANG_OFF.has(k);
+    chips[i].classList.toggle("off", off);
+    chips[i].querySelector(".tick").textContent = off ? "" : "✓";
+  });
+}
+
+// Draw the pie over only the languages NOT toggled off; percentages recompute.
+function drawPie(counts, langs, color) {
+  const svg = $("st-pie");
+  const visible = langs.filter(k => !LANG_OFF.has(k));
+  const total = visible.reduce((s, k) => s + counts[k], 0);
+  const cx = 100, cy = 100, rad = 96;
+  if (!total) { svg.innerHTML = `<circle cx="100" cy="100" r="96" fill="#1b1d23"/>`; return; }
+  if (visible.length === 1) {  // full circle — a single arc path can't draw 100%
+    svg.innerHTML = `<circle cx="100" cy="100" r="96" fill="${color[visible[0]]}"/>` +
+      pieLabel(cx, cy - 40, "100%");
+    return;
+  }
+  let angle = -Math.PI / 2;  // start at 12 o'clock
+  let out = "";
+  const labels = [];
+  for (const k of visible) {
+    const frac = counts[k] / total;
+    const end = angle + frac * 2 * Math.PI;
+    const large = frac > 0.5 ? 1 : 0;
+    const x1 = cx + rad * Math.cos(angle), y1 = cy + rad * Math.sin(angle);
+    const x2 = cx + rad * Math.cos(end), y2 = cy + rad * Math.sin(end);
+    out += `<path d="M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${rad},${rad} 0 ${large},1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="${color[k]}"><title>${escapeHtml(fmtLang(k))}: ${Math.round(frac * 100)}%</title></path>`;
+    if (frac >= 0.06) {  // only label slices big enough to fit text
+      const mid = angle + frac * Math.PI;
+      const lr = rad * 0.6;
+      labels.push(pieLabel(cx + lr * Math.cos(mid), cy + lr * Math.sin(mid), `${Math.round(frac * 100)}%`));
+    }
+    angle = end;
+  }
+  svg.innerHTML = out + labels.join("");
+}
+
+function pieLabel(x, y, text) {
+  return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" fill="#fff" font-size="15" font-weight="700" text-anchor="middle" dominant-baseline="middle" style="pointer-events:none">${text}</text>`;
 }
 
 // Weekday×hour heatmap of ALL reported files' upload times in the selected period.

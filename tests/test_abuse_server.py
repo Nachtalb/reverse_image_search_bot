@@ -410,8 +410,9 @@ def test_filed_report_stats_filed_only_with_language_and_times(abuse):
     abuse.record_user(1, username="a", language_code="en")
     abuse.record_user(2, username="b", language_code="de")
     abuse.record_user(3, username="c")
-    for uid, fid in [(1, "f1"), (1, "f2"), (2, "f3"), (3, "f4")]:
-        abuse.record_file(fid, saved_filename=f"{fid}.jpg", user_id=uid)
+    # f2 is a sticker (a STATIC IMAGE, must NOT be counted as a video).
+    for uid, fid, ftype in [(1, "f1", "photo"), (1, "f2", "sticker"), (2, "f3", "photo"), (3, "f4", "video")]:
+        abuse.record_file(fid, saved_filename=f"{fid}.jpg", user_id=uid, file_type=ftype)
 
     conn = abuse._get_conn()
     # Deterministic upload_time per file so the heatmap has known inputs.
@@ -452,6 +453,10 @@ def test_filed_report_stats_filed_only_with_language_and_times(abuse):
     assert by_user[3]["upload_times"] == [base + 30]
     # finished_at is populated (drives the year/month dropdowns).
     assert by_user[1]["finished_at"] and by_user[3]["finished_at"]
+    # File-type breakdown reflects the ACTUAL recorded types — a sticker stays a
+    # sticker (NOT a video). User 1: one photo + one sticker. User 3: one video.
+    assert by_user[1]["file_types"] == {"photo": 1, "sticker": 1}
+    assert by_user[3]["file_types"] == {"video": 1}
 
 
 @pytest.mark.asyncio
