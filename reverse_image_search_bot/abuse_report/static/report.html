@@ -38,13 +38,16 @@
   .thumb { position: relative; border: 2px solid #2a2c33; border-radius: 10px; overflow: hidden; background: #101116; aspect-ratio: 1; }
   .thumb.selected { border-color: #3a6df0; }
   .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: zoom-in; }
-  .thumb .lock { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #5a5c66; font-size: 12px; text-align: center; padding: 8px; }
+  .thumb .lock { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #5a5c66; font-size: 26px; pointer-events: none; }
   .thumb .cls { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.72); padding: 5px; display: flex; gap: 4px; justify-content: center; }
   .thumb .cls span { font-size: 14px; font-weight: 700; padding: 5px 9px; border-radius: 6px; background: #2a2c33; cursor: pointer; }
   .thumb .cls span.on { background: #3a6df0; color: #fff; }
   .thumb .reported-cls { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(15,47,90,.92); color: #8ab4ff; font-size: 11px; font-weight: 600; padding: 4px 6px; text-align: center; line-height: 1.2; }
   .thumb .reported-cls b { color: #fff; font-weight: 700; }
   .thumb .fname { position: absolute; top: 0; left: 0; right: 0; background: rgba(0,0,0,.72); color: #cfd0d6; font-size: 10px; padding: 3px 5px; word-break: break-all; line-height: 1.2; }
+  /* Uploader's original filename, shown above our stored name. */
+  .orig { display: block; color: #f0c674; }
+  .preview-item .fn .orig { color: #f0c674; }
   .thumb .vmark { position: absolute; top: 3px; right: 3px; font-size: 15px; filter: drop-shadow(0 1px 2px #000); pointer-events: none; }
   /* Centered play-triangle overlay marking a video-backed thumbnail. */
   .thumb .playicon { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
@@ -208,6 +211,7 @@ let P2 = "", P1KEY = null, META = null;
 const sel = {};       // blobId -> classification (A1/A2/B1/B2)
 const thumbUrls = {}; // blobId -> object URL (for viewer + preview)
 const blobNames = {}; // blobId -> saved_filename
+const blobOrig = {};  // blobId -> uploader's original_filename (may be undefined)
 const hasVideo = {};  // blobId -> bool (source video present/fetchable)
 const videoUrls = {}; // blobId -> decrypted video object URL (cached)
 
@@ -272,7 +276,7 @@ function renderGallery() {
     // thumbnail from the start, so it's visible without decrypting the images.
     const badge = filed && b.selected ? reportedTag(b.id) : "";
     if (badge) d.classList.add("selected");
-    d.innerHTML = `<div class="lock">🔒 locked<br><span class="muted">${escapeHtml(b.saved_filename)}</span></div>` + badge;
+    d.innerHTML = `<div class="fname">${blobLabel(b)}</div><div class="lock">🔒</div>` + badge;
     g.appendChild(d);
   }
   updateSelCount();
@@ -295,9 +299,10 @@ async function decryptThumb(b) {
   const url = URL.createObjectURL(new Blob([plain]));
   thumbUrls[b.id] = url;
   blobNames[b.id] = b.saved_filename;
+  blobOrig[b.id] = b.original_filename;
   hasVideo[b.id] = !!b.has_video;
   const el = document.querySelector(`.thumb[data-id="${b.id}"]`);
-  const fname = `<div class="fname">${escapeHtml(b.saved_filename)}</div>`;
+  const fname = `<div class="fname">${blobLabel(b)}</div>`;
   // A centered play-triangle overlay flags images that have a source video.
   const vmark = b.has_video ? `<div class="playicon"><span class="disc"></span></div>` : "";
   // After filing the report is immutable — show the reported category as a
@@ -314,6 +319,17 @@ async function decryptThumb(b) {
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
+
+// Filename label: uploader's original name (if present AND different) shown ABOVE
+// our stored name. Returns inner HTML for a .fname / .fn container.
+function fileLabel(saved, original) {
+  const s = escapeHtml(saved || "");
+  if (original && original !== saved) {
+    return `<span class="orig" title="original filename">${escapeHtml(original)}</span>${s}`;
+  }
+  return s;
+}
+function blobLabel(b) { return fileLabel(b.saved_filename, b.original_filename); }
 
 function clsBar(id) {
   const cur = sel[id];
@@ -354,7 +370,7 @@ function openViewer(blobId) {
   const vid = $("viewer-vid"), img = $("viewer-img");
   vid.pause(); vid.removeAttribute("src"); vid.classList.add("hidden");
   img.src = thumbUrls[blobId]; img.classList.remove("hidden");
-  $("viewer-name").textContent = blobNames[blobId] || "";
+  $("viewer-name").innerHTML = fileLabel(blobNames[blobId], blobOrig[blobId]);
   $("viewer-msg").textContent = "";
   $("viewer-actions").innerHTML = "";
   renderViewerCls(blobId);
@@ -466,7 +482,7 @@ function buildConfirm(ids) {
     const item = document.createElement("div");
     item.className = "preview-item";
     item.innerHTML = `<img src="${thumbUrls[id]}" alt=""><div class="tag">${sel[id]}</div>` +
-      `<div class="fn">${escapeHtml(blobNames[id] || "")}</div>`;
+      `<div class="fn">${fileLabel(blobNames[id], blobOrig[id])}</div>`;
     grid.appendChild(item);
   }
   // reset dialog to its default (button) state

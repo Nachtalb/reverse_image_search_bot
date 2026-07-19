@@ -115,6 +115,8 @@ def test_blob_meta_has_video_from_file_type_before_fetch(abuse):
     assert meta["p1"]["has_video"] is False  # photo upload → never a source video
     # file_type is an internal join column, not part of the browser payload.
     assert "file_type" not in meta["v1"]
+    # original_filename IS exposed (shown above the stored name in the UI).
+    assert "original_filename" in meta["v1"]
 
 
 @pytest.mark.asyncio

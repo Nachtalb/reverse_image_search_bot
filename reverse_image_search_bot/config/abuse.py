@@ -585,7 +585,7 @@ def blob_meta(report_uuid: str) -> list[dict]:
     conn = _get_conn()
     rows = conn.execute(
         "SELECT b.id, b.file_unique_id, b.saved_filename, b.plaintext_sha256, b.selected, "
-        "b.classification, b.video_filename, f.file_type "
+        "b.classification, b.video_filename, f.file_type, f.original_filename "
         "FROM report_blobs b LEFT JOIN files f ON f.file_unique_id = b.file_unique_id "
         "WHERE b.report_uuid = ? ORDER BY b.id",
         (report_uuid,),
