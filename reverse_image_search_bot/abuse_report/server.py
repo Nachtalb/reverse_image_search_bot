@@ -365,9 +365,22 @@ async def api_submit(request: web.Request) -> web.Response:
             raise web.HTTPBadRequest(text="image key (P1) incorrect — decryption failed") from dec_err
         if crypto.sha256_hex(plaintext) != b["plaintext_sha256"]:
             raise web.HTTPBadRequest(text="image key (P1) incorrect — hash mismatch")
-        # Report the extracted frame/still.
-        files.append({"plaintext": plaintext, "filename": b["saved_filename"], "classification": b["classification"]})
+        # Report the extracted frame/still. original_file_name keeps the
+        # uploader's original name when we have one (important to preserve);
+        # location_of_file is our PUBLIC copy's URL (the one that may have been
+        # used on the web). Two distinct facts in their two distinct NCMEC fields.
+        frec = abuse.file_by_unique_id(b["file_unique_id"]) or {}
+        files.append(
+            {
+                "plaintext": plaintext,
+                "filename": frec.get("original_filename") or b["saved_filename"],
+                "location": _public_file_url(b["saved_filename"]),
+                "classification": b["classification"],
+            }
+        )
         # If this blob has a source video, report it TOO (same classification).
+        # The video is only stored encrypted, never served publicly, so it has an
+        # original filename but no public location.
         if b.get("video_path") and base:
             vfp = Path(base) / b["video_path"]
             if vfp.is_file():

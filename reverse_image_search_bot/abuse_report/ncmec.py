@@ -162,6 +162,8 @@ async def submit_and_finish(
                 report_id=report_id,
                 file_id=file_id,
                 original_file_name=f["filename"],
+                location_of_file=f.get("location") or None,
+                publicly_available=True if f.get("location") else None,
                 file_relevance=FileRelevance.REPORTED,
                 file_viewed_by_esp=True,
                 industry_classification=_CLASSIFICATION.get(f.get("classification") or ""),

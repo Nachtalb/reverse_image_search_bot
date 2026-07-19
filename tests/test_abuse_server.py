@@ -217,6 +217,9 @@ async def test_submit_files_and_finishes_and_keeps_blobs(abuse, monkeypatch, tmp
     nonce, ct = crypto.encrypt_file(plaintext, key)
 
     abuse.record_user(1, username="bad")
+    abuse.record_file(
+        "A", saved_filename="A.jpg", user_id=1, original_filename="evidence-original.jpg", file_type="photo"
+    )
     abuse.create_report("u", 1, "")
     abuse.add_report_blob(
         "u",
@@ -237,6 +240,13 @@ async def test_submit_files_and_finishes_and_keeps_blobs(abuse, monkeypatch, tmp
     assert data["status"] == abuse.REPORT_FILED
     assert data["ncmec_report_id"] == 987654
     submitted.assert_awaited_once()
+    # Per-file NCMEC fields: original_file_name keeps the uploader's original name,
+    # location_of_file is our public copy's URL (two distinct facts, two fields).
+    assert submitted.await_args is not None
+    sent_files = submitted.await_args.args[0]
+    assert len(sent_files) == 1
+    assert sent_files[0]["filename"] == "evidence-original.jpg"
+    assert "A.jpg" in sent_files[0]["location"]
     # report is filed, disk file gone, encrypted blob KEPT
     rep = abuse.get_report("u")
     assert rep["status"] == abuse.REPORT_FILED
