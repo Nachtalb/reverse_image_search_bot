@@ -161,6 +161,7 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
                 file_type=file_type,
                 group_id=group_id,
                 channel_id=channel_id,
+                file_id=getattr(attachment, "file_id", None),
             )
 
         # Track usage metrics

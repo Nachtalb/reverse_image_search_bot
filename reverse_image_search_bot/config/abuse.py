@@ -90,7 +90,8 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             upload_time       INTEGER NOT NULL,
             user_id           INTEGER NOT NULL REFERENCES users(user_id),
             group_id          INTEGER,
-            channel_id        INTEGER
+            channel_id        INTEGER,
+            file_id           TEXT
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_files_user ON files(user_id)")
@@ -116,6 +117,7 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     # BEFORE any index referencing the new columns) -------------------------
     _add_column_if_missing(conn, "files", "group_id", "INTEGER")
     _add_column_if_missing(conn, "files", "channel_id", "INTEGER")
+    _add_column_if_missing(conn, "files", "file_id", "TEXT")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_files_group ON files(group_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_files_channel ON files(channel_id)")
 
@@ -150,10 +152,19 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             ciphertext      BLOB NOT NULL,
             plaintext_sha256 TEXT NOT NULL,
             selected        INTEGER NOT NULL DEFAULT 0,
-            classification  TEXT
+            classification  TEXT,
+            video_path      TEXT,
+            video_nonce     BLOB,
+            video_sha256    TEXT,
+            video_filename  TEXT
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_blobs_report ON report_blobs(report_uuid)")
+    # Forward migration: video columns for reports created before video support.
+    _add_column_if_missing(conn, "report_blobs", "video_path", "TEXT")
+    _add_column_if_missing(conn, "report_blobs", "video_nonce", "BLOB")
+    _add_column_if_missing(conn, "report_blobs", "video_sha256", "TEXT")
+    _add_column_if_missing(conn, "report_blobs", "video_filename", "TEXT")
     conn.commit()
 
 
@@ -197,20 +208,26 @@ def record_file(
     file_type: str | None = None,
     group_id: int | None = None,
     channel_id: int | None = None,
+    file_id: str | None = None,
 ) -> None:
     """Insert-only record of an uploaded file. Existing rows are left untouched.
 
     ``group_id`` / ``channel_id`` capture the chat the file was uploaded through
     (a message can involve a user and optionally a group and/or a channel).
+
+    ``file_id`` is the Telegram file_id of the ORIGINAL upload (not the extracted
+    frame) so the real file — e.g. the source video — can be re-downloaded later
+    to report the actual uploaded media, not just a still frame.
     """
     conn = _get_conn()
     conn.execute(
         """
         INSERT OR IGNORE INTO files
-            (file_unique_id, saved_filename, original_filename, file_type, upload_time, user_id, group_id, channel_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (file_unique_id, saved_filename, original_filename, file_type,
+             upload_time, user_id, group_id, channel_id, file_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (file_unique_id, saved_filename, original_filename, file_type, _now(), user_id, group_id, channel_id),
+        (file_unique_id, saved_filename, original_filename, file_type, _now(), user_id, group_id, channel_id, file_id),
     )
     conn.commit()
 
@@ -333,6 +350,13 @@ def files_for_user(user_id: int) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def file_by_unique_id(file_unique_id: str) -> dict | None:
+    """Look up a recorded file row (carries the original ``file_id`` + type)."""
+    conn = _get_conn()
+    row = conn.execute("SELECT * FROM files WHERE file_unique_id = ?", (file_unique_id,)).fetchone()
+    return dict(row) if row else None
+
+
 def find_user_by_filename(filename: str) -> int | None:
     """Resolve the uploader from an on-disk filename or bare ``file_unique_id``.
 
@@ -433,9 +457,10 @@ def add_report_blob(
     nonce: bytes,
     ciphertext: bytes,
     plaintext_sha256: str,
-) -> None:
+) -> int:
+    """Insert an image blob. Returns the new blob id."""
     conn = _get_conn()
-    conn.execute(
+    cur = conn.execute(
         """
         INSERT INTO report_blobs
             (report_uuid, file_unique_id, saved_filename, nonce, ciphertext, plaintext_sha256)
@@ -444,6 +469,35 @@ def add_report_blob(
         (report_uuid, file_unique_id, saved_filename, nonce, ciphertext, plaintext_sha256),
     )
     conn.commit()
+    return int(cur.lastrowid or 0)
+
+
+def set_blob_video(
+    blob_id: int,
+    *,
+    video_path: str,
+    video_nonce: bytes,
+    video_sha256: str,
+    video_filename: str,
+) -> None:
+    """Attach a lazily-fetched, encrypted-on-disk video to an existing image blob.
+
+    The video ciphertext lives on disk (videos are large — never in the DB nor
+    ever as raw plaintext on disk); only the nonce + hash + relative path are
+    stored in the row.
+    """
+    conn = _get_conn()
+    conn.execute(
+        "UPDATE report_blobs SET video_path = ?, video_nonce = ?, video_sha256 = ?, video_filename = ? WHERE id = ?",
+        (video_path, video_nonce, video_sha256, video_filename, blob_id),
+    )
+    conn.commit()
+
+
+def get_report_blob(blob_id: int) -> dict | None:
+    conn = _get_conn()
+    row = conn.execute("SELECT * FROM report_blobs WHERE id = ?", (blob_id,)).fetchone()
+    return dict(row) if row else None
 
 
 def get_report(report_uuid: str) -> dict | None:
@@ -489,14 +543,24 @@ def report_blobs(report_uuid: str, *, selected_only: bool = False) -> list[dict]
 
 
 def blob_meta(report_uuid: str) -> list[dict]:
-    """Blob metadata WITHOUT ciphertext (for the gallery listing / status)."""
+    """Blob metadata WITHOUT ciphertext (for the gallery listing / status).
+
+    ``has_video`` tells the browser to offer the video in the viewer; the
+    ciphertext itself (image in DB, video on disk) is fetched via the blob
+    endpoints only after the admin supplies P1.
+    """
     conn = _get_conn()
     rows = conn.execute(
-        "SELECT id, file_unique_id, saved_filename, plaintext_sha256, selected, classification "
+        "SELECT id, file_unique_id, saved_filename, plaintext_sha256, selected, classification, video_filename "
         "FROM report_blobs WHERE report_uuid = ? ORDER BY id",
         (report_uuid,),
     ).fetchall()
-    return [dict(r) for r in rows]
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["has_video"] = bool(d.get("video_filename"))
+        out.append(d)
+    return out
 
 
 def get_blob_cipher(report_uuid: str, blob_id: int) -> dict | None:

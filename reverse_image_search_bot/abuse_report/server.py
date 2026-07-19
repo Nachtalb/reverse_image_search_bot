@@ -29,6 +29,7 @@ from aiohttp import web
 
 from reverse_image_search_bot import settings
 from reverse_image_search_bot.abuse_report import crypto, ncmec
+from reverse_image_search_bot.abuse_report import video as abuse_video
 from reverse_image_search_bot.abuse_report.prepare import prepare_report, resolve_user
 from reverse_image_search_bot.config import abuse
 
@@ -252,6 +253,48 @@ async def api_blob(request: web.Request) -> web.Response:
     return web.Response(body=body, content_type="application/octet-stream")
 
 
+async def api_fetch_video(request: web.Request) -> web.Response:
+    """Lazily download + encrypt-to-disk the ORIGINAL video for a blob.
+
+    Best-effort: needs P1 (to encrypt with the report key) and the bot handle.
+    On success the blob gains a video; the browser can then GET the video blob
+    and decrypt it locally. Failures return ``ok:false`` + a human reason
+    (deleted message, over 20 MB, not a video, …) — never a 500.
+    """
+    _require_admin(request)
+    rep = _report_or_404(request.match_info["uuid"])
+    _require_page_secret(request, rep)
+    payload = await request.json()
+    p1 = payload.get("image_key", "")
+    if not p1:
+        raise web.HTTPBadRequest(text="image_key (P1) required")
+    blob = abuse.get_report_blob(int(request.match_info["blob_id"]))
+    if not blob or blob["report_uuid"] != rep["report_uuid"]:
+        raise web.HTTPNotFound(text="blob not found")
+
+    bot = request.app.get("bot")
+    if bot is None:
+        raise web.HTTPServiceUnavailable(text="bot unavailable for video fetch")
+    res = await abuse_video.fetch_and_encrypt_video(bot, blob, p1)
+    return web.json_response({"ok": res.ok, "reason": res.reason, "video_filename": res.filename})
+
+
+async def api_video(request: web.Request) -> web.Response:
+    """Return a blob's encrypted video (nonce + ciphertext from disk)."""
+    _require_admin(request)
+    rep = _report_or_404(request.match_info["uuid"])
+    _require_page_secret(request, rep)
+    blob = abuse.get_report_blob(int(request.match_info["blob_id"]))
+    if not blob or blob["report_uuid"] != rep["report_uuid"] or not blob.get("video_path"):
+        raise web.HTTPNotFound(text="no video for this blob")
+    base = settings.UPLOADER.get("configuration", {}).get("path")
+    fp = Path(base) / blob["video_path"] if base else None
+    if not fp or not fp.is_file():
+        raise web.HTTPNotFound(text="video ciphertext missing on disk")
+    body = bytes(blob["video_nonce"]) + fp.read_bytes()
+    return web.Response(body=body, content_type="application/octet-stream")
+
+
 async def api_status(request: web.Request) -> web.Response:
     """Poll the report status (drives the live UI)."""
     _require_admin(request)
@@ -303,6 +346,7 @@ async def api_submit(request: web.Request) -> web.Response:
 
     key = crypto.derive_key(p1)
     files = []
+    base = settings.UPLOADER.get("configuration", {}).get("path")
     for b in selected:
         try:
             plaintext = crypto.decrypt_file(bytes(b["nonce"]), bytes(b["ciphertext"]), key)
@@ -310,7 +354,25 @@ async def api_submit(request: web.Request) -> web.Response:
             raise web.HTTPBadRequest(text="image key (P1) incorrect — decryption failed") from dec_err
         if crypto.sha256_hex(plaintext) != b["plaintext_sha256"]:
             raise web.HTTPBadRequest(text="image key (P1) incorrect — hash mismatch")
+        # Report the extracted frame/still.
         files.append({"plaintext": plaintext, "filename": b["saved_filename"], "classification": b["classification"]})
+        # If this blob has a source video, report it TOO (same classification).
+        if b.get("video_path") and base:
+            vfp = Path(base) / b["video_path"]
+            if vfp.is_file():
+                try:
+                    vplain = crypto.decrypt_file(bytes(b["video_nonce"]), vfp.read_bytes(), key)
+                except Exception as verr:
+                    raise web.HTTPBadRequest(text="image key (P1) incorrect — video decryption failed") from verr
+                if crypto.sha256_hex(vplain) != b["video_sha256"]:
+                    raise web.HTTPBadRequest(text="image key (P1) incorrect — video hash mismatch")
+                files.append(
+                    {
+                        "plaintext": vplain,
+                        "filename": b["video_filename"] or b["saved_filename"],
+                        "classification": b["classification"],
+                    }
+                )
 
     incident_urls = [_public_file_url(b["saved_filename"]) for b in selected]
     abuse.set_report_status(rep["report_uuid"], abuse.REPORT_SUBMITTING)
@@ -348,7 +410,18 @@ async def api_cancel(request: web.Request) -> web.Response:
     rep = _report_or_404(request.match_info["uuid"])
     _require_page_secret(request, rep)
     abuse.set_report_status(rep["report_uuid"], abuse.REPORT_CANCELLED)
-    # Blobs only — NOT the files table, NOT disk files.
+    # Delete any encrypted video ciphertext on disk, then purge blobs (DB only —
+    # NOT the files table, NOT the user's original disk files).
+    base = settings.UPLOADER.get("configuration", {}).get("path")
+    if base:
+        for b in abuse.report_blobs(rep["report_uuid"]):
+            if b.get("video_path"):
+                try:
+                    vfp = Path(base) / b["video_path"]
+                    if vfp.is_file():
+                        vfp.unlink()
+                except Exception:
+                    logger.warning("failed to delete video on cancel %s", b["video_path"], exc_info=True)
     abuse.purge_report_blobs(rep["report_uuid"])
     return web.json_response({"ok": True, "status": abuse.REPORT_CANCELLED})
 
@@ -382,6 +455,16 @@ def _cleanup_after_finish(rep: dict) -> None:
                     fp.unlink()
             except Exception:
                 logger.warning("failed to delete plaintext %s", b["saved_filename"], exc_info=True)
+        # Delete encrypted video ciphertext for UNSELECTED blobs (their blobs are
+        # about to be purged); reported blobs keep their encrypted video on disk.
+        for b in abuse.report_blobs(rep["report_uuid"]):
+            if not b["selected"] and b.get("video_path"):
+                try:
+                    vfp = Path(upload_path) / b["video_path"]
+                    if vfp.is_file():
+                        vfp.unlink()
+                except Exception:
+                    logger.warning("failed to delete unselected video %s", b["video_path"], exc_info=True)
     # Drop only the non-reported blobs; keep the reported ones linked to the report.
     abuse.purge_unselected_blobs(rep["report_uuid"])
 
@@ -399,6 +482,8 @@ def build_app(bot=None) -> web.Application:
     app.router.add_get("/report/{uuid}", index)
     app.router.add_post("/report/{uuid}/api/unlock", api_unlock)
     app.router.add_get("/report/{uuid}/api/blob/{blob_id}", api_blob)
+    app.router.add_post("/report/{uuid}/api/blob/{blob_id}/fetch_video", api_fetch_video)
+    app.router.add_get("/report/{uuid}/api/blob/{blob_id}/video", api_video)
     app.router.add_get("/report/{uuid}/api/status", api_status)
     app.router.add_post("/report/{uuid}/api/select", api_select)
     app.router.add_post("/report/{uuid}/api/submit", api_submit)
