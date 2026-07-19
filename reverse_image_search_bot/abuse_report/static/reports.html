@@ -136,13 +136,15 @@
     <!-- ============ STATISTICS TAB ============ -->
     <div id="pane-stats" class="hidden">
       <div class="card">
-        <div class="row" style="justify-content:space-between;align-items:flex-end">
-          <div>
-            <div class="muted">Total files reported</div>
-            <div class="stat-counter" id="st-counter">—</div>
+        <div style="display:flex;justify-content:space-between;align-items:stretch;gap:12px;flex-wrap:nowrap">
+          <div style="display:flex;flex-direction:column;justify-content:space-between;min-height:120px;flex:1;min-width:0">
+            <div>
+              <div class="muted">Total files reported</div>
+              <div class="stat-counter" id="st-counter">—</div>
+            </div>
             <div class="row" id="st-filebreak" style="gap:0;margin-top:8px;align-items:center;flex-wrap:wrap"></div>
           </div>
-          <div class="row">
+          <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0">
             <select id="st-year" title="Year"></select>
             <select id="st-month" title="Month"></select>
           </div>
@@ -439,29 +441,57 @@ function paintChips(langs, color) {
   });
 }
 
-// Draw the pie over only the languages NOT toggled off; percentages recompute.
+// Persistent per-language displayed fraction, so toggles animate (tweened via
+// rAF; SVG path `d` can't be CSS-animated). Slices grow/shrink smoothly.
+let PIE_CUR = {};        // lang -> currently displayed fraction (of the circle)
+let PIE_RAF = null;      // active animation frame id (cancel on re-toggle)
+
+// Draw/animate the pie over only the languages NOT toggled off; the visible
+// slices' percentages recompute and the transition is animated.
 function drawPie(counts, langs, color) {
-  const svg = $("st-pie");
   const visible = langs.filter(k => !LANG_OFF.has(k));
   const total = visible.reduce((s, k) => s + counts[k], 0);
+  // Target fraction per language (0 for hidden/empty). New langs start at 0 → grow in.
+  const target = {};
+  for (const k of langs) { if (!(k in PIE_CUR)) PIE_CUR[k] = 0; target[k] = total ? (LANG_OFF.has(k) ? 0 : counts[k] / total) : 0; }
+  const from = { ...PIE_CUR };
+  const t0 = performance.now();
+  const DUR = 350;
+  if (PIE_RAF) cancelAnimationFrame(PIE_RAF);
+
+  const step = now => {
+    let e = Math.min(1, (now - t0) / DUR);
+    e = 1 - Math.pow(1 - e, 3);  // easeOutCubic
+    for (const k of langs) PIE_CUR[k] = from[k] + (target[k] - from[k]) * e;
+    paintPie(langs, color);
+    if (e < 1) { PIE_RAF = requestAnimationFrame(step); } else { PIE_RAF = null; }
+  };
+  PIE_RAF = requestAnimationFrame(step);
+}
+
+// Render the pie from the current PIE_CUR fractions (normalized to fill the circle).
+function paintPie(langs, color) {
+  const svg = $("st-pie");
   const cx = 100, cy = 100, rad = 96;
-  if (!total) { svg.innerHTML = `<circle cx="100" cy="100" r="96" fill="#1b1d23"/>`; return; }
-  if (visible.length === 1) {  // full circle — a single arc path can't draw 100%
-    svg.innerHTML = `<circle cx="100" cy="100" r="96" fill="${color[visible[0]]}"/>` +
-      pieLabel(cx, cy - 40, "100%");
+  const parts = langs.map(k => [k, PIE_CUR[k] || 0]).filter(([, f]) => f > 0.0005);
+  const sum = parts.reduce((s, [, f]) => s + f, 0);
+  if (sum < 0.0005) { svg.innerHTML = `<circle cx="100" cy="100" r="96" fill="#1b1d23"/>`; return; }
+  // A single slice at ~100% can't be drawn as an arc (start==end) — use a circle.
+  if (parts.length === 1) {
+    svg.innerHTML = `<circle cx="100" cy="100" r="96" fill="${color[parts[0][0]]}"/>` + pieLabel(cx, cy - 40, "100%");
     return;
   }
-  let angle = -Math.PI / 2;  // start at 12 o'clock
+  let angle = -Math.PI / 2;  // 12 o'clock
   let out = "";
   const labels = [];
-  for (const k of visible) {
-    const frac = counts[k] / total;
+  for (const [k, f] of parts) {
+    const frac = f / sum;
     const end = angle + frac * 2 * Math.PI;
     const large = frac > 0.5 ? 1 : 0;
     const x1 = cx + rad * Math.cos(angle), y1 = cy + rad * Math.sin(angle);
     const x2 = cx + rad * Math.cos(end), y2 = cy + rad * Math.sin(end);
     out += `<path d="M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${rad},${rad} 0 ${large},1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="${color[k]}"><title>${escapeHtml(fmtLang(k))}: ${Math.round(frac * 100)}%</title></path>`;
-    if (frac >= 0.06) {  // only label slices big enough to fit text
+    if (frac >= 0.06) {
       const mid = angle + frac * Math.PI;
       const lr = rad * 0.6;
       labels.push(pieLabel(cx + lr * Math.cos(mid), cy + lr * Math.sin(mid), `${Math.round(frac * 100)}%`));
