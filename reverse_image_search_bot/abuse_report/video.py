@@ -26,6 +26,22 @@ from reverse_image_search_bot.config import abuse
 logger = logging.getLogger("abuse.video")
 
 
+def _ext_of(name: str | None) -> str:
+    """Lowercase file extension of ``name`` (path or URL), or "" if none/implausible.
+
+    Strips any URL query/fragment first. Only accepts a short alphanumeric
+    extension so a bare path segment (no dot, or a dotted-but-junk tail) yields
+    "" and callers fall through to the next source.
+    """
+    if not name:
+        return ""
+    tail = name.split("?", 1)[0].split("#", 1)[0].rstrip("/").rsplit("/", 1)[-1]
+    if "." not in tail:
+        return ""
+    ext = tail.rsplit(".", 1)[-1].lower().strip()
+    return ext if ext.isalnum() and 1 <= len(ext) <= 5 else ""
+
+
 def video_dir() -> Path | None:
     """Directory for encrypted video ciphertext (under the upload PVC path)."""
     base = settings.UPLOADER.get("configuration", {}).get("path")
@@ -96,9 +112,15 @@ async def fetch_and_encrypt_video(bot, blob: dict, p1: str) -> VideoFetchResult:
     key = crypto.derive_key(p1)
     nonce, ct = crypto.encrypt_file(data, key)
 
-    ext = (rec.get("saved_filename") or "").rsplit(".", 1)
-    src_ext = ext[1] if len(ext) == 2 else "mp4"
-    video_filename = f"{blob['file_unique_id']}.{src_ext}"
+    # The video extension must come from the VIDEO, not the extracted frame's
+    # saved_filename (that's a .jpg). Prefer the uploader's original filename,
+    # then Telegram's container path from getFile; fall back to mp4. Using the
+    # frame's .jpg here filed the video with the wrong extension.
+    original = rec.get("original_filename") or ""
+    src_ext = _ext_of(original) or _ext_of(tg_file.file_path) or "mp4"
+    # Reported filename: keep the uploader's original name when we have one,
+    # otherwise a stable unique-id name with the correct extension.
+    video_filename = original if _ext_of(original) else f"{blob['file_unique_id']}.{src_ext}"
     cipher_name = f"{blob['file_unique_id']}.{src_ext}.enc"
     (vdir / cipher_name).write_bytes(ct)
 

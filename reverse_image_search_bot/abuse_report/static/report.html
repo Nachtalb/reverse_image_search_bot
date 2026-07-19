@@ -68,8 +68,16 @@
   dialog .dlg-body { padding: 16px; }
   dialog h2 { font-size: 16px; margin: 0 0 10px; }
   #viewer { width: auto; max-width: 96vw; }
-  #viewer img { display: block; max-width: 96vw; max-height: 88vh; border-radius: 10px; }
-  #viewer .dlg-body { padding: 8px; }
+  #viewer .dlg-body { padding: 8px; text-align: center; }
+  /* Cap media at the viewport minus the dialog padding+border so the box never
+     overflows the dialog's own max-width (which pinned it to the right edge). */
+  #viewer img, #viewer video { display: block; margin: 0 auto; max-width: calc(96vw - 24px); max-height: 88vh; border-radius: 10px; }
+  .viewer-cls { margin-top: 10px; }
+  .viewer-cls .vcls { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .viewer-cls .vcls span { font-size: 15px; font-weight: 700; padding: 8px 14px; border-radius: 8px; background: #2a2c33; color: #e8e8ea; cursor: pointer; }
+  .viewer-cls .vcls span.on { background: #3a6df0; color: #fff; }
+  .viewer-cls .vreported { font-size: 14px; font-weight: 600; color: #8ab4ff; }
+  .viewer-cls .vreported b { color: #fff; }
   .preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; margin: 10px 0; }
   .preview-item { position: relative; border-radius: 8px; overflow: hidden; background: #101116; }
   .preview-item img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
@@ -143,8 +151,9 @@
 <dialog id="viewer">
   <div class="dlg-body">
     <img id="viewer-img" src="" alt="">
-    <video id="viewer-vid" class="hidden" controls muted autoplay playsinline style="display:block;max-width:96vw;max-height:88vh;border-radius:10px"></video>
+    <video id="viewer-vid" class="hidden" controls muted autoplay playsinline></video>
     <div id="viewer-name" class="muted" style="text-align:center;margin-top:6px;word-break:break-all"></div>
+    <div class="viewer-cls" id="viewer-cls"></div>
     <div class="row" id="viewer-actions" style="justify-content:center;margin-top:8px"></div>
     <div class="muted center" id="viewer-msg" style="margin-top:6px;color:#f0c674"></div>
   </div>
@@ -326,24 +335,12 @@ function reportedTag(id) {
 }
 
 // The A1–B2 buttons select the image AND set its classification. Tapping the
-// active class again deselects the image entirely.
+// active class again deselects the image entirely. Routes through the shared
+// setClassification so the viewer's selector stays in sync.
 function wireCls(id) {
   const el = document.querySelector(`.thumb[data-id="${id}"]`);
   el.querySelectorAll(".cls span").forEach(s => {
-    s.onclick = (ev) => {
-      ev.stopPropagation();
-      const c = s.dataset.cls;
-      if (sel[id] === c) {
-        delete sel[id];
-        el.classList.remove("selected");
-        el.querySelectorAll(".cls span").forEach(x => x.classList.remove("on"));
-      } else {
-        sel[id] = c;
-        el.classList.add("selected");
-        el.querySelectorAll(".cls span").forEach(x => x.classList.toggle("on", x.dataset.cls === c));
-      }
-      updateSelCount();
-    };
+    s.onclick = (ev) => { ev.stopPropagation(); setClassification(id, s.dataset.cls); };
   });
 }
 
@@ -360,9 +357,46 @@ function openViewer(blobId) {
   $("viewer-name").textContent = blobNames[blobId] || "";
   $("viewer-msg").textContent = "";
   $("viewer-actions").innerHTML = "";
+  renderViewerCls(blobId);
   viewer.showModal();
   // Video-backed thumbnails auto-load and autoplay (muted) — no extra click.
   if (hasVideo[blobId]) showVideo(blobId);
+}
+
+// Classification UI inside the viewer: after filing show the read-only reported
+// category; otherwise the A1–B2 selector, kept in sync with the thumbnail grid.
+function renderViewerCls(blobId) {
+  const box = $("viewer-cls");
+  if (META.status === "filed") {
+    const c = sel[blobId];
+    box.innerHTML = c
+      ? `<div class="vreported">Reported as <b>${c}</b> — ${escapeHtml(CLS_LABEL[c] || "")}</div>`
+      : "";
+    return;
+  }
+  const cur = sel[blobId];
+  box.innerHTML = `<div class="vcls">` + ["A1", "A2", "B1", "B2"].map(c =>
+    `<span data-cls="${c}" class="${cur === c ? "on" : ""}">${c}</span>`).join("") + `</div>`;
+  box.querySelectorAll(".vcls span").forEach(s => {
+    s.onclick = () => { setClassification(blobId, s.dataset.cls); renderViewerCls(blobId); };
+  });
+}
+
+// Single source of truth for (de)selecting a blob + its class, so the viewer and
+// the thumbnail grid stay consistent. Tapping the active class deselects.
+function setClassification(id, c) {
+  if (sel[id] === c) delete sel[id]; else sel[id] = c;
+  syncThumbCls(id);
+  updateSelCount();
+}
+
+// Repaint a thumbnail's selected state + class bar from `sel` (used after the
+// viewer changes the selection).
+function syncThumbCls(id) {
+  const el = document.querySelector(`.thumb[data-id="${id}"]`);
+  if (!el) return;
+  el.classList.toggle("selected", sel[id] !== undefined);
+  el.querySelectorAll(".cls span").forEach(x => x.classList.toggle("on", x.dataset.cls === sel[id]));
 }
 
 async function showVideo(blobId) {
@@ -506,6 +540,7 @@ $("notice-ok-btn").onclick = () => $("notice").close();
 // --- terminal state ----------------------------------------------------------
 function applyFinalState(status, reportId) {
   if (reportId) { $("r-ncmec").textContent = reportId; }
+  META.status = status;
   const b = $("status-banner");
   b.className = "status " + status;
   b.textContent = status === "filed"
@@ -515,7 +550,28 @@ function applyFinalState(status, reportId) {
   // Keep the decrypt card + gallery available after filing so the reported
   // images can still be inspected; only the submit/cancel actions are removed.
   $("action-card").classList.add("hidden");
+  if (status === "filed") {
+    applyFiledLayout();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 }
+
+// Switch an already-decrypted gallery to the immutable filed layout: reported
+// images show a read-only category badge (no selector); unselected images are
+// dropped since finish purges their blobs server-side. Mirrors a fresh reload
+// of a filed report without needing one.
+function applyFiledLayout() {
+  $("gallery-card").querySelector(".cls-legend").classList.add("hidden");
+  $("sel-count").classList.add("hidden");
+  for (const b of META.blobs) {
+    const el = document.querySelector(`.thumb[data-id="${b.id}"]`);
+    if (!el) continue;
+    if (sel[b.id] === undefined) { el.remove(); continue; }
+    const bar = el.querySelector(".cls");
+    if (bar) bar.outerHTML = reportedTag(b.id);
+  }
+}
+
 </script>
 </body>
 </html>

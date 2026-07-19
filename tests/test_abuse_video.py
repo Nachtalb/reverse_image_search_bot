@@ -185,6 +185,86 @@ async def test_fetch_and_encrypt_video_roundtrip(abuse, monkeypatch, tmp_path):
     assert crypto.sha256_hex(plain) == row["video_sha256"]
 
 
+def test_ext_of():
+    """Extension helper: from plain names, URLs with queries, and junk tails."""
+    from reverse_image_search_bot.abuse_report.video import _ext_of
+
+    assert _ext_of("clip.MP4") == "mp4"
+    assert _ext_of("a/b/clip.webm") == "webm"
+    assert _ext_of("https://tg.example/file/doc123.mkv?token=x") == "mkv"
+    assert _ext_of("https://tg.example/file/video/12345") == ""  # no extension
+    assert _ext_of("noext") == ""
+    assert _ext_of("weird.thisisnotanext") == ""  # too long → rejected
+    assert _ext_of(None) == ""
+    assert _ext_of("") == ""
+
+
+@pytest.mark.asyncio
+async def test_video_extension_from_video_not_frame(abuse, monkeypatch, tmp_path):
+    """Regression: the reported video must NOT inherit the frame's .jpg extension.
+
+    The blob's saved_filename is the extracted FRAME (a .jpg). The video's real
+    extension has to come from the uploader's original filename (preferred) or
+    Telegram's container path — never the frame. Previously both filed as .jpg.
+    """
+    from reverse_image_search_bot import settings
+    from reverse_image_search_bot.abuse_report import video as vid
+
+    monkeypatch.setitem(settings.UPLOADER, "configuration", {"path": str(tmp_path)})
+
+    abuse.record_user(9, username="v")
+    # Upload was a video: on-disk frame is .jpg, but the user's file was clip.webm.
+    abuse.record_file(
+        "v1",
+        saved_filename="v1.jpg",
+        user_id=9,
+        original_filename="holiday clip.webm",
+        file_type="video",
+        file_id="BAADvid",
+    )
+    abuse.create_report("r1", 9, "")
+    bid = abuse.add_report_blob(
+        "r1", file_unique_id="v1", saved_filename="v1.jpg", nonce=b"n" * 12, ciphertext=b"c", plaintext_sha256="h"
+    )
+    blob = abuse.get_report_blob(bid)
+
+    real_video = b"\x1aE\xdf\xa3" + os.urandom(2048)  # matroska/webm magic
+
+    class FakeFile:
+        file_size = len(real_video)
+        file_path = "https://tg.example/file/v1.webm"
+
+    bot = AsyncMock()
+    bot.get_file.return_value = FakeFile()
+
+    class FakeResp:
+        def raise_for_status(self):
+            pass
+
+        async def aiter_bytes(self, n):
+            for i in range(0, len(real_video), n):
+                yield real_video[i : i + n]
+
+    class FakeStream:
+        async def __aenter__(self):
+            return FakeResp()
+
+        async def __aexit__(self, *a):
+            return False
+
+    monkeypatch.setattr(vid._dl_client, "stream", lambda method, url: FakeStream())
+
+    res = await vid.fetch_and_encrypt_video(bot, blob, "k")
+    assert res.ok, res.reason
+    # Reported filename keeps the uploader's original name — NOT the frame's .jpg.
+    assert res.filename == "holiday clip.webm"
+    row = abuse.get_report_blob(bid)
+    assert row["video_filename"] == "holiday clip.webm"
+    # The ciphertext on disk uses the correct container extension, not .jpg.
+    assert row["video_path"].endswith(".webm.enc")
+    assert ".jpg" not in row["video_path"]
+
+
 @pytest.mark.asyncio
 async def test_fetch_video_rejects_oversize(abuse, monkeypatch, tmp_path):
     from reverse_image_search_bot import settings
