@@ -36,7 +36,9 @@ from reverse_image_search_bot.config import abuse
 logger = logging.getLogger("abuse.server")
 
 _STATIC = Path(__file__).parent / "static"
-_VALID_CLASSES = {"A1", "A2", "B1", "B2"}
+# "NR" = selected/reported but Not Rated — no NCMEC industryClassification is
+# sent (that field is optional). Everything else must be a real A1-B2 code.
+_VALID_CLASSES = {"A1", "A2", "B1", "B2", "NR"}
 
 
 # --- initData validation ------------------------------------------------------

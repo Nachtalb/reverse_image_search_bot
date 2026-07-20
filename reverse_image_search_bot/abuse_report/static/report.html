@@ -42,6 +42,7 @@
   .thumb .cls { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.72); padding: 5px; display: flex; gap: 4px; justify-content: center; }
   .thumb .cls span { font-size: 14px; font-weight: 700; padding: 5px 9px; border-radius: 6px; background: #2a2c33; cursor: pointer; }
   .thumb .cls span.on { background: #3a6df0; color: #fff; }
+  .thumb .cls span.on[data-cls="NR"] { background: #6b7280; color: #fff; }
   .thumb .reported-cls { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(15,47,90,.92); color: #8ab4ff; font-size: 11px; font-weight: 600; padding: 4px 6px; text-align: center; line-height: 1.2; }
   .thumb .reported-cls b { color: #fff; font-weight: 700; }
   .thumb .fname { position: absolute; top: 0; left: 0; right: 0; background: rgba(0,0,0,.72); color: #cfd0d6; font-size: 10px; padding: 3px 5px; word-break: break-all; line-height: 1.2; }
@@ -79,12 +80,14 @@
   .viewer-cls .vcls { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
   .viewer-cls .vcls span { font-size: 15px; font-weight: 700; padding: 8px 14px; border-radius: 8px; background: #2a2c33; color: #e8e8ea; cursor: pointer; }
   .viewer-cls .vcls span.on { background: #3a6df0; color: #fff; }
+  .viewer-cls .vcls span.on[data-cls="NR"] { background: #6b7280; color: #fff; }
   .viewer-cls .vreported { font-size: 14px; font-weight: 600; color: #8ab4ff; }
   .viewer-cls .vreported b { color: #fff; }
   .preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; margin: 10px 0; }
   .preview-item { position: relative; border-radius: 8px; overflow: hidden; background: #101116; }
   .preview-item img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
   .preview-item .tag { position: absolute; top: 0; right: 0; font-size: 11px; font-weight: 700; background: rgba(58,109,240,.9); color: #fff; padding: 2px 5px; border-bottom-left-radius: 6px; }
+  .preview-item .tag[data-cls="NR"] { background: rgba(107,114,128,.95); }
   .preview-item .fn { font-size: 9px; color: #9a9ba2; padding: 3px 4px; word-break: break-all; line-height: 1.15; }
   .spinner { width: 34px; height: 34px; border: 3px solid #363842; border-top-color: #3a6df0; border-radius: 50%; animation: spin .8s linear infinite; margin: 12px auto; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -132,7 +135,8 @@
       <div class="cls-legend">
         Select the bad images and set an industry classification for each:
         <code>A1</code> prepubescent · sex act &nbsp; <code>A2</code> prepubescent · lascivious &nbsp;
-        <code>B1</code> pubescent · sex act &nbsp; <code>B2</code> pubescent · lascivious
+        <code>B1</code> pubescent · sex act &nbsp; <code>B2</code> pubescent · lascivious &nbsp;
+        <code>NR</code> not rated (report without a classification)
       </div>
       <div class="row" style="justify-content:space-between;align-items:center">
         <b>Images</b>
@@ -346,7 +350,7 @@ function blobLabel(b) { return fileLabel(b.saved_filename, b.original_filename);
 
 function clsBar(id) {
   const cur = sel[id];
-  return `<div class="cls">` + ["A1", "A2", "B1", "B2"].map(c =>
+  return `<div class="cls">` + ["A1", "A2", "B1", "B2", "NR"].map(c =>
     `<span data-cls="${c}" class="${cur === c ? "on" : ""}">${c}</span>`).join("") + `</div>`;
 }
 
@@ -355,6 +359,7 @@ function clsBar(id) {
 const CLS_LABEL = {
   A1: "prepubescent · sex act", A2: "prepubescent · lascivious",
   B1: "pubescent · sex act", B2: "pubescent · lascivious",
+  NR: "not rated",
 };
 function reportedTag(id) {
   const c = sel[id];
@@ -404,7 +409,7 @@ function renderViewerCls(blobId) {
     return;
   }
   const cur = sel[blobId];
-  box.innerHTML = `<div class="vcls">` + ["A1", "A2", "B1", "B2"].map(c =>
+  box.innerHTML = `<div class="vcls">` + ["A1", "A2", "B1", "B2", "NR"].map(c =>
     `<span data-cls="${c}" class="${cur === c ? "on" : ""}">${c}</span>`).join("") + `</div>`;
   box.querySelectorAll(".vcls span").forEach(s => {
     s.onclick = () => { setClassification(blobId, s.dataset.cls); renderViewerCls(blobId); };
@@ -476,7 +481,7 @@ $("review-btn").onclick = () => {
   $("action-err").textContent = "";
   const ids = Object.keys(sel);
   if (!ids.length) { $("action-err").textContent = "Select at least one image."; return; }
-  for (const id of ids) if (!sel[id]) { $("action-err").textContent = "Every selected image needs a classification (A1/A2/B1/B2)."; return; }
+  for (const id of ids) if (!sel[id]) { $("action-err").textContent = "Every selected image needs a classification (A1/A2/B1/B2/NR)."; return; }
   if (!P1KEY) { $("action-err").textContent = "Decrypt the images first (the image key is needed to submit)."; return; }
   buildConfirm(ids);
   confirmDlg.showModal();
@@ -494,7 +499,7 @@ function buildConfirm(ids) {
   for (const id of ids) {
     const item = document.createElement("div");
     item.className = "preview-item";
-    item.innerHTML = `<img src="${thumbUrls[id]}" alt=""><div class="tag">${sel[id]}</div>` +
+    item.innerHTML = `<img src="${thumbUrls[id]}" alt=""><div class="tag" data-cls="${sel[id]}">${sel[id]}</div>` +
       `<div class="fn">${fileLabel(blobNames[id], blobOrig[id])}</div>`;
     grid.appendChild(item);
   }

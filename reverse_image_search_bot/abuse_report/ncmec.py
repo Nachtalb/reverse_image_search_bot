@@ -35,6 +35,9 @@ from reverse_image_search_bot import settings
 
 logger = logging.getLogger("abuse.ncmec")
 
+# "NR" (Not Rated) is intentionally absent: a file may be reported without an
+# industry classification (the field is optional), so _CLASSIFICATION.get("NR")
+# returns None and industry_classification is omitted from the FileDetails.
 _CLASSIFICATION = {
     "A1": IndustryClassification.A1,
     "A2": IndustryClassification.A2,
