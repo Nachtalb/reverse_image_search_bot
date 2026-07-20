@@ -112,6 +112,13 @@ NCMEC_REPORTER_FIRST_NAME = os.getenv("NCMEC_REPORTER_FIRST_NAME", "")
 NCMEC_REPORTER_LAST_NAME = os.getenv("NCMEC_REPORTER_LAST_NAME", "")
 NCMEC_REPORTER_EMAIL = os.getenv("NCMEC_REPORTER_EMAIL", "")
 NCMEC_ESP_NAME = os.getenv("NCMEC_ESP_NAME", "")
+# Short terms-of-service statement stamped on the reporter (how we handle the
+# reported data). Free text; blank to omit.
+NCMEC_TERMS_OF_SERVICE = os.getenv(
+    "NCMEC_TERMS_OF_SERVICE",
+    "Reverse Image Search Bot operates under Telegram's Third-Party Developer Terms. "
+    "Data is retained solely for abuse reporting. Contact: report@nachtalb.io",
+)
 
 log = logging.getLogger("config")
 log.info(f"UPLOADER: {json.dumps(UPLOADER, indent=2)}")

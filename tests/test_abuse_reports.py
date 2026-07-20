@@ -72,6 +72,28 @@ def test_blob_selection_and_classification(abuse):
     assert sel[0]["classification"] == "B2"
 
 
+def test_record_file_stores_caption(abuse):
+    """A caption sent with the media is stored and read back on the file row."""
+    abuse.record_user(1)
+    abuse.record_file("F", saved_filename="F.jpg", user_id=1, caption="look at this")
+    rec = abuse.file_by_unique_id("F")
+    assert rec["caption"] == "look at this"
+    # No caption -> NULL, not an error.
+    abuse.record_file("G", saved_filename="G.jpg", user_id=1)
+    assert abuse.file_by_unique_id("G")["caption"] is None
+
+
+def test_set_user_bio(abuse):
+    """A user's bio can be stored after the fact and reads back via get_user."""
+    abuse.record_user(7, username="x")
+    assert abuse.get_user(7)["bio"] is None
+    abuse.set_user_bio(7, "my telegram bio")
+    assert abuse.get_user(7)["bio"] == "my telegram bio"
+    # Updating the profile again must NOT clobber the bio (separate write path).
+    abuse.record_user(7, username="x2")
+    assert abuse.get_user(7)["bio"] == "my telegram bio"
+
+
 def test_ncmec_id_and_filed(abuse):
     abuse.record_user(9)
     abuse.create_report("r", 9, "h")
@@ -237,11 +259,17 @@ def test_migration_adds_group_channel_columns(tmp_path, monkeypatch):
     # Opening the DB runs _ensure_schema → migration adds the columns.
     cols = {r["name"] for r in ab._get_conn().execute("PRAGMA table_info(files)")}
     assert "group_id" in cols and "channel_id" in cols
+    # New columns from later migrations are added too (caption on files, bio on users).
+    assert "caption" in cols
+    ucols = {r["name"] for r in ab._get_conn().execute("PRAGMA table_info(users)")}
+    assert "bio" in ucols
     # Existing row survived; new inserts with chat context work.
-    ab.record_file("NEW", saved_filename="NEW.jpg", user_id=5, group_id=-100123)
+    ab.record_file("NEW", saved_filename="NEW.jpg", user_id=5, group_id=-100123, caption="hi")
     files = {f["file_unique_id"]: f for f in ab.files_for_user(5)}
     assert files["OLD"]["group_id"] is None
+    assert files["OLD"]["caption"] is None
     assert files["NEW"]["group_id"] == -100123
+    assert files["NEW"]["caption"] == "hi"
 
 
 # --- initData validation ------------------------------------------------------

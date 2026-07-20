@@ -91,6 +91,7 @@
   .preview-item .fn { font-size: 9px; color: #9a9ba2; padding: 3px 4px; word-break: break-all; line-height: 1.15; }
   /* review dialog */
   #confirm { width: 560px; }
+  #confirm .dlg-body { max-height: 88vh; overflow-y: auto; }
   .rev-sec { border: 1px solid #2a2c33; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; background: #191b21; }
   .rev-h { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #8ab4ff; margin-bottom: 8px; font-weight: 700; }
   .rev-kv { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; border-bottom: 1px solid #23252c; font-size: 13px; }
@@ -560,20 +561,44 @@ $("review-btn").onclick = async () => {
 const CLS_FULL = {
   A1: "A1 · prepubescent minor · sexual act", A2: "A2 · prepubescent minor · lascivious exhibition",
   B1: "B1 · pubescent minor · sexual act", B2: "B2 · pubescent minor · lascivious exhibition",
-  NR: "NR · not rated (no industry classification sent)",
+  NR: "NR · not rated",
 };
 
+// Plain-language labels for the raw NCMEC field names, so the review reads like
+// a report, not a schema dump. Unmapped keys fall back to a de-snaked title.
+const FIELD_LABEL = {
+  reporting_person: "Reporting person", first_name: "First name", last_name: "Last name",
+  email: "Email", phone: "Phone", address: "Address", terms_of_service: "Terms of service",
+  esp_identifier: "Telegram user ID", esp_service: "Reported via", screen_name: "Username",
+  display_name: "Display name", profile_url: "Profile URL", profile_bio: "Bio",
+  group_identifier: "Group / channel", additional_info: "Additional info",
+  incident_type: "Incident type", incident_date_time: "Incident date",
+  incident_date_time_description: "Incident date note",
+  chat_client: "Chat app", chat_room_name: "Chat / room", content: "Chat content",
+  uploaded_to_esp_timestamp: "Uploaded to bot",
+};
+function prettyLabel(k) {
+  if (FIELD_LABEL[k]) return FIELD_LABEL[k];
+  return k.replace(/_/g, " ").replace(/^\w/, c => c.toUpperCase());
+}
+
 // Render a flat object as key/value rows, recursing into nested objects/arrays.
-function kvRows(obj, prefix) {
+// `path` is the human label chain; leaf `value` wrappers and array indices are
+// collapsed so "reporting_person · email[0] · value" reads simply as "Email".
+function kvRows(obj, path) {
   if (obj == null) return "";
   let out = "";
   for (const [k, v] of Object.entries(obj)) {
     if (v == null || (Array.isArray(v) && v.length === 0)) continue;
-    const label = prefix ? `${prefix} · ${k}` : k;
+    // A `{value: ...}` wrapper (NCMEC's Email/Hash shape) contributes no label
+    // of its own — keep the parent's label instead of appending "· value".
+    const label = k === "value" ? (path || "Value") : (path ? `${path} · ${prettyLabel(k)}` : prettyLabel(k));
     if (Array.isArray(v)) {
+      const multi = v.length > 1;
       v.forEach((item, i) => {
-        if (item && typeof item === "object") out += kvRows(item, `${label}[${i}]`);
-        else out += `<div class="rev-kv"><span>${escapeHtml(label)}[${i}]</span><b>${escapeHtml(String(item))}</b></div>`;
+        const il = multi ? `${label} ${i + 1}` : label;
+        if (item && typeof item === "object") out += kvRows(item, il);
+        else out += `<div class="rev-kv"><span>${escapeHtml(il)}</span><b>${escapeHtml(String(item))}</b></div>`;
       });
     } else if (typeof v === "object") {
       out += kvRows(v, label);
@@ -606,27 +631,27 @@ async function buildReview(rev) {
   });
   $("rev-file-count").textContent = rev.files.length;
   const host = $("rev-files"); host.innerHTML = "";
-  // Pre-decrypt every video piece so the review shows the ACTUAL video, not a
-  // placeholder still. Best-effort: a failed fetch falls back to the frame image.
-  for (const f of rev.files) {
-    if (f.kind === "video") { try { await ensureVideoUrl(f.blob_id); } catch (e) { /* fall back to still */ } }
-  }
   for (const blobId of Object.keys(byBlob)) {
     const pieces = byBlob[blobId].sort((a, b) => (a.kind === "frame" ? -1 : 1));
     const cls = pieces[0].classification;
     const card = document.createElement("div");
     card.className = "rev-file";
-    // media strip: each piece (frame still + the source video) with its own label
+    // media strip: each piece (frame still + the source video) with its own label.
+    // The video piece uses the SAME extracted frame image as its thumbnail, with a
+    // play-button overlay; clicking it opens the full viewer (which loads + plays
+    // the real video). This avoids decoding every video just to draw the review.
     let media = `<div class="rev-file-media">`;
     for (const p of pieces) {
       if (p.kind === "video") {
-        const vurl = videoUrls[blobId] || "";
-        const vtag = vurl
-          ? `<video src="${vurl}" muted playsinline preload="metadata" onclick="this.paused?this.play():this.pause()"></video><div class="playicon"><span class="disc"></span></div>`
-          : `<img src="${thumbUrls[blobId] || ""}" alt=""><div class="playicon"><span class="disc"></span></div>`;
-        media += `<div class="rev-piece"><span class="pkind">VIDEO</span>${vtag}<div class="plabel">${escapeHtml(p.filename)}</div></div>`;
+        media += `<div class="rev-piece" data-openvid="${blobId}" title="Open video">` +
+          `<span class="pkind">VIDEO</span>` +
+          `<img src="${thumbUrls[blobId] || ""}" alt="">` +
+          `<div class="playicon"><span class="disc"></span></div>` +
+          `<div class="plabel">${escapeHtml(p.filename)}</div></div>`;
       } else {
-        media += `<div class="rev-piece"><span class="pkind">FRAME</span><img src="${thumbUrls[blobId] || ""}" alt=""><div class="plabel">${escapeHtml(p.filename)}</div></div>`;
+        media += `<div class="rev-piece"><span class="pkind">FRAME</span>` +
+          `<img src="${thumbUrls[blobId] || ""}" alt="">` +
+          `<div class="plabel">${escapeHtml(p.filename)}</div></div>`;
       }
     }
     media += `</div>`;
@@ -647,8 +672,14 @@ async function buildReview(rev) {
     card.innerHTML = media + details;
     host.appendChild(card);
   }
+  // Clicking a video piece opens the full viewer (loads + plays the real video).
+  host.querySelectorAll(".rev-piece[data-openvid]").forEach(el => {
+    el.onclick = () => openViewer(parseInt(el.dataset.openvid, 10));
+  });
   $("confirm-err").textContent = "";
   $("confirm-actions").classList.remove("hidden");
+  // Always start the review from the top (its content is rebuilt each open).
+  $("confirm-content").scrollTop = 0;
 }
 
 function fmtBytes(n) {

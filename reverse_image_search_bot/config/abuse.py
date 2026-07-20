@@ -138,6 +138,11 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     conn.execute("UPDATE chats SET created_at = first_seen WHERE created_at IS NULL")
     conn.execute("UPDATE files SET created_at = upload_time WHERE created_at IS NULL")
 
+    # A user's Telegram bio (fetched best-effort at report time) and a per-file
+    # caption (text sent alongside the media, if any) — both reportable to NCMEC.
+    _add_column_if_missing(conn, "users", "bio", "TEXT")
+    _add_column_if_missing(conn, "files", "caption", "TEXT")
+
     # A report round for one user. `report_uuid` is the URL token; `page_secret_hash`
     # gates the report page (P2, stored hashed — the image key P1 is NEVER stored).
     # `status` drives the live UI: preparing -> ready -> submitting -> filed / retracted
@@ -218,6 +223,16 @@ def record_user(
     conn.commit()
 
 
+def set_user_bio(user_id: int, bio: str | None) -> None:
+    """Store a user's Telegram bio (fetched best-effort at report time).
+
+    Only updates an existing row; a no-op if the user isn't recorded yet.
+    """
+    conn = _get_conn()
+    conn.execute("UPDATE users SET bio = ? WHERE user_id = ?", (bio, user_id))
+    conn.commit()
+
+
 def record_file(
     file_unique_id: str,
     *,
@@ -228,6 +243,7 @@ def record_file(
     group_id: int | None = None,
     channel_id: int | None = None,
     file_id: str | None = None,
+    caption: str | None = None,
 ) -> None:
     """Insert-only record of an uploaded file. Existing rows are left untouched.
 
@@ -237,6 +253,9 @@ def record_file(
     ``file_id`` is the Telegram file_id of the ORIGINAL upload (not the extracted
     frame) so the real file — e.g. the source video — can be re-downloaded later
     to report the actual uploaded media, not just a still frame.
+
+    ``caption`` is the text the user sent alongside the media, if any — kept as
+    provenance/evidence and reported to NCMEC.
     """
     conn = _get_conn()
     now = _now()
@@ -244,8 +263,8 @@ def record_file(
         """
         INSERT OR IGNORE INTO files
             (file_unique_id, saved_filename, original_filename, file_type,
-             upload_time, user_id, group_id, channel_id, file_id, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             upload_time, user_id, group_id, channel_id, file_id, caption, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             file_unique_id,
@@ -257,6 +276,7 @@ def record_file(
             group_id,
             channel_id,
             file_id,
+            caption,
             now,
         ),
     )

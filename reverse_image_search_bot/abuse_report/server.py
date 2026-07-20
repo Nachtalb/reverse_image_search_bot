@@ -22,6 +22,7 @@ import hashlib
 import hmac
 import json
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import parse_qsl
 
@@ -338,6 +339,54 @@ async def api_select(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "selected": len(selections)})
 
 
+def _epoch_to_dt(ts: int | None) -> datetime | None:
+    """Convert a stored epoch-seconds int to a tz-aware UTC datetime (or None)."""
+    if not ts:
+        return None
+    try:
+        return datetime.fromtimestamp(int(ts), tz=UTC)
+    except ValueError, OverflowError, OSError:
+        return None
+
+
+def _incident_date(files: list[dict]) -> datetime | None:
+    """Earliest upload time across the reported files (the incident time)."""
+    times = [f["upload_time"] for f in files if f.get("upload_time")]
+    return min(times) if times else None
+
+
+def _chat_room_name(request: web.Request, rep: dict, source_chats: list[dict] | None) -> str | None:
+    """Short label for where the media was sent (the chat incident 'room').
+
+    A group/channel upload names that chat; otherwise it was a DM to the bot, so
+    name the bot itself.
+    """
+    for c in source_chats or []:
+        label = c.get("title") or (f"@{c['username']}" if c.get("username") else str(c.get("chat_id")))
+        return f"{c.get('chat_type', 'chat')}: {label}"
+    bot = request.app.get("bot")
+    uname = getattr(bot, "username", None) if bot is not None else None
+    return f"@{uname} (bot DM)" if uname else "bot DM"
+
+
+async def _fetch_and_store_bio(request: web.Request, user_id: int) -> None:
+    """Best-effort: fetch the reported user's Telegram bio and store it.
+
+    Uses get_chat on the user id (a private chat exists because they DMed the
+    bot). Silent on any failure — bio is a nice-to-have, never blocks a report.
+    """
+    bot = request.app.get("bot")
+    if bot is None:
+        return
+    try:
+        chat = await bot.get_chat(user_id)
+        bio = getattr(chat, "bio", None)
+        if bio:
+            abuse.set_user_bio(user_id, bio)
+    except Exception:
+        logger.info("could not fetch bio for user %s", user_id, exc_info=True)
+
+
 async def _gather_selected_files(request: web.Request, rep: dict, p1: str) -> tuple[list[dict], list[dict]]:
     """Decrypt every selected blob (frame + any source video) with P1.
 
@@ -345,7 +394,8 @@ async def _gather_selected_files(request: web.Request, rep: dict, p1: str) -> tu
     same file set. Ensures every selected video is fetched first (best-effort),
     then returns ``(files, selected_blobs)`` where ``files`` is the list of
     per-file dicts handed to the NCMEC builders. Each file dict carries a ``kind``
-    ("frame" | "video") and its ``blob_id`` so the UI can pair them up.
+    ("frame" | "video"), its ``blob_id``, the file's ``upload_time`` and any
+    ``caption`` so the UI can pair them up and the builders can fill the fields.
     """
     selected = abuse.report_blobs(rep["report_uuid"], selected_only=True)
     if not selected:
@@ -377,6 +427,8 @@ async def _gather_selected_files(request: web.Request, rep: dict, p1: str) -> tu
         # location_of_file is our PUBLIC copy's URL (the one that may have been
         # used on the web). Two distinct facts in their two distinct NCMEC fields.
         frec = abuse.file_by_unique_id(b["file_unique_id"]) or {}
+        upload_dt = _epoch_to_dt(frec.get("upload_time"))
+        caption = frec.get("caption")
         files.append(
             {
                 "kind": "frame",
@@ -385,6 +437,8 @@ async def _gather_selected_files(request: web.Request, rep: dict, p1: str) -> tu
                 "filename": frec.get("original_filename") or b["saved_filename"],
                 "location": _public_file_url(b["saved_filename"]),
                 "classification": b["classification"],
+                "upload_time": upload_dt,
+                "caption": caption,
             }
         )
         # If this blob has a source video, report it TOO (same classification).
@@ -406,6 +460,8 @@ async def _gather_selected_files(request: web.Request, rep: dict, p1: str) -> tu
                         "plaintext": vplain,
                         "filename": b["video_filename"] or b["saved_filename"],
                         "classification": b["classification"],
+                        "upload_time": upload_dt,
+                        "caption": caption,
                     }
                 )
     return files, selected
@@ -429,6 +485,9 @@ async def api_review(request: web.Request) -> web.Response:
         raise web.HTTPBadRequest(text="image_key (P1) required")
 
     files, selected = await _gather_selected_files(request, rep, p1)
+    # Fetch the reported user's bio (best-effort) before reading the row, so it
+    # shows up in the review exactly as it will be sent.
+    await _fetch_and_store_bio(request, rep["user_id"])
     incident_urls = [_public_file_url(b["saved_filename"]) for b in selected]
     reported_user = abuse.get_user(rep["user_id"])
     source_chats = abuse.source_chats_for_user(rep["user_id"])
@@ -437,6 +496,8 @@ async def api_review(request: web.Request) -> web.Response:
         incident_urls=incident_urls,
         reported_user=reported_user,
         source_chats=source_chats,
+        incident_date=_incident_date(files),
+        chat_room_name=_chat_room_name(request, rep, source_chats),
     )
     # Per-file summary the UI pairs with its thumbnails/videos (no plaintext).
     file_summary = [
@@ -486,6 +547,7 @@ async def api_submit(request: web.Request) -> web.Response:
 
     incident_urls = [_public_file_url(b["saved_filename"]) for b in selected]
     abuse.set_report_status(rep["report_uuid"], abuse.REPORT_SUBMITTING)
+    await _fetch_and_store_bio(request, rep["user_id"])
     reported_user = abuse.get_user(rep["user_id"])
     source_chats = abuse.source_chats_for_user(rep["user_id"])
     try:
@@ -494,6 +556,8 @@ async def api_submit(request: web.Request) -> web.Response:
             incident_urls=incident_urls,
             reported_user=reported_user,
             source_chats=source_chats,
+            incident_date=_incident_date(files),
+            chat_room_name=_chat_room_name(request, rep, source_chats),
         )
     except ncmec.NcmecNotConfigured as e:
         abuse.set_report_status(rep["report_uuid"], abuse.REPORT_ERROR, str(e))

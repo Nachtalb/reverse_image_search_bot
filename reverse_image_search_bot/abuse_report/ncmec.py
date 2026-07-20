@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from ncmec_cybertip import (
     PRODUCTION_URL,
     TESTING_URL,
+    ChatImIncident,
     CyberTiplineClient,
     Email,
     FileDetails,
@@ -66,7 +67,8 @@ def _reporter() -> Reporter:
             first_name=settings.NCMEC_REPORTER_FIRST_NAME or None,
             last_name=settings.NCMEC_REPORTER_LAST_NAME or None,
             email=[Email(value=settings.NCMEC_REPORTER_EMAIL)] if settings.NCMEC_REPORTER_EMAIL else [],
-        )
+        ),
+        terms_of_service=settings.NCMEC_TERMS_OF_SERVICE or None,
     )
 
 
@@ -112,6 +114,7 @@ def build_reported_subject(
         screen_name=(f"@{reported_user['username']}" if reported_user.get("username") else None),
         display_name=display,
         profile_url=profile_urls,
+        profile_bio=reported_user.get("bio") or None,
         group_identifier="; ".join(group_bits) or None,
         additional_info="\n".join(info_bits) or None,
     )
@@ -122,16 +125,35 @@ def build_report(
     incident_urls: list[str],
     reported_user: dict | None = None,
     source_chats: list[dict] | None = None,
+    incident_date: datetime | None = None,
+    chat_room_name: str | None = None,
 ) -> Report:
-    """Build the report envelope. One report per user round."""
+    """Build the report envelope. One report per user round.
+
+    ``incident_date`` is the time of the first reported media item's upload (must
+    be in the past); falls back to now only if unknown. ``chat_room_name`` is a
+    short label for where the media was sent (the bot DM, or a group/channel).
+    """
+    internet_details = [
+        InternetDetails(web_page_incident=WebPageIncident(url=incident_urls or ["https://ris.naa.gg/"]))
+    ]
+    # The media was delivered to the bot over Telegram — record that as the chat
+    # incident alongside the web page (re-hosted copy) details.
+    internet_details.append(
+        InternetDetails(
+            chat_im_incident=ChatImIncident(
+                chat_client="Telegram",
+                chat_room_name=chat_room_name or None,
+            )
+        )
+    )
     return Report(
         incident_summary=IncidentSummary(
             incident_type=IncidentType.CHILD_PORNOGRAPHY,
-            incident_date_time=datetime.now(UTC),
+            incident_date_time=incident_date or datetime.now(UTC),
+            incident_date_time_description="Time of the first reported media item uploaded to the bot.",
         ),
-        internet_details=[
-            InternetDetails(web_page_incident=WebPageIncident(url=incident_urls or ["https://ris.naa.gg/"]))
-        ],
+        internet_details=internet_details,
         reporter=_reporter(),
         person_or_user_reported=build_reported_subject(reported_user, source_chats),
     )
@@ -144,17 +166,25 @@ def build_file_details(report_id: int, file_id: str, f: dict, data: bytes) -> Fi
     sees is byte-for-byte what gets sent. The live submit passes the real
     NCMEC-assigned ``report_id``/``file_id``; the preview passes placeholders
     (0 / a marker string) and strips them from the dumped output.
+
+    ``uploaded_to_esp_timestamp`` is this file's real upload time (must be in the
+    past); omitted if unknown — never faked to ``now``. A user caption, if the
+    media was sent with one, goes into ``additional_info``.
     """
+    caption = (f.get("caption") or "").strip()
+    additional_info = [f"User caption: {caption}"] if caption else []
     return FileDetails(
         report_id=report_id,
         file_id=file_id,
         original_file_name=f["filename"],
+        uploaded_to_esp_timestamp=f.get("upload_time") or None,
         location_of_file=f.get("location") or None,
         publicly_available=True if f.get("location") else None,
         file_relevance=FileRelevance.REPORTED,
         file_viewed_by_esp=True,
         industry_classification=_CLASSIFICATION.get(f.get("classification") or ""),
         original_file_hash=file_hashes(data),
+        additional_info=additional_info,
     )
 
 
@@ -164,6 +194,8 @@ def preview_payload(
     incident_urls: list[str],
     reported_user: dict | None = None,
     source_chats: list[dict] | None = None,
+    incident_date: datetime | None = None,
+    chat_room_name: str | None = None,
 ) -> dict:
     """Build the EXACT objects that submit_and_finish would send, as plain dicts.
 
@@ -171,7 +203,13 @@ def preview_payload(
     submit, so the review dialog shows precisely what NCMEC receives — nothing is
     hand-mirrored. No network calls; nothing is filed.
     """
-    report = build_report(incident_urls=incident_urls, reported_user=reported_user, source_chats=source_chats)
+    report = build_report(
+        incident_urls=incident_urls,
+        reported_user=reported_user,
+        source_chats=source_chats,
+        incident_date=incident_date,
+        chat_room_name=chat_room_name,
+    )
     # report_id / file_id are assigned by NCMEC at submit time; the model requires
     # them, so use clearly-marked placeholders for the preview and strip them from
     # the dumped output (they are NOT part of what the admin is reviewing).
@@ -194,6 +232,8 @@ async def submit_and_finish(
     incident_urls: list[str],
     reported_user: dict | None = None,
     source_chats: list[dict] | None = None,
+    incident_date: datetime | None = None,
+    chat_room_name: str | None = None,
 ) -> tuple[int, list[str]]:
     """Open, populate, AND finish a report in one shot (irreversible).
 
@@ -205,7 +245,13 @@ async def submit_and_finish(
     async with _client() as client:
         await client.status()  # verify connectivity + auth up front
         opened = await client.submit(
-            build_report(incident_urls=incident_urls, reported_user=reported_user, source_chats=source_chats)
+            build_report(
+                incident_urls=incident_urls,
+                reported_user=reported_user,
+                source_chats=source_chats,
+                incident_date=incident_date,
+                chat_room_name=chat_room_name,
+            )
         )
         report_id = opened.report_id
         if report_id is None:
