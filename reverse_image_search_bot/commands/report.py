@@ -280,11 +280,22 @@ async def reports_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     reports = abuse.all_reports()
     count = len(reports)
+
+    # web_app inline buttons only work in PRIVATE chats — offer the reports console
+    # as a Mini App button there (signed initData), same as /report does per-report.
+    is_private = update.effective_chat is not None and update.effective_chat.type == "private"
+    markup = None
+    if is_private and settings.REPORT_BASE_URL:
+        markup = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("Reports", web_app=WebAppInfo(url=f"{settings.REPORT_BASE_URL}/report/console"))]]
+        )
+
     if menu_button_set:
         summary = "No reports on file yet." if not count else f"{count} report{'s' if count != 1 else ''} on file."
         await update.message.reply_html(
-            f"{summary} Tap the <b>Reports</b> menu button (bottom-left ⊞) to open the reports console "
-            "(list, open a report, or create a new one)."
+            f"{summary} Tap the <b>Reports</b> button below (or the menu button, bottom-left ⊞) to open the "
+            "reports console (list, open a report, or create a new one).",
+            reply_markup=markup,
         )
         return
 
@@ -293,7 +304,7 @@ async def reports_command(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if url:
         await update.message.reply_html(
             f"{count} report{'s' if count != 1 else ''} on file.",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Open reports console", url=url)]]),
+            reply_markup=markup or InlineKeyboardMarkup([[InlineKeyboardButton("Open reports console", url=url)]]),
         )
     else:
         await update.message.reply_html(
