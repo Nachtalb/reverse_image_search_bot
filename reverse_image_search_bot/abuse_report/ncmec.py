@@ -137,6 +137,57 @@ def build_report(
     )
 
 
+def build_file_details(report_id: int, file_id: str, f: dict, data: bytes) -> FileDetails:
+    """Build the per-file NCMEC FileDetails for one selected file.
+
+    Shared by the live submit path AND the review preview, so what the admin
+    sees is byte-for-byte what gets sent. The live submit passes the real
+    NCMEC-assigned ``report_id``/``file_id``; the preview passes placeholders
+    (0 / a marker string) and strips them from the dumped output.
+    """
+    return FileDetails(
+        report_id=report_id,
+        file_id=file_id,
+        original_file_name=f["filename"],
+        location_of_file=f.get("location") or None,
+        publicly_available=True if f.get("location") else None,
+        file_relevance=FileRelevance.REPORTED,
+        file_viewed_by_esp=True,
+        industry_classification=_CLASSIFICATION.get(f.get("classification") or ""),
+        original_file_hash=file_hashes(data),
+    )
+
+
+def preview_payload(
+    files: list[dict],
+    *,
+    incident_urls: list[str],
+    reported_user: dict | None = None,
+    source_chats: list[dict] | None = None,
+) -> dict:
+    """Build the EXACT objects that submit_and_finish would send, as plain dicts.
+
+    Uses the same ``build_report`` / ``build_file_details`` builders as the live
+    submit, so the review dialog shows precisely what NCMEC receives — nothing is
+    hand-mirrored. No network calls; nothing is filed.
+    """
+    report = build_report(incident_urls=incident_urls, reported_user=reported_user, source_chats=source_chats)
+    # report_id / file_id are assigned by NCMEC at submit time; the model requires
+    # them, so use clearly-marked placeholders for the preview and strip them from
+    # the dumped output (they are NOT part of what the admin is reviewing).
+    file_details = [build_file_details(0, "(assigned on submit)", f, f["plaintext"]) for f in files]
+    file_dumps = []
+    for fd in file_details:
+        d = fd.model_dump(mode="json", exclude_none=True, by_alias=True)
+        d.pop("report_id", None)
+        d.pop("file_id", None)
+        file_dumps.append(d)
+    return {
+        "report": report.model_dump(mode="json", exclude_none=True, by_alias=True),
+        "files": file_dumps,
+    }
+
+
 async def submit_and_finish(
     selected_files: list[dict],
     *,
@@ -169,17 +220,7 @@ async def submit_and_finish(
                 raise RuntimeError(f"NCMEC upload returned no file_id for {f['filename']}")
             file_ids.append(file_id)
 
-            details = FileDetails(
-                report_id=report_id,
-                file_id=file_id,
-                original_file_name=f["filename"],
-                location_of_file=f.get("location") or None,
-                publicly_available=True if f.get("location") else None,
-                file_relevance=FileRelevance.REPORTED,
-                file_viewed_by_esp=True,
-                industry_classification=_CLASSIFICATION.get(f.get("classification") or ""),
-                original_file_hash=file_hashes(data),
-            )
+            details = build_file_details(report_id, file_id, f, data)
             await client.file_info(details)
 
         await client.finish(report_id)

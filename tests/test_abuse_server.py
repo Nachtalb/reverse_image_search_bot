@@ -494,3 +494,64 @@ def test_report_meta_includes_language(abuse, tmp_path, monkeypatch):
 
     user = abuse.get_user(77)
     assert user["language_code"] == "pt-BR"
+
+
+@pytest.mark.asyncio
+async def test_review_returns_payload_without_filing(abuse, tmp_path, monkeypatch):
+    """/api/review builds the real NCMEC payload (files + reporter) and files NOTHING."""
+    from reverse_image_search_bot import settings
+    from reverse_image_search_bot.abuse_report import crypto, ncmec, server
+
+    updir = tmp_path / "uploads"
+    updir.mkdir()
+    plaintext = b"\xff\xd8\xff the bad image bytes"
+    (updir / "A.jpg").write_bytes(plaintext)
+    monkeypatch.setattr(settings, "UPLOADER", {"configuration": {"path": str(updir)}, "url": "https://ris.naa.gg/f"})
+    monkeypatch.setattr(server, "_admin_from_request", lambda req: 42)
+    monkeypatch.setattr(settings, "REPORT_PAGE_PASSWORD", "")
+    monkeypatch.setattr(settings, "NCMEC_REPORTER_EMAIL", "report@nachtalb.io")
+
+    # If review ever called the network, this would blow up — it must NOT.
+    boom = AsyncMock(side_effect=AssertionError("review must not file"))
+    monkeypatch.setattr(ncmec, "submit_and_finish", boom)
+
+    p1 = "test-image-key"
+    key = crypto.derive_key(p1)
+    nonce, ct = crypto.encrypt_file(plaintext, key)
+    abuse.record_user(1, username="bad", first_name="B", last_name="G")
+    abuse.record_file("A", saved_filename="A.jpg", user_id=1, original_filename="evidence.jpg", file_type="photo")
+    abuse.create_report("u", 1, "")
+    abuse.add_report_blob(
+        "u",
+        file_unique_id="A",
+        saved_filename="A.jpg",
+        nonce=nonce,
+        ciphertext=ct,
+        plaintext_sha256=crypto.sha256_hex(plaintext),
+    )
+    bid = abuse.blob_meta("u")[0]["id"]
+    abuse.set_blob_selection("u", {bid: "A1"})
+
+    req = _req(
+        headers={"X-Page-Secret": ""},
+        match={"uuid": "u"},
+        json_body={"image_key": p1},
+        app={"bot": None, "bot_data": {}},
+    )
+    resp = await server.api_review(req)
+    import json
+
+    data = json.loads(resp.text or "")
+    # Reporter email surfaced; one file with full hashes + classification; nothing filed.
+    assert data["reporter"]["reporting_person"]["email"][0]["value"] == "report@nachtalb.io"
+    assert len(data["files"]) == 1
+    f = data["files"][0]
+    assert f["kind"] == "frame"
+    assert f["filename"] == "evidence.jpg"
+    assert f["classification"] == "A1"
+    assert {"MD5", "SHA1", "SHA256"} <= {h["hash_type"] for h in f["hashes"]}
+    # file_details mirrors what submit sends (industry_classification A1 present)
+    assert data["file_details"][0]["industry_classification"] == "A1"
+    boom.assert_not_called()
+    # report status untouched (still preparing/ready, NOT filed)
+    assert abuse.get_report("u")["status"] != abuse.REPORT_FILED

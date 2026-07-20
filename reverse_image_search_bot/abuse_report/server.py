@@ -338,23 +338,15 @@ async def api_select(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "selected": len(selections)})
 
 
-async def api_submit(request: web.Request) -> web.Response:
-    """Submit to NCMEC AND finish the report in one shot (irreversible).
+async def _gather_selected_files(request: web.Request, rep: dict, p1: str) -> tuple[list[dict], list[dict]]:
+    """Decrypt every selected blob (frame + any source video) with P1.
 
-    The console double-checks the selection in a client-side preview before this
-    is called, so there is no separate review/finish step. Decrypt selected blobs
-    with P1, upload + classify + finish, then delete the plaintext files from
-    disk. The encrypted blobs are KEPT in the DB, linked to the finished report,
-    so the files remain available for further inspection / law-enforcement.
+    Shared by the review preview AND the live submit so both operate on the exact
+    same file set. Ensures every selected video is fetched first (best-effort),
+    then returns ``(files, selected_blobs)`` where ``files`` is the list of
+    per-file dicts handed to the NCMEC builders. Each file dict carries a ``kind``
+    ("frame" | "video") and its ``blob_id`` so the UI can pair them up.
     """
-    _require_admin(request)
-    rep = _report_or_404(request.match_info["uuid"])
-    _require_page_secret(request, rep)
-    payload = await request.json()
-    p1 = payload.get("image_key", "")
-    if not p1:
-        raise web.HTTPBadRequest(text="image_key (P1) required")
-
     selected = abuse.report_blobs(rep["report_uuid"], selected_only=True)
     if not selected:
         raise web.HTTPBadRequest(text="no images selected")
@@ -371,7 +363,7 @@ async def api_submit(request: web.Request) -> web.Response:
         selected = abuse.report_blobs(rep["report_uuid"], selected_only=True)
 
     key = crypto.derive_key(p1)
-    files = []
+    files: list[dict] = []
     base = settings.UPLOADER.get("configuration", {}).get("path")
     for b in selected:
         try:
@@ -387,6 +379,8 @@ async def api_submit(request: web.Request) -> web.Response:
         frec = abuse.file_by_unique_id(b["file_unique_id"]) or {}
         files.append(
             {
+                "kind": "frame",
+                "blob_id": b["id"],
                 "plaintext": plaintext,
                 "filename": frec.get("original_filename") or b["saved_filename"],
                 "location": _public_file_url(b["saved_filename"]),
@@ -407,11 +401,88 @@ async def api_submit(request: web.Request) -> web.Response:
                     raise web.HTTPBadRequest(text="image key (P1) incorrect — video hash mismatch")
                 files.append(
                     {
+                        "kind": "video",
+                        "blob_id": b["id"],
                         "plaintext": vplain,
                         "filename": b["video_filename"] or b["saved_filename"],
                         "classification": b["classification"],
                     }
                 )
+    return files, selected
+
+
+async def api_review(request: web.Request) -> web.Response:
+    """Build the EXACT NCMEC payload for the current selection, without filing.
+
+    Decrypts the selected frames + source videos with P1, runs the same NCMEC
+    builders the live submit uses, and returns the resulting objects as JSON so
+    the review dialog can show everything that will be sent — reporter, reported
+    person, incident, and every file (frame AND video) with its hash + fields.
+    Nothing is uploaded; nothing is filed.
+    """
+    _require_admin(request)
+    rep = _report_or_404(request.match_info["uuid"])
+    _require_page_secret(request, rep)
+    payload = await request.json()
+    p1 = payload.get("image_key", "")
+    if not p1:
+        raise web.HTTPBadRequest(text="image_key (P1) required")
+
+    files, selected = await _gather_selected_files(request, rep, p1)
+    incident_urls = [_public_file_url(b["saved_filename"]) for b in selected]
+    reported_user = abuse.get_user(rep["user_id"])
+    source_chats = abuse.source_chats_for_user(rep["user_id"])
+    ncmec_payload = ncmec.preview_payload(
+        files,
+        incident_urls=incident_urls,
+        reported_user=reported_user,
+        source_chats=source_chats,
+    )
+    # Per-file summary the UI pairs with its thumbnails/videos (no plaintext).
+    file_summary = [
+        {
+            "kind": f["kind"],
+            "blob_id": f["blob_id"],
+            "filename": f["filename"],
+            "location": f.get("location"),
+            "classification": f["classification"],
+            "hashes": ncmec_payload["files"][i].get("original_file_hash"),
+            "size_bytes": len(f["plaintext"]),
+        }
+        for i, f in enumerate(files)
+    ]
+    return web.json_response(
+        {
+            "ncmec_configured": bool(settings.NCMEC_USERNAME and settings.NCMEC_PASSWORD),
+            "reporter": ncmec_payload["report"].get("reporter"),
+            "reported": ncmec_payload["report"].get("person_or_user_reported"),
+            "incident": ncmec_payload["report"].get("incident_summary"),
+            "internet_details": ncmec_payload["report"].get("internet_details"),
+            "files": file_summary,
+            "file_details": ncmec_payload["files"],
+            "raw_report": ncmec_payload["report"],
+        }
+    )
+
+
+async def api_submit(request: web.Request) -> web.Response:
+    """Submit to NCMEC AND finish the report in one shot (irreversible).
+
+    The console double-checks the selection in a client-side preview before this
+    is called, so there is no separate review/finish step. Decrypt selected blobs
+    with P1, upload + classify + finish, then delete the plaintext files from
+    disk. The encrypted blobs are KEPT in the DB, linked to the finished report,
+    so the files remain available for further inspection / law-enforcement.
+    """
+    _require_admin(request)
+    rep = _report_or_404(request.match_info["uuid"])
+    _require_page_secret(request, rep)
+    payload = await request.json()
+    p1 = payload.get("image_key", "")
+    if not p1:
+        raise web.HTTPBadRequest(text="image_key (P1) required")
+
+    files, selected = await _gather_selected_files(request, rep, p1)
 
     incident_urls = [_public_file_url(b["saved_filename"]) for b in selected]
     abuse.set_report_status(rep["report_uuid"], abuse.REPORT_SUBMITTING)
@@ -554,6 +625,7 @@ def build_app(bot=None, bot_data=None) -> web.Application:
     app.router.add_get("/report/{uuid}/api/blob/{blob_id}/video", api_video)
     app.router.add_get("/report/{uuid}/api/status", api_status)
     app.router.add_post("/report/{uuid}/api/select", api_select)
+    app.router.add_post("/report/{uuid}/api/review", api_review)
     app.router.add_post("/report/{uuid}/api/submit", api_submit)
     app.router.add_post("/report/{uuid}/api/cancel", api_cancel)
     app.router.add_get("/healthz", healthz)
