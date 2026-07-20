@@ -39,8 +39,8 @@
   .thumb.selected { border-color: #3a6df0; }
   .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: zoom-in; }
   .thumb .lock { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #5a5c66; font-size: 26px; pointer-events: none; }
-  .thumb .cls { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.72); padding: 5px; display: flex; gap: 4px; justify-content: center; }
-  .thumb .cls span { font-size: 14px; font-weight: 700; padding: 5px 9px; border-radius: 6px; background: #2a2c33; cursor: pointer; }
+  .thumb .cls { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.72); padding: 4px; display: flex; gap: 3px; justify-content: center; }
+  .thumb .cls span { flex: 1; min-width: 0; text-align: center; font-size: 12px; font-weight: 700; padding: 5px 2px; border-radius: 5px; background: #2a2c33; cursor: pointer; }
   .thumb .cls span.on { background: #3a6df0; color: #fff; }
   .thumb .cls span.on[data-cls="NR"] { background: #6b7280; color: #fff; }
   .thumb .reported-cls { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(15,47,90,.92); color: #8ab4ff; font-size: 11px; font-weight: 600; padding: 4px 6px; text-align: center; line-height: 1.2; }
@@ -89,6 +89,28 @@
   .preview-item .tag { position: absolute; top: 0; right: 0; font-size: 11px; font-weight: 700; background: rgba(58,109,240,.9); color: #fff; padding: 2px 5px; border-bottom-left-radius: 6px; }
   .preview-item .tag[data-cls="NR"] { background: rgba(107,114,128,.95); }
   .preview-item .fn { font-size: 9px; color: #9a9ba2; padding: 3px 4px; word-break: break-all; line-height: 1.15; }
+  /* review dialog */
+  #confirm { width: 560px; }
+  .rev-sec { border: 1px solid #2a2c33; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; background: #191b21; }
+  .rev-h { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #8ab4ff; margin-bottom: 8px; font-weight: 700; }
+  .rev-kv { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; border-bottom: 1px solid #23252c; font-size: 13px; }
+  .rev-kv:last-child { border: none; }
+  .rev-kv span { color: #9a9ba2; flex: 0 0 auto; }
+  .rev-kv b { color: #fff; font-weight: 600; text-align: right; word-break: break-all; }
+  .rev-empty { color: #9a9ba2; font-size: 13px; font-style: italic; }
+  /* one file card: media (frame + optional video) on the left, fields on the right */
+  .rev-file { border: 1px solid #2a2c33; border-radius: 10px; padding: 10px; margin-bottom: 10px; background: #14151a; }
+  .rev-file-media { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .rev-piece { position: relative; width: 96px; }
+  .rev-piece img, .rev-piece video { width: 96px; height: 96px; object-fit: cover; border-radius: 8px; display: block; background: #101116; cursor: pointer; }
+  .rev-piece .plabel { font-size: 10px; color: #cfd0d6; text-align: center; margin-top: 3px; word-break: break-all; line-height: 1.2; }
+  .rev-piece .pkind { position: absolute; top: 3px; left: 3px; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 5px; background: rgba(0,0,0,.72); color: #fff; }
+  .rev-piece .playicon { position: absolute; top: 0; left: 0; width: 96px; height: 96px; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+  .rev-piece .playicon::after { content: ""; width: 0; height: 0; border-style: solid; border-width: 9px 0 9px 15px; border-color: transparent transparent transparent rgba(255,255,255,.95); filter: drop-shadow(0 0 3px rgba(0,0,0,.8)); margin-left: 2px; }
+  .rev-piece .playicon .disc { position: absolute; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,.5); }
+  .rev-hash { font-family: ui-monospace, Menlo, monospace; font-size: 10px; color: #9a9ba2; word-break: break-all; }
+  .rev-badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 6px; background: #3a6df0; color: #fff; }
+  .rev-badge.nr { background: #6b7280; }
   .spinner { width: 34px; height: 34px; border: 3px solid #363842; border-top-color: #3a6df0; border-radius: 50%; animation: spin .8s linear infinite; margin: 12px auto; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .center { text-align: center; }
@@ -140,7 +162,7 @@
       </div>
       <div class="row" style="justify-content:space-between;align-items:center">
         <b>Images</b>
-        <span class="muted" id="sel-count">0 selected</span>
+        <span class="muted"><span id="save-state" style="color:#7fd6a2;margin-right:8px"></span><span id="sel-count">0 selected</span></span>
       </div>
       <div class="gallery" id="gallery"></div>
     </div>
@@ -179,16 +201,25 @@
 <!-- Final review / confirm dialog -->
 <dialog id="confirm">
   <div class="dlg-body" id="confirm-content">
-    <h2>Confirm submission</h2>
-    <div id="confirm-summary"></div>
-    <div class="preview-grid" id="confirm-grid"></div>
-    <div class="muted" style="margin-bottom:12px">
-      Submits this report to NCMEC and finishes it immediately. This is irreversible.
+    <h2>Review — everything sent to NCMEC</h2>
+    <div class="muted" style="margin-bottom:10px">
+      This is exactly what will be transmitted to NCMEC. Review it, then submit.
     </div>
-    <div class="row" id="confirm-actions">
-      <button id="confirm-submit-btn">Submit</button>
-      <button id="confirm-cancel-btn" class="ghost">Cancel</button>
+    <div id="confirm-ncmec-warn" class="status error hidden" style="margin-bottom:10px"></div>
+
+    <div class="rev-sec"><div class="rev-h">Reporter</div><div id="rev-reporter"></div></div>
+    <div class="rev-sec"><div class="rev-h">Reported person / account</div><div id="rev-reported"></div></div>
+    <div class="rev-sec"><div class="rev-h">Incident</div><div id="rev-incident"></div></div>
+    <div class="rev-sec">
+      <div class="rev-h">Files sent (<span id="rev-file-count">0</span>)</div>
+      <div id="rev-files"></div>
     </div>
+
+    <div class="row" id="confirm-actions" style="margin-top:12px">
+      <button id="confirm-submit-btn">Submit to NCMEC</button>
+      <button id="confirm-cancel-btn" class="ghost">Back</button>
+    </div>
+    <div class="muted" style="margin-top:8px">Submits this report to NCMEC and finishes it immediately. This is irreversible.</div>
     <div class="muted" id="confirm-err" style="color:#f08a8a;margin-top:8px"></div>
   </div>
 </dialog>
@@ -417,11 +448,26 @@ function renderViewerCls(blobId) {
 }
 
 // Single source of truth for (de)selecting a blob + its class, so the viewer and
-// the thumbnail grid stay consistent. Tapping the active class deselects.
+// the thumbnail grid stay consistent. Tapping the active class deselects. Every
+// change is persisted to the server (fire-and-forget) so the admin can leave and
+// resume later without reclassifying — the gallery restores from the saved state.
 function setClassification(id, c) {
   if (sel[id] === c) delete sel[id]; else sel[id] = c;
   syncThumbCls(id);
   updateSelCount();
+  persistSelection();
+}
+
+// Debounced persist of the whole selection map to /api/select. Fire-and-forget:
+// a failed save is surfaced in the action-err line but never blocks the UI.
+let _persistTimer = null;
+function persistSelection() {
+  if (_persistTimer) clearTimeout(_persistTimer);
+  _persistTimer = setTimeout(() => {
+    saveSelection().then(() => {
+      const s = $("save-state"); if (s) { s.textContent = "saved"; setTimeout(() => { s.textContent = ""; }, 1500); }
+    }).catch(e => { $("action-err").textContent = "Could not save selection: " + e.message; });
+  }, 400);
 }
 
 // Repaint a thumbnail's selected state + class bar from `sel` (used after the
@@ -431,6 +477,27 @@ function syncThumbCls(id) {
   if (!el) return;
   el.classList.toggle("selected", sel[id] !== undefined);
   el.querySelectorAll(".cls span").forEach(x => x.classList.toggle("on", x.dataset.cls === sel[id]));
+}
+
+// Ensure a blob's source video is fetched + decrypted, returning its object URL
+// (cached in videoUrls). Shared by the viewer and the review dialog so the review
+// shows the ACTUAL video piece, not just a still. Throws on failure with a reason.
+async function ensureVideoUrl(blobId) {
+  if (videoUrls[blobId]) return videoUrls[blobId];
+  if (!P1KEY) throw new Error("decrypt the images first (the key is needed for the video)");
+  // Lazily download + encrypt the original video server-side (best-effort).
+  const fr = await api(`/api/blob/${blobId}/fetch_video`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ image_key: $("p1").value }),
+  });
+  const fj = await fr.json();
+  if (!fj.ok) throw new Error(fj.reason || "video unavailable");
+  const r = await api(`/api/blob/${blobId}/video`);
+  const buf = new Uint8Array(await r.arrayBuffer());
+  const nonce = buf.slice(0, 12), ct = buf.slice(12);
+  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce }, P1KEY, ct);
+  videoUrls[blobId] = URL.createObjectURL(new Blob([plain]));
+  return videoUrls[blobId];
 }
 
 async function showVideo(blobId) {
@@ -443,25 +510,13 @@ async function showVideo(blobId) {
     vid.play().catch(() => {});    // autoplay (muted autoplay is allowed)
   };
   if (videoUrls[blobId]) { play(); return; }
-  if (!P1KEY) { msg.textContent = "Decrypt the images first (the key is needed for the video)."; return; }
   msg.textContent = "Loading video…";
   try {
-    // Lazily download + encrypt the original video server-side (best-effort).
-    const fr = await api(`/api/blob/${blobId}/fetch_video`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image_key: $("p1").value }),
-    });
-    const fj = await fr.json();
-    if (!fj.ok) { msg.textContent = "Video unavailable: " + (fj.reason || "unknown"); return; }
-    const r = await api(`/api/blob/${blobId}/video`);
-    const buf = new Uint8Array(await r.arrayBuffer());
-    const nonce = buf.slice(0, 12), ct = buf.slice(12);
-    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce }, P1KEY, ct);
-    videoUrls[blobId] = URL.createObjectURL(new Blob([plain]));
+    await ensureVideoUrl(blobId);
     msg.textContent = "";
     play();
   } catch (e) {
-    msg.textContent = "Video load failed: " + e.message;
+    msg.textContent = "Video unavailable: " + e.message;
   }
 }
 
@@ -475,37 +530,132 @@ async function saveSelection() {
   });
 }
 
-// --- Review: client-side preview only ---------------------------------------
+// --- Review: fetch the EXACT NCMEC payload from the server and show it -------
 const confirmDlg = $("confirm");
-$("review-btn").onclick = () => {
+$("review-btn").onclick = async () => {
   $("action-err").textContent = "";
   const ids = Object.keys(sel);
   if (!ids.length) { $("action-err").textContent = "Select at least one image."; return; }
   for (const id of ids) if (!sel[id]) { $("action-err").textContent = "Every selected image needs a classification (A1/A2/B1/B2/NR)."; return; }
   if (!P1KEY) { $("action-err").textContent = "Decrypt the images first (the image key is needed to submit)."; return; }
-  buildConfirm(ids);
-  confirmDlg.showModal();
+  const btn = $("review-btn"); btn.disabled = true; btn.textContent = "Preparing review…";
+  try {
+    await saveSelection();
+    // Server decrypts + builds the real NCMEC objects (frames AND source videos)
+    // and returns exactly what will be transmitted. Videos are fetched here too.
+    const r = await api("/api/review", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image_key: $("p1").value }),
+    });
+    const rev = await r.json();
+    await buildReview(rev);
+    confirmDlg.showModal();
+  } catch (e) {
+    $("action-err").textContent = "Could not build review: " + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = "Review";
+  }
 };
 
-function buildConfirm(ids) {
-  const uname = META.user.username ? "@" + META.user.username : "—";
-  const full = [META.user.first_name, META.user.last_name].filter(Boolean).join(" ") || "—";
-  $("confirm-summary").innerHTML =
-    `<div class="kv"><span>User ID</span><b>${META.user.id}</b></div>` +
-    `<div class="kv"><span>Username</span><b>${uname}</b></div>` +
-    `<div class="kv"><span>Full name</span><b>${full}</b></div>` +
-    `<div class="kv"><span>Images</span><b>${ids.length}</b></div>`;
-  const grid = $("confirm-grid"); grid.innerHTML = "";
-  for (const id of ids) {
-    const item = document.createElement("div");
-    item.className = "preview-item";
-    item.innerHTML = `<img src="${thumbUrls[id]}" alt=""><div class="tag" data-cls="${sel[id]}">${sel[id]}</div>` +
-      `<div class="fn">${fileLabel(blobNames[id], blobOrig[id])}</div>`;
-    grid.appendChild(item);
+const CLS_FULL = {
+  A1: "A1 · prepubescent minor · sexual act", A2: "A2 · prepubescent minor · lascivious exhibition",
+  B1: "B1 · pubescent minor · sexual act", B2: "B2 · pubescent minor · lascivious exhibition",
+  NR: "NR · not rated (no industry classification sent)",
+};
+
+// Render a flat object as key/value rows, recursing into nested objects/arrays.
+function kvRows(obj, prefix) {
+  if (obj == null) return "";
+  let out = "";
+  for (const [k, v] of Object.entries(obj)) {
+    if (v == null || (Array.isArray(v) && v.length === 0)) continue;
+    const label = prefix ? `${prefix} · ${k}` : k;
+    if (Array.isArray(v)) {
+      v.forEach((item, i) => {
+        if (item && typeof item === "object") out += kvRows(item, `${label}[${i}]`);
+        else out += `<div class="rev-kv"><span>${escapeHtml(label)}[${i}]</span><b>${escapeHtml(String(item))}</b></div>`;
+      });
+    } else if (typeof v === "object") {
+      out += kvRows(v, label);
+    } else {
+      out += `<div class="rev-kv"><span>${escapeHtml(label)}</span><b>${escapeHtml(String(v))}</b></div>`;
+    }
   }
-  // reset dialog to its default (button) state
-  $("confirm-actions").classList.remove("hidden");
+  return out;
+}
+function kvOrEmpty(obj, emptyMsg) {
+  const rows = kvRows(obj, "");
+  return rows || `<div class="rev-empty">${escapeHtml(emptyMsg)}</div>`;
+}
+
+async function buildReview(rev) {
+  // NCMEC credential state — if unconfigured, filing will fail; warn up front.
+  const warn = $("confirm-ncmec-warn");
+  if (rev.ncmec_configured) { warn.classList.add("hidden"); }
+  else { warn.classList.remove("hidden"); warn.textContent = "⚠ NCMEC credentials are not configured on the server — submit will fail until they are set."; }
+
+  $("rev-reporter").innerHTML = kvOrEmpty(rev.reporter, "No reporter set.");
+  $("rev-reported").innerHTML = kvOrEmpty(rev.reported, "No reported person/account (uploader unknown).");
+  $("rev-incident").innerHTML = kvOrEmpty(rev.incident, "No incident summary.");
+
+  // Group the flat file list by blob so a video and its extracted frame appear
+  // together as ONE file card with both pieces shown.
+  const byBlob = {};
+  rev.files.forEach((f, i) => {
+    (byBlob[f.blob_id] = byBlob[f.blob_id] || []).push({ ...f, detail: rev.file_details[i] });
+  });
+  $("rev-file-count").textContent = rev.files.length;
+  const host = $("rev-files"); host.innerHTML = "";
+  // Pre-decrypt every video piece so the review shows the ACTUAL video, not a
+  // placeholder still. Best-effort: a failed fetch falls back to the frame image.
+  for (const f of rev.files) {
+    if (f.kind === "video") { try { await ensureVideoUrl(f.blob_id); } catch (e) { /* fall back to still */ } }
+  }
+  for (const blobId of Object.keys(byBlob)) {
+    const pieces = byBlob[blobId].sort((a, b) => (a.kind === "frame" ? -1 : 1));
+    const cls = pieces[0].classification;
+    const card = document.createElement("div");
+    card.className = "rev-file";
+    // media strip: each piece (frame still + the source video) with its own label
+    let media = `<div class="rev-file-media">`;
+    for (const p of pieces) {
+      if (p.kind === "video") {
+        const vurl = videoUrls[blobId] || "";
+        const vtag = vurl
+          ? `<video src="${vurl}" muted playsinline preload="metadata" onclick="this.paused?this.play():this.pause()"></video><div class="playicon"><span class="disc"></span></div>`
+          : `<img src="${thumbUrls[blobId] || ""}" alt=""><div class="playicon"><span class="disc"></span></div>`;
+        media += `<div class="rev-piece"><span class="pkind">VIDEO</span>${vtag}<div class="plabel">${escapeHtml(p.filename)}</div></div>`;
+      } else {
+        media += `<div class="rev-piece"><span class="pkind">FRAME</span><img src="${thumbUrls[blobId] || ""}" alt=""><div class="plabel">${escapeHtml(p.filename)}</div></div>`;
+      }
+    }
+    media += `</div>`;
+    // per-piece NCMEC field detail (filename, location, relevance, hashes, class)
+    let details = "";
+    for (const p of pieces) {
+      const badge = `<span class="rev-badge ${cls === "NR" ? "nr" : ""}">${cls}</span>`;
+      let rows = `<div class="rev-kv"><span>Piece</span><b>${p.kind.toUpperCase()} — ${escapeHtml(p.filename)}</b></div>`;
+      rows += `<div class="rev-kv"><span>Classification</span><b>${badge} ${escapeHtml(CLS_FULL[cls] || cls)}</b></div>`;
+      rows += `<div class="rev-kv"><span>Relevance</span><b>${escapeHtml((p.detail && p.detail.file_relevance) || "Reported")}</b></div>`;
+      if (p.location) rows += `<div class="rev-kv"><span>Public URL</span><b>${escapeHtml(p.location)}</b></div>`;
+      rows += `<div class="rev-kv"><span>Size</span><b>${fmtBytes(p.size_bytes)}</b></div>`;
+      for (const h of (p.hashes || [])) {
+        rows += `<div class="rev-kv"><span>${escapeHtml(h.hash_type || "hash")}</span><b class="rev-hash">${escapeHtml(h.value)}</b></div>`;
+      }
+      details += rows;
+    }
+    card.innerHTML = media + details;
+    host.appendChild(card);
+  }
   $("confirm-err").textContent = "";
+  $("confirm-actions").classList.remove("hidden");
+}
+
+function fmtBytes(n) {
+  if (!n && n !== 0) return "—";
+  if (n < 1024) return n + " B";
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+  return (n / 1024 / 1024).toFixed(2) + " MB";
 }
 
 $("confirm-cancel-btn").onclick = () => confirmDlg.close();
@@ -513,9 +663,9 @@ $("confirm-cancel-btn").onclick = () => confirmDlg.close();
 // Confirm-Submit: submit to NCMEC AND finish, in one shot.
 $("confirm-submit-btn").onclick = async () => {
   $("confirm-err").textContent = "";
-  // Replace the preview + buttons with a loading spinner.
-  $("confirm-grid").classList.add("hidden");
-  $("confirm-summary").classList.add("hidden");
+  // Replace the review sections + buttons with a loading spinner.
+  const secs = $("confirm-content").querySelectorAll(".rev-sec");
+  secs.forEach(s => s.classList.add("hidden"));
   $("confirm-actions").classList.add("hidden");
   $("confirm-content").querySelector("h2").textContent = "Filing report…";
   const spin = document.createElement("div");
@@ -530,11 +680,10 @@ $("confirm-submit-btn").onclick = async () => {
     const j = await r.json();
     showSuccess(j.ncmec_report_id);
   } catch (e) {
-    // Restore the dialog so the admin can retry / cancel.
+    // Restore the dialog so the admin can retry / go back.
     spin.remove();
-    $("confirm-content").querySelector("h2").textContent = "Confirm submission";
-    $("confirm-grid").classList.remove("hidden");
-    $("confirm-summary").classList.remove("hidden");
+    $("confirm-content").querySelector("h2").textContent = "Review — everything sent to NCMEC";
+    secs.forEach(s => s.classList.remove("hidden"));
     $("confirm-actions").classList.remove("hidden");
     $("confirm-err").textContent = "" + e.message;
   }
