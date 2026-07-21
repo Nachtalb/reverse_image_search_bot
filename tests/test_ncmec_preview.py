@@ -93,3 +93,55 @@ def test_preview_no_reported_when_no_user():
     files = _files()
     preview = ncmec.preview_payload(files, incident_urls=["https://ris.naa.gg/f/AQ.jpg"])
     assert preview["report"].get("person_or_user_reported") is None
+
+
+def test_preview_incident_date_and_description():
+    """incidentDateTime uses the passed date; description is always set."""
+    from datetime import UTC, datetime
+
+    when = datetime(2026, 7, 19, 14, 22, tzinfo=UTC)
+    preview = ncmec.preview_payload(_files(), incident_urls=["https://ris.naa.gg/f/AQ.jpg"], incident_date=when)
+    inc = preview["report"]["incident_summary"]
+    assert inc["incident_date_time"].startswith("2026-07-19T14:22")
+    assert inc["incident_date_time_description"] == "Time of the first reported media item uploaded to the bot."
+
+
+def test_preview_chat_im_incident():
+    """The chat incident records Telegram + the room label alongside the web page."""
+    preview = ncmec.preview_payload(
+        _files(), incident_urls=["https://ris.naa.gg/f/AQ.jpg"], chat_room_name="@ris_bot (bot DM)"
+    )
+    details = preview["report"]["internet_details"]
+    chats = [d["chat_im_incident"] for d in details if "chat_im_incident" in d]
+    assert len(chats) == 1
+    assert chats[0]["chat_client"] == "Telegram"
+    assert chats[0]["chat_room_name"] == "@ris_bot (bot DM)"
+
+
+def test_preview_profile_bio_and_terms(monkeypatch):
+    """profileBio comes from the reported_user dict; termsOfService from settings."""
+    from reverse_image_search_bot import settings
+
+    monkeypatch.setattr(settings, "NCMEC_TERMS_OF_SERVICE", "RIS terms here")
+    preview = ncmec.preview_payload(
+        _files(),
+        incident_urls=["https://ris.naa.gg/f/AQ.jpg"],
+        reported_user={"user_id": 5, "bio": "suspicious bio"},
+    )
+    assert preview["report"]["person_or_user_reported"]["profile_bio"] == "suspicious bio"
+    assert preview["report"]["reporter"]["terms_of_service"] == "RIS terms here"
+
+
+def test_preview_per_file_upload_timestamp_and_caption():
+    """Each file carries its own uploadedToEspTimestamp; a caption goes to additional_info."""
+    from datetime import UTC, datetime
+
+    files = _files()
+    files[0]["upload_time"] = datetime(2026, 7, 19, 14, 22, tzinfo=UTC)
+    files[0]["caption"] = "look here"
+    preview = ncmec.preview_payload(files, incident_urls=["https://ris.naa.gg/f/AQ.jpg"])
+    f0 = preview["files"][0]
+    assert f0["uploaded_to_esp_timestamp"].startswith("2026-07-19T14:22")
+    assert f0["additional_info"] == ["User caption: look here"]
+    # A file without an upload_time omits the timestamp (never faked to now).
+    assert "uploaded_to_esp_timestamp" not in preview["files"][2]
