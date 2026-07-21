@@ -646,7 +646,8 @@ async function buildReview(rev) {
           `<div class="playicon"><span class="disc"></span></div>` +
           `<div class="plabel">${escapeHtml(p.filename)}</div></div>`;
       } else {
-        media += `<div class="rev-piece"><span class="pkind">FRAME</span>` +
+        // A still: "FRAME" when extracted from a source video, else "IMAGE".
+        media += `<div class="rev-piece"><span class="pkind">${p.kind === "frame" ? "FRAME" : "IMAGE"}</span>` +
           `<img src="${thumbUrls[blobId] || ""}" alt="">` +
           `<div class="plabel">${escapeHtml(p.filename)}</div></div>`;
       }
