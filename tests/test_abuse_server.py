@@ -546,7 +546,8 @@ async def test_review_returns_payload_without_filing(abuse, tmp_path, monkeypatc
     assert data["reporter"]["reporting_person"]["email"][0]["value"] == "report@nachtalb.io"
     assert len(data["files"]) == 1
     f = data["files"][0]
-    assert f["kind"] == "frame"
+    # A photo upload (is_video unset) is an "image", not an extracted "frame".
+    assert f["kind"] == "image"
     assert f["filename"] == "evidence.jpg"
     assert f["classification"] == "A1"
     assert {"MD5", "SHA1", "SHA256"} <= {h["hash_type"] for h in f["hashes"]}
@@ -555,3 +556,70 @@ async def test_review_returns_payload_without_filing(abuse, tmp_path, monkeypatc
     boom.assert_not_called()
     # report status untouched (still preparing/ready, NOT filed)
     assert abuse.get_report("u")["status"] != abuse.REPORT_FILED
+
+
+@pytest.mark.asyncio
+async def test_review_video_piece_labeled_frame(abuse, tmp_path, monkeypatch):
+    """A real video upload yields a 'frame' still piece plus a 'video' piece.
+
+    Counterpart to the image case: when the source IS a video, the extracted
+    still is correctly labeled 'frame' (not 'image'), and the source video is a
+    separate 'video' piece.
+    """
+    from reverse_image_search_bot import settings
+    from reverse_image_search_bot.abuse_report import crypto, ncmec, server
+
+    updir = tmp_path / "uploads"
+    (updir / "report_videos").mkdir(parents=True)
+    frame_plain = b"\xff\xd8\xff extracted-frame"
+    (updir / "V.jpg").write_bytes(frame_plain)
+    monkeypatch.setattr(settings, "UPLOADER", {"configuration": {"path": str(updir)}, "url": "https://ris.naa.gg/f"})
+    monkeypatch.setattr(server, "_admin_from_request", lambda req: 42)
+    monkeypatch.setattr(settings, "REPORT_PAGE_PASSWORD", "")
+    monkeypatch.setattr(settings, "NCMEC_REPORTER_EMAIL", "report@nachtalb.io")
+    monkeypatch.setattr(ncmec, "submit_and_finish", AsyncMock(side_effect=AssertionError("review must not file")))
+
+    p1 = "vid-key"
+    key = crypto.derive_key(p1)
+    nonce, ct = crypto.encrypt_file(frame_plain, key)
+    # Encrypt a stand-in "video" on disk and attach it to the blob.
+    video_plain = b"\x00\x00\x00 ftypmp42 the-source-video"
+    vnonce, vct = crypto.encrypt_file(video_plain, key)
+    (updir / "report_videos" / "V.mp4.enc").write_bytes(vct)
+
+    abuse.record_user(1, username="bad", first_name="B", last_name="G")
+    abuse.record_file(
+        "V", saved_filename="V.jpg", user_id=1, original_filename="clip.mp4", file_type="video", is_video=True
+    )
+    abuse.create_report("u", 1, "")
+    abuse.add_report_blob(
+        "u",
+        file_unique_id="V",
+        saved_filename="V.jpg",
+        nonce=nonce,
+        ciphertext=ct,
+        plaintext_sha256=crypto.sha256_hex(frame_plain),
+    )
+    bid = abuse.blob_meta("u")[0]["id"]
+    abuse.set_blob_selection("u", {bid: "A1"})
+    abuse.set_blob_video(
+        bid,
+        video_path="report_videos/V.mp4.enc",
+        video_nonce=vnonce,
+        video_sha256=crypto.sha256_hex(video_plain),
+        video_filename="clip.mp4",
+    )
+
+    req = _req(
+        headers={"X-Page-Secret": ""},
+        match={"uuid": "u"},
+        json_body={"image_key": p1},
+        app={"bot": None, "bot_data": {}},
+    )
+    resp = await server.api_review(req)
+    import json
+
+    data = json.loads(resp.text or "")
+    kinds = {f["kind"]: f["filename"] for f in data["files"]}
+    assert kinds.get("frame") == "clip.mp4"  # the extracted still — labeled frame, not image
+    assert "video" in kinds  # the source video is its own piece

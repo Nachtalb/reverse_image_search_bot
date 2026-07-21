@@ -431,7 +431,9 @@ async def _gather_selected_files(request: web.Request, rep: dict, p1: str) -> tu
         caption = frec.get("caption")
         files.append(
             {
-                "kind": "frame",
+                # "frame" only when this still was extracted from a real source
+                # video; a standalone image (e.g. a jpg) is just an "image".
+                "kind": "frame" if frec.get("is_video") else "image",
                 "blob_id": b["id"],
                 "plaintext": plaintext,
                 "filename": frec.get("original_filename") or b["saved_filename"],
