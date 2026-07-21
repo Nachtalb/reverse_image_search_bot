@@ -88,6 +88,7 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
     try:
         image_url = None
         error = None
+        is_video = False
         mime = attachment.mime_type if isinstance(attachment, Document) else None
         logger.info(
             "file_handler: type=%s, mime=%s, file_type=%s",
@@ -103,6 +104,7 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
             ):
                 search_type = "video_frame" if isinstance(attachment, Video) else file_type
                 image_url = await video_to_url(attachment)
+                is_video = True
             elif (isinstance(attachment, Document) and mime and mime.endswith(("jpeg", "png", "webp"))) or isinstance(
                 attachment, (PhotoSize, Sticker)
             ):
@@ -163,6 +165,7 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
                 channel_id=channel_id,
                 file_id=getattr(attachment, "file_id", None),
                 caption=message.caption or message.text or None,
+                is_video=is_video,
             )
 
         # Track usage metrics
