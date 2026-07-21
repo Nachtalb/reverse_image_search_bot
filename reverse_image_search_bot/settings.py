@@ -91,19 +91,18 @@ METRICS_PORT = int(os.getenv("RIS_METRICS_PORT", "9100"))
 # --- Abuse-report webview (NCMEC) ---------------------------------------------
 # The report page is served by an aiohttp app; the admin opens it via a Telegram
 # Mini App menu button. All of these are optional — when unset the /report
-# command and web server stay dormant (Phase 1 features keep working).
+# command and web server stay dormant.
 REPORT_SERVER_ENABLED = os.getenv("REPORT_SERVER_ENABLED", "false").lower() in ("true", "1", "yes")
 REPORT_SERVER_HOST = os.getenv("REPORT_SERVER_HOST", "0.0.0.0")
 REPORT_SERVER_PORT = int(os.getenv("REPORT_SERVER_PORT", "9200"))
 # Public base URL the Mini App is reachable at, e.g. https://ris.naa.gg/report
 REPORT_BASE_URL = os.getenv("REPORT_BASE_URL", "").rstrip("/")
-# Single global page password gating the report webview (same for every report,
-# stored in Proton Pass). Combined with the per-report image key (P1), this is
+# Single global page password gating the report webview. Combined with the per-report image key (P1), this is
 # the second of the two secrets. When unset the page gate is effectively open to
 # any authenticated admin (initData still required).
 REPORT_PAGE_PASSWORD = os.getenv("REPORT_PAGE_PASSWORD", "")
 
-# NCMEC CyberTipline credentials (production). Report filing is disabled if unset.
+# NCMEC CyberTipline credentials. Report filing is disabled if unset.
 NCMEC_USERNAME = os.getenv("NCMEC_USERNAME")
 NCMEC_PASSWORD = os.getenv("NCMEC_PASSWORD")
 NCMEC_TESTING = os.getenv("NCMEC_TESTING", "false").lower() in ("true", "1", "yes")
@@ -117,7 +116,7 @@ NCMEC_ESP_NAME = os.getenv("NCMEC_ESP_NAME", "")
 NCMEC_TERMS_OF_SERVICE = os.getenv(
     "NCMEC_TERMS_OF_SERVICE",
     "Reverse Image Search Bot operates under Telegram's Third-Party Developer Terms. "
-    "Data is retained solely for abuse reporting. Contact: report@nachtalb.io",
+    "Data is retained solely for abuse reporting.",
 )
 
 log = logging.getLogger("config")
