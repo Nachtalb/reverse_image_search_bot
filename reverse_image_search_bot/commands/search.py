@@ -29,7 +29,7 @@ from reverse_image_search_bot.config import ChatConfig, abuse
 from reverse_image_search_bot.engines import engines
 from reverse_image_search_bot.engines.errors import EngineError, RateLimitError, is_transient
 from reverse_image_search_bot.engines.generic import GenericRISEngine, PreWorkEngine
-from reverse_image_search_bot.engines.types import MetaData, ResultData
+from reverse_image_search_bot.engines.types import MetaData, ProviderData, ResultData
 from reverse_image_search_bot.i18n import lang as get_lang
 from reverse_image_search_bot.i18n import t, translate_field
 from reverse_image_search_bot.settings import ADMIN_IDS
@@ -393,8 +393,8 @@ async def _best_match_search(
     )
     _reply_to_msg_id: int | None = message.message_id
 
-    engine_start_times: dict[asyncio.Task, float] = {}
-    engine_tasks: dict[asyncio.Task, GenericRISEngine] = {}
+    engine_start_times: dict[asyncio.Task[ProviderData], float] = {}
+    engine_tasks: dict[asyncio.Task[ProviderData], GenericRISEngine] = {}
     for en in search_engines:
         if hasattr(en, "_user_lang"):
             en._user_lang = L  # ty: ignore[invalid-assignment]
@@ -403,7 +403,7 @@ async def _best_match_search(
         engine_start_times[task] = time()
 
     try:
-        done_tasks: set[asyncio.Task] = set()
+        done_tasks: set[asyncio.Task[ProviderData]] = set()
         pending = set(engine_tasks.keys())
 
         while pending:
@@ -437,8 +437,8 @@ async def _best_match_search(
                         identifier = meta.get("identifier")
                         thumbnail_identifier = meta.get("thumbnail_identifier")
                         if identifier in identifiers and thumbnail_identifier not in thumbnail_identifiers:
-                            result = {}
-                            result[t("search.results.duplicate_result", L)] = ""
+                            duplicate: ResultData = {t("search.results.duplicate_result", L): ""}
+                            result = duplicate
                         elif identifier not in identifiers and thumbnail_identifier in thumbnail_identifiers:
                             result[t("search.results.duplicate_thumbnail", L)] = ""
                             del meta["thumbnail"]

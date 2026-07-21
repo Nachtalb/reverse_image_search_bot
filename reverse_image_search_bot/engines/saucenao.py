@@ -81,15 +81,14 @@ class SauceNaoEngine(GenericRISEngine):
 
     async def _37_provider(self, data: ResponseData) -> InternalProviderData:
         """Mangadex"""
-        kwargs = {}
-        if chapter_id := data.get("md_id"):
-            kwargs["chapter_id"] = chapter_id
+        md_id = data.get("md_id")
+        chapter_id = str(md_id) if md_id else None
         ext_urls: list[str] = data.get("ext_urls", [])  # ty: ignore[invalid-assignment]
         mangadex_urls = [url for url in ext_urls if URL(url).host == "mangadex.org"]
-        if mangadex_url := next(iter(mangadex_urls), None):
-            kwargs["url"] = URL(mangadex_url.strip("/"))
+        mangadex_url = next(iter(mangadex_urls), None)
+        url = URL(mangadex_url.strip("/")) if mangadex_url else None
 
-        return await mangadex.provide(**kwargs)
+        return await mangadex.provide(url=url, chapter_id=chapter_id)
 
     async def _371_provider(self, data: ResponseData) -> InternalProviderData:
         return await self._37_provider(data)
