@@ -243,6 +243,9 @@ def test_migration_adds_group_channel_columns(tmp_path, monkeypatch):
     )
     conn.execute("INSERT INTO users VALUES (5, 0, 0)")
     conn.execute("INSERT INTO files VALUES ('OLD', 'OLD.jpg', NULL, NULL, 0, 5)")
+    # A pre-existing real-video row and a document row, to check is_video backfill.
+    conn.execute("INSERT INTO files VALUES ('VID', 'VID.jpg', NULL, 'video', 0, 5)")
+    conn.execute("INSERT INTO files VALUES ('DOC', 'DOC.jpg', NULL, 'document', 0, 5)")
     conn.commit()
     conn.close()
 
@@ -263,6 +266,12 @@ def test_migration_adds_group_channel_columns(tmp_path, monkeypatch):
     assert "caption" in cols
     ucols = {r["name"] for r in ab._get_conn().execute("PRAGMA table_info(users)")}
     assert "bio" in ucols
+    # is_video column added and backfilled: real videos -> 1, everything else -> 0.
+    assert "is_video" in cols
+    vids = {f["file_unique_id"]: f["is_video"] for f in ab.files_for_user(5)}
+    assert vids["VID"] == 1  # file_type 'video' backfilled to is_video=1
+    assert vids["DOC"] == 0  # a document is NOT assumed to be a video
+    assert vids["OLD"] == 0  # unknown/NULL type -> not a video
     # Existing row survived; new inserts with chat context work.
     ab.record_file("NEW", saved_filename="NEW.jpg", user_id=5, group_id=-100123, caption="hi")
     files = {f["file_unique_id"]: f for f in ab.files_for_user(5)}

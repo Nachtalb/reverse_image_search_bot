@@ -32,11 +32,6 @@ _local = threading.local()
 _all_connections: list[sqlite3.Connection] = []
 _conn_lock = threading.Lock()
 
-# Telegram media types whose upload can carry a source video/animation. Photos
-# never do. Used to offer the video in the report viewer before any fetch and to
-# gate the lazy video-fetch path.
-VIDEO_CAPABLE_FILE_TYPES = ("video", "gif", "sticker", "document")
-
 
 def _get_conn() -> sqlite3.Connection:
     """Return a thread-local SQLite connection with WAL mode + schema ensured."""
@@ -143,6 +138,16 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     _add_column_if_missing(conn, "users", "bio", "TEXT")
     _add_column_if_missing(conn, "files", "caption", "TEXT")
 
+    # Whether the upload is ACTUALLY a video/animation (has a real source video),
+    # decided at ingest from the Telegram type/mime — NOT guessed from the coarse
+    # file_type. A jpg sent as a "document" is not a video. Backfill the
+    # unambiguous cases: Video -> file_type 'video', Animation -> 'gif' are always
+    # real videos. Documents/stickers are left 0 (can't know retroactively; the
+    # safe default is "not a video" so we never invent a bogus video piece). Rows
+    # that already have a fetched video keep it via video_filename regardless.
+    _add_column_if_missing(conn, "files", "is_video", "INTEGER NOT NULL DEFAULT 0")
+    conn.execute("UPDATE files SET is_video = 1 WHERE file_type IN ('video', 'gif')")
+
     # A report round for one user. `report_uuid` is the URL token; `page_secret_hash`
     # gates the report page (P2, stored hashed — the image key P1 is NEVER stored).
     # `status` drives the live UI: preparing -> ready -> submitting -> filed / retracted
@@ -244,6 +249,7 @@ def record_file(
     channel_id: int | None = None,
     file_id: str | None = None,
     caption: str | None = None,
+    is_video: bool = False,
 ) -> None:
     """Insert-only record of an uploaded file. Existing rows are left untouched.
 
@@ -256,6 +262,10 @@ def record_file(
 
     ``caption`` is the text the user sent alongside the media, if any — kept as
     provenance/evidence and reported to NCMEC.
+
+    ``is_video`` records whether the upload is ACTUALLY a video/animation (decided
+    at ingest from the Telegram type/mime). A jpg sent as a document is NOT a
+    video; only set this when there is a genuine source video to fetch/report.
     """
     conn = _get_conn()
     now = _now()
@@ -263,8 +273,8 @@ def record_file(
         """
         INSERT OR IGNORE INTO files
             (file_unique_id, saved_filename, original_filename, file_type,
-             upload_time, user_id, group_id, channel_id, file_id, caption, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             upload_time, user_id, group_id, channel_id, file_id, caption, is_video, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             file_unique_id,
@@ -277,6 +287,7 @@ def record_file(
             channel_id,
             file_id,
             caption,
+            1 if is_video else 0,
             now,
         ),
     )
@@ -598,14 +609,16 @@ def blob_meta(report_uuid: str) -> list[dict]:
 
     ``has_video`` tells the browser to offer the video in the viewer. It is true
     if the video was already fetched (``video_filename`` set) OR the source upload
-    is a video-capable type — so the viewer offers the video from the very first
-    open, not only after a fetch has happened. The ciphertext itself (image in DB,
-    video on disk) is fetched via the blob endpoints only after the admin supplies P1.
+    is ACTUALLY a video/animation (``is_video`` recorded at ingest) — so the
+    viewer offers the video from the very first open, not only after a fetch has
+    happened. It is NOT inferred from the coarse ``file_type``: a jpg sent as a
+    document is not a video. The ciphertext itself (image in DB, video on disk) is
+    fetched via the blob endpoints only after the admin supplies P1.
     """
     conn = _get_conn()
     rows = conn.execute(
         "SELECT b.id, b.file_unique_id, b.saved_filename, b.plaintext_sha256, b.selected, "
-        "b.classification, b.video_filename, f.file_type, f.original_filename "
+        "b.classification, b.video_filename, f.is_video, f.original_filename "
         "FROM report_blobs b LEFT JOIN files f ON f.file_unique_id = b.file_unique_id "
         "WHERE b.report_uuid = ? ORDER BY b.id",
         (report_uuid,),
@@ -613,7 +626,7 @@ def blob_meta(report_uuid: str) -> list[dict]:
     out = []
     for r in rows:
         d = dict(r)
-        d["has_video"] = bool(d.get("video_filename")) or (d.pop("file_type", None) in VIDEO_CAPABLE_FILE_TYPES)
+        d["has_video"] = bool(d.get("video_filename")) or bool(d.pop("is_video", 0))
         out.append(d)
     return out
 

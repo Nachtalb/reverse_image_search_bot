@@ -93,28 +93,38 @@ def test_blob_video_attach_and_meta(abuse):
     assert row["video_sha256"] == "vh"
 
 
-def test_blob_meta_has_video_from_file_type_before_fetch(abuse):
-    """A video-typed upload flags has_video from the start — no fetch required.
+def test_blob_meta_has_video_only_for_real_videos(abuse):
+    """has_video is True only for ACTUAL videos — never guessed from file_type.
 
-    Regression: the viewer needs has_video True on first open (to auto-load), but
-    video_filename is only set AFTER a fetch. has_video must therefore also derive
-    from the source files.file_type via the LEFT JOIN.
+    Regression: a jpg sent as a "document" must NOT be treated as a video. The
+    viewer needs has_video True on first open for real videos (video_filename is
+    only set after a fetch), so it derives from files.is_video via the LEFT JOIN —
+    a flag set at ingest from the real Telegram type/mime, not the coarse
+    file_type. Previously file_type=='document' wrongly flagged has_video.
     """
     abuse.record_user(9, username="v")
-    abuse.record_file("v1", saved_filename="v1.jpg", user_id=9, file_type="video", file_id="BAADvid")
+    # A real video upload.
+    abuse.record_file("v1", saved_filename="v1.jpg", user_id=9, file_type="video", file_id="BAADvid", is_video=True)
+    # A photo.
     abuse.record_file("p1", saved_filename="p1.jpg", user_id=9, file_type="photo", file_id="BAADpho")
+    # THE BUG: a jpg image sent as a Telegram *document* — NOT a video.
+    abuse.record_file("d1", saved_filename="d1.jpg", user_id=9, file_type="document", file_id="BAADdoc")
     abuse.create_report("r1", 9, "")
-    abuse.add_report_blob(
-        "r1", file_unique_id="v1", saved_filename="v1.jpg", nonce=b"n" * 12, ciphertext=b"c", plaintext_sha256="h"
-    )
-    abuse.add_report_blob(
-        "r1", file_unique_id="p1", saved_filename="p1.jpg", nonce=b"n" * 12, ciphertext=b"c", plaintext_sha256="h2"
-    )
+    for uid, sha in (("v1", "h"), ("p1", "h2"), ("d1", "h3")):
+        abuse.add_report_blob(
+            "r1",
+            file_unique_id=uid,
+            saved_filename=f"{uid}.jpg",
+            nonce=b"n" * 12,
+            ciphertext=b"c",
+            plaintext_sha256=sha,
+        )
     meta = {m["file_unique_id"]: m for m in abuse.blob_meta("r1")}
-    assert meta["v1"]["has_video"] is True  # video upload → offered before any fetch
-    assert meta["p1"]["has_video"] is False  # photo upload → never a source video
-    # file_type is an internal join column, not part of the browser payload.
-    assert "file_type" not in meta["v1"]
+    assert meta["v1"]["has_video"] is True  # real video → offered before any fetch
+    assert meta["p1"]["has_video"] is False  # photo → never a source video
+    assert meta["d1"]["has_video"] is False  # jpg-as-document → NOT a video (the bug)
+    # is_video is an internal join column, not part of the browser payload.
+    assert "is_video" not in meta["v1"]
     # original_filename IS exposed (shown above the stored name in the UI).
     assert "original_filename" in meta["v1"]
 
@@ -131,7 +141,7 @@ async def test_fetch_and_encrypt_video_roundtrip(abuse, monkeypatch, tmp_path):
     monkeypatch.setitem(settings.UPLOADER, "configuration", {"path": str(tmp_path)})
 
     abuse.record_user(9, username="v")
-    abuse.record_file("v1", saved_filename="v1.mp4", user_id=9, file_type="video", file_id="BAADvid")
+    abuse.record_file("v1", saved_filename="v1.mp4", user_id=9, file_type="video", file_id="BAADvid", is_video=True)
     abuse.create_report("r1", 9, "")
     bid = abuse.add_report_blob(
         "r1", file_unique_id="v1", saved_filename="v1.mp4", nonce=b"n" * 12, ciphertext=b"c", plaintext_sha256="h"
@@ -223,6 +233,7 @@ async def test_video_extension_from_video_not_frame(abuse, monkeypatch, tmp_path
         original_filename="holiday clip.webm",
         file_type="video",
         file_id="BAADvid",
+        is_video=True,
     )
     abuse.create_report("r1", 9, "")
     bid = abuse.add_report_blob(
@@ -268,13 +279,42 @@ async def test_video_extension_from_video_not_frame(abuse, monkeypatch, tmp_path
 
 
 @pytest.mark.asyncio
+async def test_fetch_video_rejects_non_video_document(abuse, monkeypatch, tmp_path):
+    """A jpg sent as a *document* must never be fetched as a video.
+
+    THE BUG: file_type=='document' was treated as video-capable, so a plain jpg
+    document got a bogus VIDEO piece in the report. The gate now keys off the
+    is_video flag (set at ingest), so a non-video document is rejected outright —
+    no get_file, no video piece.
+    """
+    from reverse_image_search_bot import settings
+    from reverse_image_search_bot.abuse_report import video as vid
+
+    monkeypatch.setitem(settings.UPLOADER, "configuration", {"path": str(tmp_path)})
+    abuse.record_user(9, username="v")
+    # A jpg image the user sent as a Telegram document (is_video defaults False).
+    abuse.record_file("d1", saved_filename="d1.jpg", user_id=9, file_type="document", file_id="BAADdoc")
+    abuse.create_report("rd", 9, "")
+    bid = abuse.add_report_blob(
+        "rd", file_unique_id="d1", saved_filename="d1.jpg", nonce=b"n" * 12, ciphertext=b"c", plaintext_sha256="h"
+    )
+    blob = abuse.get_report_blob(bid)
+
+    bot = AsyncMock()
+    res = await vid.fetch_and_encrypt_video(bot, blob, "k")
+    assert not res.ok
+    assert res.reason == "upload is not a video"
+    bot.get_file.assert_not_called()  # never even attempted a download
+
+
+@pytest.mark.asyncio
 async def test_fetch_video_rejects_oversize(abuse, monkeypatch, tmp_path):
     from reverse_image_search_bot import settings
     from reverse_image_search_bot.abuse_report import video as vid
 
     monkeypatch.setitem(settings.UPLOADER, "configuration", {"path": str(tmp_path)})
     abuse.record_user(9, username="v")
-    abuse.record_file("v2", saved_filename="v2.mp4", user_id=9, file_type="video", file_id="BAADbig")
+    abuse.record_file("v2", saved_filename="v2.mp4", user_id=9, file_type="video", file_id="BAADbig", is_video=True)
     abuse.create_report("r2", 9, "")
     bid = abuse.add_report_blob(
         "r2", file_unique_id="v2", saved_filename="v2.mp4", nonce=b"n" * 12, ciphertext=b"c", plaintext_sha256="h"
@@ -299,7 +339,7 @@ async def test_fetch_video_handles_deleted_message(abuse, monkeypatch, tmp_path)
 
     monkeypatch.setitem(settings.UPLOADER, "configuration", {"path": str(tmp_path)})
     abuse.record_user(9, username="v")
-    abuse.record_file("v3", saved_filename="v3.mp4", user_id=9, file_type="video", file_id="BAADgone")
+    abuse.record_file("v3", saved_filename="v3.mp4", user_id=9, file_type="video", file_id="BAADgone", is_video=True)
     abuse.create_report("r3", 9, "")
     bid = abuse.add_report_blob(
         "r3", file_unique_id="v3", saved_filename="v3.mp4", nonce=b"n" * 12, ciphertext=b"c", plaintext_sha256="h"
