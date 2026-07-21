@@ -203,9 +203,6 @@
 <dialog id="confirm">
   <div class="dlg-body" id="confirm-content">
     <h2>Review — everything sent to NCMEC</h2>
-    <div class="muted" style="margin-bottom:10px">
-      This is exactly what will be transmitted to NCMEC. Review it, then submit.
-    </div>
     <div id="confirm-ncmec-warn" class="status error hidden" style="margin-bottom:10px"></div>
 
     <div class="rev-sec"><div class="rev-h">Reporter</div><div id="rev-reporter"></div></div>
@@ -220,7 +217,7 @@
       <button id="confirm-submit-btn">Submit to NCMEC</button>
       <button id="confirm-cancel-btn" class="ghost">Back</button>
     </div>
-    <div class="muted" style="margin-top:8px">Submits this report to NCMEC and finishes it immediately. This is irreversible.</div>
+    <div class="muted" id="confirm-note" style="margin-top:8px">Submits this report to NCMEC and finishes it immediately. This is irreversible.</div>
     <div class="muted" id="confirm-err" style="color:#f08a8a;margin-top:8px"></div>
   </div>
 </dialog>
@@ -698,6 +695,7 @@ $("confirm-submit-btn").onclick = async () => {
   const secs = $("confirm-content").querySelectorAll(".rev-sec");
   secs.forEach(s => s.classList.add("hidden"));
   $("confirm-actions").classList.add("hidden");
+  $("confirm-note").classList.add("hidden");
   $("confirm-content").querySelector("h2").textContent = "Filing report…";
   const spin = document.createElement("div");
   spin.className = "spinner"; spin.id = "confirm-spinner";
@@ -716,6 +714,7 @@ $("confirm-submit-btn").onclick = async () => {
     $("confirm-content").querySelector("h2").textContent = "Review — everything sent to NCMEC";
     secs.forEach(s => s.classList.remove("hidden"));
     $("confirm-actions").classList.remove("hidden");
+    $("confirm-note").classList.remove("hidden");
     $("confirm-err").textContent = "" + e.message;
   }
 };
