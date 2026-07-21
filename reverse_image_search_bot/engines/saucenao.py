@@ -89,7 +89,7 @@ class SauceNaoEngine(GenericRISEngine):
         if mangadex_url := next(iter(mangadex_urls), None):
             kwargs["url"] = URL(mangadex_url.strip("/"))
 
-        return await mangadex.provide(**kwargs)
+        return await mangadex.provide(**kwargs)  # ty: ignore[invalid-argument-type]
 
     async def _371_provider(self, data: ResponseData) -> InternalProviderData:
         return await self._37_provider(data)

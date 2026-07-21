@@ -447,7 +447,7 @@ async def _best_match_search(
 
                         await results_gate.wait()
 
-                        reply, media_group = build_reply(result, meta, L)
+                        reply, media_group = build_reply(result, meta, L)  # ty: ignore[invalid-argument-type]
                         _disable_preview = not meta.get("thumbnail") or bool(media_group)
                         try:
                             provider_msg = await message.reply_html(
