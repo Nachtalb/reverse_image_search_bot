@@ -82,3 +82,11 @@ Set `MODE_ACTIVE=webhook` to use webhooks instead of polling.
 | `MODE_PORT` | Listen port |
 | `MODE_URL_PATH` | URL path for webhook |
 | `MODE_WEBHOOK_URL` | Full public webhook URL |
+
+## Security
+
+To report a security issue or abuse, see our
+[security.txt](https://naa.gg/.well-known/security.txt)
+([RFC 9116](https://www.rfc-editor.org/rfc/rfc9116)). Contact:
+[report@nachtalb.io](mailto:report@nachtalb.io)
+([PGP key](https://naa.gg/.well-known/report-nachtalb.asc)).
