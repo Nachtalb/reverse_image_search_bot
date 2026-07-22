@@ -21,6 +21,10 @@ from reverse_image_search_bot.config import abuse
 
 logger = logging.getLogger("abuse.prepare")
 
+# Hard cap on files encrypted into a report round at once. Reports with more
+# on-disk uploads get a "show more" in the webview that prepares the next batch.
+PREPARE_BATCH = 25
+
 
 def upload_dir() -> Path | None:
     p = settings.UPLOADER.get("configuration", {}).get("path")
@@ -54,6 +58,7 @@ class PrepareResult:
         report_uuid: str | None = None,
         p1: str | None = None,
         encrypted: int = 0,
+        remaining: int = 0,
         error: str | None = None,
         existing_uuid: str | None = None,
         filed_uuid: str | None = None,
@@ -62,6 +67,9 @@ class PrepareResult:
         self.report_uuid = report_uuid
         self.p1 = p1
         self.encrypted = encrypted
+        # Files still on disk but beyond the PREPARE_BATCH cap — preparable via
+        # the webview's "show more".
+        self.remaining = remaining
         self.error = error
         self.existing_uuid = existing_uuid
         # Set when the failure is "already filed with NCMEC" so the caller can
@@ -74,60 +82,34 @@ class PrepareResult:
         return self.report_uuid is not None
 
 
-def prepare_report(user_id: int) -> PrepareResult:
-    """Gather → encrypt → create a ``ready`` report for ``user_id``.
+def _present_files(user_id: int) -> tuple[list, int, int]:
+    """Files still on disk for a user, excluding cleared ones.
 
-    Returns a :class:`PrepareResult`. On success it carries the new
-    ``report_uuid``, the one-time image key ``p1`` (shown once, never stored),
-    and the ``encrypted`` file count.
+    Returns ``(present, recorded, cleared)`` where ``present`` is a list of
+    ``(file_row, path)``, ``recorded`` the total recorded file count, and
+    ``cleared`` how many on-disk files were skipped as cleared.
     """
-    if not settings.REPORT_BASE_URL:
-        return PrepareResult(error="Report server is not configured (REPORT_BASE_URL unset).")
-
-    existing = abuse.active_report_for_user(user_id)
-    if existing:
-        return PrepareResult(
-            error=f"An active report already exists for user {user_id} (status: {existing['status']}).",
-            existing_uuid=existing["report_uuid"],
-        )
-
     files = abuse.files_for_user(user_id)
     updir = upload_dir()
     present = []
+    cleared = 0
     for f in files:
-        if updir:
-            fp = updir / f["saved_filename"]
-            if fp.is_file():
-                present.append((f, fp))
-    if not present:
-        filed = abuse.latest_filed_report_for_user(user_id)
-        if filed and filed.get("ncmec_report_id"):
-            n = filed.get("reported_files", 0)
-            others = f" along with {n - 1} other file(s)" if n and n > 1 else ""
-            return PrepareResult(
-                error=(
-                    f"User {user_id} was already filed with NCMEC in report "
-                    f"#{filed['ncmec_report_id']}{others}. The plaintext files were "
-                    f"deleted from disk after filing (the encrypted copies are kept "
-                    f"in that report) — nothing new to report."
-                ),
-                filed_uuid=filed["report_uuid"],
-                filed_ncmec_id=filed["ncmec_report_id"],
-            )
-        return PrepareResult(
-            error=f"User {user_id} has {len(files)} recorded file(s) but none are still on disk — nothing to report."
-        )
+        if not updir:
+            continue
+        fp = updir / f["saved_filename"]
+        if not fp.is_file():
+            continue
+        if f.get("cleared_at"):
+            cleared += 1
+            continue
+        present.append((f, fp))
+    return present, len(files), cleared
 
-    # P1 is the one-time image key — shown ONCE and never stored. The page
-    # password is a single global secret (REPORT_PAGE_PASSWORD), not per-report.
-    p1 = crypto.gen_password()
-    report_uuid = crypto.gen_report_uuid()
-    key = crypto.derive_key(p1)
 
-    abuse.create_report(report_uuid, user_id, "")
-
+def _encrypt_batch(report_uuid: str, batch: list, key: bytes) -> int:
+    """Encrypt a batch of (file_row, path) into report blobs. Returns count."""
     encrypted = 0
-    for f, fp in present:
+    for f, fp in batch:
         try:
             data = fp.read_bytes()
         except Exception:
@@ -143,6 +125,98 @@ def prepare_report(user_id: int) -> PrepareResult:
             plaintext_sha256=crypto.sha256_hex(data),
         )
         encrypted += 1
+    return encrypted
 
+
+def prepare_report(user_id: int) -> PrepareResult:
+    """Gather → encrypt → create a ``ready`` report for ``user_id``.
+
+    Returns a :class:`PrepareResult`. On success it carries the new
+    ``report_uuid``, the one-time image key ``p1`` (shown once, never stored),
+    and the ``encrypted`` file count. At most ``PREPARE_BATCH`` files are
+    encrypted; the rest are reported via ``remaining`` (the webview's
+    "show more" prepares them in later batches).
+    """
+    if not settings.REPORT_BASE_URL:
+        return PrepareResult(error="Report server is not configured (REPORT_BASE_URL unset).")
+
+    existing = abuse.active_report_for_user(user_id)
+    if existing:
+        return PrepareResult(
+            error=f"An active report already exists for user {user_id} (status: {existing['status']}).",
+            existing_uuid=existing["report_uuid"],
+        )
+
+    present, recorded, cleared = _present_files(user_id)
+    if not present:
+        if cleared:
+            return PrepareResult(
+                error=f"All {cleared} remaining file(s) of user {user_id} are marked cleared — nothing to report."
+            )
+        filed = abuse.latest_filed_report_for_user(user_id)
+        if filed and filed.get("ncmec_report_id"):
+            n = filed.get("reported_files", 0)
+            others = f" along with {n - 1} other file(s)" if n and n > 1 else ""
+            return PrepareResult(
+                error=(
+                    f"User {user_id} was already filed with NCMEC in report "
+                    f"#{filed['ncmec_report_id']}{others}. The plaintext files were "
+                    f"deleted from disk after filing (the encrypted copies are kept "
+                    f"in that report) — nothing new to report."
+                ),
+                filed_uuid=filed["report_uuid"],
+                filed_ncmec_id=filed["ncmec_report_id"],
+            )
+        return PrepareResult(
+            error=f"User {user_id} has {recorded} recorded file(s) but none are still on disk — nothing to report."
+        )
+
+    # P1 is the one-time image key — shown ONCE and never stored. The page
+    # password is a single global secret (REPORT_PAGE_PASSWORD), not per-report.
+    p1 = crypto.gen_password()
+    report_uuid = crypto.gen_report_uuid()
+    key = crypto.derive_key(p1)
+
+    abuse.create_report(report_uuid, user_id, "")
+    batch = present[:PREPARE_BATCH]
+    encrypted = _encrypt_batch(report_uuid, batch, key)
     abuse.set_report_status(report_uuid, abuse.REPORT_READY)
-    return PrepareResult(report_uuid=report_uuid, p1=p1, encrypted=encrypted)
+    return PrepareResult(report_uuid=report_uuid, p1=p1, encrypted=encrypted, remaining=len(present) - len(batch))
+
+
+def pending_files(report_uuid: str) -> int:
+    """How many of the report user's on-disk, non-cleared files are NOT yet blobs."""
+    rep = abuse.get_report(report_uuid)
+    if not rep:
+        return 0
+    in_report = {b["file_unique_id"] for b in abuse.report_blobs(report_uuid)}
+    present, _, _ = _present_files(rep["user_id"])
+    return sum(1 for f, _ in present if f["file_unique_id"] not in in_report)
+
+
+def extend_report(report_uuid: str, p1: str) -> PrepareResult:
+    """Encrypt the next ``PREPARE_BATCH`` not-yet-included files into the report.
+
+    ``p1`` must be the report's original image key — it is verified against an
+    existing blob's hash before anything is encrypted, so a typo can't split the
+    report across two keys.
+    """
+    rep = abuse.get_report(report_uuid)
+    if not rep:
+        return PrepareResult(error="report not found")
+    key = crypto.derive_key(p1)
+    blobs = abuse.report_blobs(report_uuid)
+    if blobs:
+        probe = blobs[0]
+        try:
+            data = crypto.decrypt_file(bytes(probe["nonce"]), bytes(probe["ciphertext"]), key)
+        except Exception:
+            return PrepareResult(error="image key (P1) incorrect")
+        if crypto.sha256_hex(data) != probe["plaintext_sha256"]:
+            return PrepareResult(error="image key (P1) incorrect")
+    in_report = {b["file_unique_id"] for b in blobs}
+    present, _, _ = _present_files(rep["user_id"])
+    todo = [(f, fp) for f, fp in present if f["file_unique_id"] not in in_report]
+    batch = todo[:PREPARE_BATCH]
+    encrypted = _encrypt_batch(report_uuid, batch, key)
+    return PrepareResult(report_uuid=report_uuid, encrypted=encrypted, remaining=len(todo) - len(batch))
