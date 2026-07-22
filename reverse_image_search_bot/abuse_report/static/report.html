@@ -166,6 +166,10 @@
         <span class="muted"><span id="save-state" style="color:#7fd6a2;margin-right:8px"></span><span id="sel-count">0 selected</span></span>
       </div>
       <div class="gallery" id="gallery"></div>
+      <div class="row" style="margin-top:10px">
+        <button id="more-btn" class="secondary hidden">Show more</button>
+      </div>
+      <div class="muted" id="more-err" style="color:#f08a8a;margin-top:6px"></div>
     </div>
 
     <div class="card" id="action-card">
@@ -196,6 +200,22 @@
     <h2 id="notice-title"></h2>
     <div class="muted" id="notice-body" style="margin-bottom:14px"></div>
     <div class="row"><button id="notice-ok-btn">OK</button></div>
+  </div>
+</dialog>
+
+<!-- Cancel confirmation -->
+<dialog id="cancel-dlg">
+  <div class="dlg-body">
+    <h2>Cancel this report?</h2>
+    <div class="muted" style="margin-bottom:12px">The encrypted blobs and this report are discarded, but the user's original files and records are KEPT.</div>
+    <label style="display:flex;gap:8px;align-items:flex-start;font-size:14px;color:#e8e8ea;margin-bottom:14px;cursor:pointer">
+      <input type="checkbox" id="cancel-clear" style="margin-top:3px">
+      <span>Mark all images in this round as <b>cleared</b> (not problematic) — they will be excluded from future reports.</span>
+    </label>
+    <div class="row">
+      <button id="cancel-confirm-btn" class="danger">Cancel report</button>
+      <button id="cancel-back-btn" class="ghost">Back</button>
+    </div>
   </div>
 </dialog>
 
@@ -326,6 +346,7 @@ function renderGallery() {
     g.appendChild(d);
   }
   updateSelCount();
+  updateMoreBtn();
 }
 
 $("decrypt-btn").onclick = async () => {
@@ -410,6 +431,45 @@ function wireCls(id) {
 function updateSelCount() {
   $("sel-count").textContent = Object.keys(sel).length + " selected";
 }
+
+// --- "Show more": prepare the next batch of pending files into this report ---
+function updateMoreBtn() {
+  const btn = $("more-btn");
+  const pending = META.pending || 0;
+  const active = !["filed", "cancelled"].includes(META.status);
+  btn.classList.toggle("hidden", !(pending > 0 && active));
+  if (pending > 0) btn.textContent = `Show more (${pending} pending)`;
+}
+
+$("more-btn").onclick = async () => {
+  $("more-err").textContent = "";
+  if (!P1KEY) { $("more-err").textContent = "Decrypt the images first — the image key is needed to add more."; return; }
+  const btn = $("more-btn"); btn.disabled = true; btn.textContent = "Preparing…";
+  try {
+    const r = await api("/api/extend", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image_key: $("p1").value }),
+    });
+    const j = await r.json();
+    const known = new Set(META.blobs.map(b => b.id));
+    const added = j.blobs.filter(b => !known.has(b.id));
+    META.blobs = j.blobs;
+    META.pending = j.remaining;
+    const g = $("gallery");
+    for (const b of added) {
+      const d = document.createElement("div");
+      d.className = "thumb"; d.dataset.id = b.id;
+      d.innerHTML = `<div class="fname">${blobLabel(b)}</div><div class="lock">🔒</div>`;
+      g.appendChild(d);
+      await decryptThumb(b);
+    }
+  } catch (e) {
+    $("more-err").textContent = "" + e.message;
+  } finally {
+    btn.disabled = false;
+    updateMoreBtn();
+  }
+};
 
 // --- viewer dialog (image + optional source video) ---------------------------
 const viewer = $("viewer");
@@ -733,14 +793,23 @@ function showSuccess(reportId) {
 }
 
 // --- Cancel (nothing filed) --------------------------------------------------
-$("cancel-btn").onclick = async () => {
-  if (!confirm("Cancel this report? The encrypted blobs and this report are discarded, but the user's original files and records are KEPT.")) return;
+const cancelDlg = $("cancel-dlg");
+$("cancel-btn").onclick = () => { $("cancel-clear").checked = false; cancelDlg.showModal(); };
+$("cancel-back-btn").onclick = () => cancelDlg.close();
+$("cancel-confirm-btn").onclick = async () => {
+  const clearFiles = $("cancel-clear").checked;
   try {
-    await api("/api/cancel", { method: "POST" });
+    await api("/api/cancel", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clear_files: clearFiles }),
+    });
+    cancelDlg.close();
     applyFinalState("cancelled");
     window.scrollTo({ top: 0, behavior: "smooth" });
-    showNotice("Report cancelled", "The report was cancelled. The encrypted blobs were discarded; the user's original files and records are kept.");
-  } catch (e) { $("action-err").textContent = "" + e.message; }
+    showNotice("Report cancelled",
+      "The report was cancelled. The encrypted blobs were discarded; the user's original files and records are kept."
+      + (clearFiles ? " All images in this round were marked cleared (not problematic)." : ""));
+  } catch (e) { cancelDlg.close(); $("action-err").textContent = "" + e.message; }
 };
 
 // --- generic notice dialog (OK to dismiss) -----------------------------------
@@ -764,6 +833,7 @@ function applyFinalState(status, reportId) {
   // Keep the decrypt card + gallery available after filing so the reported
   // images can still be inspected; only the submit/cancel actions are removed.
   $("action-card").classList.add("hidden");
+  updateMoreBtn();
   if (status === "filed") {
     applyFiledLayout();
     window.scrollTo({ top: 0, behavior: "smooth" });
