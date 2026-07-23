@@ -210,7 +210,7 @@
     <div class="muted" style="margin-bottom:12px">The encrypted blobs and this report are discarded, but the user's original files and records are KEPT.</div>
     <label style="display:flex;gap:8px;align-items:flex-start;font-size:14px;color:#e8e8ea;margin-bottom:14px;cursor:pointer">
       <input type="checkbox" id="cancel-clear" style="margin-top:3px">
-      <span>Mark all images in this round as <b>cleared</b> (not problematic) — they will be excluded from future reports.</span>
+      <span>Mark all images in this round as <b>cleared</b>.</span>
     </label>
     <div class="row">
       <button id="cancel-confirm-btn" class="danger">Cancel report</button>
@@ -443,7 +443,7 @@ function updateMoreBtn() {
 
 $("more-btn").onclick = async () => {
   $("more-err").textContent = "";
-  if (!P1KEY) { $("more-err").textContent = "Decrypt the images first — the image key is needed to add more."; return; }
+  if (!P1KEY) { $("more-err").textContent = "Image key is needed to load more."; return; }
   const btn = $("more-btn"); btn.disabled = true; btn.textContent = "Preparing…";
   try {
     const r = await api("/api/extend", {
@@ -808,7 +808,7 @@ $("cancel-confirm-btn").onclick = async () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
     showNotice("Report cancelled",
       "The report was cancelled. The encrypted blobs were discarded; the user's original files and records are kept."
-      + (clearFiles ? " All images in this round were marked cleared (not problematic)." : ""));
+      + (clearFiles ? " All images in this round were marked cleared." : ""));
   } catch (e) { cancelDlg.close(); $("action-err").textContent = "" + e.message; }
 };
 
