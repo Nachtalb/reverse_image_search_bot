@@ -315,6 +315,10 @@ async def post_init(app: Application) -> None:
             logger.warning("Failed to notify admin %d of startup", admin_id)
 
 
+# Module-level handle for the aiohttp report-server runner (see note below).
+_report_runner = None
+
+
 async def _start_report_server(app: Application) -> None:
     """Start the aiohttp report webview server if enabled.
 
@@ -329,7 +333,12 @@ async def _start_report_server(app: Application) -> None:
 
         runner = await start_report_server(bot=app.bot, bot_data=app.bot_data)
         if runner is not None:
-            app.bot_data["_report_runner"] = runner
+            # Keep a reference so the runner isn't garbage collected. Never put
+            # it in bot_data: an AppRunner is unpicklable, and one unpicklable
+            # value makes every PicklePersistence flush fail silently, freezing
+            # feedback_replies/banned_users on disk.
+            global _report_runner
+            _report_runner = runner
     except Exception:
         logger.warning("Failed to start report server", exc_info=True)
 
