@@ -986,3 +986,84 @@ async def test_feedback_reply_handler_ignores_edited_message():
 
     # Previously raised AssertionError → must now be a no-op.
     await feedback_reply_handler(update, context)
+
+
+def _admin_reply_update(admin_id, reply_entities=(), reply_text_="", bot_id=999):
+    """Update: admin replying to a bot-authored feedback message."""
+    update = MagicMock()
+    update.effective_chat = MagicMock(id=admin_id)
+    reply_to = MagicMock()
+    reply_to.message_id = 42
+    reply_to.from_user = MagicMock(id=bot_id)
+    reply_to.entities = list(reply_entities)
+    reply_to.text = reply_text_
+    update.message = MagicMock()
+    update.message.reply_to_message = reply_to
+    update.message.text = "hello back"
+    update.message.reply_text = AsyncMock()
+    context = MagicMock()
+    context.bot.id = bot_id
+    context.bot.send_message = AsyncMock(return_value=MagicMock(message_id=77))
+    context.bot_data = {}
+    return update, context
+
+
+@pytest.mark.asyncio
+async def test_feedback_reply_fallback_recovers_id_from_text():
+    """Lost feedback_replies map (restart/stale pickle): the handler must
+    recover the user id from the '(<id>)' in the feedback message text."""
+    from reverse_image_search_bot.commands.feedback import feedback_reply_handler
+
+    admin_id = 713276361
+    update, context = _admin_reply_update(admin_id, reply_text_="📬 New Feedback\nFrom: Mona (87090172)\n\nhi")
+    with patch("reverse_image_search_bot.commands.feedback.settings") as mock_settings:
+        mock_settings.ADMIN_IDS = [admin_id]
+        await feedback_reply_handler(update, context)
+
+    assert context.bot.send_message.await_args_list[0].args[0] == 87090172
+    update.message.reply_text.assert_awaited()  # admin got a confirmation
+
+
+@pytest.mark.asyncio
+async def test_feedback_reply_fallback_prefers_user_entity():
+    from reverse_image_search_bot.commands.feedback import feedback_reply_handler
+
+    admin_id = 713276361
+    entity = MagicMock()
+    entity.url = "tg://user?id=87090172"
+    update, context = _admin_reply_update(admin_id, reply_entities=[entity])
+    with patch("reverse_image_search_bot.commands.feedback.settings") as mock_settings:
+        mock_settings.ADMIN_IDS = [admin_id]
+        await feedback_reply_handler(update, context)
+
+    assert context.bot.send_message.await_args_list[0].args[0] == 87090172
+
+
+@pytest.mark.asyncio
+async def test_feedback_reply_no_fallback_for_non_admin():
+    """A random user replying to some bot message with '(123)' in it must not
+    trigger a send."""
+    from reverse_image_search_bot.commands.feedback import feedback_reply_handler
+
+    update, context = _admin_reply_update(555, reply_text_="whatever (123)")
+    with patch("reverse_image_search_bot.commands.feedback.settings") as mock_settings:
+        mock_settings.ADMIN_IDS = [713276361]
+        await feedback_reply_handler(update, context)
+
+    context.bot.send_message.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_feedback_reply_no_fallback_for_non_bot_message():
+    """Admin replying to a NON-bot message (e.g. their own note containing
+    digits in parens) must not fire the fallback."""
+    from reverse_image_search_bot.commands.feedback import feedback_reply_handler
+
+    admin_id = 713276361
+    update, context = _admin_reply_update(admin_id, reply_text_="note to self (87090172)")
+    update.message.reply_to_message.from_user = MagicMock(id=admin_id)  # not the bot
+    with patch("reverse_image_search_bot.commands.feedback.settings") as mock_settings:
+        mock_settings.ADMIN_IDS = [admin_id]
+        await feedback_reply_handler(update, context)
+
+    context.bot.send_message.assert_not_awaited()

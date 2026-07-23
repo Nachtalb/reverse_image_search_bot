@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import logging
+import re
 from dataclasses import dataclass
 
 from telegram import Update
@@ -114,6 +115,27 @@ async def _send_to_user_or_chat(
         return False, "both_failed"
 
 
+def _target_from_reply_message(reply_to) -> FeedbackTarget | None:
+    """Recover the feedback target from the replied-to message itself.
+
+    Fallback for when the in-memory ``feedback_replies`` map is gone (bot
+    restart, lost persistence). The admin-facing feedback messages embed the
+    user id both as a ``tg://user?id=…`` text link and as ``(<user_id>)`` in
+    plain text — read it back from either.
+    """
+    for entity in reply_to.entities or ():
+        if entity.url and entity.url.startswith("tg://user?id="):
+            with_id = entity.url.removeprefix("tg://user?id=")
+            if with_id.isdigit():
+                uid = int(with_id)
+                return FeedbackTarget(user_id=uid, chat_id=uid)
+    match = re.search(r"\((\d+)\)", reply_to.text or "")
+    if match:
+        uid = int(match.group(1))
+        return FeedbackTarget(user_id=uid, chat_id=uid)
+    return None
+
+
 async def feedback_reply_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle replies to feedback messages — forwards between admin and user."""
     # The REPLY filter also matches edited messages, where update.message is None
@@ -127,14 +149,18 @@ async def feedback_reply_handler(update: Update, context: ContextTypes.DEFAULT_T
 
     fmap = _feedback_map(context)
     raw_target = fmap.get(key)
+    is_admin = chat_id in settings.ADMIN_IDS
     if raw_target is None:
-        return
+        # Map entry lost (restart / cleared persistence) — recover the user id
+        # from the feedback message itself. Admin replies to bot messages only.
+        if is_admin and reply_to.from_user and reply_to.from_user.id == context.bot.id:
+            raw_target = _target_from_reply_message(reply_to)
+        if raw_target is None:
+            return
 
     reply_text = update.message.text
     if not reply_text:
         return
-
-    is_admin = chat_id in settings.ADMIN_IDS
 
     if is_admin:
         # Admin → user
