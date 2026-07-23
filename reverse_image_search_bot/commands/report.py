@@ -12,6 +12,7 @@ work on one) plus a form to create a new report from a username or filename.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import html
 import logging
@@ -97,18 +98,29 @@ async def report_users(
     expansion) both resolve target user ids their own way, then hand them here so
     the outcome list looks identical everywhere.
     """
+    if not update.message:
+        return
     rows: list[dict] = []  # {icon, user_id, username, detail, uuid?}
-    for uid in dict.fromkeys(user_ids):  # de-dup, preserve order
+    uids = list(dict.fromkeys(user_ids))  # de-dup, preserve order
+    # Encrypting a round takes a while (PBKDF2 + AES per file) — tell the admin
+    # right away, and run the work off the event loop so nothing times out.
+    status_msg = None
+    with contextlib.suppress(Exception):
+        status_msg = await update.message.reply_text(
+            f"⏳ Preparing report{'s' if len(uids) != 1 else ''} for {len(uids)} user(s)…"
+        )
+    for uid in uids:
         user = abuse.get_user(uid) or {}
         uname = f"@{user['username']}" if user.get("username") else "—"
-        result = prepare_report(uid)
+        result = await asyncio.to_thread(prepare_report, uid)
         if result.ok:
+            more = f" (+{result.remaining} more via Show more)" if result.remaining else ""
             rows.append(
                 {
                     "icon": "🆕",
                     "user_id": uid,
                     "username": uname,
-                    "detail": f"P1 <code>{html.escape(result.p1 or '')}</code>",
+                    "detail": f"P1 <code>{html.escape(result.p1 or '')}</code>{more}",
                     "uuid": result.report_uuid,
                 }
             )
@@ -135,6 +147,9 @@ async def report_users(
         else:
             rows.append({"icon": "⏭", "user_id": uid, "username": uname, "detail": "nothing to report", "uuid": None})
 
+    if status_msg is not None:
+        with contextlib.suppress(Exception):
+            await status_msg.delete()
     await _send_report_summary(update, context, rows, unknown or [])
 
 
@@ -218,7 +233,13 @@ async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE, user_
     """
     assert update.message and update.effective_user
 
-    result = prepare_report(user_id)
+    status_msg = None
+    with contextlib.suppress(Exception):
+        status_msg = await update.message.reply_text("⏳ Preparing report…")
+    result = await asyncio.to_thread(prepare_report, user_id)
+    if status_msg is not None:
+        with contextlib.suppress(Exception):
+            await status_msg.delete()
     if not result.ok:
         msg = result.error or "Could not prepare a report."
         if result.existing_uuid and settings.REPORT_BASE_URL:
@@ -248,8 +269,13 @@ async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE, user_
     )
     await update.message.reply_html(
         f"<b>Report prepared</b> for user <code>{user_id}</code> ({html.escape(uname)})\n"
-        f"Encrypted <b>{result.encrypted}</b> file(s).\n\n"
-        f"<b>Image key (P1):</b> <code>{html.escape(result.p1 or '')}</code>\n\n"
+        f"Encrypted <b>{result.encrypted}</b> file(s)."
+        + (
+            f" <b>{result.remaining}</b> more can be added via the page's Show more button.\n\n"
+            if result.remaining
+            else "\n\n"
+        )
+        + f"<b>Image key (P1):</b> <code>{html.escape(result.p1 or '')}</code>\n\n"
         f"{launch}\n\n"
         f"<i>Use the global page password to open the report, then P1 to decrypt "
         f"the images. P1 is not stored — if you lose it the thumbnails can't be "

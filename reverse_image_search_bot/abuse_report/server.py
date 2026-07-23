@@ -18,6 +18,8 @@ to hand to NCMEC.
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import hashlib
 import hmac
 import json
@@ -31,7 +33,7 @@ from aiohttp import web
 from reverse_image_search_bot import settings
 from reverse_image_search_bot.abuse_report import crypto, ncmec
 from reverse_image_search_bot.abuse_report import video as abuse_video
-from reverse_image_search_bot.abuse_report.prepare import prepare_report, resolve_user
+from reverse_image_search_bot.abuse_report.prepare import extend_report, pending_files, prepare_report, resolve_user
 from reverse_image_search_bot.config import abuse
 
 logger = logging.getLogger("abuse.server")
@@ -174,7 +176,9 @@ async def api_reports_create(request: web.Request) -> web.Response:
     if user_id is None:
         raise web.HTTPNotFound(text=f"no uploader found for: {target}")
 
-    result = prepare_report(user_id)
+    # prepare_report encrypts up to a batch of files (PBKDF2 + AES) — run it off
+    # the event loop so a big report can't stall the webhook/report server.
+    result = await asyncio.to_thread(prepare_report, user_id)
     if not result.ok:
         # An existing active report is a 409 carrying its uuid so the UI can jump to it.
         if result.existing_uuid:
@@ -194,6 +198,7 @@ async def api_reports_create(request: web.Request) -> web.Response:
             "user_id": user_id,
             "p1": result.p1,
             "encrypted": result.encrypted,
+            "remaining": result.remaining,
         }
     )
 
@@ -251,6 +256,35 @@ async def api_unlock(request: web.Request) -> web.Response:
                 "language_code": user.get("language_code"),
                 "banned_at": user.get("banned_at"),
             },
+            "blobs": abuse.blob_meta(rep["report_uuid"]),
+            # On-disk, non-cleared files of this user NOT yet in the report —
+            # drives the gallery's "show more" button.
+            "pending": pending_files(rep["report_uuid"]),
+        }
+    )
+
+
+async def api_extend(request: web.Request) -> web.Response:
+    """Prepare the next batch of the user's files into this report ("show more").
+
+    Requires the report's image key (P1) so the new blobs share the existing
+    encryption key. Returns the refreshed blob list + how many are still pending.
+    """
+    _require_admin(request)
+    rep = _report_or_404(request.match_info["uuid"])
+    _require_page_secret(request, rep)
+    payload = await request.json()
+    p1 = payload.get("image_key", "")
+    if not p1:
+        raise web.HTTPBadRequest(text="image_key (P1) required")
+    result = await asyncio.to_thread(extend_report, rep["report_uuid"], p1)
+    if not result.ok:
+        raise web.HTTPBadRequest(text=result.error or "could not extend report")
+    return web.json_response(
+        {
+            "ok": True,
+            "encrypted": result.encrypted,
+            "remaining": result.remaining,
             "blobs": abuse.blob_meta(rep["report_uuid"]),
         }
     )
@@ -571,6 +605,10 @@ async def api_submit(request: web.Request) -> web.Response:
 
     abuse.set_report_ncmec_id(rep["report_uuid"], report_id)
     abuse.mark_report_filed(rep["report_uuid"])
+    # Filing IS the decision: every file in the round the admin did NOT select is
+    # thereby cleared (not problematic) and excluded from future reports.
+    unselected = [b["file_unique_id"] for b in abuse.report_blobs(rep["report_uuid"]) if not b["selected"]]
+    abuse.set_files_cleared(unselected)
     _cleanup_after_finish(rep)
     _ban_reported_user(request.app.get("bot_data"), rep["user_id"])
     return web.json_response({"ok": True, "ncmec_report_id": report_id, "status": abuse.REPORT_FILED})
@@ -582,10 +620,19 @@ async def api_cancel(request: web.Request) -> web.Response:
     Cancelling means the user did nothing wrong, so we KEEP the user's original
     files on disk and the filename->user (files table) relation untouched. Only
     the report's encrypted blobs + the report row's status are affected.
+
+    Optional ``clear_files`` in the JSON body additionally marks every file in
+    the round as cleared (not problematic) — excluded from future reports.
     """
     _require_admin(request)
     rep = _report_or_404(request.match_info["uuid"])
     _require_page_secret(request, rep)
+    clear_files = False
+    with contextlib.suppress(Exception):
+        # `is True` (not truthiness) so a missing/odd body can never clear files.
+        clear_files = (await request.json()).get("clear_files") is True
+    if clear_files:
+        abuse.set_files_cleared([b["file_unique_id"] for b in abuse.report_blobs(rep["report_uuid"])])
     abuse.set_report_status(rep["report_uuid"], abuse.REPORT_CANCELLED)
     # Delete any encrypted video ciphertext on disk, then purge blobs (DB only —
     # NOT the files table, NOT the user's original disk files).
@@ -691,6 +738,7 @@ def build_app(bot=None, bot_data=None) -> web.Application:
     app.router.add_get("/report/{uuid}/api/blob/{blob_id}/video", api_video)
     app.router.add_get("/report/{uuid}/api/status", api_status)
     app.router.add_post("/report/{uuid}/api/select", api_select)
+    app.router.add_post("/report/{uuid}/api/extend", api_extend)
     app.router.add_post("/report/{uuid}/api/review", api_review)
     app.router.add_post("/report/{uuid}/api/submit", api_submit)
     app.router.add_post("/report/{uuid}/api/cancel", api_cancel)

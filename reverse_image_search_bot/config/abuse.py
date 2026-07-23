@@ -148,6 +148,11 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     _add_column_if_missing(conn, "files", "is_video", "INTEGER NOT NULL DEFAULT 0")
     conn.execute("UPDATE files SET is_video = 1 WHERE file_type IN ('video', 'gif')")
 
+    # A file the admin marked as NOT problematic ("cleared") — excluded from
+    # report preparation just like already-filed pieces. Set from the cancel
+    # dialog, or automatically for unselected files when a report is filed.
+    _add_column_if_missing(conn, "files", "cleared_at", "INTEGER")
+
     # A report round for one user. `report_uuid` is the URL token; `page_secret_hash`
     # gates the report page (P2, stored hashed — the image key P1 is NEVER stored).
     # `status` drives the live UI: preparing -> ready -> submitting -> filed / retracted
@@ -410,6 +415,23 @@ def files_for_user(user_id: int) -> list[dict]:
     conn = _get_conn()
     rows = conn.execute("SELECT * FROM files WHERE user_id = ? ORDER BY upload_time", (user_id,)).fetchall()
     return [dict(r) for r in rows]
+
+
+def set_files_cleared(file_unique_ids: list[str]) -> int:
+    """Mark files as cleared (not problematic). Returns count updated.
+
+    Cleared files are excluded from report preparation, like filed pieces.
+    """
+    if not file_unique_ids:
+        return 0
+    conn = _get_conn()
+    placeholders = ",".join("?" * len(file_unique_ids))
+    cur = conn.execute(
+        f"UPDATE files SET cleared_at = ? WHERE file_unique_id IN ({placeholders}) AND cleared_at IS NULL",
+        [_now(), *file_unique_ids],
+    )
+    conn.commit()
+    return cur.rowcount
 
 
 def file_by_unique_id(file_unique_id: str) -> dict | None:

@@ -148,6 +148,18 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
                 elif sender_chat.type in ("group", "supergroup"):
                     group_id = sender_chat.id
                     abuse.record_chat(sender_chat.id, "group", title=sender_chat.title, username=sender_chat.username)
+            # A FORWARDED post carries its source chat in forward_origin (e.g. a
+            # channel post forwarded into the bot DM) — that chat is provenance
+            # too, otherwise reporting the channel finds no uploads.
+            origin = getattr(message, "forward_origin", None)
+            origin_chat = getattr(origin, "chat", None) or getattr(origin, "sender_chat", None)
+            if origin_chat is not None:
+                if origin_chat.type == "channel":
+                    channel_id = origin_chat.id
+                    abuse.record_chat(origin_chat.id, "channel", title=origin_chat.title, username=origin_chat.username)
+                elif origin_chat.type in ("group", "supergroup"):
+                    group_id = origin_chat.id
+                    abuse.record_chat(origin_chat.id, "group", title=origin_chat.title, username=origin_chat.username)
             abuse.record_user(
                 user.id,
                 username=user.username,
