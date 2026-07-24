@@ -50,6 +50,12 @@ SAUCENAO_API = required_env("SAUCENAO_API")
 TRACE_API = required_env("TRACE_API")
 ANILIST_TOKEN = os.getenv("ANILIST_TOKEN")
 
+# Google Cloud Vision API key for the Google best match (WEB_DETECTION).
+# Optional — when unset the Google engine is URL-button-only.
+GOOGLE_VISION_API = os.getenv("GOOGLE_VISION_API")
+# Free tier: 1000 units/month. Persisted counter so it survives restarts.
+GOOGLE_VISION_MONTHLY_LIMIT = int(os.getenv("GOOGLE_VISION_MONTHLY_LIMIT", "1000"))
+
 MODE_ACTIVE = os.getenv("MODE_ACTIVE", "polling")
 
 MODE: dict[str, Any] = {
@@ -80,6 +86,13 @@ ABUSE_DB_PATH = Path(os.getenv("ABUSE_DB_PATH", str(_DEFAULT_CONFIG_DIR / "abuse
 
 PERSISTENCE_PATH = (
     Path(os.getenv("PERSISTENCE_PATH", str(_DEFAULT_CONFIG_DIR / "bot_data.pickle"))).expanduser().absolute()
+)
+
+# Persisted monthly usage counter for the Google Vision best match.
+GOOGLE_VISION_QUOTA_PATH = (
+    Path(os.getenv("GOOGLE_VISION_QUOTA_PATH", str(_DEFAULT_CONFIG_DIR / "google_vision_quota.json")))
+    .expanduser()
+    .absolute()
 )
 
 
