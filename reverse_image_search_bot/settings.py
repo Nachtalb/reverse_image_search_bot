@@ -89,8 +89,9 @@ PERSISTENCE_PATH = (
 )
 
 # Persisted monthly usage counter for the Google Vision best match.
+# Defaults next to the config DB so it lands on the persistent volume.
 GOOGLE_VISION_QUOTA_PATH = (
-    Path(os.getenv("GOOGLE_VISION_QUOTA_PATH", str(_DEFAULT_CONFIG_DIR / "google_vision_quota.json")))
+    Path(os.getenv("GOOGLE_VISION_QUOTA_PATH", str(CONFIG_DB_PATH.parent / "google_vision_quota.json")))
     .expanduser()
     .absolute()
 )
