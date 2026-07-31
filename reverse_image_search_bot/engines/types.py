@@ -5,7 +5,7 @@ from yarl import URL
 
 __all__ = ["InternalProviderData", "InternalResultData", "MetaData", "ProviderData", "ResultData"]
 
-InternalResultData = dict[str, str | int | URL | None | list[str] | set[str]]
+InternalResultData = dict[str, str | int | URL | list[str] | set[str] | None]
 ResultData = dict[str, str | int | URL | list[str] | set[str]]
 
 
