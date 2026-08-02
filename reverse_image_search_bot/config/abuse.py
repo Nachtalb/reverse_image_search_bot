@@ -40,7 +40,7 @@ def _get_conn() -> sqlite3.Connection:
         conn = sqlite3.connect(str(ABUSE_DB_PATH))
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA busy_timeout=5000")
+        conn.execute("PRAGMA busy_timeout=15000")
         conn.execute("PRAGMA foreign_keys=ON")
         _ensure_schema(conn)
         with _conn_lock:
@@ -216,21 +216,22 @@ def record_user(
 ) -> None:
     """Insert or update a user's profile (last-seen wins). Never touches ``banned_at``."""
     conn = _get_conn()
-    now = _now()
-    conn.execute(
-        """
-        INSERT INTO users (user_id, username, first_name, last_name, language_code, first_seen, last_seen, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(user_id) DO UPDATE SET
-            username      = excluded.username,
-            first_name    = excluded.first_name,
-            last_name     = excluded.last_name,
-            language_code = excluded.language_code,
-            last_seen     = excluded.last_seen
-        """,
-        (user_id, username, first_name, last_name, language_code, now, now, now),
-    )
-    conn.commit()
+    with conn:
+        now = _now()
+        conn.execute(
+            """
+            INSERT INTO users
+                (user_id, username, first_name, last_name, language_code, first_seen, last_seen, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                username      = excluded.username,
+                first_name    = excluded.first_name,
+                last_name     = excluded.last_name,
+                language_code = excluded.language_code,
+                last_seen     = excluded.last_seen
+            """,
+            (user_id, username, first_name, last_name, language_code, now, now, now),
+        )
 
 
 def set_user_bio(user_id: int, bio: str | None) -> None:
@@ -239,8 +240,8 @@ def set_user_bio(user_id: int, bio: str | None) -> None:
     Only updates an existing row; a no-op if the user isn't recorded yet.
     """
     conn = _get_conn()
-    conn.execute("UPDATE users SET bio = ? WHERE user_id = ?", (bio, user_id))
-    conn.commit()
+    with conn:
+        conn.execute("UPDATE users SET bio = ? WHERE user_id = ?", (bio, user_id))
 
 
 def record_file(
@@ -273,30 +274,30 @@ def record_file(
     video; only set this when there is a genuine source video to fetch/report.
     """
     conn = _get_conn()
-    now = _now()
-    conn.execute(
-        """
-        INSERT OR IGNORE INTO files
-            (file_unique_id, saved_filename, original_filename, file_type,
-             upload_time, user_id, group_id, channel_id, file_id, caption, is_video, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            file_unique_id,
-            saved_filename,
-            original_filename,
-            file_type,
-            now,
-            user_id,
-            group_id,
-            channel_id,
-            file_id,
-            caption,
-            1 if is_video else 0,
-            now,
-        ),
-    )
-    conn.commit()
+    with conn:
+        now = _now()
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO files
+                (file_unique_id, saved_filename, original_filename, file_type,
+                 upload_time, user_id, group_id, channel_id, file_id, caption, is_video, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                file_unique_id,
+                saved_filename,
+                original_filename,
+                file_type,
+                now,
+                user_id,
+                group_id,
+                channel_id,
+                file_id,
+                caption,
+                1 if is_video else 0,
+                now,
+            ),
+        )
 
 
 def record_chat(
@@ -312,20 +313,20 @@ def record_chat(
     ``banned_at``.
     """
     conn = _get_conn()
-    now = _now()
-    conn.execute(
-        """
-        INSERT INTO chats (chat_id, chat_type, title, username, first_seen, last_seen, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(chat_id) DO UPDATE SET
-            chat_type = excluded.chat_type,
-            title     = excluded.title,
-            username  = excluded.username,
-            last_seen = excluded.last_seen
-        """,
-        (chat_id, chat_type, title, username, now, now, now),
-    )
-    conn.commit()
+    with conn:
+        now = _now()
+        conn.execute(
+            """
+            INSERT INTO chats (chat_id, chat_type, title, username, first_seen, last_seen, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(chat_id) DO UPDATE SET
+                chat_type = excluded.chat_type,
+                title     = excluded.title,
+                username  = excluded.username,
+                last_seen = excluded.last_seen
+            """,
+            (chat_id, chat_type, title, username, now, now, now),
+        )
 
 
 def get_chat(chat_id: int) -> dict | None:
@@ -337,16 +338,16 @@ def get_chat(chat_id: int) -> dict | None:
 def set_banned(user_id: int, banned: bool) -> None:
     """Set or clear a user's ban timestamp. Creates a bare user row if needed."""
     conn = _get_conn()
-    now = _now() if banned else None
-    conn.execute(
-        """
-        INSERT INTO users (user_id, first_seen, last_seen, banned_at, created_at)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(user_id) DO UPDATE SET banned_at = excluded.banned_at
-        """,
-        (user_id, _now(), _now(), now, _now()),
-    )
-    conn.commit()
+    with conn:
+        now = _now() if banned else None
+        conn.execute(
+            """
+            INSERT INTO users (user_id, first_seen, last_seen, banned_at, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET banned_at = excluded.banned_at
+            """,
+            (user_id, _now(), _now(), now, _now()),
+        )
 
 
 def banned_user_ids() -> list[int]:
@@ -425,12 +426,12 @@ def set_files_cleared(file_unique_ids: list[str]) -> int:
     if not file_unique_ids:
         return 0
     conn = _get_conn()
-    placeholders = ",".join("?" * len(file_unique_ids))
-    cur = conn.execute(
-        f"UPDATE files SET cleared_at = ? WHERE file_unique_id IN ({placeholders}) AND cleared_at IS NULL",
-        [_now(), *file_unique_ids],
-    )
-    conn.commit()
+    with conn:
+        placeholders = ",".join("?" * len(file_unique_ids))
+        cur = conn.execute(
+            f"UPDATE files SET cleared_at = ? WHERE file_unique_id IN ({placeholders}) AND cleared_at IS NULL",
+            [_now(), *file_unique_ids],
+        )
     return cur.rowcount
 
 
@@ -522,15 +523,15 @@ REPORT_ERROR = "error"  # something failed; status_detail carries the message
 
 def create_report(report_uuid: str, user_id: int, page_secret_hash: str) -> None:
     conn = _get_conn()
-    now = _now()
-    conn.execute(
-        """
-        INSERT INTO reports (report_uuid, user_id, page_secret_hash, status, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """,
-        (report_uuid, user_id, page_secret_hash, REPORT_PREPARING, now, now),
-    )
-    conn.commit()
+    with conn:
+        now = _now()
+        conn.execute(
+            """
+            INSERT INTO reports (report_uuid, user_id, page_secret_hash, status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (report_uuid, user_id, page_secret_hash, REPORT_PREPARING, now, now),
+        )
 
 
 def add_report_blob(
@@ -544,15 +545,15 @@ def add_report_blob(
 ) -> int:
     """Insert an image blob. Returns the new blob id."""
     conn = _get_conn()
-    cur = conn.execute(
-        """
-        INSERT INTO report_blobs
-            (report_uuid, file_unique_id, saved_filename, nonce, ciphertext, plaintext_sha256, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-        (report_uuid, file_unique_id, saved_filename, nonce, ciphertext, plaintext_sha256, _now()),
-    )
-    conn.commit()
+    with conn:
+        cur = conn.execute(
+            """
+            INSERT INTO report_blobs
+                (report_uuid, file_unique_id, saved_filename, nonce, ciphertext, plaintext_sha256, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (report_uuid, file_unique_id, saved_filename, nonce, ciphertext, plaintext_sha256, _now()),
+        )
     return int(cur.lastrowid or 0)
 
 
@@ -571,11 +572,12 @@ def set_blob_video(
     stored in the row.
     """
     conn = _get_conn()
-    conn.execute(
-        "UPDATE report_blobs SET video_path = ?, video_nonce = ?, video_sha256 = ?, video_filename = ? WHERE id = ?",
-        (video_path, video_nonce, video_sha256, video_filename, blob_id),
-    )
-    conn.commit()
+    with conn:
+        conn.execute(
+            "UPDATE report_blobs SET video_path = ?, video_nonce = ?, video_sha256 = ?, video_filename = ? "
+            "WHERE id = ?",
+            (video_path, video_nonce, video_sha256, video_filename, blob_id),
+        )
 
 
 def get_report_blob(blob_id: int) -> dict | None:
@@ -592,29 +594,29 @@ def get_report(report_uuid: str) -> dict | None:
 
 def set_report_status(report_uuid: str, status: str, detail: str | None = None) -> None:
     conn = _get_conn()
-    conn.execute(
-        "UPDATE reports SET status = ?, status_detail = ?, updated_at = ? WHERE report_uuid = ?",
-        (status, detail, _now(), report_uuid),
-    )
-    conn.commit()
+    with conn:
+        conn.execute(
+            "UPDATE reports SET status = ?, status_detail = ?, updated_at = ? WHERE report_uuid = ?",
+            (status, detail, _now(), report_uuid),
+        )
 
 
 def set_report_ncmec_id(report_uuid: str, ncmec_report_id: int) -> None:
     conn = _get_conn()
-    conn.execute(
-        "UPDATE reports SET ncmec_report_id = ?, updated_at = ? WHERE report_uuid = ?",
-        (ncmec_report_id, _now(), report_uuid),
-    )
-    conn.commit()
+    with conn:
+        conn.execute(
+            "UPDATE reports SET ncmec_report_id = ?, updated_at = ? WHERE report_uuid = ?",
+            (ncmec_report_id, _now(), report_uuid),
+        )
 
 
 def mark_report_filed(report_uuid: str) -> None:
     conn = _get_conn()
-    conn.execute(
-        "UPDATE reports SET status = ?, finished_at = ?, updated_at = ? WHERE report_uuid = ?",
-        (REPORT_FILED, _now(), _now(), report_uuid),
-    )
-    conn.commit()
+    with conn:
+        conn.execute(
+            "UPDATE reports SET status = ?, finished_at = ?, updated_at = ? WHERE report_uuid = ?",
+            (REPORT_FILED, _now(), _now(), report_uuid),
+        )
 
 
 def report_blobs(report_uuid: str, *, selected_only: bool = False) -> list[dict]:
@@ -671,21 +673,23 @@ def set_blob_selection(report_uuid: str, selections: dict[int, str | None]) -> N
     are deselected.
     """
     conn = _get_conn()
-    # Reset all to unselected first, then apply the given selections.
-    conn.execute("UPDATE report_blobs SET selected = 0, classification = NULL WHERE report_uuid = ?", (report_uuid,))
-    for blob_id, classification in selections.items():
+    with conn:
+        # Reset all to unselected first, then apply the given selections.
         conn.execute(
-            "UPDATE report_blobs SET selected = 1, classification = ? WHERE report_uuid = ? AND id = ?",
-            (classification, report_uuid, blob_id),
+            "UPDATE report_blobs SET selected = 0, classification = NULL WHERE report_uuid = ?", (report_uuid,)
         )
-    conn.commit()
+        for blob_id, classification in selections.items():
+            conn.execute(
+                "UPDATE report_blobs SET selected = 1, classification = ? WHERE report_uuid = ? AND id = ?",
+                (classification, report_uuid, blob_id),
+            )
 
 
 def purge_report_blobs(report_uuid: str) -> int:
     """Delete all encrypted blobs for a report. Returns count deleted."""
     conn = _get_conn()
-    cur = conn.execute("DELETE FROM report_blobs WHERE report_uuid = ?", (report_uuid,))
-    conn.commit()
+    with conn:
+        cur = conn.execute("DELETE FROM report_blobs WHERE report_uuid = ?", (report_uuid,))
     return cur.rowcount
 
 
@@ -697,8 +701,8 @@ def purge_unselected_blobs(report_uuid: str) -> int:
     are removed. Returns count deleted.
     """
     conn = _get_conn()
-    cur = conn.execute("DELETE FROM report_blobs WHERE report_uuid = ? AND selected = 0", (report_uuid,))
-    conn.commit()
+    with conn:
+        cur = conn.execute("DELETE FROM report_blobs WHERE report_uuid = ? AND selected = 0", (report_uuid,))
     return cur.rowcount
 
 
