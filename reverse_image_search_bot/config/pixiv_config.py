@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class PixivConfig:
-    _default_config: dict[str, None | str] = {
+    _default_config: dict[str, str | None] = {
         "refresh_token": None,
         "access_token": None,
     }

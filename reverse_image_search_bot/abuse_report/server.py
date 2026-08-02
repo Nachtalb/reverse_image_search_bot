@@ -369,7 +369,8 @@ async def api_select(request: web.Request) -> web.Response:
     for k, v in raw.items():
         cls = v if v in _VALID_CLASSES else None
         selections[int(k)] = cls
-    abuse.set_blob_selection(rep["report_uuid"], selections)
+    # DB write may wait on the write lock (busy_timeout) — keep it off the event loop.
+    await asyncio.to_thread(abuse.set_blob_selection, rep["report_uuid"], selections)
     return web.json_response({"ok": True, "selected": len(selections)})
 
 
