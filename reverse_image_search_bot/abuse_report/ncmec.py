@@ -10,6 +10,7 @@ using P1, which the admin supplies at submit time — it is never stored).
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 from ncmec_cybertip import (
@@ -234,16 +235,25 @@ async def submit_and_finish(
     source_chats: list[dict] | None = None,
     incident_date: datetime | None = None,
     chat_room_name: str | None = None,
+    progress: Callable[[str], None] | None = None,
 ) -> tuple[int, list[str]]:
     """Open, populate, AND finish a report in one shot (irreversible).
 
     The report console double-checks everything client-side before this is
     called, so there is no separate review/finish step: submit -> upload each
     file -> file_info -> finish, all under one client session. Returns
-    ``(ncmec_report_id, [file_id, ...])``.
+    ``(ncmec_report_id, [file_id, ...])``. ``progress`` (optional) receives
+    short step strings for the polling UI.
     """
+
+    def _note(msg: str) -> None:
+        if progress is not None:
+            progress(msg)
+
     async with _client() as client:
+        _note("connecting to NCMEC")
         await client.status()  # verify connectivity + auth up front
+        _note("opening report")
         opened = await client.submit(
             build_report(
                 incident_urls=incident_urls,
@@ -258,7 +268,8 @@ async def submit_and_finish(
             raise RuntimeError(f"NCMEC submit returned no report_id: {opened!r}")
 
         file_ids: list[str] = []
-        for f in selected_files:
+        for i, f in enumerate(selected_files, 1):
+            _note(f"uploading {f['kind']} {i}/{len(selected_files)}")
             data: bytes = f["plaintext"]
             up = await client.upload(report_id, data, filename=f["filename"])
             file_id = up.file_id
@@ -269,5 +280,6 @@ async def submit_and_finish(
             details = build_file_details(report_id, file_id, f, data)
             await client.file_info(details)
 
+        _note("finishing report")
         await client.finish(report_id)
         return report_id, file_ids

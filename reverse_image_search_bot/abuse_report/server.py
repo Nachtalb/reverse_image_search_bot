@@ -24,6 +24,7 @@ import hashlib
 import hmac
 import json
 import logging
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import parse_qsl
@@ -346,7 +347,11 @@ async def api_video(request: web.Request) -> web.Response:
 
 
 async def api_status(request: web.Request) -> web.Response:
-    """Poll the report status (drives the live UI)."""
+    """Poll the report status (drives the live UI).
+
+    While a background submit runs (status ``submitting``) ``progress`` carries
+    a short human-readable step string, e.g. "uploading video 3/7".
+    """
     _require_admin(request)
     rep = _report_or_404(request.match_info["uuid"])
     return web.json_response(
@@ -354,6 +359,7 @@ async def api_status(request: web.Request) -> web.Response:
             "status": rep["status"],
             "status_detail": rep["status_detail"],
             "ncmec_report_id": rep["ncmec_report_id"],
+            "progress": _submit_progress.get(rep["report_uuid"]),
         }
     )
 
@@ -422,7 +428,9 @@ async def _fetch_and_store_bio(request: web.Request, user_id: int) -> None:
         logger.info("could not fetch bio for user %s", user_id, exc_info=True)
 
 
-async def _gather_selected_files(request: web.Request, rep: dict, p1: str) -> tuple[list[dict], list[dict]]:
+async def _gather_selected_files(
+    request: web.Request, rep: dict, p1: str, progress: Callable[[str], None] | None = None
+) -> tuple[list[dict], list[dict]]:
     """Decrypt every selected blob (frame + any source video) with P1.
 
     Shared by the review preview AND the live submit so both operate on the exact
@@ -431,7 +439,15 @@ async def _gather_selected_files(request: web.Request, rep: dict, p1: str) -> tu
     per-file dicts handed to the NCMEC builders. Each file dict carries a ``kind``
     ("frame" | "video"), its ``blob_id``, the file's ``upload_time`` and any
     ``caption`` so the UI can pair them up and the builders can fill the fields.
+
+    ``progress`` (optional) receives short human-readable step strings — the
+    async submit path forwards them to the polling UI.
     """
+
+    def _note(msg: str) -> None:
+        if progress is not None:
+            progress(msg)
+
     selected = abuse.report_blobs(rep["report_uuid"], selected_only=True)
     if not selected:
         raise web.HTTPBadRequest(text="no images selected")
@@ -441,16 +457,18 @@ async def _gather_selected_files(request: web.Request, rep: dict, p1: str) -> tu
     # yet is lazily fetched now (best-effort; failures degrade to frame-only).
     bot = request.app.get("bot")
     if bot is not None:
-        for b in selected:
-            if not b.get("video_path"):
-                await abuse_video.fetch_and_encrypt_video(bot, b, p1)
+        pending = [b for b in selected if not b.get("video_path")]
+        for i, b in enumerate(pending, 1):
+            _note(f"fetching source video {i}/{len(pending)}")
+            await abuse_video.fetch_and_encrypt_video(bot, b, p1)
         # Re-read so the freshly-fetched video columns are visible below.
         selected = abuse.report_blobs(rep["report_uuid"], selected_only=True)
 
     key = crypto.derive_key(p1)
     files: list[dict] = []
     base = settings.UPLOADER.get("configuration", {}).get("path")
-    for b in selected:
+    for idx, b in enumerate(selected, 1):
+        _note(f"decrypting {idx}/{len(selected)}")
         try:
             plaintext = crypto.decrypt_file(bytes(b["nonce"]), bytes(b["ciphertext"]), key)
         except Exception as dec_err:
@@ -564,13 +582,15 @@ async def api_review(request: web.Request) -> web.Response:
 
 
 async def api_submit(request: web.Request) -> web.Response:
-    """Submit to NCMEC AND finish the report in one shot (irreversible).
+    """Kick off the NCMEC submit+finish in the background (irreversible).
 
-    The console double-checks the selection in a client-side preview before this
-    is called, so there is no separate review/finish step. Decrypt selected blobs
-    with P1, upload + classify + finish, then delete the plaintext files from
-    disk. The encrypted blobs are KEPT in the DB, linked to the finished report,
-    so the files remain available for further inspection / law-enforcement.
+    The full pipeline (fetch remaining videos, decrypt, upload everything,
+    finish) can take minutes — far past Cloudflare's ~100 s proxy timeout — so
+    this returns immediately and the page polls ``/api/status``, which carries
+    a live ``progress`` string while status is ``submitting``. The console
+    double-checks the selection in a client-side preview before calling this.
+    On success the encrypted blobs are KEPT in the DB, linked to the finished
+    report, so the files remain available for inspection / law-enforcement.
     """
     _require_admin(request)
     rep = _report_or_404(request.match_info["uuid"])
@@ -579,15 +599,37 @@ async def api_submit(request: web.Request) -> web.Response:
     p1 = payload.get("image_key", "")
     if not p1:
         raise web.HTTPBadRequest(text="image_key (P1) required")
+    uuid = rep["report_uuid"]
+    if uuid in _submit_tasks and not _submit_tasks[uuid].done():
+        return web.json_response({"ok": True, "status": abuse.REPORT_SUBMITTING})  # already running
 
-    files, selected = await _gather_selected_files(request, rep, p1)
+    abuse.set_report_status(uuid, abuse.REPORT_SUBMITTING)
+    _submit_progress[uuid] = "starting"
+    task = asyncio.create_task(_run_submit(request, rep, p1))
+    _submit_tasks[uuid] = task
+    task.add_done_callback(lambda _t: _submit_tasks.pop(uuid, None))
+    return web.json_response({"ok": True, "status": abuse.REPORT_SUBMITTING})
 
-    incident_urls = [_public_file_url(b["saved_filename"]) for b in selected]
-    abuse.set_report_status(rep["report_uuid"], abuse.REPORT_SUBMITTING)
-    await _fetch_and_store_bio(request, rep["user_id"])
-    reported_user = abuse.get_user(rep["user_id"])
-    source_chats = abuse.source_chats_for_user(rep["user_id"])
+
+# Live submit state, keyed by report_uuid (single process — in-memory is fine).
+_submit_tasks: dict[str, asyncio.Task] = {}
+_submit_progress: dict[str, str] = {}
+
+
+async def _run_submit(request: web.Request, rep: dict, p1: str) -> None:
+    """The actual submit+finish pipeline, run as a background task."""
+    uuid = rep["report_uuid"]
+
+    def note(msg: str) -> None:
+        _submit_progress[uuid] = msg
+        logger.info("submit %s: %s", uuid, msg)
+
     try:
+        files, selected = await _gather_selected_files(request, rep, p1, progress=note)
+        incident_urls = [_public_file_url(b["saved_filename"]) for b in selected]
+        await _fetch_and_store_bio(request, rep["user_id"])
+        reported_user = abuse.get_user(rep["user_id"])
+        source_chats = abuse.source_chats_for_user(rep["user_id"])
         report_id, _file_ids = await ncmec.submit_and_finish(
             files,
             incident_urls=incident_urls,
@@ -595,24 +637,27 @@ async def api_submit(request: web.Request) -> web.Response:
             source_chats=source_chats,
             incident_date=_incident_date(files),
             chat_room_name=_chat_room_name(request, rep, source_chats),
+            progress=note,
         )
-    except ncmec.NcmecNotConfigured as e:
-        abuse.set_report_status(rep["report_uuid"], abuse.REPORT_ERROR, str(e))
-        raise web.HTTPServiceUnavailable(text=f"NCMEC not configured: {e}") from e
+    except web.HTTPException as e:
+        # _gather_selected_files raises HTTP errors (bad key, no selection).
+        abuse.set_report_status(uuid, abuse.REPORT_ERROR, e.text or e.reason)
+        return
     except Exception as e:
-        logger.exception("NCMEC submit+finish failed for report %s", rep["report_uuid"])
-        abuse.set_report_status(rep["report_uuid"], abuse.REPORT_ERROR, str(e))
-        raise web.HTTPBadGateway(text=f"NCMEC submit failed: {e}") from e
+        logger.exception("NCMEC submit+finish failed for report %s", uuid)
+        abuse.set_report_status(uuid, abuse.REPORT_ERROR, str(e))
+        return
+    finally:
+        _submit_progress.pop(uuid, None)
 
-    abuse.set_report_ncmec_id(rep["report_uuid"], report_id)
-    abuse.mark_report_filed(rep["report_uuid"])
+    abuse.set_report_ncmec_id(uuid, report_id)
+    abuse.mark_report_filed(uuid)
     # Filing IS the decision: every file in the round the admin did NOT select is
     # thereby cleared (not problematic) and excluded from future reports.
-    unselected = [b["file_unique_id"] for b in abuse.report_blobs(rep["report_uuid"]) if not b["selected"]]
+    unselected = [b["file_unique_id"] for b in abuse.report_blobs(uuid) if not b["selected"]]
     abuse.set_files_cleared(unselected)
     _cleanup_after_finish(rep)
     _ban_reported_user(request.app.get("bot_data"), rep["user_id"])
-    return web.json_response({"ok": True, "ncmec_report_id": report_id, "status": abuse.REPORT_FILED})
 
 
 async def api_cancel(request: web.Request) -> web.Response:

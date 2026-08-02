@@ -244,8 +244,12 @@ async def test_submit_files_and_finishes_and_keeps_blobs(abuse, monkeypatch, tmp
     import json
 
     data = json.loads(resp.text or "")
-    assert data["status"] == abuse.REPORT_FILED
-    assert data["ncmec_report_id"] == 987654
+    # Submit is async now: the endpoint returns immediately and the pipeline
+    # runs as a background task the page polls. Await it directly here.
+    assert data["status"] == abuse.REPORT_SUBMITTING
+    task = server._submit_tasks.get("u")
+    assert task is not None
+    await task
     submitted.assert_awaited_once()
     # Per-file NCMEC fields: original_file_name keeps the uploader's original name,
     # location_of_file is our public copy's URL (two distinct facts, two fields).
