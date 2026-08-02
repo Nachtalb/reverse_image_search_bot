@@ -86,3 +86,27 @@ def test_count_files_multiple(abuse):
     for i in range(3):
         abuse.record_file(f"F{i}", saved_filename=f"F{i}.jpg", user_id=1)
     assert abuse.count_files(1) == 3
+
+
+def test_add_report_blob_is_idempotent(abuse):
+    """A raced/retried extend can't create duplicate blobs (unique index + OR IGNORE)."""
+    abuse.record_user(1)
+    abuse.create_report("u", 1, "")
+    first = abuse.add_report_blob(
+        "u", file_unique_id="A", saved_filename="A.jpg", nonce=b"n1", ciphertext=b"c1", plaintext_sha256="h"
+    )
+    dup = abuse.add_report_blob(
+        "u", file_unique_id="A", saved_filename="A.jpg", nonce=b"n2", ciphertext=b"c2", plaintext_sha256="h"
+    )
+    assert dup == first
+    blobs = abuse.report_blobs("u")
+    assert len(blobs) == 1
+    assert bytes(blobs[0]["nonce"]) == b"n1"  # original kept, retry ignored
+
+
+def test_set_file_video_error_first_wins(abuse):
+    abuse.record_user(1)
+    abuse.record_file("A", saved_filename="A.jpg", user_id=1)
+    abuse.set_file_video_error("A", "too big")
+    abuse.set_file_video_error("A", "something else")
+    assert abuse.file_by_unique_id("A")["video_error"] == "too big"

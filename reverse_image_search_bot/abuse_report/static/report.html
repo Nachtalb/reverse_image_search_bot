@@ -767,11 +767,27 @@ $("confirm-submit-btn").onclick = async () => {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ image_key: $("p1").value }),
     });
-    const j = await r.json();
-    showSuccess(j.ncmec_report_id);
+    await r.json();
+    // The submit runs server-side in the background (it can take minutes —
+    // longer than proxies allow a request). Poll status + live progress.
+    const prog = document.createElement("div");
+    prog.className = "center"; prog.id = "submit-progress";
+    prog.style.margin = "8px 0";
+    $("confirm-content").appendChild(prog);
+    for (;;) {
+      await new Promise(res => setTimeout(res, 2000));
+      let s;
+      try {
+        s = await (await api("/api/status")).json();
+      } catch (pollErr) { continue; }  // transient poll failure — keep going
+      if (s.status === "filed") { prog.remove(); showSuccess(s.ncmec_report_id); return; }
+      if (s.status === "error") throw new Error(s.status_detail || "submit failed");
+      prog.textContent = s.progress ? "… " + s.progress : "… working";
+    }
   } catch (e) {
     // Restore the dialog so the admin can retry / go back.
     spin.remove();
+    const prog = $("submit-progress"); if (prog) prog.remove();
     $("confirm-content").querySelector("h2").textContent = "Review — everything sent to NCMEC";
     secs.forEach(s => s.classList.remove("hidden"));
     $("confirm-actions").classList.remove("hidden");

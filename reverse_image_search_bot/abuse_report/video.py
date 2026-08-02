@@ -77,6 +77,10 @@ async def fetch_and_encrypt_video(bot, blob: dict, p1: str) -> VideoFetchResult:
         # Only uploads that are ACTUALLY a video/animation (decided at ingest).
         # A jpg sent as a document is not a video and has no source video.
         return VideoFetchResult(ok=False, reason="upload is not a video")
+    if rec.get("video_error"):
+        # A permanent failure (too big / deleted) was already recorded — don't
+        # retry on every review/submit and don't re-warn the admins.
+        return VideoFetchResult(ok=False, reason=rec["video_error"])
 
     vdir = video_dir()
     if vdir is None:
@@ -85,14 +89,19 @@ async def fetch_and_encrypt_video(bot, blob: dict, p1: str) -> VideoFetchResult:
     try:
         tg_file = await bot.get_file(rec["file_id"], read_timeout=15, connect_timeout=15)
     except Exception as e:
+        reason = "video no longer available (message deleted or expired)"
+        if "too big" in str(e).lower():
+            reason = "video is over Telegram's 20 MB bot-download limit"
         logger.warning("get_file failed for %s: %s", blob["file_unique_id"], e)
-        return VideoFetchResult(ok=False, reason="video no longer available (message deleted or expired)")
+        # Both cases are permanent for this file — remember so we never retry.
+        abuse.set_file_video_error(blob["file_unique_id"], reason)
+        return VideoFetchResult(ok=False, reason=reason)
 
     size = getattr(tg_file, "file_size", None) or 0
     if size and size > MAX_TELEGRAM_FILE_SIZE:
-        return VideoFetchResult(
-            ok=False, reason=f"video is {size // 1024 // 1024} MB — over Telegram's 20 MB bot-download limit"
-        )
+        reason = f"video is {size // 1024 // 1024} MB — over Telegram's 20 MB bot-download limit"
+        abuse.set_file_video_error(blob["file_unique_id"], reason)
+        return VideoFetchResult(ok=False, reason=reason)
     if not tg_file.file_path:
         return VideoFetchResult(ok=False, reason="Telegram returned no download path")
 
@@ -122,7 +131,10 @@ async def fetch_and_encrypt_video(bot, blob: dict, p1: str) -> VideoFetchResult:
     # Reported filename: keep the uploader's original name when we have one,
     # otherwise a stable unique-id name with the correct extension.
     video_filename = original if _ext_of(original) else f"{blob['file_unique_id']}.{src_ext}"
-    cipher_name = f"{blob['file_unique_id']}.{src_ext}.enc"
+    # Per-BLOB cipher name (blob id prefix): the same source file can appear in
+    # different reports with different keys — a shared name would let a later
+    # fetch overwrite the ciphertext another blob's stored nonce points at.
+    cipher_name = f"{blob['id']}-{blob['file_unique_id']}.{src_ext}.enc"
     (vdir / cipher_name).write_bytes(ct)
 
     abuse.set_blob_video(

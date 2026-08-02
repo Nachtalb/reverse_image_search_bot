@@ -153,6 +153,11 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     # dialog, or automatically for unselected files when a report is filed.
     _add_column_if_missing(conn, "files", "cleared_at", "INTEGER")
 
+    # A PERMANENT source-video fetch failure for this file (over the 20 MB bot
+    # limit, or message deleted). Once set, fetch attempts are skipped — no
+    # retry storm and no repeated admin warnings on every review/submit.
+    _add_column_if_missing(conn, "files", "video_error", "TEXT")
+
     # A report round for one user. `report_uuid` is the URL token; `page_secret_hash`
     # gates the report page (P2, stored hashed — the image key P1 is NEVER stored).
     # `status` drives the live UI: preparing -> ready -> submitting -> filed / retracted
@@ -193,6 +198,14 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_blobs_report ON report_blobs(report_uuid)")
+    # One blob per file per report. A raced extend (e.g. client retry during a
+    # locked-DB episode) used to insert duplicates; drop any existing ones (keep
+    # the lowest id) so the unique index can be created on old DBs.
+    conn.execute(
+        "DELETE FROM report_blobs WHERE id NOT IN "
+        "(SELECT MIN(id) FROM report_blobs GROUP BY report_uuid, file_unique_id)"
+    )
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_blobs_report_file ON report_blobs(report_uuid, file_unique_id)")
     # Forward migration: video columns for reports created before video support.
     _add_column_if_missing(conn, "report_blobs", "video_path", "TEXT")
     _add_column_if_missing(conn, "report_blobs", "video_nonce", "BLOB")
@@ -418,6 +431,16 @@ def files_for_user(user_id: int) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def set_file_video_error(file_unique_id: str, reason: str) -> None:
+    """Record a permanent source-video fetch failure (only the first one wins)."""
+    conn = _get_conn()
+    with conn:
+        conn.execute(
+            "UPDATE files SET video_error = ? WHERE file_unique_id = ? AND video_error IS NULL",
+            (reason, file_unique_id),
+        )
+
+
 def set_files_cleared(file_unique_ids: list[str]) -> int:
     """Mark files as cleared (not problematic). Returns count updated.
 
@@ -543,17 +566,27 @@ def add_report_blob(
     ciphertext: bytes,
     plaintext_sha256: str,
 ) -> int:
-    """Insert an image blob. Returns the new blob id."""
+    """Insert an image blob. Returns the blob id (existing one if already present).
+
+    ``INSERT OR IGNORE`` + the unique (report_uuid, file_unique_id) index make
+    this idempotent — a raced/retried extend can't create duplicate blobs.
+    """
     conn = _get_conn()
     with conn:
         cur = conn.execute(
             """
-            INSERT INTO report_blobs
+            INSERT OR IGNORE INTO report_blobs
                 (report_uuid, file_unique_id, saved_filename, nonce, ciphertext, plaintext_sha256, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (report_uuid, file_unique_id, saved_filename, nonce, ciphertext, plaintext_sha256, _now()),
         )
+        if cur.rowcount == 0:  # already there — return the existing blob's id
+            row = conn.execute(
+                "SELECT id FROM report_blobs WHERE report_uuid = ? AND file_unique_id = ?",
+                (report_uuid, file_unique_id),
+            ).fetchone()
+            return int(row["id"]) if row else 0
     return int(cur.lastrowid or 0)
 
 
