@@ -391,7 +391,7 @@ def main():
         fallbacks=[CommandHandler("cancel", feedback_cancel)],  # ty: ignore[invalid-argument-type]
         conversation_timeout=300,  # 5 minute timeout
     )
-    app.add_handler(feedback_handler)  # ty: ignore[invalid-argument-type]
+    app.add_handler(feedback_handler)
 
     # Feedback reply handler — allows admins and users to reply back and forth
     app.add_handler(

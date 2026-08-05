@@ -4,6 +4,7 @@ import re
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from cachetools import TTLCache
 from yarl import URL
 
 # ---------------------------------------------------------------------------
@@ -1007,7 +1008,7 @@ class TestPixivProvider:
             provider._images = AsyncMock(return_value=[URL("https://uploads.test/999_p0.jpg")])
 
             result, _meta = await provider.provide(999)
-            assert "more than 10 artworks" in next(iter(result.values()))
+            assert "more than 10 artworks" in str(next(iter(result.values())))
             assert result["Type"] == "Manga"
             assert result["18+ Audience"] == "Yes 🔞"
 
@@ -1017,7 +1018,7 @@ class TestPixivProvider:
         with patch.object(PixivProvider, "__init__", lambda self, *a, **kw: None):
             provider = PixivProvider.__new__(PixivProvider)
             provider.api = MagicMock()
-            provider._cache = {}
+            provider._cache = TTLCache(100, 60)
 
             mock_illust = MagicMock()
             mock_illust.error = None
@@ -1033,7 +1034,7 @@ class TestPixivProvider:
         with patch.object(PixivProvider, "__init__", lambda self, *a, **kw: None):
             provider = PixivProvider.__new__(PixivProvider)
             provider.api = MagicMock()
-            provider._cache = {}
+            provider._cache = TTLCache(100, 60)
 
             mock_illust = MagicMock()
             mock_illust.error = None
@@ -1049,7 +1050,7 @@ class TestPixivProvider:
 
         with patch.object(PixivProvider, "__init__", lambda self, *a, **kw: None):
             provider = PixivProvider.__new__(PixivProvider)
-            provider._cache = {}
+            provider._cache = TTLCache(100, 60)
 
             result = await provider.request("not-a-valid-id")
             assert result is None
@@ -1061,7 +1062,7 @@ class TestPixivProvider:
             provider = PixivProvider.__new__(PixivProvider)
             provider.api = MagicMock()
             provider.logger = MagicMock()
-            provider._cache = {}
+            provider._cache = TTLCache(100, 60)
 
             mock_illust = MagicMock()
             mock_illust.error.message = "Rate limit exceeded"
@@ -1121,7 +1122,7 @@ class TestPixivProvider:
             provider = PixivProvider.__new__(PixivProvider)
             provider.api = MagicMock()
             provider.logger = MagicMock()
-            provider._cache = {}
+            provider._cache = TTLCache(100, 60)
 
             # First call returns invalid_grant error
             mock_error = MagicMock()
