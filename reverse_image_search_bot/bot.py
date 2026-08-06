@@ -16,6 +16,7 @@ from telegram import (
 from telegram.constants import ParseMode
 from telegram.error import BadRequest, Forbidden, RetryAfter
 from telegram.ext import (
+    AIORateLimiter,
     Application,
     CallbackQueryHandler,
     CommandHandler,
@@ -359,6 +360,9 @@ def main():
     builder = Application.builder().token(settings.TELEGRAM_API_TOKEN)
     builder.persistence(persistence)
     builder.concurrent_updates(settings.CONCURRENT_UPDATES)
+    # Queue outgoing requests at Telegram's published limits and retry on
+    # RetryAfter instead of dropping the send (default max_retries is 0).
+    builder.rate_limiter(AIORateLimiter(max_retries=3))
     # Users delete their message mid-search — send the reply standalone
     # instead of failing with "Message to be replied not found".
     builder.defaults(Defaults(allow_sending_without_reply=True))

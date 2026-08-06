@@ -9,7 +9,7 @@ requires-python = ">=3.14"
 dependencies = [
     "python-magic>=0.4.27",
     "validators>=0.35.0",
-    "python-telegram-bot[job-queue,webhooks]>=22.8",
+    "python-telegram-bot[job-queue,rate-limiter,webhooks]>=22.8",
     "cachetools>=7.1.7",
     "Pillow>=12.3.0",
     "cleverdict>=1.9.2",
