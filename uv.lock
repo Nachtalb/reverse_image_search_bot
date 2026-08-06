@@ -70,6 +70,15 @@ wheels = [
 ]
 
 [[package]]
+name = "aiolimiter"
+version = "1.2.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f1/23/b52debf471f7a1e42e362d959a3982bdcb4fe13a5d46e63d28868807a79c/aiolimiter-1.2.1.tar.gz", hash = "sha256:e02a37ea1a855d9e832252a105420ad4d15011505512a1a1d814647451b5cca9", size = 7185, upload-time = "2024-12-08T15:31:51.496Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f3/ba/df6e8e1045aebc4778d19b8a3a9bc1808adb1619ba94ca354d9ba17d86c3/aiolimiter-1.2.1-py3-none-any.whl", hash = "sha256:d3f249e9059a20badcb56b61601a83556133655c11d1eb3dd3e04ff069e5f3c7", size = 6711, upload-time = "2024-12-08T15:31:49.874Z" },
+]
+
+[[package]]
 name = "aiosignal"
 version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1140,6 +1149,9 @@ wheels = [
 job-queue = [
     { name = "apscheduler" },
 ]
+rate-limiter = [
+    { name = "aiolimiter" },
+]
 webhooks = [
     { name = "tornado" },
 ]
@@ -1214,7 +1226,7 @@ dependencies = [
     { name = "prometheus-client" },
     { name = "pyopenssl" },
     { name = "python-magic" },
-    { name = "python-telegram-bot", extra = ["job-queue", "webhooks"] },
+    { name = "python-telegram-bot", extra = ["job-queue", "rate-limiter", "webhooks"] },
     { name = "user-agent" },
     { name = "validators" },
     { name = "yarl" },
@@ -1253,7 +1265,7 @@ requires-dist = [
     { name = "prometheus-client", specifier = ">=0.26.0" },
     { name = "pyopenssl", specifier = ">=26.4.0" },
     { name = "python-magic", specifier = ">=0.4.27" },
-    { name = "python-telegram-bot", extras = ["job-queue", "webhooks"], specifier = ">=22.8" },
+    { name = "python-telegram-bot", extras = ["job-queue", "rate-limiter", "webhooks"], specifier = ">=22.8" },
     { name = "user-agent", specifier = ">=0.1.14" },
     { name = "validators", specifier = ">=0.35.0" },
     { name = "yarl", specifier = ">=1.24.5" },
