@@ -46,6 +46,11 @@ UPLOADER: dict[str, Any] = {
 
 ADMIN_IDS = get_env_list("ADMIN_IDS")
 
+# Chat that WARNING+ log records are delivered to. When unset they are DMed to
+# ADMIN_IDS instead. Channel/supergroup ids carry the -100 prefix.
+_error_chat_id = os.getenv("ERROR_CHAT_ID", "").strip()
+ERROR_CHAT_ID = int(_error_chat_id) if _error_chat_id else None
+
 SAUCENAO_API = required_env("SAUCENAO_API")
 TRACE_API = required_env("TRACE_API")
 ANILIST_TOKEN = os.getenv("ANILIST_TOKEN")
