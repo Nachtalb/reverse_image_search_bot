@@ -36,6 +36,29 @@ def test_connection_uses_wal_with_synchronous_normal(abuse):
     assert conn.execute("PRAGMA synchronous").fetchone()[0] == 1
 
 
+def test_lookup_queries_use_indexes_not_scans(abuse):
+    """Both lookups were full table scans on the real DB. The username index
+    only works if it carries the query's NOCASE collation."""
+    abuse.record_user(1, username="alice")
+    abuse.set_banned(2, True)
+    conn = abuse._get_conn()
+
+    plan = " ".join(
+        r["detail"]
+        for r in conn.execute(
+            "EXPLAIN QUERY PLAN SELECT user_id FROM users WHERE username = ? COLLATE NOCASE", ("alice",)
+        )
+    )
+    assert "SCAN" not in plan, plan
+    assert "idx_users_username_nocase" in plan, plan
+
+    plan = " ".join(
+        r["detail"] for r in conn.execute("EXPLAIN QUERY PLAN SELECT user_id FROM users WHERE banned_at IS NOT NULL")
+    )
+    assert "SCAN" not in plan, plan
+    assert "idx_users_banned" in plan, plan
+
+
 def test_record_user_upserts_last_seen_wins(abuse):
     abuse.record_user(1, username="alice", first_name="Alice")
     abuse.record_user(1, username="alice2", first_name="Alice", last_name="B")
