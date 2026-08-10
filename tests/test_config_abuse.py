@@ -27,6 +27,53 @@ def abuse(tmp_path, monkeypatch):
     return ab
 
 
+def test_migrations_skip_scans_when_already_applied(abuse):
+    """_ensure_schema runs on every new thread's connection. Once the DB is
+    migrated the backfills are no-ops, but SQLite still scans the whole table to
+    find that out — so they must be probe-gated, not run unconditionally."""
+    abuse.record_user(1, username="alice")
+    abuse.record_file("F1", saved_filename="F1.mp4", user_id=1, file_type="video")
+    conn = abuse._get_conn()
+
+    ran: list[str] = []
+    # set_trace_callback sees every statement SQLite actually executes;
+    # sqlite3.Connection.execute itself is read-only and can't be patched.
+    conn.set_trace_callback(lambda sql: ran.append(" ".join(sql.split())))
+    try:
+        abuse._ensure_schema(conn)
+    finally:
+        conn.set_trace_callback(None)
+
+    writes = [s for s in ran if s.upper().startswith(("UPDATE", "DELETE"))]
+    assert writes == [], f"re-ran completed migrations: {writes}"
+
+
+def test_backfill_runs_when_column_is_first_added(abuse, tmp_path):
+    """The gate must not skip a backfill on a DB that genuinely needs it."""
+    import sqlite3
+
+    db = tmp_path / "old.db"
+    conn = sqlite3.connect(db)
+    conn.row_factory = sqlite3.Row
+    conn.execute("CREATE TABLE users (user_id INTEGER PRIMARY KEY, first_seen INTEGER, last_seen INTEGER)")
+    conn.execute(
+        "CREATE TABLE files (file_unique_id TEXT PRIMARY KEY, saved_filename TEXT NOT NULL, "
+        "original_filename TEXT, file_type TEXT, upload_time INTEGER NOT NULL, "
+        "user_id INTEGER NOT NULL REFERENCES users(user_id))"
+    )
+    conn.execute("INSERT INTO users (user_id, first_seen, last_seen) VALUES (1, 42, 42)")
+    conn.execute("INSERT INTO files VALUES ('V', 'V.mp4', NULL, 'video', 7, 1)")
+    conn.execute("INSERT INTO files VALUES ('P', 'P.jpg', NULL, 'photo', 7, 1)")
+    conn.commit()
+
+    abuse._ensure_schema(conn)
+
+    assert conn.execute("SELECT created_at FROM users WHERE user_id = 1").fetchone()[0] == 42
+    rows = dict(conn.execute("SELECT file_unique_id, is_video FROM files").fetchall())
+    assert rows == {"V": 1, "P": 0}
+    conn.close()
+
+
 def test_record_user_upserts_last_seen_wins(abuse):
     abuse.record_user(1, username="alice", first_name="Alice")
     abuse.record_user(1, username="alice2", first_name="Alice", last_name="B")
