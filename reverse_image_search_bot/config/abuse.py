@@ -67,11 +67,17 @@ def _close_all_connections() -> None:
 atexit.register(_close_all_connections)
 
 
-def _add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, decl: str) -> None:
-    """Idempotently add a column to an existing table (simple forward migration)."""
+def _add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, decl: str) -> bool:
+    """Idempotently add a column to an existing table (simple forward migration).
+
+    Returns True when the column was actually added, so a caller can run a
+    one-shot backfill exactly once instead of on every connection.
+    """
     cols = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
     if column not in cols:
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+        return True
+    return False
 
 
 def _ensure_schema(conn: sqlite3.Connection) -> None:
@@ -132,12 +138,15 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
 
     # created_at on every table (reports already has one). Backfill existing rows
     # from the closest pre-existing timestamp so old rows aren't left NULL.
-    _add_column_if_missing(conn, "users", "created_at", "INTEGER")
-    _add_column_if_missing(conn, "chats", "created_at", "INTEGER")
-    _add_column_if_missing(conn, "files", "created_at", "INTEGER")
-    conn.execute("UPDATE users SET created_at = first_seen WHERE created_at IS NULL")
-    conn.execute("UPDATE chats SET created_at = first_seen WHERE created_at IS NULL")
-    conn.execute("UPDATE files SET created_at = upload_time WHERE created_at IS NULL")
+    # Each backfill is gated on its ALTER: it is only meaningful the one time the
+    # column appears. Probing for leftover NULLs instead would re-scan the whole
+    # table on every connection to discover there is nothing to do.
+    if _add_column_if_missing(conn, "users", "created_at", "INTEGER"):
+        conn.execute("UPDATE users SET created_at = first_seen WHERE created_at IS NULL")
+    if _add_column_if_missing(conn, "chats", "created_at", "INTEGER"):
+        conn.execute("UPDATE chats SET created_at = first_seen WHERE created_at IS NULL")
+    if _add_column_if_missing(conn, "files", "created_at", "INTEGER"):
+        conn.execute("UPDATE files SET created_at = upload_time WHERE created_at IS NULL")
 
     # A user's Telegram bio (fetched best-effort at report time) and a per-file
     # caption (text sent alongside the media, if any) — both reportable to NCMEC.
@@ -151,8 +160,13 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     # real videos. Documents/stickers are left 0 (can't know retroactively; the
     # safe default is "not a video" so we never invent a bogus video piece). Rows
     # that already have a fetched video keep it via video_filename regardless.
-    _add_column_if_missing(conn, "files", "is_video", "INTEGER NOT NULL DEFAULT 0")
-    conn.execute("UPDATE files SET is_video = 1 WHERE file_type IN ('video', 'gif')")
+    #
+    # Gated on the column being NEW rather than on the rows, because is_video is
+    # set per-file at ingest: a legitimately-0 'video' row would otherwise make
+    # the backfill re-run (and re-scan) on every connection forever.
+    is_video_added = _add_column_if_missing(conn, "files", "is_video", "INTEGER NOT NULL DEFAULT 0")
+    if is_video_added:
+        conn.execute("UPDATE files SET is_video = 1 WHERE file_type IN ('video', 'gif')")
 
     # A file the admin marked as NOT problematic ("cleared") — excluded from
     # report preparation just like already-filed pieces. Set from the cancel
@@ -206,11 +220,18 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_blobs_report ON report_blobs(report_uuid)")
     # One blob per file per report. A raced extend (e.g. client retry during a
     # locked-DB episode) used to insert duplicates; drop any existing ones (keep
-    # the lowest id) so the unique index can be created on old DBs.
-    conn.execute(
-        "DELETE FROM report_blobs WHERE id NOT IN "
-        "(SELECT MIN(id) FROM report_blobs GROUP BY report_uuid, file_unique_id)"
+    # the lowest id) so the unique index can be created on old DBs. Once that
+    # index exists it enforces the constraint, so duplicates are impossible and
+    # the scanning DELETE never needs to run again.
+    has_unique_blob_index = (
+        conn.execute("SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_blobs_report_file'").fetchone()
+        is not None
     )
+    if not has_unique_blob_index:
+        conn.execute(
+            "DELETE FROM report_blobs WHERE id NOT IN "
+            "(SELECT MIN(id) FROM report_blobs GROUP BY report_uuid, file_unique_id)"
+        )
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_blobs_report_file ON report_blobs(report_uuid, file_unique_id)")
     # Forward migration: video columns for reports created before video support.
     _add_column_if_missing(conn, "report_blobs", "video_path", "TEXT")
