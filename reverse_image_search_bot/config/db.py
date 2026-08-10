@@ -41,6 +41,9 @@ def _get_conn() -> sqlite3.Connection:
         conn = sqlite3.connect(str(CONFIG_DB_PATH))
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
+        # See config/abuse.py — synchronous=FULL is far too slow on the network
+        # PVC and starves concurrent writers past busy_timeout.
+        conn.execute("PRAGMA synchronous=NORMAL")
         conn.execute("PRAGMA busy_timeout=5000")
         _ensure_schema(conn)
         with _conn_lock:

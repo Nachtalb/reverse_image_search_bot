@@ -27,6 +27,15 @@ def abuse(tmp_path, monkeypatch):
     return ab
 
 
+def test_connection_uses_wal_with_synchronous_normal(abuse):
+    """synchronous=FULL fsyncs every commit (~170 ms on the network PVC), which
+    starves concurrent writers past busy_timeout -> "database is locked"."""
+    conn = abuse._get_conn()
+    assert conn.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal"
+    # 1 == NORMAL. FULL (2) is the slow default this guards against.
+    assert conn.execute("PRAGMA synchronous").fetchone()[0] == 1
+
+
 def test_record_user_upserts_last_seen_wins(abuse):
     abuse.record_user(1, username="alice", first_name="Alice")
     abuse.record_user(1, username="alice2", first_name="Alice", last_name="B")
