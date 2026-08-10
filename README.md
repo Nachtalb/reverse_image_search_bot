@@ -49,6 +49,7 @@ All configuration is done via environment variables.
 | Variable | Default | Description |
 |---|---|---|
 | `ADMIN_IDS` | — | Comma-separated Telegram user IDs with admin access |
+| `ERROR_CHAT_ID` | — | Chat to send WARNING+ log records to; when unset they are DMed to `ADMIN_IDS`. Channel/supergroup ids need the `-100` prefix |
 | `ANILIST_TOKEN` | — | AniList OAuth token (raises rate limit from 90 to 120 req/min) |
 | `MODE_ACTIVE` | `polling` | Bot mode: `polling` or `webhook` |
 | `CONCURRENT_UPDATES` | `16` | Number of concurrent update handlers |

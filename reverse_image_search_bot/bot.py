@@ -58,7 +58,10 @@ application: Application | None = None
 
 
 class TelegramLogHandler(logging.Handler):
-    """Forward WARNING+ log records to Telegram admin chats.
+    """Forward WARNING+ log records to Telegram.
+
+    Records go to ``settings.ERROR_CHAT_ID`` when it is set, otherwise they are
+    DMed to every id in ``settings.ADMIN_IDS``.
 
     Because this handler is invoked from arbitrary threads (via the logging
     framework), we schedule coroutines on the running event loop with
@@ -81,9 +84,10 @@ class TelegramLogHandler(logging.Handler):
         try:
             prefix = self.prefixes.get(record.levelno, "")
             msg = f"{prefix} {self.format(record)}"
-            for admin in settings.ADMIN_IDS:
+            targets = [settings.ERROR_CHAT_ID] if settings.ERROR_CHAT_ID else settings.ADMIN_IDS
+            for target in targets:
                 if len(msg) <= 4096:
-                    coro = self.bot.send_message(admin, msg, parse_mode=ParseMode.HTML)
+                    coro = self.bot.send_message(target, msg, parse_mode=ParseMode.HTML)
                 else:
                     raw_text = super().format(record)
                     filename = f"error_{int(record.created)}_{record.levelname.lower()}.log"
@@ -92,7 +96,7 @@ class TelegramLogHandler(logging.Handler):
                     suffix = "\n... [truncated]"
                     caption = msg[: 1024 - len(suffix)] + suffix if len(msg) > 1024 else msg
                     coro = self.bot.send_document(
-                        admin, log_data, filename=filename, caption=caption, parse_mode=ParseMode.HTML
+                        target, log_data, filename=filename, caption=caption, parse_mode=ParseMode.HTML
                     )
                 asyncio.run_coroutine_threadsafe(coro, self.loop)
         except Exception:
