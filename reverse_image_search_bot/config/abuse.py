@@ -40,6 +40,12 @@ def _get_conn() -> sqlite3.Connection:
         conn = sqlite3.connect(str(ABUSE_DB_PATH))
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
+        # Network block storage fsyncs slowly: synchronous=FULL costs ~170 ms per
+        # commit here (p95 1.3 s), which piles writers up past busy_timeout and
+        # surfaces as "database is locked". NORMAL is the documented-safe pairing
+        # with WAL — durable across app crashes, only a power loss can lose the
+        # last commits.
+        conn.execute("PRAGMA synchronous=NORMAL")
         conn.execute("PRAGMA busy_timeout=15000")
         conn.execute("PRAGMA foreign_keys=ON")
         _ensure_schema(conn)
