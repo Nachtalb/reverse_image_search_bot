@@ -71,11 +71,18 @@
   dialog::backdrop { background: rgba(0,0,0,.72); }
   dialog .dlg-body { padding: 16px; }
   dialog h2 { font-size: 16px; margin: 0 0 10px; }
-  #viewer { width: auto; max-width: 96vw; }
+  #viewer { width: auto; max-width: 96vw; max-height: 96vh; max-height: 96dvh; overflow-y: auto; }
   #viewer .dlg-body { padding: 8px; text-align: center; }
   /* Cap media at the viewport minus the dialog padding+border so the box never
-     overflows the dialog's own max-width (which pinned it to the right edge). */
-  #viewer img, #viewer video { display: block; margin: 0 auto; max-width: calc(96vw - 24px); max-height: 88vh; border-radius: 10px; }
+     overflows the dialog's own max-width (which pinned it to the right edge).
+     The height cap leaves room for the name + classification rows below it, so
+     the whole dialog still fits on screen (dvh: mobile browser chrome). */
+  #viewer img, #viewer video { display: block; margin: 0 auto; max-width: calc(96vw - 24px); max-height: 62vh; max-height: 62dvh; object-fit: contain; border-radius: 10px; }
+  .viewer-media { position: relative; }
+  #viewer-close { position: absolute; top: 6px; right: 6px; z-index: 2; width: 34px; height: 34px; padding: 0; font-size: 17px; line-height: 1; border-radius: 50%; background: rgba(0,0,0,.62); color: #fff; }
+  .viewer-nav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 2; width: 36px; height: 56px; padding: 0; font-size: 26px; line-height: 1; background: rgba(0,0,0,.5); color: #fff; }
+  .viewer-nav.prev { left: 2px; }
+  .viewer-nav.next { right: 2px; }
   .viewer-cls { margin-top: 10px; }
   .viewer-cls .vcls { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
   .viewer-cls .vcls span { font-size: 15px; font-weight: 700; padding: 8px 14px; border-radius: 8px; background: #2a2c33; color: #e8e8ea; cursor: pointer; }
@@ -185,8 +192,13 @@
 <!-- Full-size image / video viewer -->
 <dialog id="viewer">
   <div class="dlg-body">
-    <img id="viewer-img" src="" alt="">
-    <video id="viewer-vid" class="hidden" controls muted autoplay playsinline></video>
+    <div class="viewer-media">
+      <img id="viewer-img" src="" alt="">
+      <video id="viewer-vid" class="hidden" controls muted autoplay playsinline></video>
+      <button id="viewer-close" class="secondary" title="Close" aria-label="Close">✕</button>
+      <button id="viewer-prev" class="secondary viewer-nav prev" title="Previous" aria-label="Previous">‹</button>
+      <button id="viewer-next" class="secondary viewer-nav next" title="Next" aria-label="Next">›</button>
+    </div>
     <div id="viewer-name" class="muted" style="text-align:center;margin-top:6px;word-break:break-all"></div>
     <div class="viewer-cls" id="viewer-cls"></div>
     <div class="row" id="viewer-actions" style="justify-content:center;margin-top:8px"></div>
@@ -473,18 +485,62 @@ $("more-btn").onclick = async () => {
 
 // --- viewer dialog (image + optional source video) ---------------------------
 const viewer = $("viewer");
+let viewerIds = [], viewerAt = 0, viewerBlob = null;
+
+// Blobs the viewer can step through: the decrypted thumbnails currently in the
+// gallery, in display order.
+function viewerList() {
+  return [...document.querySelectorAll(".thumb[data-id]")]
+    .map(el => parseInt(el.dataset.id, 10))
+    .filter(id => thumbUrls[id]);
+}
+
+// Wrap-around index step, so prev on the first item lands on the last.
+function stepIndex(len, i, delta) {
+  if (len <= 0) return 0;
+  return ((i + delta) % len + len) % len;
+}
+
 function openViewer(blobId) {
+  viewerIds = viewerList();
+  viewerAt = Math.max(0, viewerIds.indexOf(blobId));
+  showViewerItem(blobId);
+  viewer.showModal();
+}
+
+function showViewerItem(blobId) {
+  viewerBlob = blobId;
   const vid = $("viewer-vid"), img = $("viewer-img");
-  vid.pause(); vid.removeAttribute("src"); vid.classList.add("hidden");
+  vid.pause(); vid.removeAttribute("src"); vid.load(); vid.classList.add("hidden");
   img.src = thumbUrls[blobId]; img.classList.remove("hidden");
   $("viewer-name").innerHTML = fileLabel(blobNames[blobId], blobOrig[blobId]);
   $("viewer-msg").textContent = "";
   $("viewer-actions").innerHTML = "";
   renderViewerCls(blobId);
-  viewer.showModal();
+  const multi = viewerIds.length > 1;
+  $("viewer-prev").classList.toggle("hidden", !multi);
+  $("viewer-next").classList.toggle("hidden", !multi);
   // Video-backed thumbnails auto-load and autoplay (muted) — no extra click.
   if (hasVideo[blobId]) showVideo(blobId);
 }
+
+// Move to the neighbouring gallery item without closing the dialog.
+function stepViewer(delta) {
+  if (viewerIds.length < 2) return;
+  viewerAt = stepIndex(viewerIds.length, viewerAt, delta);
+  showViewerItem(viewerIds[viewerAt]);
+}
+
+function closeViewer() { $("viewer-vid").pause(); viewer.close(); }
+
+$("viewer-prev").onclick = () => stepViewer(-1);
+$("viewer-next").onclick = () => stepViewer(1);
+$("viewer-close").onclick = closeViewer;
+viewer.addEventListener("keydown", (ev) => {
+  if (ev.key === "ArrowLeft") { ev.preventDefault(); stepViewer(-1); }
+  else if (ev.key === "ArrowRight") { ev.preventDefault(); stepViewer(1); }
+});
+viewer.addEventListener("close", () => $("viewer-vid").pause());
 
 // Classification UI inside the viewer: after filing show the read-only reported
 // category; otherwise the A1–B2 selector, kept in sync with the thumbnail grid.
@@ -561,6 +617,7 @@ async function ensureVideoUrl(blobId) {
 async function showVideo(blobId) {
   const vid = $("viewer-vid"), img = $("viewer-img"), msg = $("viewer-msg");
   const play = () => {
+    if (viewerBlob !== blobId) return;   // navigated away while loading
     img.classList.add("hidden");
     vid.src = videoUrls[blobId];
     vid.muted = true;              // sound off
@@ -571,14 +628,15 @@ async function showVideo(blobId) {
   msg.textContent = "Loading video…";
   try {
     await ensureVideoUrl(blobId);
+    if (viewerBlob !== blobId) return;
     msg.textContent = "";
     play();
   } catch (e) {
-    msg.textContent = "Video unavailable: " + e.message;
+    if (viewerBlob === blobId) msg.textContent = "Video unavailable: " + e.message;
   }
 }
 
-viewer.onclick = (ev) => { if (ev.target === viewer) { $("viewer-vid").pause(); viewer.close(); } };
+viewer.onclick = (ev) => { if (ev.target === viewer) closeViewer(); };
 
 // --- persist selection -------------------------------------------------------
 async function saveSelection() {
