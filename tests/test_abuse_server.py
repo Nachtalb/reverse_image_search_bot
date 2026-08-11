@@ -117,17 +117,16 @@ async def test_select_persists(abuse, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_cancel_purges_blobs_but_keeps_files_and_relation(abuse, monkeypatch, tmp_path):
-    """Cancel = user did nothing wrong: keep disk files + filename->user relation.
+    """Cancel = user did nothing wrong: restore the files + keep the relation.
 
-    Only the encrypted blobs and the report status change; the original file on
-    disk and the files-table row (find_user_by_filename) must survive.
+    Preparing took the plaintext off disk, so cancelling must decrypt it back;
+    the files-table row (find_user_by_filename) must survive too.
     """
     from reverse_image_search_bot import settings
-    from reverse_image_search_bot.abuse_report import server
+    from reverse_image_search_bot.abuse_report import crypto, server
 
     updir = tmp_path / "uploads"
     updir.mkdir()
-    (updir / "A.jpg").write_bytes(b"plaintext image")
     monkeypatch.setattr(settings, "UPLOADER", {"configuration": {"path": str(updir)}})
 
     monkeypatch.setattr(server, "_admin_from_request", lambda req: 42)
@@ -135,32 +134,39 @@ async def test_cancel_purges_blobs_but_keeps_files_and_relation(abuse, monkeypat
     # provenance relation: filename -> user
     abuse.record_file(file_unique_id="A", saved_filename="A.jpg", original_filename="orig.jpg", user_id=1)
     abuse.create_report("u", 1, "")
+    p1 = "the-image-key"
+    plaintext = b"plaintext image"
+    nonce, ct = crypto.encrypt_file(plaintext, crypto.derive_key(p1))
     abuse.add_report_blob(
-        "u", file_unique_id="A", saved_filename="A.jpg", nonce=b"n", ciphertext=b"c", plaintext_sha256="1"
+        "u",
+        file_unique_id="A",
+        saved_filename="A.jpg",
+        nonce=nonce,
+        ciphertext=ct,
+        plaintext_sha256=crypto.sha256_hex(plaintext),
     )
-    req = _req(headers={"X-Page-Secret": "pw"}, match={"uuid": "u"})
+    req = _req(headers={"X-Page-Secret": "pw"}, match={"uuid": "u"}, json_body={"image_key": p1})
     await server.api_cancel(req)
 
     # report cancelled, blobs gone
     assert abuse.get_report("u")["status"] == abuse.REPORT_CANCELLED
     assert abuse.blob_meta("u") == []
-    # BUT: disk file kept, filename->user relation kept, user kept
-    assert (updir / "A.jpg").exists()
+    # BUT: disk file restored, filename->user relation kept, user kept
+    assert (updir / "A.jpg").read_bytes() == plaintext
     assert abuse.find_user_by_filename("A.jpg") == 1
     assert abuse.get_user(1) is not None
 
 
 def test_cleanup_after_finish_keeps_reported_purges_unselected(abuse, monkeypatch, tmp_path):
-    """On finish: reported files' plaintext deleted from disk, their blobs KEPT;
-    non-reported files' blobs purged, their disk plaintext left alone.
+    """On finish: the reported files' blobs are KEPT, everything else is purged.
+
+    No plaintext is on disk at this point — preparing the report removed it.
     """
     from reverse_image_search_bot import settings
     from reverse_image_search_bot.abuse_report import server
 
     updir = tmp_path / "uploads"
     updir.mkdir()
-    (updir / "A.jpg").write_bytes(b"reported image")
-    (updir / "B.jpg").write_bytes(b"not reported image")
     monkeypatch.setattr(settings, "UPLOADER", {"configuration": {"path": str(updir)}})
 
     abuse.record_user(1)
@@ -178,12 +184,11 @@ def test_cleanup_after_finish_keeps_reported_purges_unselected(abuse, monkeypatc
     rep = abuse.get_report("u")
     server._cleanup_after_finish(rep)
 
-    # A: plaintext deleted from disk, encrypted blob KEPT
-    assert not (updir / "A.jpg").exists()
+    # A (reported): its encrypted blob is KEPT
     kept = {b["file_unique_id"] for b in abuse.report_blobs("u")}
     assert kept == {"A"}
-    # B: blob purged, disk plaintext left untouched (not part of the report)
-    assert (updir / "B.jpg").exists()
+    # Nothing of this round is left on disk.
+    assert list(updir.iterdir()) == []
     # user + report survive
     assert abuse.get_user(1) is not None
     assert abuse.get_report("u") is not None

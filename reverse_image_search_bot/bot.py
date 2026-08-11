@@ -29,6 +29,7 @@ from telegram.ext import (
 )
 
 from . import metrics, settings
+from .abuse_report.prepare import delete_user_files
 from .commands import (
     callback_query_handler,
     file_handler,
@@ -160,7 +161,10 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         banned.append(user_id)
         abuse.set_banned(user_id, True)
-        text = f"banned user {user_id=}"
+        # Banning removes everything they still have on disk. Encrypted blobs of
+        # a filed report are untouched — those are the evidence, not served files.
+        removed = delete_user_files(user_id)
+        text = f"banned user {user_id=}, deleted {removed} file(s)"
     await update.message.reply_text(text)
 
 

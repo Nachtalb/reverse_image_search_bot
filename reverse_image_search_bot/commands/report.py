@@ -114,13 +114,12 @@ async def report_users(
         uname = f"@{user['username']}" if user.get("username") else "—"
         result = await asyncio.to_thread(prepare_report, uid)
         if result.ok:
-            more = f" (+{result.remaining} more via Show more)" if result.remaining else ""
             rows.append(
                 {
                     "icon": "🆕",
                     "user_id": uid,
                     "username": uname,
-                    "detail": f"P1 <code>{html.escape(result.p1 or '')}</code>{more}",
+                    "detail": f"P1 <code>{html.escape(result.p1 or '')}</code> · {result.encrypted} file(s) offline",
                     "uuid": result.report_uuid,
                 }
             )
@@ -269,19 +268,14 @@ async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE, user_
     )
     await update.message.reply_html(
         f"<b>Report prepared</b> for user <code>{user_id}</code> ({html.escape(uname)})\n"
-        f"Encrypted <b>{result.encrypted}</b> file(s)."
-        + (
-            f" <b>{result.remaining}</b> more can be added via the page's Show more button.\n\n"
-            if result.remaining
-            else "\n\n"
-        )
+        f"Encrypted <b>{result.encrypted}</b> file(s) and took them offline.\n\n"
         + f"<b>Image key (P1):</b> <code>{html.escape(result.p1 or '')}</code>\n\n"
         f"{launch}\n\n"
         f"<i>Use the global page password to open the report, then P1 to decrypt "
-        f"the images. P1 is not stored — if you lose it the thumbnails can't be "
-        f"shown (the files still exist on disk until you file/cancel). On filing, "
-        f"the plaintext files are deleted from disk but the encrypted copies stay "
-        f"in the DB, linked to the report, for further inspection.</i>",
+        f"the images. The files are no longer on disk — the encrypted blobs are "
+        f"the only copy, so P1 is NOT recoverable and losing it loses the files. "
+        f"Cancelling restores them to disk; filing keeps the reported ones "
+        f"encrypted in the DB, bans the user, and deletes the rest.</i>",
         disable_web_page_preview=True,
     )
 

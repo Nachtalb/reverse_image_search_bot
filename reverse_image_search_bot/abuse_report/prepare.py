@@ -21,10 +21,6 @@ from reverse_image_search_bot.config import abuse
 
 logger = logging.getLogger("abuse.prepare")
 
-# Hard cap on files encrypted into a report round at once. Reports with more
-# on-disk uploads get a "show more" in the webview that prepares the next batch.
-PREPARE_BATCH = 25
-
 
 def upload_dir() -> Path | None:
     p = settings.UPLOADER.get("configuration", {}).get("path")
@@ -58,7 +54,6 @@ class PrepareResult:
         report_uuid: str | None = None,
         p1: str | None = None,
         encrypted: int = 0,
-        remaining: int = 0,
         error: str | None = None,
         existing_uuid: str | None = None,
         filed_uuid: str | None = None,
@@ -67,9 +62,6 @@ class PrepareResult:
         self.report_uuid = report_uuid
         self.p1 = p1
         self.encrypted = encrypted
-        # Files still on disk but beyond the PREPARE_BATCH cap — preparable via
-        # the webview's "show more".
-        self.remaining = remaining
         self.error = error
         self.existing_uuid = existing_uuid
         # Set when the failure is "already filed with NCMEC" so the caller can
@@ -106,8 +98,14 @@ def _present_files(user_id: int) -> tuple[list, int, int]:
     return present, len(files), cleared
 
 
-def _encrypt_batch(report_uuid: str, batch: list, key: bytes) -> int:
-    """Encrypt a batch of (file_row, path) into report blobs. Returns count."""
+def _encrypt_and_remove(report_uuid: str, batch: list, key: bytes) -> int:
+    """Encrypt (file_row, path) pairs into report blobs, deleting each plaintext.
+
+    The plaintext is unlinked only AFTER its blob is committed, so a crash
+    mid-round can never lose a file: at worst it stays on disk and is picked up
+    again. Taking the file offline is the point of preparing a report — while a
+    round is open the material must not be publicly reachable.
+    """
     encrypted = 0
     for f, fp in batch:
         try:
@@ -124,8 +122,63 @@ def _encrypt_batch(report_uuid: str, batch: list, key: bytes) -> int:
             ciphertext=ct,
             plaintext_sha256=crypto.sha256_hex(data),
         )
+        try:
+            fp.unlink()
+        except Exception:
+            logger.warning("failed to remove plaintext %s", fp, exc_info=True)
         encrypted += 1
     return encrypted
+
+
+def restore_report_files(report_uuid: str, p1: str) -> str | None:
+    """Decrypt a report's blobs back onto disk. Returns an error string, or None.
+
+    The inverse of preparing: cancelling a round means the files were fine, so
+    they go back where they were. Verifies P1 against every blob's stored hash
+    BEFORE writing anything — a wrong key must not scatter garbage into the
+    upload directory.
+    """
+    updir = upload_dir()
+    if updir is None:
+        return "no upload path configured"
+    key = crypto.derive_key(p1)
+    plaintexts: list[tuple[Path, bytes]] = []
+    for b in abuse.report_blobs(report_uuid):
+        try:
+            data = crypto.decrypt_file(bytes(b["nonce"]), bytes(b["ciphertext"]), key)
+        except Exception:
+            return "image key (P1) incorrect"
+        if crypto.sha256_hex(data) != b["plaintext_sha256"]:
+            return "image key (P1) incorrect"
+        plaintexts.append((updir / b["saved_filename"], data))
+    for fp, data in plaintexts:
+        try:
+            fp.write_bytes(data)
+        except Exception:
+            logger.warning("failed to restore %s", fp, exc_info=True)
+    return None
+
+
+def delete_user_files(user_id: int) -> int:
+    """Delete every on-disk file of a user. Returns how many were removed.
+
+    Banning is the end of the line: nothing of theirs stays publicly reachable.
+    Encrypted blobs of an already-filed report are untouched — those live in the
+    DB and are the evidence.
+    """
+    updir = upload_dir()
+    if updir is None:
+        return 0
+    removed = 0
+    for f in abuse.files_for_user(user_id):
+        fp = updir / f["saved_filename"]
+        try:
+            if fp.is_file():
+                fp.unlink()
+                removed += 1
+        except Exception:
+            logger.warning("failed to delete %s on ban", fp, exc_info=True)
+    return removed
 
 
 def prepare_report(user_id: int) -> PrepareResult:
@@ -133,9 +186,12 @@ def prepare_report(user_id: int) -> PrepareResult:
 
     Returns a :class:`PrepareResult`. On success it carries the new
     ``report_uuid``, the one-time image key ``p1`` (shown once, never stored),
-    and the ``encrypted`` file count. At most ``PREPARE_BATCH`` files are
-    encrypted; the rest are reported via ``remaining`` (the webview's
-    "show more" prepares them in later batches).
+    and the ``encrypted`` file count.
+
+    EVERY on-disk file of the user is encrypted into the report and its
+    plaintext removed from disk, so opening a report takes the material offline
+    for as long as the round is open. Cancelling restores the files; filing
+    keeps the reported ones encrypted and deletes the rest.
     """
     if not settings.REPORT_BASE_URL:
         return PrepareResult(error="Report server is not configured (REPORT_BASE_URL unset).")
@@ -178,45 +234,6 @@ def prepare_report(user_id: int) -> PrepareResult:
     key = crypto.derive_key(p1)
 
     abuse.create_report(report_uuid, user_id, "")
-    batch = present[:PREPARE_BATCH]
-    encrypted = _encrypt_batch(report_uuid, batch, key)
+    encrypted = _encrypt_and_remove(report_uuid, present, key)
     abuse.set_report_status(report_uuid, abuse.REPORT_READY)
-    return PrepareResult(report_uuid=report_uuid, p1=p1, encrypted=encrypted, remaining=len(present) - len(batch))
-
-
-def pending_files(report_uuid: str) -> int:
-    """How many of the report user's on-disk, non-cleared files are NOT yet blobs."""
-    rep = abuse.get_report(report_uuid)
-    if not rep:
-        return 0
-    in_report = {b["file_unique_id"] for b in abuse.report_blobs(report_uuid)}
-    present, _, _ = _present_files(rep["user_id"])
-    return sum(1 for f, _ in present if f["file_unique_id"] not in in_report)
-
-
-def extend_report(report_uuid: str, p1: str) -> PrepareResult:
-    """Encrypt the next ``PREPARE_BATCH`` not-yet-included files into the report.
-
-    ``p1`` must be the report's original image key — it is verified against an
-    existing blob's hash before anything is encrypted, so a typo can't split the
-    report across two keys.
-    """
-    rep = abuse.get_report(report_uuid)
-    if not rep:
-        return PrepareResult(error="report not found")
-    key = crypto.derive_key(p1)
-    blobs = abuse.report_blobs(report_uuid)
-    if blobs:
-        probe = blobs[0]
-        try:
-            data = crypto.decrypt_file(bytes(probe["nonce"]), bytes(probe["ciphertext"]), key)
-        except Exception:
-            return PrepareResult(error="image key (P1) incorrect")
-        if crypto.sha256_hex(data) != probe["plaintext_sha256"]:
-            return PrepareResult(error="image key (P1) incorrect")
-    in_report = {b["file_unique_id"] for b in blobs}
-    present, _, _ = _present_files(rep["user_id"])
-    todo = [(f, fp) for f, fp in present if f["file_unique_id"] not in in_report]
-    batch = todo[:PREPARE_BATCH]
-    encrypted = _encrypt_batch(report_uuid, batch, key)
-    return PrepareResult(report_uuid=report_uuid, encrypted=encrypted, remaining=len(todo) - len(batch))
+    return PrepareResult(report_uuid=report_uuid, p1=p1, encrypted=encrypted)
