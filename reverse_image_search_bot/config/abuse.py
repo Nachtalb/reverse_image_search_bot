@@ -218,6 +218,12 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_blobs_report ON report_blobs(report_uuid)")
+    # Where a blob's image ciphertext lives while the report is open: on disk,
+    # under the upload PVC (`cipher_path`), NOT in SQLite. Only the files that
+    # actually get FILED are moved into the `ciphertext` column on finish. The
+    # column stays NOT NULL (old DBs can't drop it) — an empty blob plus a set
+    # `cipher_path` means "on disk"; see prepare.blob_ciphertext().
+    _add_column_if_missing(conn, "report_blobs", "cipher_path", "TEXT")
     # One blob per file per report. A raced extend (e.g. client retry during a
     # locked-DB episode) used to insert duplicates; drop any existing ones (keep
     # the lowest id) so the unique index can be created on old DBs. Once that
@@ -602,10 +608,15 @@ def add_report_blob(
     file_unique_id: str,
     saved_filename: str,
     nonce: bytes,
-    ciphertext: bytes,
     plaintext_sha256: str,
+    ciphertext: bytes = b"",
+    cipher_path: str | None = None,
 ) -> int:
     """Insert an image blob. Returns the blob id (existing one if already present).
+
+    Pass ``cipher_path`` (relative to the upload dir) for the normal case: the
+    ciphertext sits on disk and only ``nonce`` + hash + path go in the DB.
+    ``ciphertext`` is for blobs whose bytes live in the DB — i.e. filed ones.
 
     ``INSERT OR IGNORE`` + the unique (report_uuid, file_unique_id) index make
     this idempotent — a raced/retried extend can't create duplicate blobs.
@@ -615,10 +626,20 @@ def add_report_blob(
         cur = conn.execute(
             """
             INSERT OR IGNORE INTO report_blobs
-                (report_uuid, file_unique_id, saved_filename, nonce, ciphertext, plaintext_sha256, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                (report_uuid, file_unique_id, saved_filename, nonce, ciphertext, cipher_path,
+                 plaintext_sha256, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (report_uuid, file_unique_id, saved_filename, nonce, ciphertext, plaintext_sha256, _now()),
+            (
+                report_uuid,
+                file_unique_id,
+                saved_filename,
+                nonce,
+                ciphertext,
+                cipher_path,
+                plaintext_sha256,
+                _now(),
+            ),
         )
         if cur.rowcount == 0:  # already there — return the existing blob's id
             row = conn.execute(
@@ -627,6 +648,21 @@ def add_report_blob(
             ).fetchone()
             return int(row["id"]) if row else 0
     return int(cur.lastrowid or 0)
+
+
+def set_blob_ciphertext(blob_id: int, ciphertext: bytes) -> None:
+    """Move a blob's ciphertext INTO the DB and forget its on-disk path.
+
+    Called on filing: a reported file's encrypted bytes become part of the
+    permanent record, so they stop depending on a file that later cleanup (or a
+    ban) would delete.
+    """
+    conn = _get_conn()
+    with conn:
+        conn.execute(
+            "UPDATE report_blobs SET ciphertext = ?, cipher_path = NULL WHERE id = ?",
+            (ciphertext, blob_id),
+        )
 
 
 def set_blob_video(
@@ -731,7 +767,7 @@ def get_blob_cipher(report_uuid: str, blob_id: int) -> dict | None:
     """Nonce + ciphertext for one blob (for the browser to decrypt)."""
     conn = _get_conn()
     row = conn.execute(
-        "SELECT id, nonce, ciphertext FROM report_blobs WHERE report_uuid = ? AND id = ?",
+        "SELECT id, nonce, ciphertext, cipher_path FROM report_blobs WHERE report_uuid = ? AND id = ?",
         (report_uuid, blob_id),
     ).fetchone()
     return dict(row) if row else None
@@ -786,6 +822,13 @@ def active_report_for_user(user_id: int) -> dict | None:
         (user_id, REPORT_PREPARING, REPORT_READY, REPORT_REVIEW, REPORT_SUBMITTING),
     ).fetchone()
     return dict(row) if row else None
+
+
+def reports_for_user(user_id: int) -> list[dict]:
+    """Every report row for a user, newest first."""
+    conn = _get_conn()
+    rows = conn.execute("SELECT * FROM reports WHERE user_id = ? ORDER BY created_at DESC", (user_id,)).fetchall()
+    return [dict(r) for r in rows]
 
 
 def all_reports() -> list[dict]:

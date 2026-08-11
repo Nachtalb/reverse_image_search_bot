@@ -34,12 +34,22 @@ from aiohttp import web
 from reverse_image_search_bot import settings
 from reverse_image_search_bot.abuse_report import crypto, ncmec
 from reverse_image_search_bot.abuse_report import video as abuse_video
-from reverse_image_search_bot.abuse_report.prepare import extend_report, pending_files, prepare_report, resolve_user
+from reverse_image_search_bot.abuse_report.prepare import (
+    blob_ciphertext,
+    delete_user_files,
+    prepare_report,
+    purge_cipher_dir,
+    resolve_user,
+    restore_report_files,
+)
 from reverse_image_search_bot.config import abuse
 
 logger = logging.getLogger("abuse.server")
 
 _STATIC = Path(__file__).parent / "static"
+# Live prepare progress ("done/total"), keyed by the user id being prepared.
+# Single process, so an in-memory dict is enough (same pattern as _submit_progress).
+_prepare_progress: dict[int, str] = {}
 # "NR" = selected/reported but Not Rated — no NCMEC industryClassification is
 # sent (that field is optional). Everything else must be a real A1-B2 code.
 _VALID_CLASSES = {"A1", "A2", "B1", "B2", "NR"}
@@ -159,6 +169,27 @@ async def api_reports_stats(request: web.Request) -> web.Response:
     return web.json_response({"records": abuse.filed_report_stats()})
 
 
+async def api_prepare_progress(request: web.Request) -> web.Response:
+    """Live encryption progress for an in-flight create ("done/total").
+
+    The create request itself blocks until the whole round is encrypted, so the
+    console polls this alongside it to show movement on a big user/group.
+
+    Keyed by the same ``target`` token the create was given — the client has no
+    user id until the create returns, so it can't poll by id.
+    """
+    _require_admin(request)
+    if not crypto.verify_global_page_password(request.headers.get("X-Page-Secret", ""), settings.REPORT_PAGE_PASSWORD):
+        raise web.HTTPForbidden(text="page password incorrect")
+    target = (request.query.get("target") or "").strip()
+    if not target:
+        raise web.HTTPBadRequest(text="target required")
+    user_id = resolve_user(target)
+    if user_id is None:
+        return web.json_response({"progress": None})
+    return web.json_response({"progress": _prepare_progress.get(user_id)})
+
+
 async def api_reports_create(request: web.Request) -> web.Response:
     """Create a new report from a target token (user id, @username, or filename).
 
@@ -179,7 +210,16 @@ async def api_reports_create(request: web.Request) -> web.Response:
 
     # prepare_report encrypts up to a batch of files (PBKDF2 + AES) — run it off
     # the event loop so a big report can't stall the webhook/report server.
-    result = await asyncio.to_thread(prepare_report, user_id)
+    # Progress is published under the target user id so the console can poll it
+    # while this request is still in flight.
+    def note(done: int, total: int) -> None:
+        _prepare_progress[user_id] = f"{done}/{total}"
+
+    _prepare_progress[user_id] = "0/?"
+    try:
+        result = await asyncio.to_thread(prepare_report, user_id, note)
+    finally:
+        _prepare_progress.pop(user_id, None)
     if not result.ok:
         # An existing active report is a 409 carrying its uuid so the UI can jump to it.
         if result.existing_uuid:
@@ -199,7 +239,6 @@ async def api_reports_create(request: web.Request) -> web.Response:
             "user_id": user_id,
             "p1": result.p1,
             "encrypted": result.encrypted,
-            "remaining": result.remaining,
         }
     )
 
@@ -258,35 +297,6 @@ async def api_unlock(request: web.Request) -> web.Response:
                 "banned_at": user.get("banned_at"),
             },
             "blobs": abuse.blob_meta(rep["report_uuid"]),
-            # On-disk, non-cleared files of this user NOT yet in the report —
-            # drives the gallery's "show more" button.
-            "pending": pending_files(rep["report_uuid"]),
-        }
-    )
-
-
-async def api_extend(request: web.Request) -> web.Response:
-    """Prepare the next batch of the user's files into this report ("show more").
-
-    Requires the report's image key (P1) so the new blobs share the existing
-    encryption key. Returns the refreshed blob list + how many are still pending.
-    """
-    _require_admin(request)
-    rep = _report_or_404(request.match_info["uuid"])
-    _require_page_secret(request, rep)
-    payload = await request.json()
-    p1 = payload.get("image_key", "")
-    if not p1:
-        raise web.HTTPBadRequest(text="image_key (P1) required")
-    result = await asyncio.to_thread(extend_report, rep["report_uuid"], p1)
-    if not result.ok:
-        raise web.HTTPBadRequest(text=result.error or "could not extend report")
-    return web.json_response(
-        {
-            "ok": True,
-            "encrypted": result.encrypted,
-            "remaining": result.remaining,
-            "blobs": abuse.blob_meta(rep["report_uuid"]),
         }
     )
 
@@ -300,7 +310,10 @@ async def api_blob(request: web.Request) -> web.Response:
     row = abuse.get_blob_cipher(rep["report_uuid"], blob_id)
     if not row:
         raise web.HTTPNotFound(text="blob not found")
-    body = bytes(row["nonce"]) + bytes(row["ciphertext"])
+    ct = blob_ciphertext(row)
+    if ct is None:
+        raise web.HTTPNotFound(text="ciphertext missing on disk")
+    body = bytes(row["nonce"]) + ct
     return web.Response(body=body, content_type="application/octet-stream")
 
 
@@ -469,8 +482,11 @@ async def _gather_selected_files(
     base = settings.UPLOADER.get("configuration", {}).get("path")
     for idx, b in enumerate(selected, 1):
         _note(f"decrypting {idx}/{len(selected)}")
+        cipher = blob_ciphertext(b)
+        if cipher is None:
+            raise web.HTTPBadRequest(text=f"ciphertext missing on disk for {b['saved_filename']}")
         try:
-            plaintext = crypto.decrypt_file(bytes(b["nonce"]), bytes(b["ciphertext"]), key)
+            plaintext = crypto.decrypt_file(bytes(b["nonce"]), cipher, key)
         except Exception as dec_err:
             raise web.HTTPBadRequest(text="image key (P1) incorrect — decryption failed") from dec_err
         if crypto.sha256_hex(plaintext) != b["plaintext_sha256"]:
@@ -663,9 +679,10 @@ async def _run_submit(request: web.Request, rep: dict, p1: str) -> None:
 async def api_cancel(request: web.Request) -> web.Response:
     """Cancel the whole round (nothing filed with NCMEC).
 
-    Cancelling means the user did nothing wrong, so we KEEP the user's original
-    files on disk and the filename->user (files table) relation untouched. Only
-    the report's encrypted blobs + the report row's status are affected.
+    Cancelling means the user did nothing wrong, so every file taken offline when
+    the report was prepared is DECRYPTED BACK ONTO DISK — requiring P1, since the
+    plaintext only exists inside the blobs now. The filename->user (files table)
+    relation is untouched; only the encrypted blobs and the report status change.
 
     Optional ``clear_files`` in the JSON body additionally marks every file in
     the round as cleared (not problematic) — excluded from future reports.
@@ -673,10 +690,19 @@ async def api_cancel(request: web.Request) -> web.Response:
     _require_admin(request)
     rep = _report_or_404(request.match_info["uuid"])
     _require_page_secret(request, rep)
-    clear_files = False
+    payload = {}
     with contextlib.suppress(Exception):
-        # `is True` (not truthiness) so a missing/odd body can never clear files.
-        clear_files = (await request.json()).get("clear_files") is True
+        payload = await request.json()
+    p1 = payload.get("image_key", "")
+    if not p1:
+        raise web.HTTPBadRequest(text="image_key (P1) required to restore the files")
+    # Restore BEFORE purging the blobs — they are the only copy of the plaintext.
+    # A wrong key aborts without writing anything, so the files stay recoverable.
+    err = await asyncio.to_thread(restore_report_files, rep["report_uuid"], p1)
+    if err:
+        raise web.HTTPBadRequest(text=err)
+    # `is True` (not truthiness) so a missing/odd body can never clear files.
+    clear_files = payload.get("clear_files") is True
     if clear_files:
         abuse.set_files_cleared([b["file_unique_id"] for b in abuse.report_blobs(rep["report_uuid"])])
     abuse.set_report_status(rep["report_uuid"], abuse.REPORT_CANCELLED)
@@ -693,6 +719,7 @@ async def api_cancel(request: web.Request) -> web.Response:
                 except Exception:
                     logger.warning("failed to delete video on cancel %s", b["video_path"], exc_info=True)
     abuse.purge_report_blobs(rep["report_uuid"])
+    purge_cipher_dir(rep["report_uuid"])
     return web.json_response({"ok": True, "status": abuse.REPORT_CANCELLED})
 
 
@@ -709,11 +736,15 @@ def _ban_reported_user(bot_data, user_id: int) -> None:
     restored on the next startup sync); appending to ``bot_data['banned_users']``
     is what the live search handler actually checks. ``bot_data`` may be None in
     tests / when the server runs bot-less — the DB write still happens.
+
+    A ban also deletes everything the user still has on disk (anything uploaded
+    after this round was prepared): banned means nothing of theirs stays served.
     """
     try:
         abuse.set_banned(user_id, True)
     except Exception:
         logger.warning("failed to set DB ban for reported user %s", user_id, exc_info=True)
+    delete_user_files(user_id)
     if bot_data is None:
         return
     try:
@@ -725,29 +756,33 @@ def _ban_reported_user(bot_data, user_id: int) -> None:
 
 
 def _cleanup_after_finish(rep: dict) -> None:
-    """On finish: delete reported plaintext from disk + drop non-reported blobs.
+    """On finish: move the reported ciphertext INTO the DB, drop everything else.
 
     Retention rules:
-    - The REPORTED (selected) files: their plaintext is deleted from disk, but
-      their encrypted ``report_blobs`` are KEPT and stay linked to the filed
-      report, so the material remains available for further inspection or a
-      report to local law enforcement.
-    - The NON-reported (unselected) files: the admin decided they are not part of
-      the report, so their encrypted blobs are purged from the DB. Their
-      plaintext on disk is left untouched (nothing was filed about them).
+    - The REPORTED (selected) files: filing is what earns a place in the DB, so
+      their encrypted bytes are read off disk and written into the blob row.
+      They stay linked to the filed report, available for further inspection or
+      a report to local law enforcement, and no longer depend on a file that the
+      ban sweep below would delete. Their plaintext left the disk at prepare time.
+    - Everything else in the round: purged. The unselected blobs are deleted
+      from the DB, and the report's whole on-disk ciphertext directory goes with
+      them — filing means the user is banned, and a banned user's material is
+      not kept. Reported VIDEOS keep their encrypted file on disk (they are far
+      too large for SQLite; that is the pre-existing design).
 
     The user row, ban, and report record are always kept.
     """
-    reported = abuse.report_blobs(rep["report_uuid"], selected_only=True)
     upload_path = settings.UPLOADER.get("configuration", {}).get("path")
+    # Reported images: disk ciphertext -> DB. Do this BEFORE any purging.
+    for b in abuse.report_blobs(rep["report_uuid"], selected_only=True):
+        if not b.get("cipher_path"):
+            continue
+        cipher = blob_ciphertext(b)
+        if cipher is None:
+            logger.warning("ciphertext missing for filed blob %s — cannot persist", b["id"])
+            continue
+        abuse.set_blob_ciphertext(b["id"], cipher)
     if upload_path:
-        for b in reported:
-            try:
-                fp = Path(upload_path) / b["saved_filename"]
-                if fp.is_file():
-                    fp.unlink()
-            except Exception:
-                logger.warning("failed to delete plaintext %s", b["saved_filename"], exc_info=True)
         # Delete encrypted video ciphertext for UNSELECTED blobs (their blobs are
         # about to be purged); reported blobs keep their encrypted video on disk.
         for b in abuse.report_blobs(rep["report_uuid"]):
@@ -760,6 +795,8 @@ def _cleanup_after_finish(rep: dict) -> None:
                     logger.warning("failed to delete unselected video %s", b["video_path"], exc_info=True)
     # Drop only the non-reported blobs; keep the reported ones linked to the report.
     abuse.purge_unselected_blobs(rep["report_uuid"])
+    # Every image ciphertext is either in the DB now (reported) or unwanted.
+    purge_cipher_dir(rep["report_uuid"])
 
 
 async def healthz(request: web.Request) -> web.Response:
@@ -776,6 +813,7 @@ def build_app(bot=None, bot_data=None) -> web.Application:
     app.router.add_get("/report/console", reports_index)
     app.router.add_get("/report/console/api/list", api_reports_list)
     app.router.add_get("/report/console/api/stats", api_reports_stats)
+    app.router.add_get("/report/console/api/prepare_progress", api_prepare_progress)
     app.router.add_post("/report/console/api/create", api_reports_create)
     app.router.add_get("/report/{uuid}", index)
     app.router.add_post("/report/{uuid}/api/unlock", api_unlock)
@@ -784,7 +822,6 @@ def build_app(bot=None, bot_data=None) -> web.Application:
     app.router.add_get("/report/{uuid}/api/blob/{blob_id}/video", api_video)
     app.router.add_get("/report/{uuid}/api/status", api_status)
     app.router.add_post("/report/{uuid}/api/select", api_select)
-    app.router.add_post("/report/{uuid}/api/extend", api_extend)
     app.router.add_post("/report/{uuid}/api/review", api_review)
     app.router.add_post("/report/{uuid}/api/submit", api_submit)
     app.router.add_post("/report/{uuid}/api/cancel", api_cancel)
