@@ -107,6 +107,7 @@
           <button id="create-btn">Create</button>
         </div>
         <div class="err" id="create-err"></div>
+        <div class="muted hidden" id="create-progress" style="margin-top:8px"></div>
         <div id="create-ok" class="hidden" style="margin-top:10px"></div>
       </div>
 
@@ -265,6 +266,18 @@ $("create-btn").onclick = async () => {
   $("create-ok").classList.add("hidden");
   const target = $("target").value.trim();
   if (!target) { $("create-err").textContent = "Enter a user id, @username, or filename."; return; }
+  // The create request blocks until every file is encrypted, which is slow for
+  // a big user/group — poll a side channel so the admin sees it move.
+  const btn = $("create-btn"); btn.disabled = true;
+  const prog = $("create-progress");
+  prog.classList.remove("hidden");
+  prog.textContent = "⏳ preparing…";
+  const poll = setInterval(async () => {
+    try {
+      const p = await (await api("/api/prepare_progress?target=" + encodeURIComponent(target))).json();
+      if (p.progress) prog.textContent = "⏳ encrypting " + p.progress + "…";
+    } catch (e) { /* transient — keep polling */ }
+  }, 1000);
   try {
     const r = await api("/api/create", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -291,7 +304,13 @@ $("create-btn").onclick = async () => {
     $("goto-new").onclick = () => openReport(j.uuid);
     $("target").value = "";
     loadList().catch(() => {});
-  } catch (e) { $("create-err").textContent = "" + e.message; }
+  } catch (e) {
+    $("create-err").textContent = "" + e.message;
+  } finally {
+    clearInterval(poll);
+    prog.classList.add("hidden");
+    btn.disabled = false;
+  }
 };
 
 function escapeHtml(s) {

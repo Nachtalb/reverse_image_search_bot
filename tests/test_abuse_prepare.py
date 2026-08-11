@@ -47,6 +47,17 @@ def env(abuse, tmp_path, monkeypatch):
     return abuse, updir, mkfiles
 
 
+def plaintexts(updir):
+    """Uploaded plaintext files still on disk (ignores report_files/ ciphertext)."""
+    return sorted(p.name for p in updir.iterdir() if p.is_file())
+
+
+def ciphertexts(updir, report_uuid):
+    """Encrypted blobs on disk for a report."""
+    d = updir / "report_files" / report_uuid
+    return sorted(p.name for p in d.iterdir()) if d.is_dir() else []
+
+
 def test_prepare_encrypts_every_file_and_takes_them_offline(env):
     from reverse_image_search_bot.abuse_report import crypto, prepare
 
@@ -57,11 +68,16 @@ def test_prepare_encrypts_every_file_and_takes_them_offline(env):
     assert result.encrypted == 30
     assert len(abuse.blob_meta(result.report_uuid)) == 30
     # No cap: every plaintext is gone from disk while the round is open.
-    assert list(updir.iterdir()) == []
-    # And the blobs really hold the plaintext, under P1.
+    assert plaintexts(updir) == []
+    # The ciphertext is on DISK, not in the DB — only filed files enter SQLite.
+    assert len(ciphertexts(updir, result.report_uuid)) == 30
     key = crypto.derive_key(result.p1 or "")
     b = abuse.report_blobs(result.report_uuid)[0]
-    plain = crypto.decrypt_file(bytes(b["nonce"]), bytes(b["ciphertext"]), key)
+    assert bytes(b["ciphertext"]) == b""
+    assert b["cipher_path"].startswith(f"report_files/{result.report_uuid}/")
+    cipher = prepare.blob_ciphertext(b)
+    assert cipher is not None
+    plain = crypto.decrypt_file(bytes(b["nonce"]), cipher, key)
     assert crypto.sha256_hex(plain) == b["plaintext_sha256"]
 
 
@@ -86,7 +102,7 @@ def test_restore_with_wrong_key_writes_nothing(env):
     result = prepare.prepare_report(1)
     err = prepare.restore_report_files(result.report_uuid or "", "totally-wrong-key")
     assert "P1" in (err or "")
-    assert list(updir.iterdir()) == []  # nothing scattered into the upload dir
+    assert plaintexts(updir) == []  # nothing scattered into the upload dir
 
 
 def test_delete_user_files_removes_everything_on_disk(env):
@@ -98,6 +114,49 @@ def test_delete_user_files_removes_everything_on_disk(env):
     assert prepare.delete_user_files(1) == 3
     assert not (updir / "F0.jpg").exists()
     assert (updir / "OTHER0.jpg").exists()  # other users untouched
+
+
+def test_prepare_reports_progress(env):
+    from reverse_image_search_bot.abuse_report import prepare
+
+    _abuse, _, mkfiles = env
+    mkfiles(1, 5)
+    seen = []
+    result = prepare.prepare_report(1, lambda done, total: seen.append((done, total)))
+    assert result.ok
+    assert seen == [(1, 5), (2, 5), (3, 5), (4, 5), (5, 5)]
+
+
+def test_ban_deletes_encrypted_leftovers_of_an_open_report(env):
+    """Ban with a round still open: the ciphertext goes too, blobs and all."""
+    from reverse_image_search_bot.abuse_report import prepare
+
+    abuse, updir, mkfiles = env
+    mkfiles(1, 3)
+    result = prepare.prepare_report(1)
+    assert len(ciphertexts(updir, result.report_uuid)) == 3
+
+    prepare.delete_user_files(1)
+    assert ciphertexts(updir, result.report_uuid) == []
+    assert abuse.report_blobs(result.report_uuid) == []
+
+
+def test_ban_keeps_a_filed_report_intact(env):
+    """A filed report's blobs live in the DB and must survive the ban sweep."""
+    from reverse_image_search_bot.abuse_report import prepare
+
+    abuse, _, mkfiles = env
+    mkfiles(1, 2)
+    result = prepare.prepare_report(1)
+    # Simulate filing: bytes into the DB, then the round is marked filed.
+    for b in abuse.report_blobs(result.report_uuid):
+        abuse.set_blob_ciphertext(b["id"], prepare.blob_ciphertext(b) or b"")
+    abuse.mark_report_filed(result.report_uuid)
+
+    prepare.delete_user_files(1)
+    kept = abuse.report_blobs(result.report_uuid)
+    assert len(kept) == 2
+    assert all(bytes(b["ciphertext"]) for b in kept)
 
 
 def test_cleared_files_excluded_from_prepare(env):
@@ -183,7 +242,7 @@ async def test_cancel_restores_files_and_rejects_wrong_key(env, monkeypatch):
     abuse, updir, mkfiles = env
     mkfiles(1, 2)
     result = prepare.prepare_report(1)
-    assert list(updir.iterdir()) == []
+    assert plaintexts(updir) == []
 
     monkeypatch.setattr(server, "_admin_from_request", lambda req: 42)
     req = MagicMock(spec=web.Request)

@@ -157,6 +157,40 @@ async def test_cancel_purges_blobs_but_keeps_files_and_relation(abuse, monkeypat
     assert abuse.get_user(1) is not None
 
 
+def test_finish_moves_reported_ciphertext_into_the_db(abuse, monkeypatch, tmp_path):
+    """Filing is what earns a place in SQLite: disk ciphertext -> DB, dir purged."""
+    from reverse_image_search_bot import settings
+    from reverse_image_search_bot.abuse_report import prepare, server
+
+    updir = tmp_path / "uploads"
+    updir.mkdir()
+    monkeypatch.setattr(settings, "UPLOADER", {"uploader": "local", "configuration": {"path": str(updir)}})
+    monkeypatch.setattr(settings, "REPORT_BASE_URL", "https://ris.naa.gg")
+
+    abuse.record_user(1)
+    for fid in ("A", "B"):
+        abuse.record_file(fid, saved_filename=f"{fid}.jpg", user_id=1, file_type="photo")
+        (updir / f"{fid}.jpg").write_bytes(b"bytes-" + fid.encode())
+    result = prepare.prepare_report(1)
+    uuid = result.report_uuid
+
+    # Nothing in the DB yet — ciphertext is on disk only.
+    assert all(bytes(b["ciphertext"]) == b"" for b in abuse.report_blobs(uuid))
+    cdir = updir / "report_files" / uuid
+    assert len(list(cdir.iterdir())) == 2
+
+    ids = {m["file_unique_id"]: m["id"] for m in abuse.blob_meta(uuid)}
+    abuse.set_blob_selection(uuid, {ids["A"]: "A1"})
+    server._cleanup_after_finish(abuse.get_report(uuid))
+
+    kept = abuse.report_blobs(uuid)
+    assert [b["file_unique_id"] for b in kept] == ["A"]
+    # The reported blob now carries its bytes in the DB and no disk dependency.
+    assert bytes(kept[0]["ciphertext"]) != b""
+    assert kept[0]["cipher_path"] is None
+    assert not cdir.exists()  # whole ciphertext dir gone
+
+
 def test_cleanup_after_finish_keeps_reported_purges_unselected(abuse, monkeypatch, tmp_path):
     """On finish: the reported files' blobs are KEPT, everything else is purged.
 

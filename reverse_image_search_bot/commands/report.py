@@ -27,6 +27,36 @@ from reverse_image_search_bot.config import abuse
 
 logger = logging.getLogger("abuse.commands")
 
+# Don't edit the progress message more often than this (Telegram rate limits
+# edits, and a 500-file round would otherwise fire 500 edits).
+PROGRESS_EVERY = 10
+
+
+def _progress_pump(message, prefix: str):
+    """Build a (done, total) callback that live-edits ``message``.
+
+    ``prepare_report`` runs in a worker thread (asyncio.to_thread), so the
+    callback cannot await — it schedules the edit back onto the running loop
+    with ``run_coroutine_threadsafe`` and never blocks the encryption.
+    """
+    loop = asyncio.get_running_loop()
+
+    def on_progress(done: int, total: int) -> None:
+        if done != total and done % PROGRESS_EVERY:
+            return
+        text = f"{prefix} encrypting {done}/{total}…"
+        with contextlib.suppress(Exception):
+            asyncio.run_coroutine_threadsafe(_safe_edit(message, text), loop)
+
+    return on_progress
+
+
+async def _safe_edit(message, text: str) -> None:
+    """Edit a status message, ignoring rate limits / identical-content errors."""
+    with contextlib.suppress(Exception):
+        await message.edit_text(text)
+
+
 # Cloudflare CSAM reports list our public file URLs like
 #   https://ris.naa.gg/f/AQADsAxrG35d6EZ9.jpg
 # (often defanged: hxxps://ris.naa[.]gg/f/…). The /f/<file> path segment is never
@@ -112,7 +142,10 @@ async def report_users(
     for uid in uids:
         user = abuse.get_user(uid) or {}
         uname = f"@{user['username']}" if user.get("username") else "—"
-        result = await asyncio.to_thread(prepare_report, uid)
+        # Plain text — _safe_edit uses edit_text (no parse_mode).
+        prefix = f"⏳ user {uid} ({len(rows) + 1}/{len(uids)}) —" if len(uids) > 1 else "⏳"
+        on_progress = _progress_pump(status_msg, prefix) if status_msg else None
+        result = await asyncio.to_thread(prepare_report, uid, on_progress)
         if result.ok:
             rows.append(
                 {
@@ -235,7 +268,8 @@ async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE, user_
     status_msg = None
     with contextlib.suppress(Exception):
         status_msg = await update.message.reply_text("⏳ Preparing report…")
-    result = await asyncio.to_thread(prepare_report, user_id)
+    on_progress = _progress_pump(status_msg, "⏳") if status_msg else None
+    result = await asyncio.to_thread(prepare_report, user_id, on_progress)
     if status_msg is not None:
         with contextlib.suppress(Exception):
             await status_msg.delete()
