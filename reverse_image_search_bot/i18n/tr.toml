@@ -1,0 +1,139 @@
+[help]
+title = "🔎 Tersine Görsel Arama Botu — Yardım"
+how_to_use = "🤔 Beni nasıl kullanırsın"
+how_to_use_text = "Bana bir görsel, çıkartma, video/gif veya URL gönder; sana SauceNao, Google, Yandex ve benzerleri için doğrudan tersine görsel arama bağlantıları göndereyim.\nAnime görselleri için SauceNao'yu, diğer görseller için Google veya Yandex'i öneririm."
+commands_title = "🖥️ Komutlar"
+commands_list = "/help — Yardımı göster\n/search — Aramak için bir görsele veya videoya yanıt ver\n/settings — Sohbete özel davranışı ayarla\n/feedback — Yöneticilere geri bildirim gönder"
+
+[commands]
+ban_usage = "Kullanım: /ban <user_id>"
+bot_started = "✅ Bot başarıyla başlatıldı."
+
+[search]
+reply_required = "/search kullanırken görsel veya video içeren bir mesaja yanıt vermelisin"
+select_engine = "Bir arama motoru seç:"
+best_match = "En İyi Eşleşme"
+go_to_image = "🔗 Görsele Git"
+creating_url = "{engine} arama bağlantısı oluşturuluyor..."
+searching = "⏳ aranıyor..."
+no_results = "🔴 Senin için {engines} üzerinde arama yaptım ama hiçbir şey bulamadım. Lütfen yukarıdaki başka bir motoru dene."
+results_found = "🔵 Senin için {engines} üzerinde arama yaptım. Daha fazla sonuç için yukarıdaki diğerlerini deneyebilirsin."
+results_found_reenable = " İstersen otomatik aramayı /settings üzerinden yeniden etkinleştirebilirsin."
+slow_down = "Biraz yavaşla lütfen...."
+something_went_wrong = "Bir şeyler ters gitti"
+generic_error = "Bir hata oluştu, tekrar dene."
+more_button = "Daha fazla"
+
+[search.files]
+banned = "🔴 Yasa dışı içerik yüklediğin için bu botu kullanman engellendi."
+animated_not_supported = "Hareketli çıkartmalar desteklenmiyor."
+format_not_supported = "Bu biçim desteklenmiyor"
+video_too_large = "Bu video indirilemeyecek kadar büyük ve küçük resmi yok. Lütfen daha küçük bir dosya gönder."
+
+[search.results]
+provided_by = "Sağlayan: {provider}"
+with_via = " {via} aracılığıyla"
+with_similarity = " {similarity}% benzerlik ile"
+duplicate_result = "Yinelenen arama sonucu atlandı"
+duplicate_thumbnail = "Yinelenen küçük resim atlandı"
+rate_limit = "{engine}: {period} sınırına ulaşıldı. Doğrudan aramak için <b>Daha fazla</b> düğmesini dene."
+rate_limit_default_period = "Sınır"
+engine_auto_disabled = "🔕 <b>{engine}</b>, art arda 5 boş sonuç sonrasında bu sohbet için otomatik olarak devre dışı bırakıldı. Yeniden etkinleştirmek için /settings kullan."
+
+[search.auto_disable]
+message = "🟡 Art arda 5 arama sonuç vermedi — bu sohbet için otomatik arama devre dışı bırakıldı. Bu, kullanım sınırlarına takılmayı önlemeye yardımcı olur. Otomatik arama motorları esas olarak anime ve manga içerikleri içindir. Yeniden etkinleştirmek için /settings kullan."
+
+[settings]
+title = "⚙️ <b>Sohbet Ayarları</b>"
+subtitle = "Botun bu sohbette nasıl davranacağını ayarla."
+admins_only = "Ayarlara yalnızca grup yöneticileri erişebilir."
+admins_only_change = "Ayarları yalnızca grup yöneticileri değiştirebilir."
+admins_only_configure = "Botu yalnızca grup yöneticileri yapılandırabilir."
+
+[settings.toggles]
+auto_search = "🔍 Otomatik arama: {status}"
+show_buttons = "🔘 Düğmeleri göster: {status}"
+auto_search_engines = "🔍 Otomatik arama motorları →"
+auto_search_engines_locked = "🔍 Otomatik arama motorları 🔒"
+button_engines = "🔘 Motor düğmeleri →"
+button_engines_locked = "🔘 Motor düğmeleri 🔒"
+best_match_btn = "{status} En İyi Eşleşme"
+show_link_btn = "{status} 🔗 Görsele Git"
+back = "← Geri"
+language = "🌐 Dil: {language}"
+
+[settings.disabled_reasons]
+auto_search_engines = "Motorlarını ayarlamak için önce otomatik aramayı etkinleştir."
+button_engines = "Motor düğmelerini ayarlamak için önce \"Düğmeleri göster\" seçeneğini etkinleştir."
+default = "Önce ana anahtarı etkinleştir."
+
+[settings.warnings]
+enable_buttons_first = "⚠️ Önce motor düğmelerini etkinleştir — en az biri aktif olmalı."
+enable_autosearch_first = "⚠️ Önce otomatik aramayı etkinleştir — en az biri aktif olmalı."
+min_one_button = "⚠️ En az bir düğme etkin kalmalı."
+min_one_engine = "⚠️ En az bir motor etkin kalmalı."
+
+[start]
+private = "🔎 Bana bir görsel, çıkartma veya video gönder, kaynağını bulayım."
+group = "🔎 Bana bir görsel, çıkartma veya video gönder, kaynağını bulayım.\n\n/search · /settings"
+opening_settings = "⚙️ Ayarlar açılıyor..."
+
+[onboarding]
+title = "👋 <b>Bu grupta görselleri nasıl ele alayım?</b>"
+description = "• <b>Yalnızca arama sonuçları</b> — görselleri otomatik ara, sonuçları göster\n• <b>Tam</b> — otomatik arama + motor düğmelerini göster\n• <b>Manuel</b> — yalnızca biri /search ile yanıt verdiğinde ara\n• <b>Ayarlar</b> — her şeyi kendin yapılandır"
+btn_search_only = "🔍 Yalnızca arama sonuçları"
+btn_full = "🔍 Tam (sonuçlar + düğmeler)"
+btn_manual = "❌ Yalnızca manuel (/search)"
+btn_settings = "⚙️ Ayarları aç"
+done_search_only = "✅ <b>Yalnızca arama sonuçları</b> olarak ayarlandı. /settings ile istediğin zaman değiştirebilirsin."
+done_full = "✅ <b>Tam mod</b> (sonuçlar + düğmeler) olarak ayarlandı. /settings ile istediğin zaman değiştirebilirsin."
+done_manual = "✅ <b>Manuel mod</b> olarak ayarlandı. Aramak için /search kullan. /settings ile istediğin zaman değiştirebilirsin."
+
+[feedback]
+prompt = "💬 Lütfen geri bildirimini aşağıya yaz. İptal etmek için /cancel gönder."
+empty = "Mesajın boş görünüyor. Lütfen bir geri bildirim yaz veya iptal etmek için /cancel gönder."
+thanks = "✅ Geri bildirimin için teşekkürler! Yöneticilere iletildi."
+cancelled = "Geri bildirim iptal edildi."
+admin_message = "📬 <b>Yeni Geri Bildirim</b>\nGönderen: {user} (<code>{user_id}</code>)\n\n{feedback}\n\n💡 <i>Kullanıcıya yanıt vermek için bu mesajı yanıtla.</i>"
+admin_reply = "📩 <b>Yöneticiden yanıt:</b>\n\n{reply}\n\n💡 <i>Yanıt vermek için bu mesajı yanıtla.</i>"
+reply_sent = "✅ Yanıt kullanıcıya gönderildi."
+reply_failed = "❌ Yanıt kullanıcıya gönderilemedi. Botu engellemiş olabilir."
+user_followup = "📬 <b>Devam Mesajı</b>\nGönderen: {user} (<code>{user_id}</code>)\n\n{feedback}\n\n💡 <i>Kullanıcıya yanıt vermek için bu mesajı yanıtla.</i>"
+followup_sent = "✅ Yanıtın yöneticilere gönderildi."
+followup_failed = "❌ Yanıtın gönderilemedi."
+
+[bot_commands]
+search = "Görselin kaynağını ara (görsele yanıt ver)"
+settings = "Bu sohbet için bot davranışını ayarla"
+help = "Yardımı göster"
+start = "Botu başlat"
+feedback = "Yöneticilere geri bildirim gönder"
+
+[fields]
+title = "Başlık"
+"title_romaji" = "Başlık [romaji]"
+"title_ja" = "Başlık [ja]"
+chapter = "Bölüm"
+episode = "Bölüm"
+status = "Durum"
+type = "Tür"
+year = "Yıl"
+genres = "Türler"
+"audience_18" = "18+ İzleyici"
+"est_time" = "Tahmini Süre"
+description = "Açıklama"
+author = "Yazar"
+artist = "Çizer"
+rating = "Değerlendirme"
+tags = "Etiketler"
+character = "Karakter"
+characters = "Karakterler"
+work = "Eser"
+also_possible = "Ayrıca olası"
+material = "Materyal"
+by = "Yapan"
+poster = "Poster"
+source = "Kaynak"
+score = "Puan"
+creator = "Oluşturan"
+"created_at" = "Oluşturulma Tarihi"
