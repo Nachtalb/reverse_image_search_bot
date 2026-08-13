@@ -284,10 +284,29 @@ class TestAvailableLanguages:
         assert langs == sorted(langs)
 
     def test_expected_count(self):
-        assert len(available_languages()) == 15
+        assert len(available_languages()) == 18
 
     def test_all_expected_present(self):
-        expected = {"ar", "bn", "de", "en", "es", "fa", "fr", "hi", "id", "it", "ja", "pt", "ru", "ur", "zh"}
+        expected = {
+            "ar",
+            "bn",
+            "de",
+            "en",
+            "es",
+            "fa",
+            "fr",
+            "hi",
+            "id",
+            "it",
+            "ja",
+            "pt",
+            "ru",
+            "tr",
+            "uk",
+            "ur",
+            "vi",
+            "zh",
+        }
         assert set(available_languages()) == expected
 
 
