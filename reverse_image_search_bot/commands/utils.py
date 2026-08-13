@@ -51,6 +51,7 @@ _LANG_NAMES: dict[str, str] = {
     "es": "🇪🇸 Español",
     "it": "🇮🇹 Italiano",
     "ar": "🇸🇦 العربية",
+    "fa": "🇮🇷 فارسی",
     "ja": "🇯🇵 日本語",
     "de": "🇩🇪 Deutsch",
     "fr": "🇫🇷 Français",
