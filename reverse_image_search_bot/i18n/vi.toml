@@ -1,0 +1,139 @@
+[help]
+title = "🔎 Bot Tìm Kiếm Ảnh Ngược — Trợ giúp"
+how_to_use = "🤔 Cách sử dụng tôi"
+how_to_use_text = "Hãy gửi cho tôi một hình ảnh, nhãn dán, video/gif hoặc URL và tôi sẽ gửi cho bạn các liên kết tìm kiếm ảnh ngược trực tiếp cho SauceNao, Google, Yandex và những trang tương tự.\nVới ảnh anime tôi khuyên dùng SauceNao, với các ảnh khác tôi khuyên dùng Google hoặc Yandex."
+commands_title = "🖥️ Lệnh"
+commands_list = "/help — Hiển thị trợ giúp\n/search — Trả lời một hình ảnh hoặc video để tìm kiếm\n/settings — Thiết lập hành vi cho từng cuộc trò chuyện\n/feedback — Gửi phản hồi tới quản trị viên"
+
+[commands]
+ban_usage = "Cách dùng: /ban <user_id>"
+bot_started = "✅ Bot đã khởi động thành công."
+
+[search]
+reply_required = "Khi dùng /search bạn phải trả lời một tin nhắn có hình ảnh hoặc video"
+select_engine = "Chọn một công cụ tìm kiếm:"
+best_match = "Kết Quả Khớp Nhất"
+go_to_image = "🔗 Mở Ảnh"
+creating_url = "Đang tạo url tìm kiếm {engine}..."
+searching = "⏳ đang tìm kiếm..."
+no_results = "🔴 Tôi đã tìm giúp bạn trên {engines} nhưng không thấy gì cả. Vui lòng thử một công cụ khác ở trên."
+results_found = "🔵 Tôi đã tìm giúp bạn trên {engines}. Bạn có thể thử các công cụ khác ở trên để có thêm kết quả."
+results_found_reenable = " Bạn có thể bật lại tìm kiếm tự động qua /settings nếu muốn."
+slow_down = "Xin hãy chậm lại một chút...."
+something_went_wrong = "Đã có lỗi xảy ra"
+generic_error = "Đã xảy ra lỗi, hãy thử lại."
+more_button = "Thêm"
+
+[search.files]
+banned = "🔴 Bạn đã bị cấm sử dụng bot này do đăng tải nội dung bất hợp pháp."
+animated_not_supported = "Nhãn dán động không được hỗ trợ."
+format_not_supported = "Định dạng không được hỗ trợ"
+video_too_large = "Video này quá lớn để tải xuống và không có ảnh thu nhỏ. Vui lòng gửi một tệp nhỏ hơn."
+
+[search.results]
+provided_by = "Được cung cấp bởi: {provider}"
+with_via = " qua {via}"
+with_similarity = " với độ tương đồng {similarity}%"
+duplicate_result = "Đã bỏ qua kết quả tìm kiếm trùng lặp"
+duplicate_thumbnail = "Đã bỏ qua ảnh thu nhỏ trùng lặp"
+rate_limit = "{engine}: đã đạt giới hạn {period}. Hãy thử nút <b>Thêm</b> để tìm kiếm trực tiếp."
+rate_limit_default_period = "Giới hạn"
+engine_auto_disabled = "🔕 <b>{engine}</b> đã tự động bị tắt cho cuộc trò chuyện này sau 5 lần liên tiếp không có kết quả. Dùng /settings để bật lại."
+
+[search.auto_disable]
+message = "🟡 5 lần tìm kiếm liên tiếp không có kết quả — tìm kiếm tự động đã bị tắt cho cuộc trò chuyện này. Điều này giúp tránh chạm giới hạn sử dụng. Các công cụ tìm kiếm tự động chủ yếu dành cho nội dung anime & manga. Dùng /settings để bật lại."
+
+[settings]
+title = "⚙️ <b>Cài Đặt Trò Chuyện</b>"
+subtitle = "Thiết lập cách bot hoạt động trong cuộc trò chuyện này."
+admins_only = "Chỉ quản trị viên nhóm mới có thể truy cập cài đặt."
+admins_only_change = "Chỉ quản trị viên nhóm mới có thể thay đổi cài đặt."
+admins_only_configure = "Chỉ quản trị viên nhóm mới có thể thiết lập bot."
+
+[settings.toggles]
+auto_search = "🔍 Tìm kiếm tự động: {status}"
+show_buttons = "🔘 Hiển thị nút: {status}"
+auto_search_engines = "🔍 Công cụ tìm kiếm tự động →"
+auto_search_engines_locked = "🔍 Công cụ tìm kiếm tự động 🔒"
+button_engines = "🔘 Nút công cụ →"
+button_engines_locked = "🔘 Nút công cụ 🔒"
+best_match_btn = "{status} Kết Quả Khớp Nhất"
+show_link_btn = "{status} 🔗 Mở Ảnh"
+back = "← Quay lại"
+language = "🌐 Ngôn ngữ: {language}"
+
+[settings.disabled_reasons]
+auto_search_engines = "Hãy bật tìm kiếm tự động trước để thiết lập các công cụ của nó."
+button_engines = "Hãy bật \"Hiển thị nút\" trước để thiết lập các nút công cụ."
+default = "Hãy bật công tắc chính trước."
+
+[settings.warnings]
+enable_buttons_first = "⚠️ Hãy bật nút công cụ trước — phải có ít nhất một nút đang hoạt động."
+enable_autosearch_first = "⚠️ Hãy bật tìm kiếm tự động trước — phải có ít nhất một công cụ đang hoạt động."
+min_one_button = "⚠️ Phải giữ ít nhất một nút được bật."
+min_one_engine = "⚠️ Phải giữ ít nhất một công cụ được bật."
+
+[start]
+private = "🔎 Hãy gửi cho tôi một hình ảnh, nhãn dán hoặc video và tôi sẽ tìm ra nguồn của nó."
+group = "🔎 Hãy gửi cho tôi một hình ảnh, nhãn dán hoặc video và tôi sẽ tìm ra nguồn của nó.\n\n/search · /settings"
+opening_settings = "⚙️ Đang mở cài đặt..."
+
+[onboarding]
+title = "👋 <b>Tôi nên xử lý hình ảnh trong nhóm này như thế nào?</b>"
+description = "• <b>Chỉ kết quả tìm kiếm</b> — tự động tìm ảnh, hiển thị kết quả\n• <b>Đầy đủ</b> — tự động tìm kiếm + hiển thị nút công cụ\n• <b>Thủ công</b> — chỉ tìm kiếm khi có người trả lời bằng /search\n• <b>Cài đặt</b> — tự bạn thiết lập mọi thứ"
+btn_search_only = "🔍 Chỉ kết quả tìm kiếm"
+btn_full = "🔍 Đầy đủ (kết quả + nút)"
+btn_manual = "❌ Chỉ thủ công (/search)"
+btn_settings = "⚙️ Mở cài đặt"
+done_search_only = "✅ Đã đặt thành <b>chỉ kết quả tìm kiếm</b>. Thay đổi bất cứ lúc nào bằng /settings."
+done_full = "✅ Đã đặt thành <b>chế độ đầy đủ</b> (kết quả + nút). Thay đổi bất cứ lúc nào bằng /settings."
+done_manual = "✅ Đã đặt thành <b>chế độ thủ công</b>. Dùng /search để tìm kiếm. Thay đổi bất cứ lúc nào bằng /settings."
+
+[feedback]
+prompt = "💬 Vui lòng nhập phản hồi của bạn bên dưới. Gửi /cancel để hủy."
+empty = "Tin nhắn của bạn có vẻ trống. Vui lòng nhập phản hồi hoặc gửi /cancel để hủy."
+thanks = "✅ Cảm ơn phản hồi của bạn! Nó đã được chuyển tới các quản trị viên."
+cancelled = "Đã hủy phản hồi."
+admin_message = "📬 <b>Phản Hồi Mới</b>\nTừ: {user} (<code>{user_id}</code>)\n\n{feedback}\n\n💡 <i>Trả lời tin nhắn này để phản hồi người dùng.</i>"
+admin_reply = "📩 <b>Trả lời từ quản trị viên:</b>\n\n{reply}\n\n💡 <i>Trả lời tin nhắn này để phản hồi.</i>"
+reply_sent = "✅ Đã gửi câu trả lời tới người dùng."
+reply_failed = "❌ Không gửi được câu trả lời tới người dùng. Có thể họ đã chặn bot."
+user_followup = "📬 <b>Phản Hồi Tiếp Theo</b>\nTừ: {user} (<code>{user_id}</code>)\n\n{feedback}\n\n💡 <i>Trả lời tin nhắn này để phản hồi người dùng.</i>"
+followup_sent = "✅ Câu trả lời của bạn đã được gửi tới các quản trị viên."
+followup_failed = "❌ Không gửi được câu trả lời của bạn."
+
+[bot_commands]
+search = "Tìm nguồn của ảnh (trả lời vào ảnh)"
+settings = "Thiết lập hành vi của bot cho cuộc trò chuyện này"
+help = "Hiển thị trợ giúp"
+start = "Khởi động bot"
+feedback = "Gửi phản hồi tới quản trị viên"
+
+[fields]
+title = "Tiêu đề"
+"title_romaji" = "Tiêu đề [romaji]"
+"title_ja" = "Tiêu đề [ja]"
+chapter = "Chương"
+episode = "Tập"
+status = "Trạng thái"
+type = "Loại"
+year = "Năm"
+genres = "Thể loại"
+"audience_18" = "Đối tượng 18+"
+"est_time" = "Thời gian ước tính"
+description = "Mô tả"
+author = "Tác giả"
+artist = "Họa sĩ"
+rating = "Đánh giá"
+tags = "Thẻ"
+character = "Nhân vật"
+characters = "Nhân vật"
+work = "Tác phẩm"
+also_possible = "Cũng có thể là"
+material = "Chất liệu"
+by = "Bởi"
+poster = "Áp phích"
+source = "Nguồn"
+score = "Điểm"
+creator = "Người tạo"
+"created_at" = "Tạo lúc"
