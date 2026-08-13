@@ -284,11 +284,10 @@ class TestAvailableLanguages:
         assert langs == sorted(langs)
 
     def test_expected_count(self):
-        # We ship 8 TOML files: ar, de, en, es, it, ja, ru, zh
-        assert len(available_languages()) == 10
+        assert len(available_languages()) == 15
 
     def test_all_expected_present(self):
-        expected = {"ar", "de", "en", "es", "fr", "it", "ja", "pt", "ru", "zh"}
+        expected = {"ar", "bn", "de", "en", "es", "fa", "fr", "hi", "id", "it", "ja", "pt", "ru", "ur", "zh"}
         assert set(available_languages()) == expected
 
 

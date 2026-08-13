@@ -1,0 +1,139 @@
+[help]
+title = "🔎 Bot Pencarian Gambar Terbalik — Bantuan"
+how_to_use = "🤔 Cara menggunakan saya"
+how_to_use_text = "Kirimkan saya gambar, stiker, video/gif atau URL dan saya akan mengirimkan tautan pencarian gambar terbalik langsung untuk SauceNao, Google, Yandex dan sejenisnya.\nUntuk gambar anime saya sarankan SauceNao, untuk gambar lainnya saya sarankan Google atau Yandex."
+commands_title = "🖥️ Perintah"
+commands_list = "/help — Tampilkan bantuan\n/search — Balas sebuah gambar atau video untuk mencari\n/settings — Atur perilaku bot di obrolan ini\n/feedback — Kirim masukan ke admin"
+
+[commands]
+ban_usage = "Cara pakai: /ban <user_id>"
+bot_started = "✅ Bot berhasil dijalankan."
+
+[search]
+reply_required = "Saat menggunakan /search kamu harus membalas pesan yang berisi gambar atau video"
+select_engine = "Pilih mesin pencari:"
+best_match = "Kecocokan Terbaik"
+go_to_image = "🔗 Buka Gambar"
+creating_url = "Membuat url pencarian {engine}..."
+searching = "⏳ mencari..."
+no_results = "🔴 Saya sudah mencari untukmu di {engines} tetapi tidak menemukan apa pun. Silakan coba mesin lain di atas."
+results_found = "🔵 Saya sudah mencari untukmu di {engines}. Kamu bisa mencoba yang lain di atas untuk hasil lebih banyak."
+results_found_reenable = " Kamu bisa mengaktifkan kembali pencarian otomatis lewat /settings jika mau."
+slow_down = "Pelan-pelan sedikit ya...."
+something_went_wrong = "Ada yang tidak beres"
+generic_error = "Terjadi kesalahan, coba lagi."
+more_button = "Lainnya"
+
+[search.files]
+banned = "🔴 Kamu diblokir dari penggunaan bot ini karena mengunggah konten ilegal."
+animated_not_supported = "Stiker animasi tidak didukung."
+format_not_supported = "Format tidak didukung"
+video_too_large = "Video ini terlalu besar untuk diunduh dan tidak memiliki thumbnail. Silakan kirim berkas yang lebih kecil."
+
+[search.results]
+provided_by = "Disediakan oleh: {provider}"
+with_via = " melalui {via}"
+with_similarity = " dengan kemiripan {similarity}%"
+duplicate_result = "Hasil pencarian duplikat dihilangkan"
+duplicate_thumbnail = "Thumbnail duplikat dihilangkan"
+rate_limit = "{engine}: batas {period} tercapai. Coba tombol <b>Lainnya</b> untuk mencari secara langsung."
+rate_limit_default_period = "Batas"
+engine_auto_disabled = "🔕 <b>{engine}</b> dinonaktifkan otomatis untuk obrolan ini setelah 5 hasil kosong berturut-turut. Gunakan /settings untuk mengaktifkannya kembali."
+
+[search.auto_disable]
+message = "🟡 5 pencarian berturut-turut tidak menghasilkan apa pun — pencarian otomatis telah dinonaktifkan untuk obrolan ini. Ini membantu mencegah tercapainya batas penggunaan. Mesin pencarian otomatis terutama ditujukan untuk konten anime & manga. Gunakan /settings untuk mengaktifkannya kembali."
+
+[settings]
+title = "⚙️ <b>Pengaturan Obrolan</b>"
+subtitle = "Atur bagaimana bot berperilaku di obrolan ini."
+admins_only = "Hanya admin grup yang dapat mengakses pengaturan."
+admins_only_change = "Hanya admin grup yang dapat mengubah pengaturan."
+admins_only_configure = "Hanya admin grup yang dapat mengatur bot."
+
+[settings.toggles]
+auto_search = "🔍 Pencarian otomatis: {status}"
+show_buttons = "🔘 Tampilkan tombol: {status}"
+auto_search_engines = "🔍 Mesin pencarian otomatis →"
+auto_search_engines_locked = "🔍 Mesin pencarian otomatis 🔒"
+button_engines = "🔘 Tombol mesin →"
+button_engines_locked = "🔘 Tombol mesin 🔒"
+best_match_btn = "{status} Kecocokan Terbaik"
+show_link_btn = "{status} 🔗 Buka Gambar"
+back = "← Kembali"
+language = "🌐 Bahasa: {language}"
+
+[settings.disabled_reasons]
+auto_search_engines = "Aktifkan pencarian otomatis terlebih dahulu untuk mengatur mesinnya."
+button_engines = "Aktifkan \"Tampilkan tombol\" terlebih dahulu untuk mengatur tombol mesin."
+default = "Aktifkan sakelar utama terlebih dahulu."
+
+[settings.warnings]
+enable_buttons_first = "⚠️ Aktifkan tombol mesin terlebih dahulu — setidaknya satu harus aktif."
+enable_autosearch_first = "⚠️ Aktifkan pencarian otomatis terlebih dahulu — setidaknya satu harus aktif."
+min_one_button = "⚠️ Setidaknya satu tombol harus tetap aktif."
+min_one_engine = "⚠️ Setidaknya satu mesin harus tetap aktif."
+
+[start]
+private = "🔎 Kirimkan saya gambar, stiker, atau video dan saya akan menemukan sumbernya."
+group = "🔎 Kirimkan saya gambar, stiker, atau video dan saya akan menemukan sumbernya.\n\n/search · /settings"
+opening_settings = "⚙️ Membuka pengaturan..."
+
+[onboarding]
+title = "👋 <b>Bagaimana saya harus menangani gambar di grup ini?</b>"
+description = "• <b>Hanya hasil pencarian</b> — cari gambar otomatis, tampilkan hasil\n• <b>Penuh</b> — pencarian otomatis + tampilkan tombol mesin\n• <b>Manual</b> — hanya mencari saat seseorang membalas dengan /search\n• <b>Pengaturan</b> — atur semuanya sendiri"
+btn_search_only = "🔍 Hanya hasil pencarian"
+btn_full = "🔍 Penuh (hasil + tombol)"
+btn_manual = "❌ Hanya manual (/search)"
+btn_settings = "⚙️ Buka pengaturan"
+done_search_only = "✅ Disetel ke <b>hanya hasil pencarian</b>. Ubah kapan saja dengan /settings."
+done_full = "✅ Disetel ke <b>mode penuh</b> (hasil + tombol). Ubah kapan saja dengan /settings."
+done_manual = "✅ Disetel ke <b>mode manual</b>. Gunakan /search untuk mencari. Ubah kapan saja dengan /settings."
+
+[feedback]
+prompt = "💬 Silakan tulis masukanmu di bawah ini. Kirim /cancel untuk membatalkan."
+empty = "Pesanmu sepertinya kosong. Silakan tulis masukan atau kirim /cancel untuk membatalkan."
+thanks = "✅ Terima kasih atas masukanmu! Pesanmu sudah diteruskan ke admin."
+cancelled = "Masukan dibatalkan."
+admin_message = "📬 <b>Masukan Baru</b>\nDari: {user} (<code>{user_id}</code>)\n\n{feedback}\n\n💡 <i>Balas pesan ini untuk menjawab pengguna.</i>"
+admin_reply = "📩 <b>Balasan dari admin:</b>\n\n{reply}\n\n💡 <i>Balas pesan ini untuk menjawab.</i>"
+reply_sent = "✅ Balasan terkirim ke pengguna."
+reply_failed = "❌ Gagal mengirim balasan ke pengguna. Mungkin dia telah memblokir bot."
+user_followup = "📬 <b>Tindak Lanjut</b>\nDari: {user} (<code>{user_id}</code>)\n\n{feedback}\n\n💡 <i>Balas pesan ini untuk menjawab pengguna.</i>"
+followup_sent = "✅ Balasanmu telah dikirim ke admin."
+followup_failed = "❌ Gagal mengirim balasanmu."
+
+[bot_commands]
+search = "Cari sumber gambar (balas ke gambar)"
+settings = "Atur perilaku bot untuk obrolan ini"
+help = "Tampilkan bantuan"
+start = "Mulai bot"
+feedback = "Kirim masukan ke admin"
+
+[fields]
+title = "Judul"
+"title_romaji" = "Judul [romaji]"
+"title_ja" = "Judul [ja]"
+chapter = "Bab"
+episode = "Episode"
+status = "Status"
+type = "Tipe"
+year = "Tahun"
+genres = "Genre"
+"audience_18" = "Khalayak 18+"
+"est_time" = "Perkiraan Waktu"
+description = "Deskripsi"
+author = "Penulis"
+artist = "Seniman"
+rating = "Peringkat"
+tags = "Tag"
+character = "Karakter"
+characters = "Karakter"
+work = "Karya"
+also_possible = "Kemungkinan lain"
+material = "Materi"
+by = "Oleh"
+poster = "Poster"
+source = "Sumber"
+score = "Skor"
+creator = "Pembuat"
+"created_at" = "Dibuat Pada"
