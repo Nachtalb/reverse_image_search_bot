@@ -65,6 +65,21 @@ class TestSetBotCommands:
         assert mock_app.bot.set_my_commands.call_count == 1 + n_localised + 2
 
     @pytest.mark.asyncio
+    @patch("reverse_image_search_bot.bot.asyncio.sleep", new_callable=AsyncMock)
+    @patch("reverse_image_search_bot.bot.settings")
+    async def test_timeout_is_retried(self, mock_settings, _sleep, mock_app):
+        from telegram.error import TimedOut
+
+        mock_settings.ADMIN_IDS = []
+        from reverse_image_search_bot.i18n import available_languages
+
+        n_localised = len(available_languages()) - 1
+        # first localised call times out once, retry succeeds
+        mock_app.bot.set_my_commands = AsyncMock(side_effect=[None, TimedOut()] + [None] * n_localised)
+        await _set_bot_commands(mock_app)
+        assert mock_app.bot.set_my_commands.call_count == 2 + n_localised
+
+    @pytest.mark.asyncio
     @patch("reverse_image_search_bot.bot.settings")
     async def test_admin_failure_does_not_crash(self, mock_settings, mock_app):
         mock_settings.ADMIN_IDS = [111]

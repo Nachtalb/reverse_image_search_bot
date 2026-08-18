@@ -14,7 +14,7 @@ from telegram import (
     Update,
 )
 from telegram.constants import ParseMode
-from telegram.error import BadRequest, Forbidden, RetryAfter
+from telegram.error import BadRequest, Forbidden, RetryAfter, TimedOut
 from telegram.ext import (
     AIORateLimiter,
     Application,
@@ -247,6 +247,15 @@ _ADMIN_COMMANDS = [
 ]
 
 
+async def _set_commands_retrying(app: Application, commands, **scope_kwargs) -> None:
+    """setMyCommands with one retry — Telegram occasionally times out mid-startup."""
+    try:
+        await app.bot.set_my_commands(commands, **scope_kwargs)
+    except TimedOut:
+        await asyncio.sleep(2)
+        await app.bot.set_my_commands(commands, **scope_kwargs)
+
+
 async def _set_bot_commands(app: Application) -> None:
     """Register bot command menus with Telegram.
 
@@ -266,14 +275,14 @@ async def _set_bot_commands(app: Application) -> None:
             BotCommand("start", t("bot_commands.start", lang_code)),
         ]
         try:
-            await app.bot.set_my_commands(commands, scope=BotCommandScopeDefault(), language_code=lang_code)
+            await _set_commands_retrying(app, commands, scope=BotCommandScopeDefault(), language_code=lang_code)
         except Exception:
-            logger.warning("Failed to set %s commands", lang_code)
+            logger.warning("Failed to set %s commands", lang_code, exc_info=True)
     for admin_id in settings.ADMIN_IDS:
         try:
-            await app.bot.set_my_commands(_ADMIN_COMMANDS, scope=BotCommandScopeChat(chat_id=admin_id))
+            await _set_commands_retrying(app, _ADMIN_COMMANDS, scope=BotCommandScopeChat(chat_id=admin_id))
         except Exception:
-            logger.warning("Failed to set admin commands for %d", admin_id)
+            logger.warning("Failed to set admin commands for %d", admin_id, exc_info=True)
 
 
 async def post_init(app: Application) -> None:
