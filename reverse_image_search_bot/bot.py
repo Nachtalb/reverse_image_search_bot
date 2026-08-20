@@ -220,6 +220,9 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
         if "rights" in error_msg:
             metrics.track_permission_error(chat)
             return
+        if "query is too old" in error_msg or "query id is invalid" in error_msg or "query_id_invalid" in error_msg:
+            logger.info("Stale callback query: %s", context.error)
+            return
 
     if isinstance(context.error, RetryAfter):
         metrics.track_retry_after(context.error.retry_after)
