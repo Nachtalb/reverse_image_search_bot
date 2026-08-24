@@ -22,7 +22,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, MenuButtonWebAp
 from telegram.ext import ContextTypes
 
 from reverse_image_search_bot import metrics, settings
-from reverse_image_search_bot.abuse_report.prepare import prepare_report, resolve_user
+from reverse_image_search_bot.abuse_report.prepare import prepare_report, resolve_targets
 from reverse_image_search_bot.config import abuse
 
 logger = logging.getLogger("abuse.commands")
@@ -57,13 +57,6 @@ async def _safe_edit(message, text: str) -> None:
         await message.edit_text(text)
 
 
-# Cloudflare CSAM reports list our public file URLs like
-#   https://ris.naa.gg/f/AQADsAxrG35d6EZ9.jpg
-# (often defanged: hxxps://ris.naa[.]gg/f/…). The /f/<file> path segment is never
-# defanged, so match the filename right after /f/. Case-insensitive extension.
-_CF_FILE_RE = re.compile(r"/f/([A-Za-z0-9_\-]+\.[A-Za-z0-9]+)")
-
-
 async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Prepare NCMEC report round(s).
 
@@ -82,36 +75,19 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     raw = update.message.text
     body = re.sub(r"^/report(@\S+)?\s*", "", raw, count=1).strip()
 
-    # 1) Any Cloudflare /f/<file> URLs present → treat the whole message as a bulk
-    #    paste. 2) Otherwise a single target token (id / @username / filename).
-    filenames = list(dict.fromkeys(_CF_FILE_RE.findall(body)))
-    targets: list[tuple[int | None, str]] = []  # (user_id, source_label)
-    unknown: list[str] = []
-
-    if filenames:
-        seen: set[int] = set()
-        for fn in filenames:
-            uid = abuse.find_user_by_filename(fn)
-            if uid is None:
-                unknown.append(fn)
-            elif uid not in seen:
-                seen.add(uid)
-                targets.append((uid, fn))
-    elif body:
-        uid = resolve_user(body)
-        if uid is None:
-            await update.message.reply_text(f"No uploader found for: {body}")
-            return
-        targets.append((uid, body))
-    else:
+    # Any input shape: a single token, a #uid tag, or a whole pasted Cloudflare
+    # report full of file URLs — resolve_targets handles them uniformly.
+    user_ids, unknown = resolve_targets(body)
+    if not body:
         await update.message.reply_text(
             "Usage: /report <user_id | @username | group/channel id | filename>\n"
             "or paste Cloudflare file URLs (https://ris.naa.gg/f/…) to report each uploader."
         )
         return
+    if not user_ids:
+        await update.message.reply_text(f"No uploader found for: {', '.join(unknown) or body}")
+        return
 
-    # Prepare a report per unique target user via the shared summary helper.
-    user_ids = [uid for uid, _ in targets if uid is not None]
     await report_users(update, context, user_ids, unknown)
 
 
