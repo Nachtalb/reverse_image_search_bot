@@ -101,7 +101,7 @@ def test_restore_with_wrong_key_writes_nothing(env):
     mkfiles(1, 2)
     result = prepare.prepare_report(1)
     err = prepare.restore_report_files(result.report_uuid or "", "totally-wrong-key")
-    assert "P1" in (err or "")
+    assert "image key" in (err or "")
     assert plaintexts(updir) == []  # nothing scattered into the upload dir
 
 

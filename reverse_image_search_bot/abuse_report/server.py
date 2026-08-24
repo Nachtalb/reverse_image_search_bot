@@ -249,7 +249,7 @@ async def api_reports_create(request: web.Request) -> web.Response:
 
 
 async def _dm_report_created(bot, admin_id: int | None, user_id: int, result) -> None:
-    """DM the admin the P1 image key + report link for an app-created report."""
+    """DM the admin the image key + report link for an app-created report."""
     if bot is None or not admin_id:
         return
     import html as _html
@@ -260,16 +260,15 @@ async def _dm_report_created(bot, admin_id: int | None, user_id: int, result) ->
     try:
         await bot.send_message(
             admin_id,
-            f"<b>Report prepared</b> for user <code>{user_id}</code> ({_html.escape(uname)})\n"
-            f"Encrypted <b>{result.encrypted}</b> file(s).\n\n"
-            f"<b>Image key (P1):</b> <code>{_html.escape(result.p1 or '')}</code>\n\n"
-            f"Open it from the reports console, or: {_html.escape(url)}\n\n"
-            f"<i>P1 is not stored — keep it to decrypt the images.</i>",
+            f"🆕 <code>{user_id}</code> {_html.escape(uname)} · {result.encrypted} file(s) offline\n"
+            f"Image key: <code>{_html.escape(result.p1 or '')}</code>\n\n"
+            f"{_html.escape(url)}\n\n"
+            f"<i>Shown once and not stored — losing it loses the files.</i>",
             parse_mode="HTML",
             disable_web_page_preview=True,
         )
     except Exception:
-        logger.warning("failed to DM P1 for app-created report %s", result.report_uuid, exc_info=True)
+        logger.warning("failed to DM the image key for app-created report %s", result.report_uuid, exc_info=True)
 
 
 async def index(request: web.Request) -> web.StreamResponse:
@@ -336,7 +335,7 @@ async def api_fetch_video(request: web.Request) -> web.Response:
     payload = await request.json()
     p1 = payload.get("image_key", "")
     if not p1:
-        raise web.HTTPBadRequest(text="image_key (P1) required")
+        raise web.HTTPBadRequest(text="image key required")
     blob = abuse.get_report_blob(int(request.match_info["blob_id"]))
     if not blob or blob["report_uuid"] != rep["report_uuid"]:
         raise web.HTTPNotFound(text="blob not found")
@@ -493,9 +492,9 @@ async def _gather_selected_files(
         try:
             plaintext = crypto.decrypt_file(bytes(b["nonce"]), cipher, key)
         except Exception as dec_err:
-            raise web.HTTPBadRequest(text="image key (P1) incorrect — decryption failed") from dec_err
+            raise web.HTTPBadRequest(text="image key incorrect — decryption failed") from dec_err
         if crypto.sha256_hex(plaintext) != b["plaintext_sha256"]:
-            raise web.HTTPBadRequest(text="image key (P1) incorrect — hash mismatch")
+            raise web.HTTPBadRequest(text="image key incorrect — hash mismatch")
         # Report the extracted frame/still. original_file_name keeps the
         # uploader's original name when we have one (important to preserve);
         # location_of_file is our PUBLIC copy's URL (the one that may have been
@@ -526,9 +525,9 @@ async def _gather_selected_files(
                 try:
                     vplain = crypto.decrypt_file(bytes(b["video_nonce"]), vfp.read_bytes(), key)
                 except Exception as verr:
-                    raise web.HTTPBadRequest(text="image key (P1) incorrect — video decryption failed") from verr
+                    raise web.HTTPBadRequest(text="image key incorrect — video decryption failed") from verr
                 if crypto.sha256_hex(vplain) != b["video_sha256"]:
-                    raise web.HTTPBadRequest(text="image key (P1) incorrect — video hash mismatch")
+                    raise web.HTTPBadRequest(text="image key incorrect — video hash mismatch")
                 files.append(
                     {
                         "kind": "video",
@@ -558,7 +557,7 @@ async def api_review(request: web.Request) -> web.Response:
     payload = await request.json()
     p1 = payload.get("image_key", "")
     if not p1:
-        raise web.HTTPBadRequest(text="image_key (P1) required")
+        raise web.HTTPBadRequest(text="image key required")
 
     files, selected = await _gather_selected_files(request, rep, p1)
     # Fetch the reported user's bio (best-effort) before reading the row, so it
@@ -619,7 +618,7 @@ async def api_submit(request: web.Request) -> web.Response:
     payload = await request.json()
     p1 = payload.get("image_key", "")
     if not p1:
-        raise web.HTTPBadRequest(text="image_key (P1) required")
+        raise web.HTTPBadRequest(text="image key required")
     uuid = rep["report_uuid"]
     if uuid in _submit_tasks and not _submit_tasks[uuid].done():
         return web.json_response({"ok": True, "status": abuse.REPORT_SUBMITTING})  # already running
@@ -700,7 +699,7 @@ async def api_cancel(request: web.Request) -> web.Response:
         payload = await request.json()
     p1 = payload.get("image_key", "")
     if not p1:
-        raise web.HTTPBadRequest(text="image_key (P1) required to restore the files")
+        raise web.HTTPBadRequest(text="image key required to restore the files")
     # Restore BEFORE purging the blobs — they are the only copy of the plaintext.
     # A wrong key aborts without writing anything, so the files stay recoverable.
     err = await asyncio.to_thread(restore_report_files, rep["report_uuid"], p1)
