@@ -114,8 +114,8 @@ async def test_report_bulk_urls_group_unique_users(abuse, tmp_path, monkeypatch)
     out = "\n".join(replies)
     # Two unique uploaders → two 🆕 rows (user 1 grouped despite two files).
     assert out.count("🆕") >= 2
-    # Both users' P1 keys are surfaced as "P1 <code>…".
-    assert out.count("P1 <code>") == 2
+    # Both users' image keys are surfaced as "key <code>…".
+    assert out.count("key <code>") == 2
     # The unknown file is reported.
     assert "UNKNOWN.jpg" in out and "no uploader on record" in out
     # Reports actually exist, one active per user.
@@ -142,7 +142,7 @@ async def test_report_single_target_by_username(abuse, tmp_path, monkeypatch):
     await rc.report_command(cast(Any, update), cast(Any, context))
 
     out = "\n".join(replies)
-    assert "🆕" in out and "55" in out and "P1 <code>" in out
+    assert "🆕" in out and "55" in out and "key <code>" in out
     assert abuse.active_report_for_user(55) is not None
 
 

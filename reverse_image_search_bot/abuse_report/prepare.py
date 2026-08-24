@@ -250,9 +250,9 @@ def restore_report_files(report_uuid: str, p1: str) -> str | None:
         try:
             data = crypto.decrypt_file(bytes(b["nonce"]), ct, key)
         except Exception:
-            return "image key (P1) incorrect"
+            return "image key incorrect"
         if crypto.sha256_hex(data) != b["plaintext_sha256"]:
-            return "image key (P1) incorrect"
+            return "image key incorrect"
         plaintexts.append((updir / b["saved_filename"], data))
     for fp, data in plaintexts:
         try:
@@ -332,35 +332,24 @@ def prepare_report(user_id: int, progress: Callable[[int, int], None] | None = N
     existing = abuse.active_report_for_user(user_id)
     if existing:
         return PrepareResult(
-            error=f"An active report already exists for user {user_id} (status: {existing['status']}).",
+            error=f"active report already open ({existing['status']})",
             existing_uuid=existing["report_uuid"],
         )
 
     present, recorded, cleared = _present_files(user_id)
     if not present:
         if cleared:
-            return PrepareResult(
-                error=f"All {cleared} remaining file(s) of user {user_id} are marked cleared — nothing to report."
-            )
+            return PrepareResult(error=f"all {cleared} remaining file(s) cleared — nothing to report")
         filed = abuse.latest_filed_report_for_user(user_id)
         if filed and filed.get("ncmec_report_id"):
-            n = filed.get("reported_files", 0)
-            others = f" along with {n - 1} other file(s)" if n and n > 1 else ""
             return PrepareResult(
-                error=(
-                    f"User {user_id} was already filed with NCMEC in report "
-                    f"#{filed['ncmec_report_id']}{others}. The plaintext files were "
-                    f"deleted from disk after filing (the encrypted copies are kept "
-                    f"in that report) — nothing new to report."
-                ),
+                error=f"already filed with NCMEC in report #{filed['ncmec_report_id']}",
                 filed_uuid=filed["report_uuid"],
                 filed_ncmec_id=filed["ncmec_report_id"],
             )
-        return PrepareResult(
-            error=f"User {user_id} has {recorded} recorded file(s) but none are still on disk — nothing to report."
-        )
+        return PrepareResult(error=f"{recorded} recorded file(s), none still on disk — nothing to report")
 
-    # P1 is the one-time image key — shown ONCE and never stored. The page
+    # The image key is generated here, shown ONCE and never stored. The page
     # password is a single global secret (REPORT_PAGE_PASSWORD), not per-report.
     p1 = crypto.gen_password()
     report_uuid = crypto.gen_report_uuid()

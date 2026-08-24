@@ -128,7 +128,7 @@ async def report_users(
                     "icon": "🆕",
                     "user_id": uid,
                     "username": uname,
-                    "detail": f"P1 <code>{html.escape(result.p1 or '')}</code> · {result.encrypted} file(s) offline",
+                    "detail": f"key <code>{html.escape(result.p1 or '')}</code> · {result.encrypted} file(s) offline",
                     "uuid": result.report_uuid,
                 }
             )
@@ -272,20 +272,15 @@ async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE, user_
     user = abuse.get_user(user_id) or {}
     uname = f"@{user['username']}" if user.get("username") else "—"
     launch = (
-        "Tap the <b>Open report</b> menu button (bottom-left ⊞) to open it."
+        "Tap the <b>Open report</b> menu button (bottom-left ⊞)."
         if menu_button_set
         else f"Open via the report menu button: {html.escape(url)}"
     )
     await update.message.reply_html(
-        f"<b>Report prepared</b> for user <code>{user_id}</code> ({html.escape(uname)})\n"
-        f"Encrypted <b>{result.encrypted}</b> file(s) and took them offline.\n\n"
-        + f"<b>Image key (P1):</b> <code>{html.escape(result.p1 or '')}</code>\n\n"
+        f"🆕 <code>{user_id}</code> {html.escape(uname)} · {result.encrypted} file(s) offline\n"
+        f"Image key: <code>{html.escape(result.p1 or '')}</code>\n\n"
         f"{launch}\n\n"
-        f"<i>Use the global page password to open the report, then P1 to decrypt "
-        f"the images. The files are no longer on disk — the encrypted blobs are "
-        f"the only copy, so P1 is NOT recoverable and losing it loses the files. "
-        f"Cancelling restores them to disk; filing keeps the reported ones "
-        f"encrypted in the DB, bans the user, and deletes the rest.</i>",
+        f"<i>Shown once and not stored — losing it loses the files.</i>",
         disable_web_page_preview=True,
     )
 

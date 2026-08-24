@@ -133,7 +133,7 @@
 <main>
   <!-- Global page password gate -->
   <div class="card" id="unlock-card">
-    <input type="password" id="p2" autocomplete="off" placeholder="Report page password">
+    <input type="password" id="p2" autocomplete="off" placeholder="Page password">
     <div style="height:10px"></div>
     <button id="unlock-btn">Unlock report</button>
     <div class="muted" id="unlock-err" style="color:#f08a8a;margin-top:8px"></div>
@@ -153,10 +153,10 @@
       <div class="kv"><span>NCMEC report id</span><b id="r-ncmec">—</b></div>
     </div>
 
-    <!-- Decrypt (P1) -->
+    <!-- Decrypt with the image key -->
     <div class="card" id="decrypt-card">
       <label for="p1">Image decryption key</label>
-      <input type="password" id="p1" autocomplete="off" placeholder="Enter the image key to reveal thumbnails">
+      <input type="password" id="p1" autocomplete="off" placeholder="Image key">
       <div style="height:10px"></div>
       <button id="decrypt-btn">Decrypt &amp; show images</button>
       <div class="muted" id="decrypt-err" style="color:#f08a8a;margin-top:8px"></div>
@@ -216,7 +216,7 @@
 <dialog id="cancel-dlg">
   <div class="dlg-body">
     <h2>Cancel this report?</h2>
-    <div class="muted" style="margin-bottom:12px">The files are decrypted back onto disk and the encrypted blobs discarded. Needs the image key (P1) — it is the only copy.</div>
+    <div class="muted" style="margin-bottom:12px">The files are decrypted back onto disk and the encrypted blobs discarded. Needs the image key — the blobs are the only copy.</div>
     <label style="display:flex;gap:8px;align-items:flex-start;font-size:14px;color:#e8e8ea;margin-bottom:14px;cursor:pointer">
       <input type="checkbox" id="cancel-clear" style="margin-top:3px">
       <span>Mark all images in this round as <b>cleared</b>.</span>
@@ -607,7 +607,7 @@ $("review-btn").onclick = async () => {
   const ids = Object.keys(sel);
   if (!ids.length) { $("action-err").textContent = "Select at least one image."; return; }
   for (const id of ids) if (!sel[id]) { $("action-err").textContent = "Every selected image needs a classification (A1/A2/B1/B2/NR)."; return; }
-  if (!P1KEY) { $("action-err").textContent = "Decrypt the images first (the image key is needed to submit)."; return; }
+  if (!P1KEY) { $("action-err").textContent = "Decrypt the images first."; return; }
   const btn = $("review-btn"); btn.disabled = true; btn.textContent = "Preparing review…";
   try {
     await saveSelection();
@@ -826,8 +826,8 @@ $("cancel-btn").onclick = () => { $("cancel-clear").checked = false; cancelDlg.s
 $("cancel-back-btn").onclick = () => cancelDlg.close();
 $("cancel-confirm-btn").onclick = async () => {
   const clearFiles = $("cancel-clear").checked;
-  // Cancelling restores the plaintext from the blobs, so it needs P1.
-  if (!$("p1").value) { cancelDlg.close(); $("action-err").textContent = "Enter the image key (P1) first — cancelling restores the files."; return; }
+  // Cancelling restores the plaintext from the blobs, so it needs the image key.
+  if (!$("p1").value) { cancelDlg.close(); $("action-err").textContent = "Enter the image key first — cancelling restores the files."; return; }
   try {
     await api("/api/cancel", {
       method: "POST", headers: { "Content-Type": "application/json" },
