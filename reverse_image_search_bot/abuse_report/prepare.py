@@ -13,6 +13,7 @@ upload path from ``settings``.
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Callable
 from pathlib import Path
 
@@ -71,6 +72,55 @@ def resolve_user(arg: str) -> int | None:
         return abuse.find_user_by_username(arg)
     # Try username first (bare word), then fall back to a filename lookup.
     return abuse.find_user_by_username(arg) or abuse.find_user_by_filename(arg)
+
+
+# Cloudflare CSAM reports list our public file URLs like
+#   https://ris.naa.gg/f/AQADsAxrG35d6EZ9.jpg
+# (often defanged: hxxps://ris.naa[.]gg/f/…). The /f/<file> segment is never
+# defanged, so match the filename right after /f/.
+_FILE_URL_RE = re.compile(r"/f/([A-Za-z0-9_\-]+\.[A-Za-z0-9]+)")
+# Admin-forward caption tags; cid/gid are rendered abs() so re-negate them.
+_TAG_RE = re.compile(r"^#(uid|cid|gid)(\d+)$")
+# Target-shaped token in a multi-token paste: a bare id, an @username, or a
+# bare filename (``<file_unique_id>.<ext>``).
+_TARGETISH_RE = re.compile(r"^(-?\d+|@\w+|[A-Za-z0-9_\-]+\.[A-Za-z0-9]+)$")
+
+
+def resolve_targets(text: str) -> tuple[list[int], list[str]]:
+    """Resolve ANY blob of text into uploader user ids + unresolvable tokens.
+
+    Accepts a single token (user id, @username, filename, ``#uid…`` tag) or a
+    whole pasted Cloudflare report containing many file URLs — each token is
+    resolved independently and the user ids are de-duplicated in order, so one
+    paste yields one report round per unique uploader.
+
+    In a multi-token paste only target-SHAPED tokens are considered (file URL,
+    ``#uid`` tag, bare id, ``@username``, ``name.ext``), so surrounding prose
+    ("URLs:", "Hi Nick") is neither resolved nor reported as unknown.
+    """
+    tokens = [t.strip().strip(".,;:()[]<>\"'") for t in re.split(r"[\s,;]+", text or "")]
+    tokens = [t for t in tokens if t]
+    lone = len(tokens) == 1
+    ids: list[int] = []
+    unknown: list[str] = []
+    for tok in tokens:
+        url = _FILE_URL_RE.search(tok)
+        tag = _TAG_RE.match(tok)
+        if url:
+            tok = url.group(1)
+            uid = abuse.find_user_by_filename(tok)
+        elif tag:
+            uid = -int(tag.group(2)) if tag.group(1) in ("cid", "gid") else int(tag.group(2))
+        elif lone or _TARGETISH_RE.match(tok):
+            uid = resolve_user(tok)
+        else:
+            continue
+        if uid is None:
+            if tok not in unknown:
+                unknown.append(tok)
+        elif uid not in ids:
+            ids.append(uid)
+    return ids, unknown
 
 
 class PrepareResult:

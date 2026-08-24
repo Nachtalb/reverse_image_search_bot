@@ -27,27 +27,45 @@ def abuse(tmp_path, monkeypatch):
     return ab
 
 
-def test_cf_file_regex_defanged_and_plain():
-    from reverse_image_search_bot.commands.report import _CF_FILE_RE
+def test_resolve_targets_defanged_urls_tags_and_unknowns(abuse):
+    from reverse_image_search_bot.abuse_report.prepare import resolve_targets
+
+    abuse.record_user(55, username="one")
+    abuse.record_user(66, username="two")
+    abuse.record_file("AQADsAxrG35d6EZ9", saved_filename="AQADsAxrG35d6EZ9.jpg", user_id=55)
+    abuse.record_file("AgADkAcAAn5d6EY", saved_filename="AgADkAcAAn5d6EY.jpg", user_id=55)
+    abuse.record_file("Zz_9-Ab", saved_filename="Zz_9-Ab.png", user_id=66)
 
     text = (
         "URLs: hxxps://ris.naa[.]gg/f/AQADsAxrG35d6EZ9.jpg, "
         "hxxps://ris.naa[.]gg/f/AgADkAcAAn5d6EY.jpg, "
-        "https://ris.naa.gg/f/Zz_9-Ab.png"
+        "https://ris.naa.gg/f/Zz_9-Ab.png, "
+        "https://ris.naa.gg/f/gone.jpg"
     )
-    assert _CF_FILE_RE.findall(text) == [
-        "AQADsAxrG35d6EZ9.jpg",
-        "AgADkAcAAn5d6EY.jpg",
-        "Zz_9-Ab.png",
-    ]
+    assert resolve_targets(text) == ([55, 66], ["gone.jpg"])
 
 
-def test_cf_file_regex_ignores_non_f_paths():
-    from reverse_image_search_bot.commands.report import _CF_FILE_RE
+def test_resolve_targets_ignores_non_f_paths(abuse):
+    from reverse_image_search_bot.abuse_report.prepare import resolve_targets
 
-    # Only /f/<file> matches; other paths (e.g. /d/ debug, /report/) are ignored.
+    abuse.record_user(55, username="one")
+    abuse.record_file("keep", saved_filename="keep.jpg", user_id=55)
+    # Only /f/<file> is treated as a file URL; other paths resolve to nothing.
     text = "https://ris.naa.gg/d/skip.jpg https://ris.naa.gg/report/abc https://ris.naa.gg/f/keep.jpg"
-    assert _CF_FILE_RE.findall(text) == ["keep.jpg"]
+    ids, unknown = resolve_targets(text)
+    assert ids == [55]
+    assert "keep.jpg" not in unknown
+
+
+def test_resolve_targets_single_tokens_and_tags(abuse):
+    from reverse_image_search_bot.abuse_report.prepare import resolve_targets
+
+    abuse.record_user(55, username="badguy")
+    assert resolve_targets("55") == ([55], [])
+    assert resolve_targets("@badguy") == ([55], [])
+    assert resolve_targets("#uid55") == ([55], [])
+    # cid/gid tags are rendered abs() in captions — re-negated on the way back.
+    assert resolve_targets("#gid1001234567890") == ([-1001234567890], [])
 
 
 def _mk_update(text: str, chat_type: str = "group"):
