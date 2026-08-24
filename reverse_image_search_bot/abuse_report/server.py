@@ -39,7 +39,7 @@ from reverse_image_search_bot.abuse_report.prepare import (
     delete_user_files,
     prepare_report,
     purge_cipher_dir,
-    resolve_user,
+    resolve_targets,
     restore_report_files,
 )
 from reverse_image_search_bot.config import abuse
@@ -47,9 +47,10 @@ from reverse_image_search_bot.config import abuse
 logger = logging.getLogger("abuse.server")
 
 _STATIC = Path(__file__).parent / "static"
-# Live prepare progress ("done/total"), keyed by the user id being prepared.
+# Live prepare progress ("done/total"), keyed by the raw target token the create
+# request was given (the client has no user id until create returns).
 # Single process, so an in-memory dict is enough (same pattern as _submit_progress).
-_prepare_progress: dict[int, str] = {}
+_prepare_progress: dict[str, str] = {}
 # "NR" = selected/reported but Not Rated — no NCMEC industryClassification is
 # sent (that field is optional). Everything else must be a real A1-B2 code.
 _VALID_CLASSES = {"A1", "A2", "B1", "B2", "NR"}
@@ -184,17 +185,16 @@ async def api_prepare_progress(request: web.Request) -> web.Response:
     target = (request.query.get("target") or "").strip()
     if not target:
         raise web.HTTPBadRequest(text="target required")
-    user_id = resolve_user(target)
-    if user_id is None:
-        return web.json_response({"progress": None})
-    return web.json_response({"progress": _prepare_progress.get(user_id)})
+    return web.json_response({"progress": _prepare_progress.get(target)})
 
 
 async def api_reports_create(request: web.Request) -> web.Response:
-    """Create a new report from a target token (user id, @username, or filename).
+    """Create report round(s) from a target field.
 
-    Returns the new report's uuid + the one-time image key (P1), which is shown
-    once and never stored — the caller must surface it immediately.
+    The field takes any input shape: a user id, @username, filename, ``#uid``
+    tag, or a whole pasted Cloudflare abuse report full of file URLs. Every
+    token is resolved, deduped to unique uploaders, and one round is prepared
+    per uploader. Returns one result entry per uploader (P1 shown once).
     """
     _require_admin(request)
     if not crypto.verify_global_page_password(request.headers.get("X-Page-Secret", ""), settings.REPORT_PAGE_PASSWORD):
@@ -203,44 +203,49 @@ async def api_reports_create(request: web.Request) -> web.Response:
     payload = await request.json()
     target = (payload.get("target") or "").strip()
     if not target:
-        raise web.HTTPBadRequest(text="target (user id, @username, or filename) required")
-    user_id = resolve_user(target)
-    if user_id is None:
+        raise web.HTTPBadRequest(text="target (user id, @username, filename, or file URLs) required")
+    user_ids, unknown = resolve_targets(target)
+    if not user_ids:
         raise web.HTTPNotFound(text=f"no uploader found for: {target}")
 
-    # prepare_report encrypts up to a batch of files (PBKDF2 + AES) — run it off
-    # the event loop so a big report can't stall the webhook/report server.
-    # Progress is published under the target user id so the console can poll it
-    # while this request is still in flight.
-    def note(done: int, total: int) -> None:
-        _prepare_progress[user_id] = f"{done}/{total}"
+    results = []
+    for user_id in user_ids:
+        # prepare_report encrypts every file (PBKDF2 + AES) — run it off the
+        # event loop so a big report can't stall the webhook/report server.
+        # Progress is published under the target token so the console can poll
+        # it while this request is still in flight.
+        def note(done: int, total: int) -> None:
+            _prepare_progress[target] = f"{done}/{total}"
 
-    _prepare_progress[user_id] = "0/?"
-    try:
-        result = await asyncio.to_thread(prepare_report, user_id, note)
-    finally:
-        _prepare_progress.pop(user_id, None)
-    if not result.ok:
-        # An existing active report is a 409 carrying its uuid so the UI can jump to it.
-        if result.existing_uuid:
-            return web.json_response(
-                {"ok": False, "error": result.error, "existing_uuid": result.existing_uuid}, status=409
+        _prepare_progress[target] = "0/?"
+        try:
+            result = await asyncio.to_thread(prepare_report, user_id, note)
+        finally:
+            _prepare_progress.pop(target, None)
+        if result.ok:
+            # DM the requesting admin the one-time image key (P1) + launch link,
+            # so it is delivered as a normal message (the page never shows P1 again).
+            await _dm_report_created(request.app.get("bot"), admin_id, user_id, result)
+            results.append(
+                {
+                    "user_id": user_id,
+                    "uuid": result.report_uuid,
+                    "p1": result.p1,
+                    "encrypted": result.encrypted,
+                }
             )
-        raise web.HTTPBadRequest(text=result.error or "could not prepare report")
+        else:
+            results.append(
+                {
+                    "user_id": user_id,
+                    "error": result.error,
+                    "existing_uuid": result.existing_uuid,
+                    "filed_uuid": result.filed_uuid,
+                    "ncmec_report_id": result.filed_ncmec_id,
+                }
+            )
 
-    # DM the requesting admin the one-time image key (P1) + launch link, so it is
-    # delivered as a normal message (the page never shows P1 again after this).
-    await _dm_report_created(request.app.get("bot"), admin_id, user_id, result)
-
-    return web.json_response(
-        {
-            "ok": True,
-            "uuid": result.report_uuid,
-            "user_id": user_id,
-            "p1": result.p1,
-            "encrypted": result.encrypted,
-        }
-    )
+    return web.json_response({"ok": True, "results": results, "unknown": unknown})
 
 
 async def _dm_report_created(bot, admin_id: int | None, user_id: int, result) -> None:

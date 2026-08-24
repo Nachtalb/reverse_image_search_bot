@@ -351,11 +351,12 @@ async def test_reports_create_by_username(abuse, monkeypatch, tmp_path):
 
     data = json.loads(resp.text or "")
     assert data["ok"] is True
-    assert data["user_id"] == 55
-    assert data["encrypted"] == 1
-    assert data["p1"]  # one-time key returned
+    res = data["results"][0]
+    assert res["user_id"] == 55
+    assert res["encrypted"] == 1
+    assert res["p1"]  # one-time key returned
     # a ready report now exists for the user
-    assert abuse.active_report_for_user(55)["report_uuid"] == data["uuid"]
+    assert abuse.active_report_for_user(55)["report_uuid"] == res["uuid"]
 
 
 @pytest.mark.asyncio
@@ -385,7 +386,7 @@ async def test_reports_create_dms_p1(abuse, monkeypatch, tmp_path):
     bot.send_message.assert_awaited_once()
     args, _kwargs = bot.send_message.call_args
     assert args[0] == 4242  # DMed the requesting admin
-    assert data["p1"] in args[1]  # the P1 key is in the message body
+    assert data["results"][0]["p1"] in args[1]  # the P1 key is in the message body
 
 
 @pytest.mark.asyncio
@@ -412,13 +413,15 @@ async def test_reports_create_already_filed_message(abuse, monkeypatch, tmp_path
     abuse.mark_report_filed("old")
 
     req = _req(headers={"X-Page-Secret": ""}, json_body={"target": "A.jpg"})
-    with pytest.raises(web.HTTPBadRequest) as exc:
-        await server.api_reports_create(req)
-    assert "700200" in (exc.value.text or "")  # points at the NCMEC report id
+    resp = await server.api_reports_create(req)
+    import json
+
+    res = json.loads(resp.text or "")["results"][0]
+    assert res["ncmec_report_id"] == 700200  # points at the NCMEC report id
 
 
 @pytest.mark.asyncio
-async def test_reports_create_existing_returns_409(abuse, monkeypatch, tmp_path):
+async def test_reports_create_existing_reported_per_result(abuse, monkeypatch, tmp_path):
     from reverse_image_search_bot import settings
     from reverse_image_search_bot.abuse_report import server
 
@@ -439,9 +442,44 @@ async def test_reports_create_existing_returns_409(abuse, monkeypatch, tmp_path)
     resp = await server.api_reports_create(req)
     import json
 
-    assert resp.status == 409
+    assert resp.status == 200
+    res = json.loads(resp.text or "")["results"][0]
+    assert res["existing_uuid"] == "existing"
+
+
+@pytest.mark.asyncio
+async def test_reports_create_bulk_urls_one_report_per_uploader(abuse, monkeypatch, tmp_path):
+    """A pasted Cloudflare report creates one round per unique uploader."""
+    from reverse_image_search_bot import settings
+    from reverse_image_search_bot.abuse_report import server
+
+    updir = tmp_path / "uploads"
+    updir.mkdir()
+    for name in ("A.jpg", "B.jpg", "C.jpg"):
+        (updir / name).write_bytes(b"img")
+    monkeypatch.setattr(settings, "UPLOADER", {"configuration": {"path": str(updir)}, "url": "https://x/f"})
+    monkeypatch.setattr(settings, "REPORT_PAGE_PASSWORD", "")
+    monkeypatch.setattr(settings, "REPORT_BASE_URL", "https://ris.naa.gg")
+    monkeypatch.setattr(server, "_admin_from_request", lambda req: 42)
+
+    abuse.record_user(55, username="one")
+    abuse.record_user(66, username="two")
+    abuse.record_file("A", saved_filename="A.jpg", user_id=55)
+    abuse.record_file("B", saved_filename="B.jpg", user_id=55)  # same uploader as A
+    abuse.record_file("C", saved_filename="C.jpg", user_id=66)
+
+    target = (
+        "URLs: hxxps://ris.naa[.]gg/f/A.jpg, hxxps://ris.naa[.]gg/f/B.jpg, "
+        "hxxps://ris.naa[.]gg/f/C.jpg, hxxps://ris.naa[.]gg/f/nope.jpg"
+    )
+    req = _req(headers={"X-Page-Secret": ""}, json_body={"target": target})
+    resp = await server.api_reports_create(req)
+    import json
+
     data = json.loads(resp.text or "")
-    assert data["existing_uuid"] == "existing"
+    assert [r["user_id"] for r in data["results"]] == [55, 66]  # deduped, in order
+    assert data["unknown"] == ["nope.jpg"]
+    assert all(r["uuid"] for r in data["results"])
 
 
 def test_filed_report_stats_filed_only_with_language_and_times(abuse):

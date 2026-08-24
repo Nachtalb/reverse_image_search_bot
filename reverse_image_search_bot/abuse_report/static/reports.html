@@ -18,7 +18,7 @@
   main { padding: 16px; }
   .card { background: #1f2128; border: 1px solid #2a2c33; border-radius: 12px; padding: 14px; margin-bottom: 14px; }
   label { display: block; font-size: 13px; color: #9a9ba2; margin-bottom: 6px; }
-  input[type=password], input[type=text] {
+  input[type=password], input[type=text], textarea {
     width: 100%; padding: 11px 12px; border-radius: 9px; border: 1px solid #363842;
     background: #14151a; color: #e8e8ea; font-size: 15px;
   }
@@ -103,7 +103,7 @@
       <div class="card">
         <label for="target">Create a new report</label>
         <div class="row">
-          <input type="text" id="target" placeholder="user id, @username, or filename" style="flex:1;min-width:180px">
+          <textarea id="target" rows="2" placeholder="user id, @username, filename, #uid…, or paste Cloudflare file URLs" style="flex:1;min-width:180px"></textarea>
           <button id="create-btn">Create</button>
         </div>
         <div class="err" id="create-err"></div>
@@ -178,9 +178,8 @@
 <script>
 const TG = window.Telegram && window.Telegram.WebApp;
 if (TG) { TG.ready(); TG.expand(); }
-// This IS the overview — clear the "came from console" flag and hide any Back
-// button Telegram may still be showing from a previous report page.
-try { sessionStorage.removeItem("ris_from_console"); } catch (e) {}
+// This IS the overview — hide any Back button Telegram may still be showing
+// from a previous report page.
 if (TG && TG.BackButton) TG.BackButton.hide();
 const INIT = (TG && TG.initData) || "";
 let P2 = "";
@@ -216,11 +215,9 @@ $("unlock-btn").onclick = async () => {
 function fmtTs(ts) { return ts ? new Date(ts * 1000).toLocaleString() : "—"; }
 
 function openReport(uuid) {
-  // Persist the page password so the report page auto-unlocks on arrival, and
-  // flag that we came from the console so the report shows a Back button.
+  // Persist the page password so the report page auto-unlocks on arrival.
   try {
     sessionStorage.setItem("ris_report_pw", P2);
-    sessionStorage.setItem("ris_from_console", "1");
   } catch (e) {}
   location.href = `/report/${uuid}`;
 }
@@ -284,24 +281,37 @@ $("create-btn").onclick = async () => {
       body: JSON.stringify({ target }),
     });
     const j = await r.json();
-    if (r.status === 409 && j.existing_uuid) {
-      // Active report already exists — offer to open it.
-      const ok = $("create-ok");
-      ok.classList.remove("hidden");
-      ok.innerHTML = `<div class="muted">${escapeHtml(j.error || "Active report already exists.")}</div>` +
-        `<div style="height:8px"></div><button id="goto-existing">Open existing report</button>`;
-      $("goto-existing").onclick = () => openReport(j.existing_uuid);
-      return;
-    }
-    // Success — show the one-time image key (P1) and an open button.
+    // One entry per unique uploader found in the input.
     const ok = $("create-ok");
     ok.classList.remove("hidden");
-    ok.innerHTML =
-      `<div>Report created — encrypted <b>${j.encrypted}</b> file(s).</div>` +
-      `<div style="margin:6px 0">Image key (P1): <code>${escapeHtml(j.p1)}</code> ` +
-      `<span class="muted">(shown once — copy it)</span></div>` +
-      `<button id="goto-new">Open report</button>`;
-    $("goto-new").onclick = () => openReport(j.uuid);
+    ok.innerHTML = "";
+    for (const res of j.results || []) {
+      const row = document.createElement("div");
+      row.style.marginBottom = "10px";
+      if (res.uuid) {
+        row.innerHTML =
+          `<div>🆕 <code>${res.user_id}</code> — encrypted <b>${res.encrypted}</b> file(s).</div>` +
+          `<div style="margin:4px 0">Image key (P1): <code>${escapeHtml(res.p1)}</code> ` +
+          `<span class="muted">(shown once — copy it)</span></div>`;
+      } else {
+        const icon = res.ncmec_report_id ? "✅" : (res.existing_uuid ? "⏳" : "⏭");
+        row.innerHTML = `<div>${icon} <code>${res.user_id}</code> — ${escapeHtml(res.error || "nothing to report")}</div>`;
+      }
+      const uuid = res.uuid || res.existing_uuid || res.filed_uuid;
+      if (uuid) {
+        const b = document.createElement("button");
+        b.textContent = "Open report " + res.user_id;
+        b.onclick = () => openReport(uuid);
+        row.appendChild(b);
+      }
+      ok.appendChild(row);
+    }
+    if ((j.unknown || []).length) {
+      const u = document.createElement("div");
+      u.className = "muted";
+      u.textContent = `❓ ${j.unknown.length} token(s) with no uploader on record: ${j.unknown.join(", ")}`;
+      ok.appendChild(u);
+    }
     $("target").value = "";
     loadList().catch(() => {});
   } catch (e) {
