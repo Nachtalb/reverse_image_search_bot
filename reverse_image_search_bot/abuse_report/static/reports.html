@@ -46,6 +46,8 @@
   .badge.cancelled, .badge.error, .badge.retracted, .badge.review { background: #3a1c1c; color: #f0a0a0; }
   .err { color: #f08a8a; font-size: 13px; margin-top: 8px; }
   code { background: #2a2c33; padding: 1px 5px; border-radius: 4px; }
+  code.copyable { cursor: pointer; border: 1px dashed #4a4c56; }
+  code.copyable:active { background: #3a6df0; color: #fff; }
   /* Tabs */
   .tabs { display: flex; gap: 8px; margin-bottom: 14px; }
   .tab { flex: 1; text-align: center; padding: 10px; border-radius: 9px; background: #1f2128; border: 1px solid #2a2c33; color: #9a9ba2; cursor: pointer; font-weight: 600; }
@@ -103,7 +105,7 @@
       <div class="card">
         <label for="target">Create a new report</label>
         <div class="row">
-          <textarea id="target" rows="2" placeholder="user id, @username, filename, #uid…, or paste Cloudflare file URLs" style="flex:1;min-width:180px"></textarea>
+          <textarea id="target" rows="1" placeholder="ID, @username, file or URLs" style="flex:1;min-width:180px"></textarea>
           <button id="create-btn">Create</button>
         </div>
         <div class="err" id="create-err"></div>
@@ -290,26 +292,29 @@ $("create-btn").onclick = async () => {
       row.style.marginBottom = "10px";
       if (res.uuid) {
         row.innerHTML =
-          `<div>🆕 <code>${res.user_id}</code> — encrypted <b>${res.encrypted}</b> file(s).</div>` +
-          `<div style="margin:4px 0">Image key (P1): <code>${escapeHtml(res.p1)}</code> ` +
-          `<span class="muted">(shown once — copy it)</span></div>`;
+          `<div>🆕 encrypted <b>${res.encrypted}</b> file(s).</div>` +
+          `<div style="margin:4px 0">Image key: <code class="copyable" data-copy="${escapeHtml(res.p1)}">${escapeHtml(res.p1)}</code></div>`;
       } else {
         const icon = res.ncmec_report_id ? "✅" : (res.existing_uuid ? "⏳" : "⏭");
-        row.innerHTML = `<div>${icon} <code>${res.user_id}</code> — ${escapeHtml(res.error || "nothing to report")}</div>`;
+        row.innerHTML = `<div>${icon} ${escapeHtml(res.error || "nothing to report")}</div>`;
       }
       const uuid = res.uuid || res.existing_uuid || res.filed_uuid;
       if (uuid) {
         const b = document.createElement("button");
-        b.textContent = "Open report " + res.user_id;
+        b.textContent = "Open " + res.user_id;
+        b.style.width = "100%";
         b.onclick = () => openReport(uuid);
         row.appendChild(b);
+      } else {
+        // No report to open — the id has nowhere else to live.
+        row.firstChild.innerHTML = `<code>${res.user_id}</code> · ` + row.firstChild.innerHTML;
       }
       ok.appendChild(row);
     }
     if ((j.unknown || []).length) {
       const u = document.createElement("div");
       u.className = "muted";
-      u.textContent = `❓ ${j.unknown.length} token(s) with no uploader on record: ${j.unknown.join(", ")}`;
+      u.textContent = `❓ no uploader on record: ${j.unknown.join(", ")}`;
       ok.appendChild(u);
     }
     $("target").value = "";
@@ -326,6 +331,24 @@ $("create-btn").onclick = async () => {
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
+
+// Tap a .copyable to copy its data-copy value (clipboard API needs a secure
+// context; the textarea fallback covers older Telegram webviews).
+document.addEventListener("click", ev => {
+  const el = ev.target.closest(".copyable");
+  if (!el) return;
+  const text = el.dataset.copy || el.textContent;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(() => {});
+    return;
+  }
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand("copy"); } catch (e) {}
+  ta.remove();
+});
 
 // ============ Tabs ============
 document.querySelectorAll(".tab").forEach(t => {
