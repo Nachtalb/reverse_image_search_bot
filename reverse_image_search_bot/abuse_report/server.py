@@ -206,7 +206,7 @@ async def api_reports_create(request: web.Request) -> web.Response:
     target = (payload.get("target") or "").strip()
     if not target:
         raise web.HTTPBadRequest(text="target (user id, @username, filename, or file URLs) required")
-    user_ids, unknown = resolve_targets(target)
+    user_ids, unknown, indicators = resolve_targets(target)
     if not user_ids:
         raise web.HTTPNotFound(text=f"no uploader found for: {target}")
 
@@ -221,7 +221,7 @@ async def api_reports_create(request: web.Request) -> web.Response:
 
         _prepare_progress[target] = "0/?"
         try:
-            result = await asyncio.to_thread(prepare_report, user_id, note)
+            result = await asyncio.to_thread(prepare_report, user_id, note, indicators.get(user_id))
         finally:
             _prepare_progress.pop(target, None)
         if result.ok:

@@ -86,7 +86,7 @@ _TAG_RE = re.compile(r"^#(uid|cid|gid)(\d+)$")
 _TARGETISH_RE = re.compile(r"^(-?\d+|@\w+|[A-Za-z0-9_\-]+\.[A-Za-z0-9]+)$")
 
 
-def resolve_targets(text: str) -> tuple[list[int], list[str]]:
+def resolve_targets(text: str) -> tuple[list[int], list[str], dict[int, list[str]]]:
     """Resolve ANY blob of text into uploader user ids + unresolvable tokens.
 
     Accepts a single token (user id, @username, filename, ``#uid…`` tag) or a
@@ -97,30 +97,46 @@ def resolve_targets(text: str) -> tuple[list[int], list[str]]:
     In a multi-token paste only target-SHAPED tokens are considered (file URL,
     ``#uid`` tag, bare id, ``@username``, ``name.ext``), so surrounding prose
     ("URLs:", "Hi Nick") is neither resolved nor reported as unknown.
+
+    The third element maps each user id to the ``file_unique_id``s that pointed
+    at them — the files the report was actually opened over. They are flagged on
+    their blobs so the admin can still tell them apart from the rest of the
+    user's material.
     """
     tokens = [t.strip().strip(".,;:()[]<>\"'") for t in re.split(r"[\s,;]+", text or "")]
     tokens = [t for t in tokens if t]
     lone = len(tokens) == 1
     ids: list[int] = []
     unknown: list[str] = []
+    indicators: dict[int, list[str]] = {}
     for tok in tokens:
         url = _FILE_URL_RE.search(tok)
         tag = _TAG_RE.match(tok)
+        fname = None
         if url:
-            tok = url.group(1)
+            tok = fname = url.group(1)
             uid = abuse.find_user_by_filename(tok)
         elif tag:
             uid = -int(tag.group(2)) if tag.group(1) in ("cid", "gid") else int(tag.group(2))
         elif lone or _TARGETISH_RE.match(tok):
             uid = resolve_user(tok)
+            # A bare filename is an indicator too — same as a pasted URL.
+            if uid is not None and not tok.startswith("@") and not tok.lstrip("-").isdigit():
+                fname = tok
         else:
             continue
         if uid is None:
             if tok not in unknown:
                 unknown.append(tok)
-        elif uid not in ids:
+            continue
+        if uid not in ids:
             ids.append(uid)
-    return ids, unknown
+        if fname:
+            stem = fname.rsplit(".", 1)[0]
+            indicators.setdefault(uid, [])
+            if stem not in indicators[uid]:
+                indicators[uid].append(stem)
+    return ids, unknown, indicators
 
 
 class PrepareResult:
@@ -182,7 +198,11 @@ def _present_files(user_id: int) -> tuple[list, int, int]:
 
 
 def _encrypt_and_remove(
-    report_uuid: str, batch: list, key: bytes, progress: Callable[[int, int], None] | None = None
+    report_uuid: str,
+    batch: list,
+    key: bytes,
+    progress: Callable[[int, int], None] | None = None,
+    indicators: set[str] | None = None,
 ) -> int:
     """Encrypt (file_row, path) pairs into report blobs, deleting each plaintext.
 
@@ -218,6 +238,7 @@ def _encrypt_and_remove(
             nonce=nonce,
             cipher_path=f"report_files/{report_uuid}/{cipher_name}",
             plaintext_sha256=crypto.sha256_hex(data),
+            indicator=bool(indicators and f["file_unique_id"] in indicators),
         )
         try:
             fp.unlink()
@@ -310,7 +331,11 @@ def delete_user_files(user_id: int) -> int:
     return removed
 
 
-def prepare_report(user_id: int, progress: Callable[[int, int], None] | None = None) -> PrepareResult:
+def prepare_report(
+    user_id: int,
+    progress: Callable[[int, int], None] | None = None,
+    indicators: list[str] | None = None,
+) -> PrepareResult:
     """Gather → encrypt → create a ``ready`` report for ``user_id``.
 
     Returns a :class:`PrepareResult`. On success it carries the new
@@ -356,6 +381,6 @@ def prepare_report(user_id: int, progress: Callable[[int, int], None] | None = N
     key = crypto.derive_key(p1)
 
     abuse.create_report(report_uuid, user_id, "")
-    encrypted = _encrypt_and_remove(report_uuid, present, key, progress)
+    encrypted = _encrypt_and_remove(report_uuid, present, key, progress, set(indicators or ()))
     abuse.set_report_status(report_uuid, abuse.REPORT_READY)
     return PrepareResult(report_uuid=report_uuid, p1=p1, encrypted=encrypted)

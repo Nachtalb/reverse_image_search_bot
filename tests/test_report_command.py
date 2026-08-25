@@ -42,7 +42,10 @@ def test_resolve_targets_defanged_urls_tags_and_unknowns(abuse):
         "https://ris.naa.gg/f/Zz_9-Ab.png, "
         "https://ris.naa.gg/f/gone.jpg"
     )
-    assert resolve_targets(text) == ([55, 66], ["gone.jpg"])
+    ids, unknown, indicators = resolve_targets(text)
+    assert (ids, unknown) == ([55, 66], ["gone.jpg"])
+    # Every resolved file URL is recorded as an indicator for its uploader.
+    assert indicators == {55: ["AQADsAxrG35d6EZ9", "AgADkAcAAn5d6EY"], 66: ["Zz_9-Ab"]}
 
 
 def test_resolve_targets_ignores_non_f_paths(abuse):
@@ -52,7 +55,7 @@ def test_resolve_targets_ignores_non_f_paths(abuse):
     abuse.record_file("keep", saved_filename="keep.jpg", user_id=55)
     # Only /f/<file> is treated as a file URL; other paths resolve to nothing.
     text = "https://ris.naa.gg/d/skip.jpg https://ris.naa.gg/report/abc https://ris.naa.gg/f/keep.jpg"
-    ids, unknown = resolve_targets(text)
+    ids, unknown, _ = resolve_targets(text)
     assert ids == [55]
     assert "keep.jpg" not in unknown
 
@@ -61,11 +64,12 @@ def test_resolve_targets_single_tokens_and_tags(abuse):
     from reverse_image_search_bot.abuse_report.prepare import resolve_targets
 
     abuse.record_user(55, username="badguy")
-    assert resolve_targets("55") == ([55], [])
-    assert resolve_targets("@badguy") == ([55], [])
-    assert resolve_targets("#uid55") == ([55], [])
+    # A plain id / @username / tag names a user, not a file — no indicators.
+    assert resolve_targets("55") == ([55], [], {})
+    assert resolve_targets("@badguy") == ([55], [], {})
+    assert resolve_targets("#uid55") == ([55], [], {})
     # cid/gid tags are rendered abs() in captions — re-negated on the way back.
-    assert resolve_targets("#gid1001234567890") == ([-1001234567890], [])
+    assert resolve_targets("#gid1001234567890") == ([-1001234567890], [], {})
 
 
 def _mk_update(text: str, chat_type: str = "group"):

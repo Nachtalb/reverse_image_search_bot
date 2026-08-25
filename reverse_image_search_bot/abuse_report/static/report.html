@@ -37,6 +37,9 @@
   .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; margin-top: 8px; }
   .thumb { position: relative; border: 2px solid #2a2c33; border-radius: 10px; overflow: hidden; background: #101116; aspect-ratio: 1; }
   .thumb.selected { border-color: #3a6df0; }
+  /* The file(s) the report was opened over. `outline` sits outside the border
+     and takes no layout space, so it stays readable alongside .selected. */
+  .thumb.indicator { outline: 2px solid #f0c674; outline-offset: 1px; }
   .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: zoom-in; }
   .thumb .lock { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #5a5c66; font-size: 26px; pointer-events: none; }
   .thumb .cls { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.72); padding: 4px; display: flex; gap: 3px; justify-content: center; }
@@ -343,6 +346,7 @@ function renderGallery() {
   for (const b of META.blobs) {
     const d = document.createElement("div");
     d.className = "thumb"; d.dataset.id = b.id;
+    if (b.indicator) d.classList.add("indicator");
     if (b.selected) sel[b.id] = b.classification;
     // A filed report is immutable: show the reported category on the still-locked
     // thumbnail from the start, so it's visible without decrypting the images.
