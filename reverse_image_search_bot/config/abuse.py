@@ -590,6 +590,7 @@ REPORT_REVIEW = "review"  # uploaded to NCMEC, awaiting final finish/retract
 REPORT_FILED = "filed"  # finish() succeeded — report is with NCMEC
 REPORT_RETRACTED = "retracted"  # retract() called
 REPORT_CANCELLED = "cancelled"  # admin cancelled the whole round, blobs purged
+REPORT_DELETED = "deleted"  # selected files destroyed, rest restored; nothing filed
 REPORT_ERROR = "error"  # something failed; status_detail carries the message
 
 

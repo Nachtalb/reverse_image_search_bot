@@ -250,13 +250,18 @@ def _encrypt_and_remove(
     return encrypted
 
 
-def restore_report_files(report_uuid: str, p1: str) -> str | None:
+def restore_report_files(report_uuid: str, p1: str, skip_ids: set[int] | None = None) -> str | None:
     """Decrypt a report's blobs back onto disk. Returns an error string, or None.
 
     The inverse of preparing: cancelling a round means the files were fine, so
     they go back where they were. Verifies P1 against every blob's stored hash
     BEFORE writing anything — a wrong key must not scatter garbage into the
     upload directory.
+
+    ``skip_ids`` leaves those blobs' plaintext on the floor — used by the
+    delete flow, where the selected files are the ones being destroyed and only
+    the rest go back online. They are still decrypted and hash-checked, so a
+    wrong key is caught before anything is written or deleted.
     """
     updir = upload_dir()
     if updir is None:
@@ -274,6 +279,8 @@ def restore_report_files(report_uuid: str, p1: str) -> str | None:
             return "image key incorrect"
         if crypto.sha256_hex(data) != b["plaintext_sha256"]:
             return "image key incorrect"
+        if skip_ids and b["id"] in skip_ids:
+            continue
         plaintexts.append((updir / b["saved_filename"], data))
     for fp, data in plaintexts:
         try:

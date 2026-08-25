@@ -740,6 +740,52 @@ async def api_cancel(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "status": abuse.REPORT_CANCELLED})
 
 
+async def api_delete(request: web.Request) -> web.Response:
+    """Destroy the SELECTED files and put the rest back online. Nothing is filed.
+
+    For material that is plainly unwanted but can't be attributed to a minor —
+    a Cloudflare complaint about content nobody can age-verify. Deleting it is
+    the right call; banning the uploader and filing with NCMEC is not.
+
+    The selected blobs' plaintext is never written back (their ciphertext and
+    rows are dropped with the round), every other file is restored to disk, and
+    the report is closed as ``deleted``. The uploader is NOT banned. Deleted
+    files are marked cleared so a later round doesn't drag them back in.
+    """
+    _require_admin(request)
+    rep = _report_or_404(request.match_info["uuid"])
+    _require_page_secret(request, rep)
+    payload = await request.json()
+    p1 = payload.get("image_key", "")
+    if not p1:
+        raise web.HTTPBadRequest(text="image key required")
+    doomed = [b for b in abuse.report_blobs(rep["report_uuid"]) if b["selected"]]
+    if not doomed:
+        raise web.HTTPBadRequest(text="select the files to delete first")
+    # Restore everything EXCEPT the doomed files. This verifies the key against
+    # every blob before writing or deleting anything, so a wrong key destroys
+    # nothing.
+    err = await asyncio.to_thread(restore_report_files, rep["report_uuid"], p1, {b["id"] for b in doomed})
+    if err:
+        raise web.HTTPBadRequest(text=err)
+    # The deleted files must not come back in a future round for this user.
+    abuse.set_files_cleared([b["file_unique_id"] for b in doomed])
+    abuse.set_report_status(rep["report_uuid"], abuse.REPORT_DELETED, detail=f"{len(doomed)} file(s) deleted")
+    base = settings.UPLOADER.get("configuration", {}).get("path")
+    if base:
+        for b in abuse.report_blobs(rep["report_uuid"]):
+            if b.get("video_path"):
+                try:
+                    vfp = Path(base) / b["video_path"]
+                    if vfp.is_file():
+                        vfp.unlink()
+                except Exception:
+                    logger.warning("failed to delete video on delete %s", b["video_path"], exc_info=True)
+    abuse.purge_report_blobs(rep["report_uuid"])
+    purge_cipher_dir(rep["report_uuid"])
+    return web.json_response({"ok": True, "status": abuse.REPORT_DELETED, "deleted": len(doomed)})
+
+
 def _public_file_url(saved_filename: str) -> str:
     base = settings.UPLOADER.get("url", "").rstrip("/")
     return f"{base}/{saved_filename}" if base else saved_filename
@@ -842,6 +888,7 @@ def build_app(bot=None, bot_data=None) -> web.Application:
     app.router.add_post("/report/{uuid}/api/review", api_review)
     app.router.add_post("/report/{uuid}/api/submit", api_submit)
     app.router.add_post("/report/{uuid}/api/cancel", api_cancel)
+    app.router.add_post("/report/{uuid}/api/delete", api_delete)
     app.router.add_get("/healthz", healthz)
     return app
 
