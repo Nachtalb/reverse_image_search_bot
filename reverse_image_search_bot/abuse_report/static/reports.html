@@ -245,7 +245,7 @@ function renderList() {
     return;
   }
   for (const rep of reports) {
-    const who = rep.username ? "@" + rep.username : (rep.display_name || "(no name)");
+    const who = rep.username ? "@" + rep.username : (rep.display_name || rep.user_id);
     const ncmec = rep.ncmec_report_id ? ` · NCMEC #${rep.ncmec_report_id}` : "";
     const el = document.createElement("div");
     el.className = "rep";
