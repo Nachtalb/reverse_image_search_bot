@@ -234,6 +234,40 @@ async def test_delete_with_wrong_key_destroys_nothing(abuse, monkeypatch, tmp_pa
     assert len(abuse.blob_meta("u")) == 1
 
 
+@pytest.mark.asyncio
+async def test_mini_app_pages_are_not_cached(abuse, monkeypatch):
+    """The Telegram webview has no reload button — a cached shell hides deploys."""
+    from reverse_image_search_bot.abuse_report import server
+
+    monkeypatch.setattr(server, "_admin_from_request", lambda req: 42)
+    abuse.record_user(1)
+    abuse.create_report("u", 1, "")
+
+    console = await server.reports_index(_req())
+    report = await server.index(_req(match={"uuid": "u"}))
+    for resp in (console, report):
+        assert "no-store" in resp.headers["Cache-Control"]
+
+
+@pytest.mark.asyncio
+async def test_reports_list_falls_back_to_the_full_name(abuse, monkeypatch):
+    """A user with no @username is listed by name, not a placeholder."""
+    from reverse_image_search_bot import settings
+    from reverse_image_search_bot.abuse_report import server
+
+    monkeypatch.setattr(settings, "REPORT_PAGE_PASSWORD", "")
+    monkeypatch.setattr(server, "_admin_from_request", lambda req: 42)
+    abuse.record_user(7, first_name="J", last_name="C")
+    abuse.create_report("u", 7, "")
+
+    resp = await server.api_reports_list(_req(headers={"X-Page-Secret": ""}))
+    import json
+
+    rep = json.loads(resp.text or "")["reports"][0]
+    assert rep["username"] is None
+    assert rep["display_name"] == "J C"
+
+
 def test_finish_moves_reported_ciphertext_into_the_db(abuse, monkeypatch, tmp_path):
     """Filing is what earns a place in SQLite: disk ciphertext -> DB, dir purged."""
     from reverse_image_search_bot import settings

@@ -131,9 +131,20 @@ def _require_page_secret(request: web.Request, rep: dict) -> None:
 # --- routes -------------------------------------------------------------------
 
 
+def _no_cache(resp: web.StreamResponse) -> web.StreamResponse:
+    """Stop the Telegram webview serving a stale copy of a Mini App page.
+
+    The webview caches aggressively and has no reload button, so without this a
+    deployed UI change is invisible until the cache happens to expire — it looks
+    exactly like the fix was never shipped.
+    """
+    resp.headers["Cache-Control"] = "no-store, must-revalidate"
+    return resp
+
+
 async def reports_index(request: web.Request) -> web.StreamResponse:
     """Serve the reports-list Mini App shell. Auth happens via API calls."""
-    return web.FileResponse(_STATIC / "reports.html")
+    return _no_cache(web.FileResponse(_STATIC / "reports.html"))
 
 
 async def api_reports_list(request: web.Request) -> web.Response:
@@ -289,7 +300,7 @@ async def index(request: web.Request) -> web.StreamResponse:
     uuid = request.match_info["uuid"]
     if not abuse.get_report(uuid):
         return web.Response(status=404, text="report not found")
-    return web.FileResponse(_STATIC / "report.html")
+    return _no_cache(web.FileResponse(_STATIC / "report.html"))
 
 
 async def api_unlock(request: web.Request) -> web.Response:
