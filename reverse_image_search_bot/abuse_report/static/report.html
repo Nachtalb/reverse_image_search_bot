@@ -46,6 +46,11 @@
   .thumb .cls span { flex: 1; min-width: 0; text-align: center; font-size: 12px; font-weight: 700; padding: 5px 2px; border-radius: 5px; background: #2a2c33; cursor: pointer; }
   .thumb .cls span.on { background: #3a6df0; color: #fff; }
   .thumb .cls span.on[data-cls="NR"] { background: #6b7280; color: #fff; }
+  /* Delete mode: selection means destruction, so it must not look like the
+     blue "reporting this one" state. */
+  .gallery.deleting .thumb.selected { border-color: #e0524a; }
+  .gallery.deleting .thumb .cls span.on,
+  .gallery.deleting .thumb .cls span.on[data-cls="NR"] { background: #e0524a; color: #fff; }
   .thumb .reported-cls { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(15,47,90,.92); color: #8ab4ff; font-size: 11px; font-weight: 600; padding: 4px 6px; text-align: center; line-height: 1.2; }
   .thumb .reported-cls b { color: #fff; font-weight: 700; }
   .thumb .fname { position: absolute; top: 0; left: 0; right: 0; background: rgba(0,0,0,.72); color: #cfd0d6; font-size: 10px; padding: 3px 5px; word-break: break-all; line-height: 1.2; }
@@ -92,6 +97,8 @@
   .viewer-cls .vcls span { font-size: 15px; font-weight: 700; padding: 8px 14px; border-radius: 8px; background: #2a2c33; color: #e8e8ea; cursor: pointer; }
   .viewer-cls .vcls span.on { background: #3a6df0; color: #fff; }
   .viewer-cls .vcls span.on[data-cls="NR"] { background: #6b7280; color: #fff; }
+  .viewer-cls.deleting .vcls span.on,
+  .viewer-cls.deleting .vcls span.on[data-cls="NR"] { background: #e0524a; color: #fff; }
   .viewer-cls .vreported { font-size: 14px; font-weight: 600; color: #8ab4ff; }
   .viewer-cls .vreported b { color: #fff; }
   .preview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; margin: 10px 0; }
@@ -188,7 +195,7 @@
       </div>
       <label style="display:flex;gap:8px;align-items:center;font-size:14px;color:#e8e8ea;margin-top:12px;cursor:pointer">
         <input type="checkbox" id="delete-mode">
-        <span>Delete mode — remove files without reporting the user</span>
+        <span>Delete mode</span>
       </label>
       <div class="muted" id="action-err" style="color:#f08a8a;margin-top:8px"></div>
     </div>
@@ -535,6 +542,7 @@ function renderViewerCls(blobId) {
     return;
   }
   const cur = sel[blobId];
+  box.classList.toggle("deleting", DELETE_MODE);
   const codes = DELETE_MODE ? ["NR"] : ["A1", "A2", "B1", "B2", "NR"];
   const label = c => (DELETE_MODE ? (cur ? "✓ delete" : "delete") : c);
   box.innerHTML = `<div class="vcls">` + codes.map(c =>
@@ -896,6 +904,7 @@ $("delete-mode").onchange = (ev) => {
   $("review-btn").classList.toggle("hidden", DELETE_MODE);
   $("delete-btn").classList.toggle("hidden", !DELETE_MODE);
   $("gallery-card").querySelector(".cls-legend").classList.toggle("hidden", DELETE_MODE);
+  $("gallery").classList.toggle("deleting", DELETE_MODE);
   for (const b of META.blobs) syncThumbCls(b.id);
 };
 
