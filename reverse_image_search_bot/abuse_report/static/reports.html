@@ -44,6 +44,7 @@
   .badge.submitting { background: #4a3a10; color: #f0c674; }
   .badge.filed { background: #0f2f5a; color: #8ab4ff; }
   .badge.cancelled, .badge.error, .badge.retracted, .badge.review { background: #3a1c1c; color: #f0a0a0; }
+  .badge.deleted { background: #3a2c10; color: #f0c674; }
   .err { color: #f08a8a; font-size: 13px; margin-top: 8px; }
   code { background: #2a2c33; padding: 1px 5px; border-radius: 4px; }
   code.copyable { cursor: pointer; border: 1px dashed #4a4c56; }
@@ -126,6 +127,7 @@
               <option value="review">Review</option>
               <option value="submitting">Submitting</option>
               <option value="cancelled">Cancelled</option>
+              <option value="deleted">Deleted</option>
               <option value="retracted">Retracted</option>
               <option value="error">Error</option>
             </select>
@@ -243,7 +245,7 @@ function renderList() {
     return;
   }
   for (const rep of reports) {
-    const who = rep.username ? "@" + rep.username : "(no username)";
+    const who = rep.username ? "@" + rep.username : (rep.display_name || "(no name)");
     const ncmec = rep.ncmec_report_id ? ` · NCMEC #${rep.ncmec_report_id}` : "";
     const el = document.createElement("div");
     el.className = "rep";

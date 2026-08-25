@@ -835,7 +835,8 @@ def all_reports() -> list[dict]:
     """All reports, newest first — for the admin overview command."""
     conn = _get_conn()
     rows = conn.execute(
-        "SELECT r.*, u.username FROM reports r LEFT JOIN users u ON u.user_id = r.user_id ORDER BY r.created_at DESC"
+        "SELECT r.*, u.username, u.first_name, u.last_name FROM reports r "
+        "LEFT JOIN users u ON u.user_id = r.user_id ORDER BY r.created_at DESC"
     ).fetchall()
     return [dict(r) for r in rows]
 

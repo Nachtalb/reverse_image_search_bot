@@ -30,6 +30,7 @@ from pathlib import Path
 from urllib.parse import parse_qsl
 
 from aiohttp import web
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 from reverse_image_search_bot import settings
 from reverse_image_search_bot.abuse_report import crypto, ncmec
@@ -148,6 +149,7 @@ async def api_reports_list(request: web.Request) -> web.Response:
                     "uuid": r["report_uuid"],
                     "user_id": r["user_id"],
                     "username": r.get("username"),
+                    "display_name": " ".join(filter(None, (r.get("first_name"), r.get("last_name")))) or None,
                     "status": r["status"],
                     "ncmec_report_id": r["ncmec_report_id"],
                     "created_at": r["created_at"],
@@ -248,24 +250,35 @@ async def api_reports_create(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "results": results, "unknown": unknown})
 
 
+def _who(user_id: int) -> str:
+    """Human label for a user: @username, else full name, else empty.
+
+    Empty rather than a placeholder dash — every call site already shows the id,
+    so a "—" would just be noise between it and the detail.
+    """
+    u = abuse.get_user(user_id) or {}
+    if u.get("username"):
+        return f"@{u['username']}"
+    return " ".join(filter(None, (u.get("first_name"), u.get("last_name"))))
+
+
 async def _dm_report_created(bot, admin_id: int | None, user_id: int, result) -> None:
     """DM the admin the image key + report link for an app-created report."""
     if bot is None or not admin_id:
         return
     import html as _html
 
-    user = abuse.get_user(user_id) or {}
-    uname = f"@{user['username']}" if user.get("username") else "—"
-    url = f"{settings.REPORT_BASE_URL}/report/{result.report_uuid}" if settings.REPORT_BASE_URL else result.report_uuid
+    url = f"{settings.REPORT_BASE_URL}/report/console" if settings.REPORT_BASE_URL else ""
     try:
         await bot.send_message(
             admin_id,
-            f"🆕 <code>{user_id}</code> {_html.escape(uname)} · {result.encrypted} file(s) offline\n"
-            f"Image key: <code>{_html.escape(result.p1 or '')}</code>\n\n"
-            f"{_html.escape(url)}\n\n"
-            f"<i>Shown once and not stored — losing it loses the files.</i>",
+            f"🆕 <code>{user_id}</code> {_html.escape(_who(user_id))} · {result.encrypted} file(s)\n"
+            f"Image key: <code>{_html.escape(result.p1 or '')}</code>",
             parse_mode="HTML",
             disable_web_page_preview=True,
+            reply_markup=(
+                InlineKeyboardMarkup([[InlineKeyboardButton("Reports", web_app=WebAppInfo(url=url))]]) if url else None
+            ),
         )
     except Exception:
         logger.warning("failed to DM the image key for app-created report %s", result.report_uuid, exc_info=True)
