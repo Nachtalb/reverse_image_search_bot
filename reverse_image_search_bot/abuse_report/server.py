@@ -30,6 +30,7 @@ from pathlib import Path
 from urllib.parse import parse_qsl
 
 from aiohttp import web
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 from reverse_image_search_bot import settings
 from reverse_image_search_bot.abuse_report import crypto, ncmec
@@ -148,6 +149,7 @@ async def api_reports_list(request: web.Request) -> web.Response:
                     "uuid": r["report_uuid"],
                     "user_id": r["user_id"],
                     "username": r.get("username"),
+                    "display_name": " ".join(filter(None, (r.get("first_name"), r.get("last_name")))) or None,
                     "status": r["status"],
                     "ncmec_report_id": r["ncmec_report_id"],
                     "created_at": r["created_at"],
@@ -204,7 +206,7 @@ async def api_reports_create(request: web.Request) -> web.Response:
     target = (payload.get("target") or "").strip()
     if not target:
         raise web.HTTPBadRequest(text="target (user id, @username, filename, or file URLs) required")
-    user_ids, unknown = resolve_targets(target)
+    user_ids, unknown, indicators = resolve_targets(target)
     if not user_ids:
         raise web.HTTPNotFound(text=f"no uploader found for: {target}")
 
@@ -219,7 +221,7 @@ async def api_reports_create(request: web.Request) -> web.Response:
 
         _prepare_progress[target] = "0/?"
         try:
-            result = await asyncio.to_thread(prepare_report, user_id, note)
+            result = await asyncio.to_thread(prepare_report, user_id, note, indicators.get(user_id))
         finally:
             _prepare_progress.pop(target, None)
         if result.ok:
@@ -248,24 +250,35 @@ async def api_reports_create(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "results": results, "unknown": unknown})
 
 
+def _who(user_id: int) -> str:
+    """Human label for a user: @username, else full name, else empty.
+
+    Empty rather than a placeholder dash — every call site already shows the id,
+    so a "—" would just be noise between it and the detail.
+    """
+    u = abuse.get_user(user_id) or {}
+    if u.get("username"):
+        return f"@{u['username']}"
+    return " ".join(filter(None, (u.get("first_name"), u.get("last_name"))))
+
+
 async def _dm_report_created(bot, admin_id: int | None, user_id: int, result) -> None:
     """DM the admin the image key + report link for an app-created report."""
     if bot is None or not admin_id:
         return
     import html as _html
 
-    user = abuse.get_user(user_id) or {}
-    uname = f"@{user['username']}" if user.get("username") else "—"
-    url = f"{settings.REPORT_BASE_URL}/report/{result.report_uuid}" if settings.REPORT_BASE_URL else result.report_uuid
+    url = f"{settings.REPORT_BASE_URL}/report/console" if settings.REPORT_BASE_URL else ""
     try:
         await bot.send_message(
             admin_id,
-            f"🆕 <code>{user_id}</code> {_html.escape(uname)} · {result.encrypted} file(s) offline\n"
-            f"Image key: <code>{_html.escape(result.p1 or '')}</code>\n\n"
-            f"{_html.escape(url)}\n\n"
-            f"<i>Shown once and not stored — losing it loses the files.</i>",
+            f"🆕 <code>{user_id}</code> {_html.escape(_who(user_id))} · {result.encrypted} file(s)\n"
+            f"Image key: <code>{_html.escape(result.p1 or '')}</code>",
             parse_mode="HTML",
             disable_web_page_preview=True,
+            reply_markup=(
+                InlineKeyboardMarkup([[InlineKeyboardButton("Reports", web_app=WebAppInfo(url=url))]]) if url else None
+            ),
         )
     except Exception:
         logger.warning("failed to DM the image key for app-created report %s", result.report_uuid, exc_info=True)
@@ -727,6 +740,52 @@ async def api_cancel(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "status": abuse.REPORT_CANCELLED})
 
 
+async def api_delete(request: web.Request) -> web.Response:
+    """Destroy the SELECTED files and put the rest back online. Nothing is filed.
+
+    For material that is plainly unwanted but can't be attributed to a minor —
+    a Cloudflare complaint about content nobody can age-verify. Deleting it is
+    the right call; banning the uploader and filing with NCMEC is not.
+
+    The selected blobs' plaintext is never written back (their ciphertext and
+    rows are dropped with the round), every other file is restored to disk, and
+    the report is closed as ``deleted``. The uploader is NOT banned. Deleted
+    files are marked cleared so a later round doesn't drag them back in.
+    """
+    _require_admin(request)
+    rep = _report_or_404(request.match_info["uuid"])
+    _require_page_secret(request, rep)
+    payload = await request.json()
+    p1 = payload.get("image_key", "")
+    if not p1:
+        raise web.HTTPBadRequest(text="image key required")
+    doomed = [b for b in abuse.report_blobs(rep["report_uuid"]) if b["selected"]]
+    if not doomed:
+        raise web.HTTPBadRequest(text="select the files to delete first")
+    # Restore everything EXCEPT the doomed files. This verifies the key against
+    # every blob before writing or deleting anything, so a wrong key destroys
+    # nothing.
+    err = await asyncio.to_thread(restore_report_files, rep["report_uuid"], p1, {b["id"] for b in doomed})
+    if err:
+        raise web.HTTPBadRequest(text=err)
+    # The deleted files must not come back in a future round for this user.
+    abuse.set_files_cleared([b["file_unique_id"] for b in doomed])
+    abuse.set_report_status(rep["report_uuid"], abuse.REPORT_DELETED, detail=f"{len(doomed)} file(s) deleted")
+    base = settings.UPLOADER.get("configuration", {}).get("path")
+    if base:
+        for b in abuse.report_blobs(rep["report_uuid"]):
+            if b.get("video_path"):
+                try:
+                    vfp = Path(base) / b["video_path"]
+                    if vfp.is_file():
+                        vfp.unlink()
+                except Exception:
+                    logger.warning("failed to delete video on delete %s", b["video_path"], exc_info=True)
+    abuse.purge_report_blobs(rep["report_uuid"])
+    purge_cipher_dir(rep["report_uuid"])
+    return web.json_response({"ok": True, "status": abuse.REPORT_DELETED, "deleted": len(doomed)})
+
+
 def _public_file_url(saved_filename: str) -> str:
     base = settings.UPLOADER.get("url", "").rstrip("/")
     return f"{base}/{saved_filename}" if base else saved_filename
@@ -829,6 +888,7 @@ def build_app(bot=None, bot_data=None) -> web.Application:
     app.router.add_post("/report/{uuid}/api/review", api_review)
     app.router.add_post("/report/{uuid}/api/submit", api_submit)
     app.router.add_post("/report/{uuid}/api/cancel", api_cancel)
+    app.router.add_post("/report/{uuid}/api/delete", api_delete)
     app.router.add_get("/healthz", healthz)
     return app
 

@@ -157,6 +157,83 @@ async def test_cancel_purges_blobs_but_keeps_files_and_relation(abuse, monkeypat
     assert abuse.get_user(1) is not None
 
 
+@pytest.mark.asyncio
+async def test_delete_destroys_selected_restores_rest_and_keeps_user_unbanned(abuse, monkeypatch, tmp_path):
+    """Delete mode: selected files are destroyed, the rest come back, no ban."""
+    from reverse_image_search_bot import settings
+    from reverse_image_search_bot.abuse_report import crypto, server
+
+    updir = tmp_path / "uploads"
+    updir.mkdir()
+    monkeypatch.setattr(settings, "UPLOADER", {"configuration": {"path": str(updir)}})
+    monkeypatch.setattr(server, "_admin_from_request", lambda req: 42)
+
+    abuse.record_user(1)
+    abuse.create_report("u", 1, "")
+    p1 = "the-image-key"
+    key = crypto.derive_key(p1)
+    ids = {}
+    for name, body in (("A.jpg", b"doomed"), ("B.jpg", b"innocent")):
+        abuse.record_file(file_unique_id=name[0], saved_filename=name, user_id=1)
+        nonce, ct = crypto.encrypt_file(body, key)
+        ids[name] = abuse.add_report_blob(
+            "u",
+            file_unique_id=name[0],
+            saved_filename=name,
+            nonce=nonce,
+            ciphertext=ct,
+            plaintext_sha256=crypto.sha256_hex(body),
+        )
+    abuse.set_blob_selection("u", {ids["A.jpg"]: "NR"})
+
+    req = _req(headers={"X-Page-Secret": "pw"}, match={"uuid": "u"}, json_body={"image_key": p1})
+    resp = await server.api_delete(req)
+    import json
+
+    assert json.loads(resp.text or "")["deleted"] == 1
+    assert abuse.get_report("u")["status"] == abuse.REPORT_DELETED
+    # The selected file is gone for good; the unselected one is back on disk.
+    assert not (updir / "A.jpg").exists()
+    assert (updir / "B.jpg").read_bytes() == b"innocent"
+    # Deleting is not reporting: the uploader keeps their account.
+    assert not abuse.get_user(1).get("banned_at")
+    # The destroyed file is cleared so a later round can't drag it back in.
+    assert abuse.blob_meta("u") == []
+
+
+@pytest.mark.asyncio
+async def test_delete_with_wrong_key_destroys_nothing(abuse, monkeypatch, tmp_path):
+    """A wrong image key must abort before anything is written or deleted."""
+    from reverse_image_search_bot import settings
+    from reverse_image_search_bot.abuse_report import crypto, server
+
+    updir = tmp_path / "uploads"
+    updir.mkdir()
+    monkeypatch.setattr(settings, "UPLOADER", {"configuration": {"path": str(updir)}})
+    monkeypatch.setattr(server, "_admin_from_request", lambda req: 42)
+
+    abuse.record_user(1)
+    abuse.create_report("u", 1, "")
+    plaintext = b"doomed"
+    nonce, ct = crypto.encrypt_file(plaintext, crypto.derive_key("right-key"))
+    blob_id = abuse.add_report_blob(
+        "u",
+        file_unique_id="A",
+        saved_filename="A.jpg",
+        nonce=nonce,
+        ciphertext=ct,
+        plaintext_sha256=crypto.sha256_hex(plaintext),
+    )
+    abuse.set_blob_selection("u", {blob_id: "NR"})
+
+    req = _req(headers={"X-Page-Secret": "pw"}, match={"uuid": "u"}, json_body={"image_key": "wrong-key"})
+    with pytest.raises(web.HTTPBadRequest):
+        await server.api_delete(req)
+    # Report still open, blobs intact — nothing was destroyed.
+    assert abuse.get_report("u")["status"] != abuse.REPORT_DELETED
+    assert len(abuse.blob_meta("u")) == 1
+
+
 def test_finish_moves_reported_ciphertext_into_the_db(abuse, monkeypatch, tmp_path):
     """Filing is what earns a place in SQLite: disk ciphertext -> DB, dir purged."""
     from reverse_image_search_bot import settings

@@ -37,6 +37,9 @@
   .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; margin-top: 8px; }
   .thumb { position: relative; border: 2px solid #2a2c33; border-radius: 10px; overflow: hidden; background: #101116; aspect-ratio: 1; }
   .thumb.selected { border-color: #3a6df0; }
+  /* The file(s) the report was opened over. `outline` sits outside the border
+     and takes no layout space, so it stays readable alongside .selected. */
+  .thumb.indicator { outline: 2px solid #f0c674; outline-offset: 1px; }
   .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: zoom-in; }
   .thumb .lock { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #5a5c66; font-size: 26px; pointer-events: none; }
   .thumb .cls { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.72); padding: 4px; display: flex; gap: 3px; justify-content: center; }
@@ -59,6 +62,7 @@
   .status.ready { background: #103a2a; color: #7fd6a2; }
   .status.filed { background: #0f2f5a; color: #8ab4ff; }
   .status.error, .status.cancelled { background: #4a1010; color: #f08a8a; }
+  .status.deleted { background: #3a2c10; color: #f0c674; }
   .hidden { display: none !important; }
   .muted { color: #9a9ba2; font-size: 12px; }
   .cls-legend { font-size: 12px; color: #9a9ba2; margin-bottom: 10px; }
@@ -179,8 +183,13 @@
     <div class="card" id="action-card">
       <div class="row">
         <button id="review-btn">Review</button>
+        <button id="delete-btn" class="danger hidden">Delete selected</button>
         <button id="cancel-btn" class="ghost">Cancel</button>
       </div>
+      <label style="display:flex;gap:8px;align-items:center;font-size:14px;color:#e8e8ea;margin-top:12px;cursor:pointer">
+        <input type="checkbox" id="delete-mode">
+        <span>Delete mode — remove files without reporting the user</span>
+      </label>
       <div class="muted" id="action-err" style="color:#f08a8a;margin-top:8px"></div>
     </div>
   </div>
@@ -224,6 +233,18 @@
     <div class="row">
       <button id="cancel-confirm-btn" class="danger">Cancel report</button>
       <button id="cancel-back-btn" class="ghost">Back</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Delete confirmation -->
+<dialog id="delete-dlg">
+  <div class="dlg-body">
+    <h2>Delete <span id="delete-count">0</span> file(s)?</h2>
+    <div class="muted" style="margin-bottom:14px">The selected files are destroyed and never come back. Everything else in this round is restored to disk. The uploader is not banned and nothing is filed with NCMEC.</div>
+    <div class="row">
+      <button id="delete-confirm-btn" class="danger">Delete</button>
+      <button id="delete-back-btn" class="ghost">Back</button>
     </div>
   </div>
 </dialog>
@@ -334,7 +355,7 @@ function renderMeta() {
   $("r-created").textContent = fmtTs(META.created_at);
   $("r-ncmec").textContent = META.ncmec_report_id || "—";
   renderGallery();
-  if (["filed", "cancelled"].includes(META.status)) applyFinalState(META.status, META.ncmec_report_id);
+  if (["filed", "cancelled", "deleted"].includes(META.status)) applyFinalState(META.status, META.ncmec_report_id);
 }
 
 function renderGallery() {
@@ -343,6 +364,7 @@ function renderGallery() {
   for (const b of META.blobs) {
     const d = document.createElement("div");
     d.className = "thumb"; d.dataset.id = b.id;
+    if (b.indicator) d.classList.add("indicator");
     if (b.selected) sel[b.id] = b.classification;
     // A filed report is immutable: show the reported category on the still-locked
     // thumbnail from the start, so it's visible without decrypting the images.
@@ -405,6 +427,11 @@ function blobLabel(b) { return fileLabel(b.saved_filename, b.original_filename);
 
 function clsBar(id) {
   const cur = sel[id];
+  // Delete mode doesn't grade anything — one toggle marking the file for
+  // destruction replaces the A1–NR scale.
+  if (DELETE_MODE) {
+    return `<div class="cls"><span data-cls="NR" class="${cur ? "on" : ""}">${cur ? "✓ delete" : "delete"}</span></div>`;
+  }
   return `<div class="cls">` + ["A1", "A2", "B1", "B2", "NR"].map(c =>
     `<span data-cls="${c}" class="${cur === c ? "on" : ""}">${c}</span>`).join("") + `</div>`;
 }
@@ -508,8 +535,11 @@ function renderViewerCls(blobId) {
     return;
   }
   const cur = sel[blobId];
-  box.innerHTML = `<div class="vcls">` + ["A1", "A2", "B1", "B2", "NR"].map(c =>
-    `<span data-cls="${c}" class="${cur === c ? "on" : ""}">${c}</span>`).join("") + `</div>`;
+  const codes = DELETE_MODE ? ["NR"] : ["A1", "A2", "B1", "B2", "NR"];
+  const label = c => (DELETE_MODE ? (cur ? "✓ delete" : "delete") : c);
+  box.innerHTML = `<div class="vcls">` + codes.map(c =>
+    `<span data-cls="${c}" class="${DELETE_MODE ? (cur ? "on" : "") : (cur === c ? "on" : "")}">${label(c)}</span>`
+  ).join("") + `</div>`;
   box.querySelectorAll(".vcls span").forEach(s => {
     s.onclick = () => { setClassification(blobId, s.dataset.cls); renderViewerCls(blobId); };
   });
@@ -544,7 +574,9 @@ function syncThumbCls(id) {
   const el = document.querySelector(`.thumb[data-id="${id}"]`);
   if (!el) return;
   el.classList.toggle("selected", sel[id] !== undefined);
-  el.querySelectorAll(".cls span").forEach(x => x.classList.toggle("on", x.dataset.cls === sel[id]));
+  const cls = el.querySelector(".cls");
+  if (cls) cls.outerHTML = clsBar(id);
+  wireCls(id);
 }
 
 // Ensure a blob's source video is fetched + decrypted, returning its object URL
@@ -851,14 +883,61 @@ function showNotice(title, body) {
 $("notice-ok-btn").onclick = () => $("notice").close();
 
 // --- terminal state ----------------------------------------------------------
-function applyFinalState(status, reportId) {
+// --- Delete mode (destroy files, don't report the user) ----------------------
+// For material that's clearly unwanted but can't be attributed to a minor:
+// banning + filing would be wrong, deleting isn't. Selecting is reused as-is —
+// only the grading UI and the action button change.
+let DELETE_MODE = false;
+const deleteDlg = $("delete-dlg");
+
+$("delete-mode").onchange = (ev) => {
+  DELETE_MODE = ev.target.checked;
+  $("action-err").textContent = "";
+  $("review-btn").classList.toggle("hidden", DELETE_MODE);
+  $("delete-btn").classList.toggle("hidden", !DELETE_MODE);
+  $("gallery-card").querySelector(".cls-legend").classList.toggle("hidden", DELETE_MODE);
+  for (const b of META.blobs) syncThumbCls(b.id);
+};
+
+$("delete-btn").onclick = () => {
+  $("action-err").textContent = "";
+  const n = Object.keys(sel).length;
+  if (!n) { $("action-err").textContent = "Select the files to delete."; return; }
+  if (!$("p1").value) { $("action-err").textContent = "Enter the image key first — the other files are restored from it."; return; }
+  $("delete-count").textContent = n;
+  deleteDlg.showModal();
+};
+
+$("delete-back-btn").onclick = () => deleteDlg.close();
+$("delete-confirm-btn").onclick = async () => {
+  const btn = $("delete-confirm-btn"); btn.disabled = true;
+  try {
+    await saveSelection();
+    const r = await api("/api/delete", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image_key: $("p1").value }),
+    });
+    const j = await r.json();
+    deleteDlg.close();
+    applyFinalState("deleted", null, j.deleted);
+  } catch (e) {
+    deleteDlg.close();
+    $("action-err").textContent = "Delete failed: " + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+};
+
+function applyFinalState(status, reportId, deleted) {
   if (reportId) { $("r-ncmec").textContent = reportId; }
   META.status = status;
   const b = $("status-banner");
   b.className = "status " + status;
   b.textContent = status === "filed"
     ? "✓ Filed with NCMEC — report id " + (reportId || META.ncmec_report_id || "")
-    : "Cancelled — files restored to disk";
+    : status === "deleted"
+      ? `Deleted ${deleted ?? ""} file(s) — the rest restored to disk`
+      : "Cancelled — files restored to disk";
   b.classList.remove("hidden");
   // Keep the decrypt card + gallery available after filing so the reported
   // images can still be inspected; only the submit/cancel actions are removed.

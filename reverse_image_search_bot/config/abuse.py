@@ -245,6 +245,10 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     _add_column_if_missing(conn, "report_blobs", "video_sha256", "TEXT")
     _add_column_if_missing(conn, "report_blobs", "video_filename", "TEXT")
     _add_column_if_missing(conn, "report_blobs", "created_at", "INTEGER")
+    # Marks the file(s) the report was actually opened over (the Cloudflare URL
+    # or filename the admin pasted), so they stay distinguishable in the gallery
+    # from the rest of the user's material.
+    _add_column_if_missing(conn, "report_blobs", "indicator", "INTEGER NOT NULL DEFAULT 0")
 
     # User lookup indexes. Created AFTER every column migration above — an old DB
     # has no `username` column when this function starts, and indexing a
@@ -586,6 +590,7 @@ REPORT_REVIEW = "review"  # uploaded to NCMEC, awaiting final finish/retract
 REPORT_FILED = "filed"  # finish() succeeded — report is with NCMEC
 REPORT_RETRACTED = "retracted"  # retract() called
 REPORT_CANCELLED = "cancelled"  # admin cancelled the whole round, blobs purged
+REPORT_DELETED = "deleted"  # selected files destroyed, rest restored; nothing filed
 REPORT_ERROR = "error"  # something failed; status_detail carries the message
 
 
@@ -611,6 +616,7 @@ def add_report_blob(
     plaintext_sha256: str,
     ciphertext: bytes = b"",
     cipher_path: str | None = None,
+    indicator: bool = False,
 ) -> int:
     """Insert an image blob. Returns the blob id (existing one if already present).
 
@@ -627,8 +633,8 @@ def add_report_blob(
             """
             INSERT OR IGNORE INTO report_blobs
                 (report_uuid, file_unique_id, saved_filename, nonce, ciphertext, cipher_path,
-                 plaintext_sha256, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 plaintext_sha256, created_at, indicator)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 report_uuid,
@@ -639,6 +645,7 @@ def add_report_blob(
                 cipher_path,
                 plaintext_sha256,
                 _now(),
+                1 if indicator else 0,
             ),
         )
         if cur.rowcount == 0:  # already there — return the existing blob's id
@@ -750,7 +757,7 @@ def blob_meta(report_uuid: str) -> list[dict]:
     conn = _get_conn()
     rows = conn.execute(
         "SELECT b.id, b.file_unique_id, b.saved_filename, b.plaintext_sha256, b.selected, "
-        "b.classification, b.video_filename, f.is_video, f.original_filename "
+        "b.classification, b.video_filename, b.indicator, f.is_video, f.original_filename "
         "FROM report_blobs b LEFT JOIN files f ON f.file_unique_id = b.file_unique_id "
         "WHERE b.report_uuid = ? ORDER BY b.id",
         (report_uuid,),
@@ -835,7 +842,8 @@ def all_reports() -> list[dict]:
     """All reports, newest first — for the admin overview command."""
     conn = _get_conn()
     rows = conn.execute(
-        "SELECT r.*, u.username FROM reports r LEFT JOIN users u ON u.user_id = r.user_id ORDER BY r.created_at DESC"
+        "SELECT r.*, u.username, u.first_name, u.last_name FROM reports r "
+        "LEFT JOIN users u ON u.user_id = r.user_id ORDER BY r.created_at DESC"
     ).fetchall()
     return [dict(r) for r in rows]
 

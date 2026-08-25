@@ -81,6 +81,17 @@ def test_prepare_encrypts_every_file_and_takes_them_offline(env):
     assert crypto.sha256_hex(plain) == b["plaintext_sha256"]
 
 
+def test_prepare_flags_indicator_files(env):
+    """The file(s) the report was opened over are marked on their blobs."""
+    from reverse_image_search_bot.abuse_report import prepare
+
+    abuse, _updir, mkfiles = env
+    mkfiles(1, 3)
+    result = prepare.prepare_report(1, None, ["F1"])
+    flagged = {b["saved_filename"] for b in abuse.blob_meta(result.report_uuid or "") if b["indicator"]}
+    assert flagged == {"F1.jpg"}
+
+
 def test_restore_puts_files_back(env):
     from reverse_image_search_bot.abuse_report import prepare
 

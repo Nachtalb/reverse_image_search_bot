@@ -57,6 +57,18 @@ async def _safe_edit(message, text: str) -> None:
         await message.edit_text(text)
 
 
+def _who(user_id: int) -> str:
+    """Human label for a user: @username, else full name, else empty.
+
+    Empty rather than a placeholder dash — every call site already shows the id,
+    so a "—" would just be noise between it and the detail.
+    """
+    u = abuse.get_user(user_id) or {}
+    if u.get("username"):
+        return f"@{u['username']}"
+    return " ".join(filter(None, (u.get("first_name"), u.get("last_name"))))
+
+
 async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Prepare NCMEC report round(s).
 
@@ -77,7 +89,7 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     # Any input shape: a single token, a #uid tag, or a whole pasted Cloudflare
     # report full of file URLs — resolve_targets handles them uniformly.
-    user_ids, unknown = resolve_targets(body)
+    user_ids, unknown, indicators = resolve_targets(body)
     if not body:
         await update.message.reply_text(
             "Usage: /report <user_id | @username | group/channel id | filename>\n"
@@ -88,7 +100,7 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text(f"No uploader found for: {', '.join(unknown) or body}")
         return
 
-    await report_users(update, context, user_ids, unknown)
+    await report_users(update, context, user_ids, unknown, indicators)
 
 
 async def report_users(
@@ -96,6 +108,7 @@ async def report_users(
     context: ContextTypes.DEFAULT_TYPE,
     user_ids: list[int],
     unknown: list[str] | None = None,
+    indicators: dict[int, list[str]] | None = None,
 ) -> None:
     """Prepare a report for each user id and reply with the compact status list.
 
@@ -116,19 +129,18 @@ async def report_users(
             f"⏳ Preparing report{'s' if len(uids) != 1 else ''} for {len(uids)} user(s)…"
         )
     for uid in uids:
-        user = abuse.get_user(uid) or {}
-        uname = f"@{user['username']}" if user.get("username") else "—"
+        uname = _who(uid)
         # Plain text — _safe_edit uses edit_text (no parse_mode).
         prefix = f"⏳ user {uid} ({len(rows) + 1}/{len(uids)}) —" if len(uids) > 1 else "⏳"
         on_progress = _progress_pump(status_msg, prefix) if status_msg else None
-        result = await asyncio.to_thread(prepare_report, uid, on_progress)
+        result = await asyncio.to_thread(prepare_report, uid, on_progress, (indicators or {}).get(uid))
         if result.ok:
             rows.append(
                 {
                     "icon": "🆕",
                     "user_id": uid,
                     "username": uname,
-                    "detail": f"key <code>{html.escape(result.p1 or '')}</code> · {result.encrypted} file(s) offline",
+                    "detail": f"key <code>{html.escape(result.p1 or '')}</code> · {result.encrypted} file(s)",
                     "uuid": result.report_uuid,
                 }
             )
@@ -201,8 +213,9 @@ async def _send_report_summary(
 
     lines = ["<b>Report</b>"]
     for r in rows:
-        uname = html.escape(r["username"])
-        lines.append(f"{r['icon']} <code>{r['user_id']}</code> {uname} · {r['detail']}")
+        # Skip empty parts so a user without a username doesn't render a stray "·".
+        parts = [f"<code>{r['user_id']}</code>", html.escape(r["username"]), r["detail"]]
+        lines.append(f"{r['icon']} " + " · ".join(p for p in parts if p))
         if is_private and base and r["uuid"]:
             keyboard.append(
                 [
@@ -261,27 +274,25 @@ async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE, user_
 
     # Point THIS admin's menu button at THIS report, so tapping it launches the
     # report as a Mini App with signed initData (which the webview validates).
-    menu_button_set = False
     with contextlib.suppress(Exception):
         await context.bot.set_chat_menu_button(
             chat_id=update.effective_user.id,
             menu_button=MenuButtonWebApp(text="Open report", web_app=WebAppInfo(url=url)),
         )
-        menu_button_set = True
 
-    user = abuse.get_user(user_id) or {}
-    uname = f"@{user['username']}" if user.get("username") else "—"
-    launch = (
-        "Tap the <b>Open report</b> menu button (bottom-left ⊞)."
-        if menu_button_set
-        else f"Open via the report menu button: {html.escape(url)}"
-    )
+    uname = _who(user_id)
+    parts = [f"<code>{user_id}</code>", html.escape(uname), f"{result.encrypted} file(s)"]
+    # web_app buttons only work in private chats; elsewhere the menu button set
+    # above is the entry point.
+    is_private = update.effective_chat is not None and update.effective_chat.type == "private"
     await update.message.reply_html(
-        f"🆕 <code>{user_id}</code> {html.escape(uname)} · {result.encrypted} file(s) offline\n"
-        f"Image key: <code>{html.escape(result.p1 or '')}</code>\n\n"
-        f"{launch}\n\n"
-        f"<i>Shown once and not stored — losing it loses the files.</i>",
+        "🆕 " + " · ".join(p for p in parts if p) + f"\nImage key: <code>{html.escape(result.p1 or '')}</code>",
         disable_web_page_preview=True,
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton("Reports", web_app=WebAppInfo(url=f"{settings.REPORT_BASE_URL}/report/console"))]]
+        )
+        if settings.REPORT_BASE_URL and is_private
+        else None,
     )
 
 
