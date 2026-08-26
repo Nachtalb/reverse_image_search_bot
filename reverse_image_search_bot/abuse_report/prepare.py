@@ -342,6 +342,7 @@ def prepare_report(
     user_id: int,
     progress: Callable[[int, int], None] | None = None,
     indicators: list[str] | None = None,
+    source_id: int | None = None,
 ) -> PrepareResult:
     """Gather → encrypt → create a ``ready`` report for ``user_id``.
 
@@ -387,7 +388,7 @@ def prepare_report(
     report_uuid = crypto.gen_report_uuid()
     key = crypto.derive_key(p1)
 
-    abuse.create_report(report_uuid, user_id, "")
+    abuse.create_report(report_uuid, user_id, "", source_id)
     encrypted = _encrypt_and_remove(report_uuid, present, key, progress, set(indicators or ()))
     abuse.set_report_status(report_uuid, abuse.REPORT_READY)
     return PrepareResult(report_uuid=report_uuid, p1=p1, encrypted=encrypted)

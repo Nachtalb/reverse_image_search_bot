@@ -32,6 +32,11 @@ _local = threading.local()
 _all_connections: list[sqlite3.Connection] = []
 _conn_lock = threading.Lock()
 
+# The source every manually-created report (``/report``, the console) is filed
+# under, and the one automated sources are contrasted with. Always exists and
+# cannot be deleted.
+DEFAULT_SOURCE = "sweep"
+
 
 def _get_conn() -> sqlite3.Connection:
     """Return a thread-local SQLite connection with WAL mode + schema ensured."""
@@ -196,6 +201,39 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_reports_user ON reports(user_id)")
+
+    # Where a report came from: the manual sweep (/report, the console) or an
+    # automated feed pushing through the ingest API (Cloudflare CSAM detection,
+    # Cybertip.ca, …). A source must exist before it can be used; `sweep` is
+    # seeded here so there is always one and old rows have somewhere to point.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS report_sources (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            name       TEXT NOT NULL UNIQUE,
+            created_at INTEGER NOT NULL
+        )
+    """)
+    conn.execute("INSERT OR IGNORE INTO report_sources (name, created_at) VALUES (?, ?)", (DEFAULT_SOURCE, _now()))
+    # Backfill gated on the ALTER: only meaningful the one time the column
+    # appears, and every later report gets a source at insert time.
+    if _add_column_if_missing(conn, "reports", "source_id", "INTEGER REFERENCES report_sources(id)"):
+        conn.execute("UPDATE reports SET source_id = (SELECT id FROM report_sources WHERE name = ?)", (DEFAULT_SOURCE,))
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_reports_source ON reports(source_id)")
+
+    # API keys for the ingest endpoint. Only the SHA-256 of the key is stored —
+    # the plaintext is shown once at creation/rotation and never again; the
+    # masked `preview` is what every later read returns.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS api_keys (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            name         TEXT NOT NULL,
+            key_hash     TEXT NOT NULL UNIQUE,
+            key_preview  TEXT NOT NULL,
+            created_at   INTEGER NOT NULL,
+            rotated_at   INTEGER,
+            last_used_at INTEGER
+        )
+    """)
 
     # Encrypted image blobs for a report (AES-GCM, key derived from P1 which is
     # never stored). Purged on finish/cancel. One row per file in the round.
@@ -594,17 +632,116 @@ REPORT_DELETED = "deleted"  # selected files destroyed, rest restored; nothing f
 REPORT_ERROR = "error"  # something failed; status_detail carries the message
 
 
-def create_report(report_uuid: str, user_id: int, page_secret_hash: str) -> None:
+def create_report(report_uuid: str, user_id: int, page_secret_hash: str, source_id: int | None = None) -> None:
     conn = _get_conn()
     with conn:
         now = _now()
         conn.execute(
             """
-            INSERT INTO reports (report_uuid, user_id, page_secret_hash, status, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO reports (report_uuid, user_id, page_secret_hash, status, created_at, updated_at, source_id)
+            VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, (SELECT id FROM report_sources WHERE name = ?)))
             """,
-            (report_uuid, user_id, page_secret_hash, REPORT_PREPARING, now, now),
+            (report_uuid, user_id, page_secret_hash, REPORT_PREPARING, now, now, source_id, DEFAULT_SOURCE),
         )
+
+
+# --- report sources -----------------------------------------------------------
+
+
+def list_sources() -> list[dict]:
+    """All sources with their report counts, oldest first."""
+    conn = _get_conn()
+    rows = conn.execute(
+        "SELECT s.id, s.name, s.created_at, COUNT(r.report_uuid) AS reports "
+        "FROM report_sources s LEFT JOIN reports r ON r.source_id = s.id "
+        "GROUP BY s.id ORDER BY s.id"
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_source_by_name(name: str) -> dict | None:
+    conn = _get_conn()
+    row = conn.execute("SELECT * FROM report_sources WHERE name = ?", (name,)).fetchone()
+    return dict(row) if row else None
+
+
+def add_source(name: str) -> int:
+    """Create a source. Raises ``sqlite3.IntegrityError`` if the name is taken."""
+    conn = _get_conn()
+    with conn:
+        cur = conn.execute("INSERT INTO report_sources (name, created_at) VALUES (?, ?)", (name, _now()))
+    return int(cur.lastrowid or 0)
+
+
+def delete_source(source_id: int) -> str | None:
+    """Delete a source. Returns an error string when it must be kept.
+
+    The default source is permanent (reports fall back to it), and a source that
+    already has reports is kept so the statistics stay attributable.
+    """
+    conn = _get_conn()
+    row = conn.execute("SELECT name FROM report_sources WHERE id = ?", (source_id,)).fetchone()
+    if not row:
+        return "source not found"
+    if row["name"] == DEFAULT_SOURCE:
+        return f"the default source ({DEFAULT_SOURCE}) cannot be deleted"
+    used = conn.execute("SELECT COUNT(*) AS n FROM reports WHERE source_id = ?", (source_id,)).fetchone()["n"]
+    if used:
+        return f"source has {used} report(s) — kept so the statistics stay attributable"
+    with conn:
+        conn.execute("DELETE FROM report_sources WHERE id = ?", (source_id,))
+    return None
+
+
+# --- ingest API keys ----------------------------------------------------------
+
+
+def list_api_keys() -> list[dict]:
+    """All API keys, newest first. Never returns the key itself — only its mask."""
+    conn = _get_conn()
+    rows = conn.execute(
+        "SELECT id, name, key_preview, created_at, rotated_at, last_used_at FROM api_keys ORDER BY id DESC"
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def add_api_key(name: str, key_hash: str, key_preview: str) -> int:
+    conn = _get_conn()
+    with conn:
+        cur = conn.execute(
+            "INSERT INTO api_keys (name, key_hash, key_preview, created_at) VALUES (?, ?, ?, ?)",
+            (name, key_hash, key_preview, _now()),
+        )
+    return int(cur.lastrowid or 0)
+
+
+def rotate_api_key(key_id: int, key_hash: str, key_preview: str) -> bool:
+    """Replace a key's secret in place (name + creation date kept)."""
+    conn = _get_conn()
+    with conn:
+        cur = conn.execute(
+            "UPDATE api_keys SET key_hash = ?, key_preview = ?, rotated_at = ?, last_used_at = NULL WHERE id = ?",
+            (key_hash, key_preview, _now(), key_id),
+        )
+    return cur.rowcount > 0
+
+
+def delete_api_key(key_id: int) -> bool:
+    conn = _get_conn()
+    with conn:
+        cur = conn.execute("DELETE FROM api_keys WHERE id = ?", (key_id,))
+    return cur.rowcount > 0
+
+
+def api_key_by_hash(key_hash: str) -> dict | None:
+    """Look a presented key up by its hash and stamp last-used. None = unknown."""
+    conn = _get_conn()
+    row = conn.execute("SELECT * FROM api_keys WHERE key_hash = ?", (key_hash,)).fetchone()
+    if not row:
+        return None
+    with conn:
+        conn.execute("UPDATE api_keys SET last_used_at = ? WHERE id = ?", (_now(), row["id"]))
+    return dict(row)
 
 
 def add_report_blob(
@@ -874,9 +1011,11 @@ def filed_report_stats() -> list[dict]:
         reps = conn.execute(
             "SELECT r.report_uuid, r.user_id, "
             "COALESCE(r.finished_at, r.updated_at, r.created_at) AS reported_at, "
-            "u.language_code AS language "
+            "u.language_code AS language, COALESCE(s.name, ?) AS source "
             "FROM reports r LEFT JOIN users u ON u.user_id = r.user_id "
-            "WHERE r.status = 'filed'"
+            "LEFT JOIN report_sources s ON s.id = r.source_id "
+            "WHERE r.status = 'filed'",
+            (DEFAULT_SOURCE,),
         ).fetchall()
     except sqlite3.OperationalError:
         return []  # reports table not created yet
@@ -909,6 +1048,7 @@ def filed_report_stats() -> list[dict]:
             "user_id": r["user_id"],
             "language": r["language"],
             "finished_at": r["reported_at"],
+            "source": r["source"],
             "upload_times": times.get(r["report_uuid"], []),
             "file_types": file_types.get(r["report_uuid"], {}),
         }
