@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib
 import sqlite3
 from unittest.mock import AsyncMock, MagicMock
@@ -141,11 +142,12 @@ def test_api_key_masked_and_rotatable(abuse):
     assert abuse.list_api_keys()[0]["last_used_at"] is not None
 
     # The lookup hash is deterministic (fixed salt) or a key could never be found
-    # again, and it is a slow KDF rather than a bare digest.
+    # again, and it is the same slow KDF the page secret uses.
     assert crypto.hash_api_key(key) == crypto.hash_api_key(key) != crypto.hash_api_key(key + "x")
-    import hashlib
-
-    assert crypto.hash_api_key(key) != hashlib.sha256(key.encode()).hexdigest()
+    assert (
+        crypto.hash_api_key(key)
+        == hashlib.pbkdf2_hmac("sha256", key.encode(), crypto.API_KEY_SALT, crypto.PBKDF2_ITERATIONS).hex()
+    )
 
     new = crypto.gen_api_key()
     assert abuse.rotate_api_key(kid, crypto.hash_api_key(new), crypto.mask_api_key(new))
