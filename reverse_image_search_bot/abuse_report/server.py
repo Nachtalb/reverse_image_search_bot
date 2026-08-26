@@ -373,14 +373,22 @@ async def api_keys(request: web.Request) -> web.Response:
 # --- ingest API ---------------------------------------------------------------
 
 
-def _require_api_key(request: web.Request) -> dict:
-    """Bearer-token auth for the machine ingest endpoint (no initData, no page pw)."""
+async def _require_api_key(request: web.Request) -> dict:
+    """Bearer-token auth for the machine ingest endpoint (no initData, no page pw).
+
+    The lookup hash is a PBKDF2 derivation, so it runs off the event loop — an
+    automated caller can hammer this endpoint.
+    """
     header = request.headers.get("Authorization", "")
     token = header[7:].strip() if header.lower().startswith("bearer ") else ""
-    key = abuse.api_key_by_hash(crypto.hash_api_key(token)) if token else None
+    key = await asyncio.to_thread(_lookup_api_key, token) if token else None
     if not key:
         raise web.HTTPUnauthorized(text="invalid or missing API key")
     return key
+
+
+def _lookup_api_key(token: str) -> dict | None:
+    return abuse.api_key_by_hash(crypto.hash_api_key(token))
 
 
 async def api_ingest(request: web.Request) -> web.Response:
@@ -391,7 +399,7 @@ async def api_ingest(request: web.Request) -> web.Response:
     the console. The one-time image key is NEVER returned here; it is DM'd to the
     admins exactly as for a manually-created report.
     """
-    _require_api_key(request)
+    await _require_api_key(request)
     payload = await request.json()
     source = _source_or_400(payload.get("source") or "")
     targets = payload.get("targets")

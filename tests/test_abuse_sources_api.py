@@ -140,6 +140,13 @@ def test_api_key_masked_and_rotatable(abuse):
     assert abuse.api_key_by_hash(crypto.hash_api_key(key))["name"] == "feed"
     assert abuse.list_api_keys()[0]["last_used_at"] is not None
 
+    # The lookup hash is deterministic (fixed salt) or a key could never be found
+    # again, and it is a slow KDF rather than a bare digest.
+    assert crypto.hash_api_key(key) == crypto.hash_api_key(key) != crypto.hash_api_key(key + "x")
+    import hashlib
+
+    assert crypto.hash_api_key(key) != hashlib.sha256(key.encode()).hexdigest()
+
     new = crypto.gen_api_key()
     assert abuse.rotate_api_key(kid, crypto.hash_api_key(new), crypto.mask_api_key(new))
     # The old key stops working the moment it is rotated.
