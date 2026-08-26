@@ -217,6 +217,7 @@ async def api_reports_create(request: web.Request) -> web.Response:
     target = (payload.get("target") or "").strip()
     if not target:
         raise web.HTTPBadRequest(text="target (user id, @username, filename, or file URLs) required")
+    source = _source_or_400(payload.get("source") or abuse.DEFAULT_SOURCE)
     user_ids, unknown, indicators = resolve_targets(target)
     if not user_ids:
         raise web.HTTPNotFound(text=f"no uploader found for: {target}")
@@ -232,7 +233,7 @@ async def api_reports_create(request: web.Request) -> web.Response:
 
         _prepare_progress[target] = "0/?"
         try:
-            result = await asyncio.to_thread(prepare_report, user_id, note, indicators.get(user_id))
+            result = await asyncio.to_thread(prepare_report, user_id, note, indicators.get(user_id), source["id"])
         finally:
             _prepare_progress.pop(target, None)
         if result.ok:
@@ -273,26 +274,150 @@ def _who(user_id: int) -> str:
     return " ".join(filter(None, (u.get("first_name"), u.get("last_name"))))
 
 
-async def _dm_report_created(bot, admin_id: int | None, user_id: int, result) -> None:
-    """DM the admin the image key + report link for an app-created report."""
-    if bot is None or not admin_id:
+async def _dm_report_created(bot, admin_id: int | None, user_id: int, result, source: str | None = None) -> None:
+    """DM the admin(s) the image key + report link for an app/API-created report."""
+    if bot is None:
+        return
+    # An API-created report has no requesting admin — tell everyone.
+    targets = [admin_id] if admin_id else list(settings.ADMIN_IDS)
+    if not targets:
         return
     import html as _html
 
     url = f"{settings.REPORT_BASE_URL}/report/console" if settings.REPORT_BASE_URL else ""
-    try:
-        await bot.send_message(
-            admin_id,
-            f"🆕 <code>{user_id}</code> {_html.escape(_who(user_id))} · {result.encrypted} file(s)\n"
-            f"Image key: <code>{_html.escape(result.p1 or '')}</code>",
-            parse_mode="HTML",
-            disable_web_page_preview=True,
-            reply_markup=(
-                InlineKeyboardMarkup([[InlineKeyboardButton("Reports", web_app=WebAppInfo(url=url))]]) if url else None
-            ),
-        )
-    except Exception:
-        logger.warning("failed to DM the image key for app-created report %s", result.report_uuid, exc_info=True)
+    via = f" · via {_html.escape(source)}" if source else ""
+    for target in targets:
+        try:
+            await bot.send_message(
+                target,
+                f"🆕 <code>{user_id}</code> {_html.escape(_who(user_id))} · {result.encrypted} file(s){via}\n"
+                f"Image key: <code>{_html.escape(result.p1 or '')}</code>",
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+                reply_markup=(
+                    InlineKeyboardMarkup([[InlineKeyboardButton("Reports", web_app=WebAppInfo(url=url))]])
+                    if url
+                    else None
+                ),
+            )
+        except Exception:
+            logger.warning("failed to DM the image key for app-created report %s", result.report_uuid, exc_info=True)
+
+
+# --- sources + API keys (console management) ----------------------------------
+
+
+def _source_or_400(name: str) -> dict:
+    """Resolve a source name to its row. A source must exist before it is used."""
+    source = abuse.get_source_by_name(name.strip())
+    if not source:
+        raise web.HTTPBadRequest(text=f"unknown source: {name} — create it first")
+    return source
+
+
+async def api_sources(request: web.Request) -> web.Response:
+    """List / create / delete report sources (admin + page password gated)."""
+    _require_admin(request)
+    if not crypto.verify_global_page_password(request.headers.get("X-Page-Secret", ""), settings.REPORT_PAGE_PASSWORD):
+        raise web.HTTPForbidden(text="page password incorrect")
+    if request.method == "POST":
+        payload = await request.json()
+        action = payload.get("action")
+        if action == "add":
+            name = (payload.get("name") or "").strip()
+            if not name:
+                raise web.HTTPBadRequest(text="name required")
+            if abuse.get_source_by_name(name):
+                raise web.HTTPBadRequest(text=f"source {name} already exists")
+            abuse.add_source(name)
+        elif action == "delete":
+            err = abuse.delete_source(int(payload.get("id") or 0))
+            if err:
+                raise web.HTTPBadRequest(text=err)
+        else:
+            raise web.HTTPBadRequest(text="action must be add or delete")
+    return web.json_response({"sources": abuse.list_sources(), "default": abuse.DEFAULT_SOURCE})
+
+
+async def api_keys(request: web.Request) -> web.Response:
+    """List / create / rotate / delete ingest API keys.
+
+    The key itself is returned exactly once — on ``add`` and on ``rotate``.
+    Every listing returns the server-side mask, never the secret.
+    """
+    _require_admin(request)
+    if not crypto.verify_global_page_password(request.headers.get("X-Page-Secret", ""), settings.REPORT_PAGE_PASSWORD):
+        raise web.HTTPForbidden(text="page password incorrect")
+    new_key = None
+    if request.method == "POST":
+        payload = await request.json()
+        action = payload.get("action")
+        if action in ("add", "rotate"):
+            new_key = crypto.gen_api_key()
+            key_hash, preview = crypto.hash_api_key(new_key), crypto.mask_api_key(new_key)
+            if action == "add":
+                name = (payload.get("name") or "").strip()
+                if not name:
+                    raise web.HTTPBadRequest(text="name required")
+                abuse.add_api_key(name, key_hash, preview)
+            elif not abuse.rotate_api_key(int(payload.get("id") or 0), key_hash, preview):
+                raise web.HTTPNotFound(text="key not found")
+        elif action == "delete":
+            if not abuse.delete_api_key(int(payload.get("id") or 0)):
+                raise web.HTTPNotFound(text="key not found")
+        else:
+            raise web.HTTPBadRequest(text="action must be add, rotate or delete")
+    return web.json_response({"keys": abuse.list_api_keys(), "new_key": new_key})
+
+
+# --- ingest API ---------------------------------------------------------------
+
+
+def _require_api_key(request: web.Request) -> dict:
+    """Bearer-token auth for the machine ingest endpoint (no initData, no page pw)."""
+    header = request.headers.get("Authorization", "")
+    token = header[7:].strip() if header.lower().startswith("bearer ") else ""
+    key = abuse.api_key_by_hash(crypto.hash_api_key(token)) if token else None
+    if not key:
+        raise web.HTTPUnauthorized(text="invalid or missing API key")
+    return key
+
+
+async def api_ingest(request: web.Request) -> web.Response:
+    """Create report rounds from an automated feed.
+
+    ``{"source": "cloudflare-csam", "targets": ["123", "@name", "<pasted urls>"]}``
+    — every target goes through the same resolve+prepare path as ``/report`` and
+    the console. The one-time image key is NEVER returned here; it is DM'd to the
+    admins exactly as for a manually-created report.
+    """
+    _require_api_key(request)
+    payload = await request.json()
+    source = _source_or_400(payload.get("source") or "")
+    targets = payload.get("targets")
+    if isinstance(targets, str):
+        targets = [targets]
+    if not targets or not isinstance(targets, list):
+        raise web.HTTPBadRequest(text="targets (list of user ids, @usernames, filenames or URLs) required")
+
+    user_ids, unknown, indicators = resolve_targets("\n".join(str(t) for t in targets))
+    results = []
+    for user_id in user_ids:
+        result = await asyncio.to_thread(prepare_report, user_id, None, indicators.get(user_id), source["id"])
+        if result.ok:
+            await _dm_report_created(request.app.get("bot"), None, user_id, result, source["name"])
+            results.append({"user_id": user_id, "uuid": result.report_uuid, "encrypted": result.encrypted})
+        else:
+            results.append(
+                {
+                    "user_id": user_id,
+                    "error": result.error,
+                    "existing_uuid": result.existing_uuid,
+                    "filed_uuid": result.filed_uuid,
+                    "ncmec_report_id": result.filed_ncmec_id,
+                }
+            )
+    return web.json_response({"ok": True, "source": source["name"], "results": results, "unknown": unknown})
 
 
 async def index(request: web.Request) -> web.StreamResponse:
@@ -889,6 +1014,9 @@ def build_app(bot=None, bot_data=None) -> web.Application:
     app.router.add_get("/report/console/api/stats", api_reports_stats)
     app.router.add_get("/report/console/api/prepare_progress", api_prepare_progress)
     app.router.add_post("/report/console/api/create", api_reports_create)
+    app.router.add_route("*", "/report/console/api/sources", api_sources)
+    app.router.add_route("*", "/report/console/api/keys", api_keys)
+    app.router.add_post("/report/api/ingest", api_ingest)
     app.router.add_get("/report/{uuid}", index)
     app.router.add_post("/report/{uuid}/api/unlock", api_unlock)
     app.router.add_get("/report/{uuid}/api/blob/{blob_id}", api_blob)

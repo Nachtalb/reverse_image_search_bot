@@ -91,3 +91,22 @@ def verify_global_page_password(entered: str, configured: str) -> bool:
 
 def sha256_hex(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+API_KEY_PREFIX = "ris_"
+
+
+def gen_api_key() -> str:
+    """A new ingest API key. Shown once at creation/rotation, then only masked."""
+    return API_KEY_PREFIX + secrets.token_urlsafe(32)
+
+
+def hash_api_key(key: str) -> str:
+    """Lookup hash for a presented key. Plain SHA-256: the key is 32 random bytes,
+    so it is not guessable and needs no slow KDF."""
+    return hashlib.sha256(key.encode("utf-8")).hexdigest()
+
+
+def mask_api_key(key: str) -> str:
+    """``ris_ab12…7f9c`` — what the server returns for an existing key."""
+    return f"{key[:8]}…{key[-4:]}" if len(key) > 16 else "…"
