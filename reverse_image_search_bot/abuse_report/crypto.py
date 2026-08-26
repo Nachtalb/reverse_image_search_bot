@@ -91,3 +91,25 @@ def verify_global_page_password(entered: str, configured: str) -> bool:
 
 def sha256_hex(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+API_KEY_PREFIX = "ris_"
+# A fixed application salt, like P1's: the key is looked up BY its hash, so the
+# derivation has to be deterministic from the key alone.
+API_KEY_SALT = b"ris-ingest-api-key-v1"
+
+
+def gen_api_key() -> str:
+    """A new ingest API key. Shown once at creation/rotation, then only masked."""
+    return API_KEY_PREFIX + secrets.token_urlsafe(32)
+
+
+def hash_api_key(key: str) -> str:
+    """Lookup hash for a presented key. PBKDF2-SHA256, same cost as the page
+    secret — call it off the event loop."""
+    return hashlib.pbkdf2_hmac("sha256", key.encode("utf-8"), API_KEY_SALT, PBKDF2_ITERATIONS).hex()
+
+
+def mask_api_key(key: str) -> str:
+    """``ris_ab12…7f9c`` — what the server returns for an existing key."""
+    return f"{key[:8]}…{key[-4:]}" if len(key) > 16 else "…"

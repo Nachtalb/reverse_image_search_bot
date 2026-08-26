@@ -78,12 +78,32 @@
   .heat th.hh { font-size: 8px; }
   .heat td.cell { border-radius: 2px; outline: 1px solid #14151a; }
   .heat td.day { width: 30px; color: #9a9ba2; font-size: 10px; text-align: right; padding-right: 5px; }
+  /* Settings gear + dropdown */
+  .gear { background: none; border: none; color: #9a9ba2; font-size: 20px; padding: 0 4px; line-height: 1; cursor: pointer; }
+  .menu { position: absolute; right: 0; top: 26px; background: #1f2128; border: 1px solid #363842; border-radius: 10px; min-width: 170px; z-index: 20; overflow: hidden; }
+  .menu div { padding: 11px 14px; cursor: pointer; }
+  .menu div:hover { background: #2a2c33; }
+  .item { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid #2a2c33; border-radius: 10px; margin-bottom: 8px; background: #1b1d23; }
+  .item .nm { font-weight: 600; }
+  button.small { padding: 6px 10px; font-size: 13px; }
+  button.danger { background: #7a2b2b; }
 </style>
 </head>
 <body>
 <header>
-  <h1>Abuse Reports</h1>
-  <div class="sub" id="hdr-sub">Locked</div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+    <div>
+      <h1>Abuse Reports</h1>
+      <div class="sub" id="hdr-sub">Locked</div>
+    </div>
+    <div style="position:relative">
+      <button class="gear hidden" id="gear-btn" title="Settings">⚙</button>
+      <div class="menu hidden" id="gear-menu">
+        <div data-open="keys">API keys</div>
+        <div data-open="sources">Sources</div>
+      </div>
+    </div>
+  </div>
 </header>
 <main>
   <!-- Global page password gate -->
@@ -107,6 +127,7 @@
         <label for="target">Create a new report</label>
         <div class="row">
           <textarea id="target" rows="1" placeholder="ID, @username, file or URLs" style="flex:1;min-width:180px"></textarea>
+          <select id="create-source" title="Source"></select>
           <button id="create-btn">Create</button>
         </div>
         <div class="err" id="create-err"></div>
@@ -170,11 +191,46 @@
       </div>
 
       <div class="card">
+        <b>Sources</b>
+        <div style="display:flex;justify-content:center;margin:12px 0">
+          <svg id="st-src-pie" viewBox="0 0 200 200" width="220" height="220" role="img"></svg>
+        </div>
+        <div class="row" id="st-src-legend" style="justify-content:center"></div>
+      </div>
+
+      <div class="card">
         <b>Posting Time</b>
         <div class="heat" id="st-heat" style="margin-top:10px"></div>
       </div>
 
       <div class="err" id="st-err"></div>
+    </div>
+
+    <!-- ============ API KEYS ============ -->
+    <div id="pane-keys" class="hidden">
+      <div class="card">
+        <label for="key-name">New API key</label>
+        <div class="row">
+          <input type="text" id="key-name" placeholder="e.g. cloudflare-feed" style="flex:1;min-width:160px">
+          <button id="key-add">Create</button>
+        </div>
+        <div class="err" id="key-err"></div>
+        <div id="key-new" class="hidden" style="margin-top:10px"></div>
+      </div>
+      <div class="card"><div id="key-list"></div></div>
+    </div>
+
+    <!-- ============ SOURCES ============ -->
+    <div id="pane-sources" class="hidden">
+      <div class="card">
+        <label for="src-name">New source</label>
+        <div class="row">
+          <input type="text" id="src-name" placeholder="e.g. cybertip.ca" style="flex:1;min-width:160px">
+          <button id="src-add">Create</button>
+        </div>
+        <div class="err" id="src-err"></div>
+      </div>
+      <div class="card"><div id="src-list"></div></div>
     </div>
   </div>
 </main>
@@ -205,7 +261,9 @@ $("unlock-btn").onclick = async () => {
     try { sessionStorage.setItem("ris_report_pw", P2); } catch (e) {}
     $("unlock-card").classList.add("hidden");
     $("body").classList.remove("hidden");
+    $("gear-btn").classList.remove("hidden");
     $("hdr-sub").classList.add("hidden");
+    loadSources().catch(() => {});
   } catch (e) { $("unlock-err").textContent = "" + e.message; P2 = ""; }
 };
 
@@ -282,7 +340,7 @@ $("create-btn").onclick = async () => {
   try {
     const r = await api("/api/create", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ target }),
+      body: JSON.stringify({ target, source: $("create-source").value }),
     });
     const j = await r.json();
     // One entry per unique uploader found in the input.
@@ -352,16 +410,147 @@ document.addEventListener("click", ev => {
   ta.remove();
 });
 
-// ============ Tabs ============
-document.querySelectorAll(".tab").forEach(t => {
-  t.onclick = () => {
-    document.querySelectorAll(".tab").forEach(x => x.classList.toggle("active", x === t));
-    const isStats = t.dataset.tab === "stats";
-    $("pane-reports").classList.toggle("hidden", isStats);
-    $("pane-stats").classList.toggle("hidden", !isStats);
-    if (isStats) loadStats().catch(e => { $("st-err").textContent = "" + e.message; });
-  };
+// ============ Tabs / panes ============
+// Four panes share the body; the two tabs cover reports+stats, the gear menu
+// opens keys/sources. showPane() is the single place any of them is switched.
+const PANES = ["reports", "stats", "keys", "sources"];
+
+function showPane(name) {
+  PANES.forEach(p => $("pane-" + p).classList.toggle("hidden", p !== name));
+  document.querySelectorAll(".tabs")[0].classList.toggle("hidden", name === "keys" || name === "sources");
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
+  if (name === "stats") loadStats().catch(e => { $("st-err").textContent = "" + e.message; });
+  if (name === "keys") loadKeys().catch(e => { $("key-err").textContent = "" + e.message; });
+  if (name === "sources") loadSources().catch(e => { $("src-err").textContent = "" + e.message; });
+}
+
+document.querySelectorAll(".tab").forEach(t => { t.onclick = () => showPane(t.dataset.tab); });
+
+$("gear-btn").onclick = ev => { ev.stopPropagation(); $("gear-menu").classList.toggle("hidden"); };
+document.addEventListener("click", ev => {
+  const item = ev.target.closest("#gear-menu div");
+  if (item) showPane(item.dataset.open);
+  if (!ev.target.closest("#gear-btn")) $("gear-menu").classList.add("hidden");
 });
+
+// ============ Sources ============
+let SOURCES = [];
+let DEFAULT_SOURCE = "sweep";
+
+async function loadSources() {
+  const j = await (await api("/api/sources")).json();
+  SOURCES = j.sources;
+  DEFAULT_SOURCE = j.default;
+  renderSources();
+  fillSourceSelect();
+}
+
+// Keep the create dropdown on whatever was selected; default otherwise.
+function fillSourceSelect() {
+  const sel = $("create-source");
+  const keep = sel.value;
+  sel.innerHTML = SOURCES.map(s => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join("");
+  sel.value = SOURCES.some(s => s.name === keep) ? keep : DEFAULT_SOURCE;
+}
+
+function renderSources() {
+  const box = $("src-list");
+  box.innerHTML = "";
+  for (const s of SOURCES) {
+    const el = document.createElement("div");
+    el.className = "item";
+    el.innerHTML = `<div><div class="nm">${escapeHtml(s.name)}</div>` +
+      `<div class="muted">${s.reports} report(s) · ${fmtTs(s.created_at)}</div></div>`;
+    // The default source is permanent, and a used one is kept so the statistics
+    // stay attributable — the server enforces both; no button is offered.
+    if (s.name !== DEFAULT_SOURCE && !s.reports) {
+      const b = document.createElement("button");
+      b.className = "small danger";
+      b.textContent = "Delete";
+      b.onclick = () => sourceAction({ action: "delete", id: s.id });
+      el.appendChild(b);
+    }
+    box.appendChild(el);
+  }
+}
+
+async function sourceAction(body) {
+  $("src-err").textContent = "";
+  try {
+    const j = await (await api("/api/sources", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    })).json();
+    SOURCES = j.sources;
+    DEFAULT_SOURCE = j.default;
+    renderSources();
+    fillSourceSelect();
+  } catch (e) { $("src-err").textContent = "" + e.message; }
+}
+
+$("src-add").onclick = async () => {
+  const name = $("src-name").value.trim();
+  if (!name) { $("src-err").textContent = "Enter a name."; return; }
+  await sourceAction({ action: "add", name });
+  $("src-name").value = "";
+};
+
+// ============ API keys ============
+async function loadKeys(newKey) {
+  const j = await (await api("/api/keys")).json();
+  renderKeys(j.keys, newKey);
+}
+
+function renderKeys(keys, newKey) {
+  // The key itself only ever exists in this one response — show it until the
+  // pane is reloaded, then it is gone for good.
+  const nb = $("key-new");
+  nb.classList.toggle("hidden", !newKey);
+  if (newKey) {
+    nb.innerHTML = `<div>Copy it now — it is not shown again.</div>` +
+      `<div style="margin-top:4px"><code class="copyable" data-copy="${escapeHtml(newKey)}">${escapeHtml(newKey)}</code></div>`;
+  }
+  const box = $("key-list");
+  box.innerHTML = keys.length ? "" : `<div class="muted">No API keys yet.</div>`;
+  for (const k of keys) {
+    const used = k.last_used_at ? ` · used ${fmtTs(k.last_used_at)}` : "";
+    const rotated = k.rotated_at ? ` · rotated ${fmtTs(k.rotated_at)}` : "";
+    const el = document.createElement("div");
+    el.className = "item";
+    el.innerHTML = `<div><div class="nm">${escapeHtml(k.name)}</div>` +
+      `<div class="muted"><code>${escapeHtml(k.key_preview)}</code> · ${fmtTs(k.created_at)}${rotated}${used}</div></div>`;
+    const row = document.createElement("div");
+    row.className = "row";
+    for (const [label, body, cls] of [
+      ["Revoke", { action: "rotate", id: k.id }, "small ghost"],
+      ["Delete", { action: "delete", id: k.id }, "small danger"],
+    ]) {
+      const b = document.createElement("button");
+      b.className = cls;
+      b.textContent = label;
+      b.onclick = () => keyAction(body);
+      row.appendChild(b);
+    }
+    el.appendChild(row);
+    box.appendChild(el);
+  }
+}
+
+async function keyAction(body) {
+  $("key-err").textContent = "";
+  try {
+    const j = await (await api("/api/keys", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    })).json();
+    renderKeys(j.keys, j.new_key);
+  } catch (e) { $("key-err").textContent = "" + e.message; }
+}
+
+$("key-add").onclick = async () => {
+  const name = $("key-name").value.trim();
+  if (!name) { $("key-err").textContent = "Enter a name."; return; }
+  await keyAction({ action: "add", name });
+  $("key-name").value = "";
+};
 
 // ============ Statistics ============
 let STATS = null;  // raw records from the server (filed only)
@@ -435,6 +624,7 @@ function renderStats() {
   $("st-reports").textContent = recs.length;
   $("st-users").textContent = new Set(recs.map(r => r.user_id)).size;
   renderLangPie(recs);
+  renderSourcePie(recs);
   renderHeatmap(recs);
 }
 
@@ -525,15 +715,19 @@ function drawPie(counts, langs, color) {
 
 // Render the pie from the current PIE_CUR fractions (normalized to fill the circle).
 function paintPie(langs, color) {
-  const svg = $("st-pie");
+  $("st-pie").innerHTML = pieSvg(langs.map(k => [k, PIE_CUR[k] || 0]), color, fmtLang);
+}
+
+// Pie markup for [key, weight] pairs — shared by the animated language pie and
+// the static source pie.
+function pieSvg(pairs, color, label) {
   const cx = 100, cy = 100, rad = 96;
-  const parts = langs.map(k => [k, PIE_CUR[k] || 0]).filter(([, f]) => f > 0.0005);
+  const parts = pairs.filter(([, f]) => f > 0.0005);
   const sum = parts.reduce((s, [, f]) => s + f, 0);
-  if (sum < 0.0005) { svg.innerHTML = `<circle cx="100" cy="100" r="96" fill="#1b1d23"/>`; return; }
+  if (sum < 0.0005) return `<circle cx="100" cy="100" r="96" fill="#1b1d23"/>`;
   // A single slice at ~100% can't be drawn as an arc (start==end) — use a circle.
   if (parts.length === 1) {
-    svg.innerHTML = `<circle cx="100" cy="100" r="96" fill="${color[parts[0][0]]}"/>` + pieLabel(cx, cy - 40, "100%");
-    return;
+    return `<circle cx="100" cy="100" r="96" fill="${color[parts[0][0]]}"/>` + pieLabel(cx, cy - 40, "100%");
   }
   let angle = -Math.PI / 2;  // 12 o'clock
   let out = "";
@@ -544,7 +738,7 @@ function paintPie(langs, color) {
     const large = frac > 0.5 ? 1 : 0;
     const x1 = cx + rad * Math.cos(angle), y1 = cy + rad * Math.sin(angle);
     const x2 = cx + rad * Math.cos(end), y2 = cy + rad * Math.sin(end);
-    out += `<path d="M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${rad},${rad} 0 ${large},1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="${color[k]}"><title>${escapeHtml(fmtLang(k))}: ${Math.round(frac * 100)}%</title></path>`;
+    out += `<path d="M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${rad},${rad} 0 ${large},1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="${color[k]}"><title>${escapeHtml(label(k))}: ${Math.round(frac * 100)}%</title></path>`;
     if (frac >= 0.06) {
       const mid = angle + frac * Math.PI;
       const lr = rad * 0.6;
@@ -552,7 +746,21 @@ function paintPie(langs, color) {
     }
     angle = end;
   }
-  svg.innerHTML = out + labels.join("");
+  return out + labels.join("");
+}
+
+// Static pie of filed reports per source, with a plain (non-toggle) legend.
+function renderSourcePie(recs) {
+  const counts = {};
+  for (const r of recs) { const k = r.source || "—"; counts[k] = (counts[k] || 0) + 1; }
+  const names = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+  const color = {};
+  names.forEach((k, i) => { color[k] = PIE_COLORS[i % PIE_COLORS.length]; });
+  $("st-src-pie").innerHTML = pieSvg(names.map(k => [k, counts[k]]), color, k => k);
+  const legend = $("st-src-legend");
+  legend.innerHTML = names.length
+    ? names.map(k => `<span class="lang-chip" style="background:${color[k]};cursor:default">${escapeHtml(k)} · ${counts[k]}</span>`).join("")
+    : `<div class="muted">No data for this period.</div>`;
 }
 
 function pieLabel(x, y, text) {
