@@ -897,10 +897,13 @@ async def api_delete(request: web.Request) -> web.Response:
     a Cloudflare complaint about content nobody can age-verify. Deleting it is
     the right call; banning the uploader and filing with NCMEC is not.
 
-    The selected blobs' plaintext is never written back (their ciphertext and
-    rows are dropped with the round), every other file is restored to disk, and
-    the report is closed as ``deleted``. The uploader is NOT banned. Deleted
-    files are marked cleared so a later round doesn't drag them back in.
+    "Deleted" means gone from the public web, NOT forgotten: the deleted files'
+    encrypted bytes move into the DB exactly as a filed report's do, so the
+    decision stays auditable and the material is still available to law
+    enforcement. Their plaintext is never written back. Every other file is
+    restored to disk and the report closes as ``deleted``. The uploader is NOT
+    banned, but they are on the watchlist from here on. Deleted files are marked
+    cleared so a later round doesn't drag them back in.
     """
     _require_admin(request)
     rep = _report_or_404(request.match_info["uuid"])
@@ -921,18 +924,9 @@ async def api_delete(request: web.Request) -> web.Response:
     # The deleted files must not come back in a future round for this user.
     abuse.set_files_cleared([b["file_unique_id"] for b in doomed])
     abuse.set_report_status(rep["report_uuid"], abuse.REPORT_DELETED, detail=f"{len(doomed)} file(s) deleted")
-    base = settings.UPLOADER.get("configuration", {}).get("path")
-    if base:
-        for b in abuse.report_blobs(rep["report_uuid"]):
-            if b.get("video_path"):
-                try:
-                    vfp = Path(base) / b["video_path"]
-                    if vfp.is_file():
-                        vfp.unlink()
-                except Exception:
-                    logger.warning("failed to delete video on delete %s", b["video_path"], exc_info=True)
-    abuse.purge_report_blobs(rep["report_uuid"])
-    purge_cipher_dir(rep["report_uuid"])
+    # Keep the deleted material as evidence, exactly like a filed report: its
+    # ciphertext moves into the DB, everything else in the round is dropped.
+    _cleanup_after_finish(rep)
     return web.json_response({"ok": True, "status": abuse.REPORT_DELETED, "deleted": len(doomed)})
 
 
@@ -969,19 +963,20 @@ def _ban_reported_user(bot_data, user_id: int) -> None:
 
 
 def _cleanup_after_finish(rep: dict) -> None:
-    """On finish: move the reported ciphertext INTO the DB, drop everything else.
+    """On a decision: move the acted-on ciphertext INTO the DB, drop the rest.
 
-    Retention rules:
-    - The REPORTED (selected) files: filing is what earns a place in the DB, so
-      their encrypted bytes are read off disk and written into the blob row.
-      They stay linked to the filed report, available for further inspection or
-      a report to local law enforcement, and no longer depend on a file that the
-      ban sweep below would delete. Their plaintext left the disk at prepare time.
+    Runs for both outcomes that decide something — FILED and DELETED. Retention
+    rules:
+    - The SELECTED files (reported to NCMEC, or deleted): the decision is what
+      earns them a place in the DB, so their encrypted bytes are read off disk
+      and written into the blob row. They stay linked to the report, available
+      for further inspection or a report to local law enforcement, and no longer
+      depend on a file that the ban sweep below would delete. Their plaintext
+      left the disk at prepare time.
     - Everything else in the round: purged. The unselected blobs are deleted
       from the DB, and the report's whole on-disk ciphertext directory goes with
-      them — filing means the user is banned, and a banned user's material is
-      not kept. Reported VIDEOS keep their encrypted file on disk (they are far
-      too large for SQLite; that is the pre-existing design).
+      them. Reported VIDEOS keep their encrypted file on disk (they are far too
+      large for SQLite; that is the pre-existing design).
 
     The user row, ban, and report record are always kept.
     """
