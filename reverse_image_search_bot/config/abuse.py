@@ -985,72 +985,78 @@ def all_reports() -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def filed_report_stats() -> list[dict]:
-    """Per-filed-report records for the statistics dashboard (FILED only).
+# Report outcomes the statistics dashboard reports on. `filed` went to NCMEC,
+# `deleted` destroyed the material without filing — both are real outcomes worth
+# counting, and both keep their blobs, so their files stay resolvable.
+STATS_STATUSES = (REPORT_FILED, REPORT_DELETED)
 
-    Cancelled/errored/in-flight reports are excluded — only successfully filed
-    NCMEC reports count. Each record carries what the stats view needs to do all
-    its own aggregation + period filtering client-side:
 
+def report_stats() -> list[dict]:
+    """Per-report records for the statistics dashboard (filed + deleted).
+
+    Cancelled/errored/in-flight reports are excluded — nothing was decided about
+    them. Each record carries what the stats view needs to do all its own
+    aggregation + period filtering client-side:
+
+      * ``status``        — ``filed`` or ``deleted``, so the view can split them
       * ``user_id``       — for the unique-user count
       * ``language``      — the uploader's Telegram UI language (may be None)
-      * ``finished_at``   — when it was filed (drives year/month dropdowns); falls
-                            back to ``updated_at`` then ``created_at`` for old rows
-                            filed before ``finished_at`` was recorded
-      * ``upload_times``  — unix ts of each reported file's ORIGINAL upload, for the
-                            weekday×hour "when were they posted" heatmap
-      * ``file_types``    — {file_type: count} of the reported files by their ACTUAL
-                            recorded Telegram type (photo/video/sticker/gif/document/
-                            unknown) — NOT forced into an image/video binary
+      * ``finished_at``   — when it was decided (drives year/month dropdowns);
+                            falls back to ``updated_at`` then ``created_at`` for
+                            old rows closed before ``finished_at`` was recorded
+      * ``upload_times``  — unix ts of each reported file's ORIGINAL upload, for
+                            the weekday×hour "when were they posted" heatmap
+      * ``file_types``    — {file_type: count} of the reported files by their
+                            ACTUAL recorded Telegram type (photo/video/sticker/
+                            gif/document/unknown) — NOT forced into an
+                            image/video binary
 
-    The reported files' encrypted blobs and their ``files`` rows are kept after
-    filing, so the upload times remain resolvable.
+    One statement, not a report query plus a per-report file query: the whole
+    thing joins reports → users → sources → blobs → files and is folded into
+    per-report records here. Every blob still attached to the report counts —
+    closing a report purges the ones it did not act on, so what remains IS the
+    material the decision was about.
     """
     conn = _get_conn()
+    placeholders = ",".join("?" * len(STATS_STATUSES))
     try:
-        reps = conn.execute(
-            "SELECT r.report_uuid, r.user_id, "
+        rows = conn.execute(
+            "SELECT r.report_uuid, r.status, r.user_id, "
             "COALESCE(r.finished_at, r.updated_at, r.created_at) AS reported_at, "
-            "u.language_code AS language, COALESCE(s.name, ?) AS source "
-            "FROM reports r LEFT JOIN users u ON u.user_id = r.user_id "
+            "u.language_code AS language, COALESCE(s.name, ?) AS source, "
+            "f.file_type, f.upload_time "
+            "FROM reports r "
+            "LEFT JOIN users u ON u.user_id = r.user_id "
             "LEFT JOIN report_sources s ON s.id = r.source_id "
-            "WHERE r.status = 'filed'",
-            (DEFAULT_SOURCE,),
+            "LEFT JOIN report_blobs b ON b.report_uuid = r.report_uuid "
+            "LEFT JOIN files f ON f.file_unique_id = b.file_unique_id "
+            f"WHERE r.status IN ({placeholders})",
+            (DEFAULT_SOURCE, *STATS_STATUSES),
         ).fetchall()
     except sqlite3.OperationalError:
         return []  # reports table not created yet
-    if not reps:
-        return []
 
-    # Per-report reported files: upload times (heatmap) + a breakdown by the file's
-    # ACTUAL recorded type. We do NOT infer "video" from capability flags — a
-    # sticker is usually a static image, a document can be anything, so forcing
-    # them into a video bucket would be wrong. Missing/NULL type → "unknown".
-    uuids = [r["report_uuid"] for r in reps]
-    placeholders = ",".join("?" * len(uuids))
-    times: dict[str, list[int]] = {u: [] for u in uuids}
-    file_types: dict[str, dict[str, int]] = {u: {} for u in uuids}
-    rows = conn.execute(
-        f"SELECT b.report_uuid, f.file_type, f.upload_time "
-        f"FROM report_blobs b LEFT JOIN files f ON f.file_unique_id = b.file_unique_id "
-        f"WHERE b.report_uuid IN ({placeholders})",
-        uuids,
-    ).fetchall()
+    # Fold the flat join back into one record per report. A report with no blobs
+    # left still yields a row (LEFT JOIN), with NULL file columns.
+    out: dict[str, dict] = {}
     for row in rows:
-        u = row["report_uuid"]
+        rec = out.get(row["report_uuid"])
+        if rec is None:
+            rec = out[row["report_uuid"]] = {
+                "status": row["status"],
+                "user_id": row["user_id"],
+                "language": row["language"],
+                "finished_at": row["reported_at"],
+                "source": row["source"],
+                "upload_times": [],
+                "file_types": {},
+            }
+        if row["file_type"] is None and row["upload_time"] is None:
+            continue  # no blob for this report
         if row["upload_time"] is not None:
-            times[u].append(row["upload_time"])
+            rec["upload_times"].append(row["upload_time"])
+        # We do NOT infer "video" from capability flags — a sticker is usually a
+        # static image and a document can be anything. Missing type → "unknown".
         ftype = row["file_type"] or "unknown"
-        file_types[u][ftype] = file_types[u].get(ftype, 0) + 1
-
-    return [
-        {
-            "user_id": r["user_id"],
-            "language": r["language"],
-            "finished_at": r["reported_at"],
-            "source": r["source"],
-            "upload_times": times.get(r["report_uuid"], []),
-            "file_types": file_types.get(r["report_uuid"], {}),
-        }
-        for r in reps
-    ]
+        rec["file_types"][ftype] = rec["file_types"].get(ftype, 0) + 1
+    return list(out.values())

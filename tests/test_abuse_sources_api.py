@@ -119,7 +119,7 @@ def test_filed_stats_carry_source(abuse):
     abuse.record_user(2)
     abuse.create_report("r2", 2, "")
     abuse.mark_report_filed("r2")
-    sources = sorted(r["source"] for r in abuse.filed_report_stats())
+    sources = sorted(r["source"] for r in abuse.report_stats())
     assert sources == ["cloudflare", abuse.DEFAULT_SOURCE]
 
 

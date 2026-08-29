@@ -172,15 +172,21 @@ async def api_reports_list(request: web.Request) -> web.Response:
 
 
 async def api_reports_stats(request: web.Request) -> web.Response:
-    """Filed-only report records for the statistics dashboard (admin + pw gated).
+    """Report records for the statistics dashboard (admin + pw gated).
 
-    Returns the raw per-report records; the client does all aggregation and
-    period filtering so year/month dropdowns switch instantly with no re-fetch.
+    Returns the raw per-report records for every decided report (filed and
+    deleted); the client does all aggregation and period filtering so year/month
+    dropdowns switch instantly with no re-fetch.
+
+    The query walks reports → users → sources → blobs → files. That is cheap on
+    a warm page cache but takes ~2 s on a cold one (network block storage), so
+    it runs off the event loop — otherwise the first stats open after a restart
+    stalls the webhook and every other report request with it.
     """
     _require_admin(request)
     if not crypto.verify_global_page_password(request.headers.get("X-Page-Secret", ""), settings.REPORT_PAGE_PASSWORD):
         raise web.HTTPForbidden(text="page password incorrect")
-    return web.json_response({"records": abuse.filed_report_stats()})
+    return web.json_response({"records": await asyncio.to_thread(abuse.report_stats)})
 
 
 async def api_prepare_progress(request: web.Request) -> web.Response:

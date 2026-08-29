@@ -593,8 +593,8 @@ async def test_reports_create_bulk_urls_one_report_per_uploader(abuse, monkeypat
     assert all(r["uuid"] for r in data["results"])
 
 
-def test_filed_report_stats_filed_only_with_language_and_times(abuse):
-    """Stats are FILED-only, carry the user's language + reported files' upload times."""
+def test_report_stats_decided_only_with_language_and_times(abuse):
+    """Stats cover DECIDED reports (filed + deleted), with language + upload times."""
     import time
 
     # User A (lang 'en') → one filed report over two files. User B (lang 'de') →
@@ -633,11 +633,12 @@ def test_filed_report_stats_filed_only_with_language_and_times(abuse):
     )
     abuse.mark_report_filed("rC")
 
-    recs = abuse.filed_report_stats()
+    recs = abuse.report_stats()
     by_user = {r["user_id"]: r for r in recs}
     # Only the two FILED reports — the cancelled one is gone.
     assert set(by_user) == {1, 3}
     assert len(recs) == 2
+    assert by_user[1]["status"] == "filed"
     assert by_user[1]["language"] == "en"
     assert by_user[3]["language"] is None
     # User 1's report carries BOTH reported files' upload times.
@@ -649,6 +650,21 @@ def test_filed_report_stats_filed_only_with_language_and_times(abuse):
     # sticker (NOT a video). User 1: one photo + one sticker. User 3: one video.
     assert by_user[1]["file_types"] == {"photo": 1, "sticker": 1}
     assert by_user[3]["file_types"] == {"video": 1}
+
+
+def test_report_stats_includes_deleted_reports(abuse):
+    """A `deleted` report is a decision too — it must show up, tagged as such."""
+    abuse.record_user(9, username="d", language_code="fr")
+    abuse.record_file("fd", saved_filename="fd.jpg", user_id=9, file_type="photo")
+    abuse.create_report("rD", 9, "")
+    abuse.add_report_blob(
+        "rD", file_unique_id="fd", saved_filename="fd.jpg", nonce=b"n", ciphertext=b"c", plaintext_sha256="h"
+    )
+    abuse.set_report_status("rD", abuse.REPORT_DELETED)
+
+    recs = abuse.report_stats()
+    assert [r["status"] for r in recs] == ["deleted"]
+    assert recs[0]["file_types"] == {"photo": 1}
 
 
 @pytest.mark.asyncio
