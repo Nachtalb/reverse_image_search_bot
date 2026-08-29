@@ -148,13 +148,31 @@ async def reports_index(request: web.Request) -> web.StreamResponse:
 
 
 async def api_reports_list(request: web.Request) -> web.Response:
-    """List all reports (admin + global page password gated)."""
+    """One page of reports (admin + global page password gated).
+
+    ``?offset=&limit=&q=&status=`` — the console loads 20 at a time as you
+    scroll rather than rendering the whole history, and ``q`` searches the
+    uploader (id, @username, name) and the report ids (uuid, NCMEC number).
+    Filtering happens in SQL so paging stays correct: paginating a
+    client-filtered list would silently skip matches.
+    """
     _require_admin(request)
     if not crypto.verify_global_page_password(request.headers.get("X-Page-Secret", ""), settings.REPORT_PAGE_PASSWORD):
         raise web.HTTPForbidden(text="page password incorrect")
-    reports = abuse.all_reports()
+    try:
+        limit = min(max(int(request.query.get("limit", 20)), 1), 100)
+        offset = max(int(request.query.get("offset", 0)), 0)
+    except ValueError:
+        raise web.HTTPBadRequest(text="limit and offset must be numbers") from None
+    query = (request.query.get("q") or "").strip()
+    status = (request.query.get("status") or "").strip() or None
+    reports, total = await asyncio.to_thread(abuse.search_reports, query, status, limit, offset)
     return web.json_response(
         {
+            "total": total,
+            "offset": offset,
+            "limit": limit,
+            "statuses": abuse.report_status_counts(),
             "reports": [
                 {
                     "uuid": r["report_uuid"],
@@ -166,7 +184,7 @@ async def api_reports_list(request: web.Request) -> web.Response:
                     "created_at": r["created_at"],
                 }
                 for r in reports
-            ]
+            ],
         }
     )
 
@@ -187,6 +205,37 @@ async def api_reports_stats(request: web.Request) -> web.Response:
     if not crypto.verify_global_page_password(request.headers.get("X-Page-Secret", ""), settings.REPORT_PAGE_PASSWORD):
         raise web.HTTPForbidden(text="page password incorrect")
     return web.json_response({"records": await asyncio.to_thread(abuse.report_stats)})
+
+
+async def api_reports_waiting(request: web.Request) -> web.Response:
+    """Uploaders whose held material is waiting for a report round.
+
+    A watchlisted user keeps uploading; that material is held rather than served
+    (see ``abuse_report.hold``) and only reaches NCMEC when someone opens a
+    round. This is the queue: who, how much is waiting, since when, and what
+    their previous report ended as — so the console can offer one-click create.
+    """
+    _require_admin(request)
+    if not crypto.verify_global_page_password(request.headers.get("X-Page-Secret", ""), settings.REPORT_PAGE_PASSWORD):
+        raise web.HTTPForbidden(text="page password incorrect")
+    waiting = await asyncio.to_thread(abuse.held_uploaders)
+    return web.json_response(
+        {
+            "waiting": [
+                {
+                    "user_id": w["user_id"],
+                    "username": w.get("username"),
+                    "display_name": " ".join(filter(None, (w.get("first_name"), w.get("last_name")))) or None,
+                    "held": w["held"],
+                    "first_held": w["first_held"],
+                    "last_held": w["last_held"],
+                    "banned": bool(w.get("banned_at")),
+                    "last_status": w.get("last_status"),
+                }
+                for w in waiting
+            ]
+        }
+    )
 
 
 async def api_prepare_progress(request: web.Request) -> web.Response:
@@ -1020,6 +1069,7 @@ def build_app(bot=None, bot_data=None) -> web.Application:
     app["bot_data"] = bot_data
     app.router.add_get("/report/console", reports_index)
     app.router.add_get("/report/console/api/list", api_reports_list)
+    app.router.add_get("/report/console/api/waiting", api_reports_waiting)
     app.router.add_get("/report/console/api/stats", api_reports_stats)
     app.router.add_get("/report/console/api/prepare_progress", api_prepare_progress)
     app.router.add_post("/report/console/api/create", api_reports_create)

@@ -1117,6 +1117,56 @@ def all_reports() -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def report_status_counts() -> dict[str, int]:
+    """How many reports sit in each status. Drives the console's status filter,
+    which only offers a status that actually exists."""
+    conn = _get_conn()
+    try:
+        rows = conn.execute("SELECT status, COUNT(*) AS n FROM reports GROUP BY status").fetchall()
+    except sqlite3.OperationalError:
+        return {}
+    return {r["status"]: r["n"] for r in rows}
+
+
+def search_reports(
+    query: str = "", status: str | None = None, limit: int = 20, offset: int = 0
+) -> tuple[list[dict], int]:
+    """One page of reports, newest first, plus the total number of matches.
+
+    ``query`` matches the uploader (numeric id, @username, first/last name) or
+    the report's own ids (uuid prefix, NCMEC number). Matching in SQL rather
+    than client-side is what makes paging honest — a filtered page must be a
+    page of the filtered set, not a filtered page of everything.
+    """
+    conn = _get_conn()
+    where = []
+    params: list = []
+    if status:
+        where.append("r.status = ?")
+        params.append(status)
+    if query:
+        like = f"%{query.lstrip('@')}%"
+        where.append(
+            "(CAST(r.user_id AS TEXT) LIKE ? OR u.username LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? "
+            "OR r.report_uuid LIKE ? OR CAST(r.ncmec_report_id AS TEXT) LIKE ?)"
+        )
+        params.extend([like] * 6)
+    clause = f"WHERE {' AND '.join(where)}" if where else ""
+    try:
+        total = conn.execute(
+            f"SELECT COUNT(*) FROM reports r LEFT JOIN users u ON u.user_id = r.user_id {clause}", params
+        ).fetchone()[0]
+        rows = conn.execute(
+            "SELECT r.*, u.username, u.first_name, u.last_name FROM reports r "
+            f"LEFT JOIN users u ON u.user_id = r.user_id {clause} "
+            "ORDER BY r.created_at DESC LIMIT ? OFFSET ?",
+            [*params, limit, offset],
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return [], 0
+    return [dict(r) for r in rows], total
+
+
 # Report outcomes the statistics dashboard reports on. `filed` went to NCMEC,
 # `deleted` destroyed the material without filing — both are real outcomes worth
 # counting, and both keep their blobs, so their files stay resolvable.

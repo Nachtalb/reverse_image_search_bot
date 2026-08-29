@@ -26,10 +26,10 @@ def abuse(tmp_path, monkeypatch):
     return ab
 
 
-def _req(headers=None, match=None, json_body=None, app=None):
+def _req(headers=None, match=None, json_body=None, app=None, query=None):
     r = MagicMock(spec=web.Request)
     r.headers = headers or {}
-    r.query = {}
+    r.query = query or {}
     r.match_info = match or {}
     r.app = app if app is not None else {"bot": None}
     if json_body is not None:
