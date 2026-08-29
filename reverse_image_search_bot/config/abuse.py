@@ -178,6 +178,20 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     # dialog, or automatically for unselected files when a report is filed.
     _add_column_if_missing(conn, "files", "cleared_at", "INTEGER")
 
+    # Why this file is being HELD rather than served: it was uploaded by a user
+    # already under investigation ('during_investigation') or by one who has been
+    # banned ('after_ban'). Held files live outside the public upload directory
+    # and are pulled into the user's next report round. NULL = a normal upload.
+    _add_column_if_missing(conn, "files", "hold_reason", "TEXT")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_files_held ON files(user_id) WHERE hold_reason IS NOT NULL")
+    # Where a NEVER-PUBLISHED upload's ciphertext sits (a banned user's media
+    # never gets a public URL), plus its nonce and plaintext hash. A held file
+    # from a user who is only under investigation is still served, so it has a
+    # hold_reason but no hold_path.
+    _add_column_if_missing(conn, "files", "hold_path", "TEXT")
+    _add_column_if_missing(conn, "files", "hold_nonce", "BLOB")
+    _add_column_if_missing(conn, "files", "hold_sha256", "TEXT")
+
     # A PERMANENT source-video fetch failure for this file (over the 20 MB bot
     # limit, or message deleted). Once set, fetch attempts are skipped — no
     # retry storm and no repeated admin warnings on every review/submit.
@@ -356,6 +370,8 @@ def record_file(
     file_id: str | None = None,
     caption: str | None = None,
     is_video: bool = False,
+    hold_reason: str | None = None,
+    hold: tuple[str, bytes, str] | None = None,
 ) -> None:
     """Insert-only record of an uploaded file. Existing rows are left untouched.
 
@@ -372,16 +388,24 @@ def record_file(
     ``is_video`` records whether the upload is ACTUALLY a video/animation (decided
     at ingest from the Telegram type/mime). A jpg sent as a document is NOT a
     video; only set this when there is a genuine source video to fetch/report.
+
+    ``hold_reason`` marks the file as HELD (``HOLD_INVESTIGATION`` /
+    ``HOLD_AFTER_BAN``) — it goes into the uploader's next report round instead
+    of being forgotten. ``hold`` is the ``(path, nonce, sha256)`` triple from
+    ``abuse_report.hold.store`` for material that was NEVER published (a banned
+    user's upload): it exists only as ciphertext under the upload dir.
     """
     conn = _get_conn()
+    hold_path, hold_nonce, hold_sha = hold or (None, None, None)
     with conn:
         now = _now()
         conn.execute(
             """
             INSERT OR IGNORE INTO files
                 (file_unique_id, saved_filename, original_filename, file_type,
-                 upload_time, user_id, group_id, channel_id, file_id, caption, is_video, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 upload_time, user_id, group_id, channel_id, file_id, caption, is_video, created_at,
+                 hold_reason, hold_path, hold_nonce, hold_sha256)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 file_unique_id,
@@ -396,6 +420,10 @@ def record_file(
                 caption,
                 1 if is_video else 0,
                 now,
+                hold_reason,
+                hold_path,
+                hold_nonce,
+                hold_sha,
             ),
         )
 
@@ -630,6 +658,110 @@ REPORT_RETRACTED = "retracted"  # retract() called
 REPORT_CANCELLED = "cancelled"  # admin cancelled the whole round, blobs purged
 REPORT_DELETED = "deleted"  # selected files destroyed, rest restored; nothing filed
 REPORT_ERROR = "error"  # something failed; status_detail carries the message
+
+
+# Why a file is being held instead of served. `during_investigation` = the
+# uploader has a report open or one whose material was deleted; `after_ban` =
+# they were banned (filing bans them), so nothing of theirs is served again.
+HOLD_INVESTIGATION = "during_investigation"
+HOLD_AFTER_BAN = "after_ban"
+
+# The report statuses that put an uploader on the WATCHLIST: an open round, a
+# filed report, or one whose material was deleted. Their later uploads are held
+# rather than published, so the next round has them.
+WATCHLIST_STATUSES = (
+    REPORT_PREPARING,
+    REPORT_READY,
+    REPORT_REVIEW,
+    REPORT_SUBMITTING,
+    REPORT_FILED,
+    REPORT_DELETED,
+)
+
+
+def hold_reason_for_user(user_id: int) -> str | None:
+    """Why this user's next upload must be held, or None if it can be served.
+
+    A banned user is held as ``after_ban``; anyone with an open, filed, or
+    deleted report is under investigation. Everyone else uploads normally.
+    Called on EVERY upload, so it is one indexed query and nothing more.
+    """
+    conn = _get_conn()
+    placeholders = ",".join("?" * len(WATCHLIST_STATUSES))
+    try:
+        row = conn.execute(
+            "SELECT u.banned_at, ("
+            "  SELECT 1 FROM reports r WHERE r.user_id = u.user_id "
+            f"  AND r.status IN ({placeholders}) LIMIT 1"
+            ") AS watched FROM users u WHERE u.user_id = ?",
+            (*WATCHLIST_STATUSES, user_id),
+        ).fetchone()
+    except sqlite3.OperationalError:
+        return None  # reports table not created yet
+    if not row:
+        return None
+    if row["banned_at"] is not None:
+        return HOLD_AFTER_BAN
+    return HOLD_INVESTIGATION if row["watched"] else None
+
+
+def held_uploaders() -> list[dict]:
+    """Users with held files waiting for a report, most files first.
+
+    One row per user: profile, how many files are waiting, when the first and
+    last arrived, and the outcome that put them on the watchlist (``filed``,
+    ``deleted``, or an open round) so the console can say why they are here.
+    """
+    conn = _get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT f.user_id, COUNT(*) AS held, MIN(f.upload_time) AS first_held, "
+            "MAX(f.upload_time) AS last_held, "
+            "u.username, u.first_name, u.last_name, u.banned_at, "
+            "(SELECT r.status FROM reports r WHERE r.user_id = f.user_id "
+            " ORDER BY r.status = 'filed' DESC, r.created_at DESC LIMIT 1) AS last_status "
+            "FROM files f LEFT JOIN users u ON u.user_id = f.user_id "
+            "WHERE f.hold_reason IS NOT NULL AND f.cleared_at IS NULL "
+            "GROUP BY f.user_id ORDER BY held DESC"
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return []
+    return [dict(r) for r in rows]
+
+
+def held_files_for_user(user_id: int) -> list[dict]:
+    """A user's held files (not yet cleared), oldest first."""
+    conn = _get_conn()
+    rows = conn.execute(
+        "SELECT * FROM files WHERE user_id = ? AND hold_reason IS NOT NULL AND cleared_at IS NULL ORDER BY upload_time",
+        (user_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def clear_file_hold_path(file_unique_id: str) -> None:
+    """Forget where a held file's ciphertext was — a report round owns it now.
+
+    ``hold_reason`` is kept: it records WHY the file was held (during the
+    investigation or after the ban), which is exactly the provenance the report
+    needs to state.
+    """
+    conn = _get_conn()
+    with conn:
+        conn.execute(
+            "UPDATE files SET hold_path = NULL, hold_nonce = NULL, hold_sha256 = NULL WHERE file_unique_id = ?",
+            (file_unique_id,),
+        )
+
+
+def set_file_hold(file_unique_id: str, hold_reason: str, hold: tuple[str, bytes, str]) -> None:
+    """Point a file row back at a (re-)written hold ciphertext."""
+    conn = _get_conn()
+    with conn:
+        conn.execute(
+            "UPDATE files SET hold_reason = ?, hold_path = ?, hold_nonce = ?, hold_sha256 = ? WHERE file_unique_id = ?",
+            (hold_reason, *hold, file_unique_id),
+        )
 
 
 def create_report(report_uuid: str, user_id: int, page_secret_hash: str, source_id: int | None = None) -> None:
@@ -1039,24 +1171,29 @@ def report_stats() -> list[dict]:
     # Fold the flat join back into one record per report. A report with no blobs
     # left still yields a row (LEFT JOIN), with NULL file columns.
     out: dict[str, dict] = {}
+    times: dict[str, list[int]] = {}
+    types: dict[str, dict[str, int]] = {}
     for row in rows:
-        rec = out.get(row["report_uuid"])
-        if rec is None:
-            rec = out[row["report_uuid"]] = {
+        uuid = row["report_uuid"]
+        if uuid not in out:
+            out[uuid] = {
                 "status": row["status"],
                 "user_id": row["user_id"],
                 "language": row["language"],
                 "finished_at": row["reported_at"],
                 "source": row["source"],
-                "upload_times": [],
-                "file_types": {},
             }
+            times[uuid] = []
+            types[uuid] = {}
         if row["file_type"] is None and row["upload_time"] is None:
             continue  # no blob for this report
         if row["upload_time"] is not None:
-            rec["upload_times"].append(row["upload_time"])
+            times[uuid].append(row["upload_time"])
         # We do NOT infer "video" from capability flags — a sticker is usually a
         # static image and a document can be anything. Missing type → "unknown".
         ftype = row["file_type"] or "unknown"
-        rec["file_types"][ftype] = rec["file_types"].get(ftype, 0) + 1
+        types[uuid][ftype] = types[uuid].get(ftype, 0) + 1
+    for uuid, rec in out.items():
+        rec["upload_times"] = times[uuid]
+        rec["file_types"] = types[uuid]
     return list(out.values())
