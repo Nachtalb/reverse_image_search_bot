@@ -25,6 +25,7 @@ from telegram.ext import ContextTypes
 from yarl import URL
 
 from reverse_image_search_bot import metrics
+from reverse_image_search_bot.abuse_report import hold
 from reverse_image_search_bot.config import ChatConfig, abuse
 from reverse_image_search_bot.engines import engines
 from reverse_image_search_bot.engines.errors import EngineError, RateLimitError, is_transient
@@ -39,8 +40,10 @@ from reverse_image_search_bot.utils.tags import a, b, code, hidden_a, title
 from .utils import (
     _detect_file_type,
     _normalize_extension,
+    image_to_bytes,
     image_to_url,
     last_used,
+    video_to_bytes,
     video_to_url,
 )
 
@@ -57,12 +60,20 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
     if not user:
         return
     L = get_lang(update)
-    if user.id in context.bot_data.get("banned_users", []):
+    chat_id = message.chat_id
+    logger.info("file_handler: start user=%s chat=%s msg=%s", user.id, chat_id, message.message_id)
+
+    # Watchlist: an uploader with an open/filed/deleted report is under
+    # investigation, and a banned one is past that. Either way their media is
+    # evidence for the next report round, so it is recorded — and a banned
+    # user's media is never published at all: it goes straight to the encrypted
+    # hold, gets no URL, and the bot answers nothing else.
+    hold_reason = abuse.hold_reason_for_user(user.id)
+    if hold_reason == abuse.HOLD_AFTER_BAN or user.id in context.bot_data.get("banned_users", []):
+        await _hold_upload(message, user)
         await message.reply_text(t("search.files.banned", L))
         return
 
-    chat_id = message.chat_id
-    logger.info("file_handler: start user=%s chat=%s msg=%s", user.id, chat_id, message.message_id)
     await context.bot.send_chat_action(chat_id=message.chat_id, action=ChatAction.TYPING)
 
     attachment = message.effective_attachment
@@ -178,6 +189,7 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
                 file_id=getattr(attachment, "file_id", None),
                 caption=message.caption or message.text or None,
                 is_video=is_video,
+                hold_reason=hold_reason,
             )
 
         # Track usage metrics
@@ -210,6 +222,59 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
     except Exception:
         await message.reply_text(t("search.generic_error", L))
         raise
+
+
+async def _hold_upload(message: Message, user) -> None:
+    """Record a banned user's upload as evidence without ever publishing it.
+
+    The bot does not answer a banned user, but what they send is still material
+    for the next report round. It is encrypted at rest under ``held/<uid>/`` and
+    the file row gets no public URL — ``saved_filename`` still names what the
+    file WOULD have been called, because that is the id the rest of the pipeline
+    (and any Cloudflare report) uses.
+
+    Best effort throughout: a ban must never turn into a visible error.
+    """
+    attachment = message.effective_attachment
+    if isinstance(attachment, (list, tuple)):
+        attachment = attachment[-1]
+    # Only real media has a file to hold; a poll/contact/… has nothing.
+    if not isinstance(attachment, (PhotoSize, Sticker, Document, Video, Animation)):
+        return
+    try:
+        if isinstance(attachment, (Video, Animation)) or (
+            isinstance(attachment, Document) and (attachment.mime_type or "").startswith("video")
+        ):
+            data, filename = await video_to_bytes(attachment)
+            is_video = True
+        else:
+            data, filename = await image_to_bytes(attachment)
+            is_video = False
+        stored = hold.store(user.id, attachment.file_unique_id, data)
+        if stored is None:
+            return
+        abuse.record_user(
+            user.id,
+            username=user.username,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            language_code=getattr(user, "language_code", None),
+        )
+        abuse.record_file(
+            attachment.file_unique_id,
+            saved_filename=filename,
+            user_id=user.id,
+            original_filename=getattr(attachment, "file_name", None),
+            file_type=_detect_file_type(attachment),
+            file_id=getattr(attachment, "file_id", None),
+            caption=message.caption or message.text or None,
+            is_video=is_video,
+            hold_reason=abuse.HOLD_AFTER_BAN,
+            hold=stored,
+        )
+        logger.info("held upload %s from banned user %s", attachment.file_unique_id, user.id)
+    except Exception:
+        logger.warning("failed to hold upload from banned user %s", user.id, exc_info=True)
 
 
 async def general_image_search(update: Update, image_url: URL, reply_done: asyncio.Event):
