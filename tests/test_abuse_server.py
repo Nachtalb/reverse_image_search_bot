@@ -26,10 +26,10 @@ def abuse(tmp_path, monkeypatch):
     return ab
 
 
-def _req(headers=None, match=None, json_body=None, app=None):
+def _req(headers=None, match=None, json_body=None, app=None, query=None):
     r = MagicMock(spec=web.Request)
     r.headers = headers or {}
-    r.query = {}
+    r.query = query or {}
     r.match_info = match or {}
     r.app = app if app is not None else {"bot": None}
     if json_body is not None:
@@ -159,7 +159,7 @@ async def test_cancel_purges_blobs_but_keeps_files_and_relation(abuse, monkeypat
 
 @pytest.mark.asyncio
 async def test_delete_destroys_selected_restores_rest_and_keeps_user_unbanned(abuse, monkeypatch, tmp_path):
-    """Delete mode: selected files are destroyed, the rest come back, no ban."""
+    """Delete mode: selected files leave the web but stay as evidence; no ban."""
     from reverse_image_search_bot import settings
     from reverse_image_search_bot.abuse_report import crypto, server
 
@@ -192,13 +192,16 @@ async def test_delete_destroys_selected_restores_rest_and_keeps_user_unbanned(ab
 
     assert json.loads(resp.text or "")["deleted"] == 1
     assert abuse.get_report("u")["status"] == abuse.REPORT_DELETED
-    # The selected file is gone for good; the unselected one is back on disk.
+    # The selected file is off the web; the unselected one is back on disk.
     assert not (updir / "A.jpg").exists()
     assert (updir / "B.jpg").read_bytes() == b"innocent"
     # Deleting is not reporting: the uploader keeps their account.
     assert not abuse.get_user(1).get("banned_at")
-    # The destroyed file is cleared so a later round can't drag it back in.
-    assert abuse.blob_meta("u") == []
+    # Deleted is not forgotten — the destroyed file stays as evidence, encrypted
+    # in the DB, exactly like a filed one. The untouched file's blob is dropped.
+    kept = abuse.report_blobs("u")
+    assert [b["saved_filename"] for b in kept] == ["A.jpg"]
+    assert crypto.decrypt_file(bytes(kept[0]["nonce"]), bytes(kept[0]["ciphertext"]), key) == b"doomed"
 
 
 @pytest.mark.asyncio
@@ -593,8 +596,8 @@ async def test_reports_create_bulk_urls_one_report_per_uploader(abuse, monkeypat
     assert all(r["uuid"] for r in data["results"])
 
 
-def test_filed_report_stats_filed_only_with_language_and_times(abuse):
-    """Stats are FILED-only, carry the user's language + reported files' upload times."""
+def test_report_stats_decided_only_with_language_and_times(abuse):
+    """Stats cover DECIDED reports (filed + deleted), with language + upload times."""
     import time
 
     # User A (lang 'en') → one filed report over two files. User B (lang 'de') →
@@ -633,11 +636,12 @@ def test_filed_report_stats_filed_only_with_language_and_times(abuse):
     )
     abuse.mark_report_filed("rC")
 
-    recs = abuse.filed_report_stats()
+    recs = abuse.report_stats()
     by_user = {r["user_id"]: r for r in recs}
     # Only the two FILED reports — the cancelled one is gone.
     assert set(by_user) == {1, 3}
     assert len(recs) == 2
+    assert by_user[1]["status"] == "filed"
     assert by_user[1]["language"] == "en"
     assert by_user[3]["language"] is None
     # User 1's report carries BOTH reported files' upload times.
@@ -649,6 +653,21 @@ def test_filed_report_stats_filed_only_with_language_and_times(abuse):
     # sticker (NOT a video). User 1: one photo + one sticker. User 3: one video.
     assert by_user[1]["file_types"] == {"photo": 1, "sticker": 1}
     assert by_user[3]["file_types"] == {"video": 1}
+
+
+def test_report_stats_includes_deleted_reports(abuse):
+    """A `deleted` report is a decision too — it must show up, tagged as such."""
+    abuse.record_user(9, username="d", language_code="fr")
+    abuse.record_file("fd", saved_filename="fd.jpg", user_id=9, file_type="photo")
+    abuse.create_report("rD", 9, "")
+    abuse.add_report_blob(
+        "rD", file_unique_id="fd", saved_filename="fd.jpg", nonce=b"n", ciphertext=b"c", plaintext_sha256="h"
+    )
+    abuse.set_report_status("rD", abuse.REPORT_DELETED)
+
+    recs = abuse.report_stats()
+    assert [r["status"] for r in recs] == ["deleted"]
+    assert recs[0]["file_types"] == {"photo": 1}
 
 
 @pytest.mark.asyncio

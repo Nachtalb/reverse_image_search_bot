@@ -148,13 +148,31 @@ async def reports_index(request: web.Request) -> web.StreamResponse:
 
 
 async def api_reports_list(request: web.Request) -> web.Response:
-    """List all reports (admin + global page password gated)."""
+    """One page of reports (admin + global page password gated).
+
+    ``?offset=&limit=&q=&status=`` — the console loads 20 at a time as you
+    scroll rather than rendering the whole history, and ``q`` searches the
+    uploader (id, @username, name) and the report ids (uuid, NCMEC number).
+    Filtering happens in SQL so paging stays correct: paginating a
+    client-filtered list would silently skip matches.
+    """
     _require_admin(request)
     if not crypto.verify_global_page_password(request.headers.get("X-Page-Secret", ""), settings.REPORT_PAGE_PASSWORD):
         raise web.HTTPForbidden(text="page password incorrect")
-    reports = abuse.all_reports()
+    try:
+        limit = min(max(int(request.query.get("limit", 20)), 1), 100)
+        offset = max(int(request.query.get("offset", 0)), 0)
+    except ValueError:
+        raise web.HTTPBadRequest(text="limit and offset must be numbers") from None
+    query = (request.query.get("q") or "").strip()
+    status = (request.query.get("status") or "").strip() or None
+    reports, total = await asyncio.to_thread(abuse.search_reports, query, status, limit, offset)
     return web.json_response(
         {
+            "total": total,
+            "offset": offset,
+            "limit": limit,
+            "statuses": abuse.report_status_counts(),
             "reports": [
                 {
                     "uuid": r["report_uuid"],
@@ -166,21 +184,58 @@ async def api_reports_list(request: web.Request) -> web.Response:
                     "created_at": r["created_at"],
                 }
                 for r in reports
-            ]
+            ],
         }
     )
 
 
 async def api_reports_stats(request: web.Request) -> web.Response:
-    """Filed-only report records for the statistics dashboard (admin + pw gated).
+    """Report records for the statistics dashboard (admin + pw gated).
 
-    Returns the raw per-report records; the client does all aggregation and
-    period filtering so year/month dropdowns switch instantly with no re-fetch.
+    Returns the raw per-report records for every decided report (filed and
+    deleted); the client does all aggregation and period filtering so year/month
+    dropdowns switch instantly with no re-fetch.
+
+    The query walks reports → users → sources → blobs → files. That is cheap on
+    a warm page cache but takes ~2 s on a cold one (network block storage), so
+    it runs off the event loop — otherwise the first stats open after a restart
+    stalls the webhook and every other report request with it.
     """
     _require_admin(request)
     if not crypto.verify_global_page_password(request.headers.get("X-Page-Secret", ""), settings.REPORT_PAGE_PASSWORD):
         raise web.HTTPForbidden(text="page password incorrect")
-    return web.json_response({"records": abuse.filed_report_stats()})
+    return web.json_response({"records": await asyncio.to_thread(abuse.report_stats)})
+
+
+async def api_reports_waiting(request: web.Request) -> web.Response:
+    """Uploaders whose held material is waiting for a report round.
+
+    A watchlisted user keeps uploading; that material is held rather than served
+    (see ``abuse_report.hold``) and only reaches NCMEC when someone opens a
+    round. This is the queue: who, how much is waiting, since when, and what
+    their previous report ended as — so the console can offer one-click create.
+    """
+    _require_admin(request)
+    if not crypto.verify_global_page_password(request.headers.get("X-Page-Secret", ""), settings.REPORT_PAGE_PASSWORD):
+        raise web.HTTPForbidden(text="page password incorrect")
+    waiting = await asyncio.to_thread(abuse.held_uploaders)
+    return web.json_response(
+        {
+            "waiting": [
+                {
+                    "user_id": w["user_id"],
+                    "username": w.get("username"),
+                    "display_name": " ".join(filter(None, (w.get("first_name"), w.get("last_name")))) or None,
+                    "held": w["held"],
+                    "first_held": w["first_held"],
+                    "last_held": w["last_held"],
+                    "banned": bool(w.get("banned_at")),
+                    "last_status": w.get("last_status"),
+                }
+                for w in waiting
+            ]
+        }
+    )
 
 
 async def api_prepare_progress(request: web.Request) -> web.Response:
@@ -891,10 +946,13 @@ async def api_delete(request: web.Request) -> web.Response:
     a Cloudflare complaint about content nobody can age-verify. Deleting it is
     the right call; banning the uploader and filing with NCMEC is not.
 
-    The selected blobs' plaintext is never written back (their ciphertext and
-    rows are dropped with the round), every other file is restored to disk, and
-    the report is closed as ``deleted``. The uploader is NOT banned. Deleted
-    files are marked cleared so a later round doesn't drag them back in.
+    "Deleted" means gone from the public web, NOT forgotten: the deleted files'
+    encrypted bytes move into the DB exactly as a filed report's do, so the
+    decision stays auditable and the material is still available to law
+    enforcement. Their plaintext is never written back. Every other file is
+    restored to disk and the report closes as ``deleted``. The uploader is NOT
+    banned, but they are on the watchlist from here on. Deleted files are marked
+    cleared so a later round doesn't drag them back in.
     """
     _require_admin(request)
     rep = _report_or_404(request.match_info["uuid"])
@@ -915,18 +973,9 @@ async def api_delete(request: web.Request) -> web.Response:
     # The deleted files must not come back in a future round for this user.
     abuse.set_files_cleared([b["file_unique_id"] for b in doomed])
     abuse.set_report_status(rep["report_uuid"], abuse.REPORT_DELETED, detail=f"{len(doomed)} file(s) deleted")
-    base = settings.UPLOADER.get("configuration", {}).get("path")
-    if base:
-        for b in abuse.report_blobs(rep["report_uuid"]):
-            if b.get("video_path"):
-                try:
-                    vfp = Path(base) / b["video_path"]
-                    if vfp.is_file():
-                        vfp.unlink()
-                except Exception:
-                    logger.warning("failed to delete video on delete %s", b["video_path"], exc_info=True)
-    abuse.purge_report_blobs(rep["report_uuid"])
-    purge_cipher_dir(rep["report_uuid"])
+    # Keep the deleted material as evidence, exactly like a filed report: its
+    # ciphertext moves into the DB, everything else in the round is dropped.
+    _cleanup_after_finish(rep)
     return web.json_response({"ok": True, "status": abuse.REPORT_DELETED, "deleted": len(doomed)})
 
 
@@ -963,19 +1012,20 @@ def _ban_reported_user(bot_data, user_id: int) -> None:
 
 
 def _cleanup_after_finish(rep: dict) -> None:
-    """On finish: move the reported ciphertext INTO the DB, drop everything else.
+    """On a decision: move the acted-on ciphertext INTO the DB, drop the rest.
 
-    Retention rules:
-    - The REPORTED (selected) files: filing is what earns a place in the DB, so
-      their encrypted bytes are read off disk and written into the blob row.
-      They stay linked to the filed report, available for further inspection or
-      a report to local law enforcement, and no longer depend on a file that the
-      ban sweep below would delete. Their plaintext left the disk at prepare time.
+    Runs for both outcomes that decide something — FILED and DELETED. Retention
+    rules:
+    - The SELECTED files (reported to NCMEC, or deleted): the decision is what
+      earns them a place in the DB, so their encrypted bytes are read off disk
+      and written into the blob row. They stay linked to the report, available
+      for further inspection or a report to local law enforcement, and no longer
+      depend on a file that the ban sweep below would delete. Their plaintext
+      left the disk at prepare time.
     - Everything else in the round: purged. The unselected blobs are deleted
       from the DB, and the report's whole on-disk ciphertext directory goes with
-      them — filing means the user is banned, and a banned user's material is
-      not kept. Reported VIDEOS keep their encrypted file on disk (they are far
-      too large for SQLite; that is the pre-existing design).
+      them. Reported VIDEOS keep their encrypted file on disk (they are far too
+      large for SQLite; that is the pre-existing design).
 
     The user row, ban, and report record are always kept.
     """
@@ -1019,6 +1069,7 @@ def build_app(bot=None, bot_data=None) -> web.Application:
     app["bot_data"] = bot_data
     app.router.add_get("/report/console", reports_index)
     app.router.add_get("/report/console/api/list", api_reports_list)
+    app.router.add_get("/report/console/api/waiting", api_reports_waiting)
     app.router.add_get("/report/console/api/stats", api_reports_stats)
     app.router.add_get("/report/console/api/prepare_progress", api_prepare_progress)
     app.router.add_post("/report/console/api/create", api_reports_create)

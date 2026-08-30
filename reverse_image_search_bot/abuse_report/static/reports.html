@@ -115,7 +115,7 @@
   </div>
 
   <div id="body" class="hidden">
-    <div class="tabs">
+    <div class="tabs" id="main-tabs">
       <div class="tab active" id="tab-reports" data-tab="reports">Reports</div>
       <div class="tab" id="tab-stats" data-tab="stats">Statistics</div>
     </div>
@@ -135,37 +135,41 @@
         <div id="create-ok" class="hidden" style="margin-top:10px"></div>
       </div>
 
+      <!-- Waiting list: watchlisted users whose held uploads need a round -->
+      <div class="card hidden" id="waiting-card">
+        <b>Waiting for a report</b>
+        <div class="muted" style="margin:4px 0 10px">
+          Held uploads from watched users. They are not served anywhere.
+        </div>
+        <div id="waiting-list"></div>
+      </div>
+
       <!-- Report list -->
       <div class="card">
         <div class="row" style="justify-content:space-between">
           <b>All reports</b>
           <div class="row">
-            <select id="status-filter" title="Filter by status">
-              <option value="">All statuses</option>
-              <option value="filed">Filed</option>
-              <option value="ready">Ready</option>
-              <option value="preparing">Preparing</option>
-              <option value="review">Review</option>
-              <option value="submitting">Submitting</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="deleted">Deleted</option>
-              <option value="retracted">Retracted</option>
-              <option value="error">Error</option>
-            </select>
+            <select id="status-filter" title="Filter by status"></select>
             <button class="ghost" id="refresh-btn">Refresh</button>
           </div>
         </div>
+        <input type="text" id="list-search" placeholder="Search id, @username, name, report" style="margin-top:10px">
         <div id="list" style="margin-top:10px"></div>
+        <div class="muted hidden" id="list-more" style="text-align:center;padding:10px">Loading…</div>
       </div>
     </div>
 
     <!-- ============ STATISTICS TAB ============ -->
     <div id="pane-stats" class="hidden">
+      <div class="tabs" id="st-outcome">
+        <div class="tab active" data-outcome="filed">Reported</div>
+        <div class="tab" data-outcome="deleted">Deleted</div>
+      </div>
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:stretch;gap:12px;flex-wrap:nowrap">
           <div style="display:flex;flex-direction:column;justify-content:space-between;min-height:120px;flex:1;min-width:0">
             <div>
-              <div class="muted">Total files reported</div>
+              <div class="muted" id="st-counter-label">Total files reported</div>
               <div class="stat-counter" id="st-counter">—</div>
             </div>
             <div class="row" id="st-filebreak" style="gap:0;margin-top:8px;align-items:center;flex-wrap:wrap"></div>
@@ -178,7 +182,7 @@
       </div>
 
       <div class="stat-grid">
-        <div class="stat-box"><div class="n" id="st-reports">—</div><div class="l">Reports filed</div></div>
+        <div class="stat-box"><div class="n" id="st-reports">—</div><div class="l" id="st-reports-label">Reports filed</div></div>
         <div class="stat-box"><div class="n" id="st-users">—</div><div class="l">Unique users reported</div></div>
       </div>
 
@@ -264,6 +268,7 @@ $("unlock-btn").onclick = async () => {
     $("gear-btn").classList.remove("hidden");
     $("hdr-sub").classList.add("hidden");
     loadSources().catch(() => {});
+    loadWaiting().catch(() => {});
   } catch (e) { $("unlock-err").textContent = "" + e.message; P2 = ""; }
 };
 
@@ -284,24 +289,65 @@ function openReport(uuid) {
   location.href = `/report/${uuid}`;
 }
 
-async function loadList() {
-  const r = await api("/api/list");
-  const j = await r.json();
-  ALL_REPORTS = j.reports;
-  renderList();
+// ============ Report list (paged + searched server-side) ============
+// The history is long, so the list loads a page at a time as you scroll and the
+// filtering happens in SQL — paging a client-filtered array would skip matches.
+const PAGE = 20;
+let LIST = { offset: 0, total: 0, loading: false, done: false, q: "", status: "" };
+
+// Statuses always offered. Anything else (a stuck submit, an errored round) only
+// appears while a report is actually in it — the dropdown describes reality.
+const CORE_STATUSES = ["filed", "ready", "cancelled", "deleted", "watched"];
+const STATUS_LABEL = {
+  filed: "Filed", ready: "Ready", cancelled: "Cancelled", deleted: "Deleted", watched: "Watched",
+  preparing: "Preparing", review: "Review", submitting: "Submitting", retracted: "Retracted", error: "Error",
+};
+
+function fillStatusFilter(counts) {
+  const sel = $("status-filter");
+  const keep = sel.value;
+  const extra = Object.keys(counts || {}).filter(s => !CORE_STATUSES.includes(s) && counts[s]);
+  const opts = ['<option value="">All statuses</option>'];
+  for (const s of CORE_STATUSES.concat(extra)) {
+    opts.push(`<option value="${s}">${escapeHtml(STATUS_LABEL[s] || s)}</option>`);
+  }
+  sel.innerHTML = opts.join("");
+  sel.value = keep;
+  if (sel.value !== keep) sel.value = "";  // the kept status no longer exists
 }
 
-let ALL_REPORTS = [];
+// Restart the list from the top (new search or filter) and load the first page.
+async function loadList() {
+  LIST = { offset: 0, total: 0, loading: false, done: false, q: $("list-search").value.trim(), status: $("status-filter").value };
+  $("list").innerHTML = "";
+  await loadMore();
+}
 
-function renderList() {
-  const filter = $("status-filter").value;
-  const reports = filter ? ALL_REPORTS.filter(r => r.status === filter) : ALL_REPORTS;
-  const list = $("list");
-  list.innerHTML = "";
-  if (!reports.length) {
-    list.innerHTML = `<div class="muted">${ALL_REPORTS.length ? "No reports match this filter." : "No reports yet."}</div>`;
-    return;
+async function loadMore() {
+  if (LIST.loading || LIST.done) return;
+  LIST.loading = true;
+  $("list-more").classList.remove("hidden");
+  try {
+    const qs = new URLSearchParams({ offset: LIST.offset, limit: PAGE });
+    if (LIST.q) qs.set("q", LIST.q);
+    if (LIST.status) qs.set("status", LIST.status);
+    const j = await (await api("/api/list?" + qs)).json();
+    LIST.total = j.total;
+    LIST.offset += j.reports.length;
+    LIST.done = LIST.offset >= j.total || !j.reports.length;
+    fillStatusFilter(j.statuses);
+    appendReports(j.reports);
+    if (!LIST.offset) {
+      $("list").innerHTML = `<div class="muted">${LIST.q || LIST.status ? "No reports match." : "No reports yet."}</div>`;
+    }
+  } finally {
+    LIST.loading = false;
+    $("list-more").classList.toggle("hidden", LIST.done);
   }
+}
+
+function appendReports(reports) {
+  const list = $("list");
   for (const rep of reports) {
     const who = rep.username ? "@" + rep.username : (rep.display_name || rep.user_id);
     const ncmec = rep.ncmec_report_id ? ` · NCMEC #${rep.ncmec_report_id}` : "";
@@ -316,9 +362,52 @@ function renderList() {
   }
 }
 
-$("status-filter").onchange = renderList;
+// Infinite scroll: pull the next page as the end of the list comes into view.
+window.addEventListener("scroll", () => {
+  if ($("pane-reports").classList.contains("hidden")) return;
+  if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
+    loadMore().catch(() => {});
+  }
+});
 
-$("refresh-btn").onclick = () => loadList().catch(e => { $("create-err").textContent = "" + e.message; });
+$("status-filter").onchange = () => loadList().catch(e => { $("create-err").textContent = "" + e.message; });
+
+// Debounced so typing doesn't fire a request per keystroke.
+let SEARCH_TIMER = null;
+$("list-search").oninput = () => {
+  clearTimeout(SEARCH_TIMER);
+  SEARCH_TIMER = setTimeout(() => loadList().catch(() => {}), 250);
+};
+
+// ============ Waiting list ============
+// Watchlisted users whose held uploads have nowhere to go until a round exists.
+async function loadWaiting() {
+  const j = await (await api("/api/waiting")).json();
+  const box = $("waiting-list");
+  $("waiting-card").classList.toggle("hidden", !j.waiting.length);
+  box.innerHTML = "";
+  for (const w of j.waiting) {
+    const who = w.username ? "@" + w.username : (w.display_name || w.user_id);
+    // Why they are watched — a previous outcome, or the ban that followed one.
+    const why = w.banned ? "banned" : (STATUS_LABEL[w.last_status] || w.last_status || "watched").toLowerCase();
+    const el = document.createElement("div");
+    el.className = "item";
+    el.innerHTML =
+      `<div><div class="nm">${escapeHtml(who)} · <span class="muted">${w.user_id}</span></div>` +
+      `<div class="muted">${w.held} file(s) · ${why} · since ${fmtTs(w.first_held)}</div></div>`;
+    const b = document.createElement("button");
+    b.className = "small";
+    b.textContent = "Create report";
+    b.onclick = () => { $("target").value = String(w.user_id); $("create-btn").click(); };
+    el.appendChild(b);
+    box.appendChild(el);
+  }
+}
+
+$("refresh-btn").onclick = () => {
+  loadList().catch(e => { $("create-err").textContent = "" + e.message; });
+  loadWaiting().catch(() => {});
+};
 
 $("create-btn").onclick = async () => {
   $("create-err").textContent = "";
@@ -379,6 +468,8 @@ $("create-btn").onclick = async () => {
     }
     $("target").value = "";
     loadList().catch(() => {});
+    // Creating a round consumes that user's held files — they leave the queue.
+    loadWaiting().catch(() => {});
   } catch (e) {
     $("create-err").textContent = "" + e.message;
   } finally {
@@ -417,14 +508,14 @@ const PANES = ["reports", "stats", "keys", "sources"];
 
 function showPane(name) {
   PANES.forEach(p => $("pane-" + p).classList.toggle("hidden", p !== name));
-  document.querySelectorAll(".tabs")[0].classList.toggle("hidden", name === "keys" || name === "sources");
-  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
+  $("main-tabs").classList.toggle("hidden", name === "keys" || name === "sources");
+  $("main-tabs").querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
   if (name === "stats") loadStats().catch(e => { $("st-err").textContent = "" + e.message; });
   if (name === "keys") loadKeys().catch(e => { $("key-err").textContent = "" + e.message; });
   if (name === "sources") loadSources().catch(e => { $("src-err").textContent = "" + e.message; });
 }
 
-document.querySelectorAll(".tab").forEach(t => { t.onclick = () => showPane(t.dataset.tab); });
+$("main-tabs").querySelectorAll(".tab").forEach(t => { t.onclick = () => showPane(t.dataset.tab); });
 
 $("gear-btn").onclick = ev => { ev.stopPropagation(); $("gear-menu").classList.toggle("hidden"); };
 document.addEventListener("click", ev => {
@@ -553,8 +644,11 @@ $("key-add").onclick = async () => {
 };
 
 // ============ Statistics ============
-let STATS = null;  // raw records from the server (filed only)
+let STATS = null;  // raw records from the server (decided reports: filed + deleted)
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+// Which outcome the whole dashboard is showing. Filed reports went to NCMEC;
+// deleted ones destroyed the material without filing.
+let STATS_OUTCOME = "filed";
 
 function fmtLang(code) {
   if (!code) return "Unknown";
@@ -575,7 +669,7 @@ async function loadStats() {
   renderStats();
 }
 
-// Year dropdown = every year that has a filed report (desc). Month dropdown =
+// Year dropdown = every year that has a decided report (desc). Month dropdown =
 // "Full year" + Jan..current (current year capped at this month; past years all 12).
 function buildPeriodDropdowns() {
   const now = new Date();
@@ -599,17 +693,26 @@ function buildMonthDropdown() {
   $("st-month").onchange = renderStats;
 }
 
-// Records filtered to the selected year + (optional) month, by filing date.
+// Records filtered to the selected outcome + year + (optional) month.
 function selectedRecords() {
   const year = parseInt($("st-year").value, 10);
   const month = $("st-month").value;
   return STATS.filter(r => {
+    if (r.status !== STATS_OUTCOME) return false;
     const d = new Date(r.finished_at * 1000);
     if (d.getFullYear() !== year) return false;
     if (month !== "all" && d.getMonth() !== parseInt(month, 10)) return false;
     return true;
   });
 }
+
+document.querySelectorAll("#st-outcome .tab").forEach(t => {
+  t.onclick = () => {
+    STATS_OUTCOME = t.dataset.outcome;
+    document.querySelectorAll("#st-outcome .tab").forEach(o => o.classList.toggle("active", o === t));
+    renderStats();
+  };
+});
 
 function renderStats() {
   const recs = selectedRecords();
@@ -620,6 +723,8 @@ function renderStats() {
     for (const [t, n] of Object.entries(r.file_types || {})) { byType[t] = (byType[t] || 0) + n; total += n; }
   }
   $("st-counter").textContent = total;
+  $("st-counter-label").textContent = STATS_OUTCOME === "filed" ? "Total files reported" : "Total files deleted";
+  $("st-reports-label").textContent = STATS_OUTCOME === "filed" ? "Reports filed" : "Reports deleted";
   renderFileBreakdown(byType);
   $("st-reports").textContent = recs.length;
   $("st-users").textContent = new Set(recs.map(r => r.user_id)).size;
@@ -646,80 +751,90 @@ function renderFileBreakdown(byType) {
   });
 }
 
-// Palette for language slices (cycled). Toggling a chip drops that language from
-// the pie and the percentages recompute over the remaining visible languages.
+// Palette for pie slices (cycled). Toggling a chip drops that key from the pie
+// and the percentages recompute over the remaining visible ones.
 const PIE_COLORS = ["#54a0ff", "#3a6df0", "#8ac926", "#ffca3a", "#ff6b6b", "#a78bfa", "#26c6da", "#ff9f43", "#c44dff", "#95a5a6"];
-let LANG_OFF = null;  // Set of language codes toggled off (persists across period changes)
+
+// One toggleable pie: which keys are hidden, and the animation state for the
+// slice tween. Languages and sources are the same widget over a different field,
+// so they share everything except this state (and it must stay separate, or
+// hiding "en" would hide a source too).
+function pieState() { return { off: new Set(), cur: {}, raf: null }; }
+const PIES = { lang: pieState(), src: pieState() };
+
+// Draw a toggleable pie: counts by key, a chip per key that hides/shows its
+// slice, animated. `label` renders a key for humans.
+function renderTogglePie(state, svgId, chipsId, counts, label) {
+  // Stable order: biggest first, so colors stay put as the period changes.
+  const keys = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+  const color = {};
+  keys.forEach((k, i) => { color[k] = PIE_COLORS[i % PIE_COLORS.length]; });
+
+  const chips = $(chipsId);
+  chips.innerHTML = "";
+  if (!keys.length) chips.innerHTML = `<div class="muted">No data for this period.</div>`;
+  for (const k of keys) {
+    const chip = document.createElement("button");
+    chip.className = "lang-chip" + (state.off.has(k) ? " off" : "");
+    chip.style.background = color[k];
+    chip.innerHTML = `<span class="tick">${state.off.has(k) ? "" : "✓"}</span>${escapeHtml(label(k))}`;
+    chip.onclick = () => {
+      if (state.off.has(k)) state.off.delete(k); else state.off.add(k);
+      drawPie(state, svgId, counts, keys, color, label);
+      paintChips(chipsId, state, keys);
+    };
+    chips.appendChild(chip);
+  }
+  drawPie(state, svgId, counts, keys, color, label);
+}
 
 function renderLangPie(recs) {
   const counts = {};
   for (const r of recs) { const k = r.language || ""; counts[k] = (counts[k] || 0) + 1; }
-  // Stable order: biggest first, so colors stay put as the period changes.
-  const langs = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
-  const color = {};
-  langs.forEach((k, i) => { color[k] = PIE_COLORS[i % PIE_COLORS.length]; });
-  if (LANG_OFF === null) LANG_OFF = new Set();
-
-  // Chips (toggle) — one per language present in this period.
-  const chips = $("st-lang-chips");
-  chips.innerHTML = "";
-  if (!langs.length) { chips.innerHTML = `<div class="muted">No data for this period.</div>`; }
-  for (const k of langs) {
-    const off = LANG_OFF.has(k);
-    const chip = document.createElement("button");
-    chip.className = "lang-chip" + (off ? " off" : "");
-    chip.style.background = color[k];
-    chip.innerHTML = `<span class="tick">${off ? "" : "✓"}</span>${escapeHtml(fmtLang(k))}`;
-    chip.onclick = () => { if (LANG_OFF.has(k)) LANG_OFF.delete(k); else LANG_OFF.add(k); drawPie(counts, langs, color); paintChips(langs, color); };
-    chips.appendChild(chip);
-  }
-  drawPie(counts, langs, color);
+  renderTogglePie(PIES.lang, "st-pie", "st-lang-chips", counts, fmtLang);
 }
 
-function paintChips(langs, color) {
-  const chips = [...$("st-lang-chips").querySelectorAll(".lang-chip")];
-  langs.forEach((k, i) => {
-    const off = LANG_OFF.has(k);
+// Filed/deleted reports per source — same toggleable widget as the languages.
+function renderSourcePie(recs) {
+  const counts = {};
+  for (const r of recs) { const k = r.source || "—"; counts[k] = (counts[k] || 0) + 1; }
+  renderTogglePie(PIES.src, "st-src-pie", "st-src-legend", counts, k => k);
+}
+
+function paintChips(chipsId, state, keys) {
+  const chips = [...$(chipsId).querySelectorAll(".lang-chip")];
+  keys.forEach((k, i) => {
+    const off = state.off.has(k);
     chips[i].classList.toggle("off", off);
     chips[i].querySelector(".tick").textContent = off ? "" : "✓";
   });
 }
 
-// Persistent per-language displayed fraction, so toggles animate (tweened via
-// rAF; SVG path `d` can't be CSS-animated). Slices grow/shrink smoothly.
-let PIE_CUR = {};        // lang -> currently displayed fraction (of the circle)
-let PIE_RAF = null;      // active animation frame id (cancel on re-toggle)
-
-// Draw/animate the pie over only the languages NOT toggled off; the visible
-// slices' percentages recompute and the transition is animated.
-function drawPie(counts, langs, color) {
-  const visible = langs.filter(k => !LANG_OFF.has(k));
+// Draw/animate the pie over only the keys NOT toggled off; the visible slices'
+// percentages recompute and the transition is animated (tweened via rAF; an SVG
+// path `d` can't be CSS-animated).
+function drawPie(state, svgId, counts, keys, color, label) {
+  const visible = keys.filter(k => !state.off.has(k));
   const total = visible.reduce((s, k) => s + counts[k], 0);
-  // Target fraction per language (0 for hidden/empty). New langs start at 0 → grow in.
+  // Target fraction per key (0 for hidden/empty). New keys start at 0 → grow in.
   const target = {};
-  for (const k of langs) { if (!(k in PIE_CUR)) PIE_CUR[k] = 0; target[k] = total ? (LANG_OFF.has(k) ? 0 : counts[k] / total) : 0; }
-  const from = { ...PIE_CUR };
+  for (const k of keys) { if (!(k in state.cur)) state.cur[k] = 0; target[k] = total ? (state.off.has(k) ? 0 : counts[k] / total) : 0; }
+  const from = { ...state.cur };
   const t0 = performance.now();
   const DUR = 350;
-  if (PIE_RAF) cancelAnimationFrame(PIE_RAF);
+  if (state.raf) cancelAnimationFrame(state.raf);
 
   const step = now => {
     let e = Math.min(1, (now - t0) / DUR);
     e = 1 - Math.pow(1 - e, 3);  // easeOutCubic
-    for (const k of langs) PIE_CUR[k] = from[k] + (target[k] - from[k]) * e;
-    paintPie(langs, color);
-    if (e < 1) { PIE_RAF = requestAnimationFrame(step); } else { PIE_RAF = null; }
+    for (const k of keys) state.cur[k] = from[k] + (target[k] - from[k]) * e;
+    $(svgId).innerHTML = pieSvg(keys.map(k => [k, state.cur[k] || 0]), color, label);
+    if (e < 1) { state.raf = requestAnimationFrame(step); } else { state.raf = null; }
   };
-  PIE_RAF = requestAnimationFrame(step);
+  state.raf = requestAnimationFrame(step);
 }
 
-// Render the pie from the current PIE_CUR fractions (normalized to fill the circle).
-function paintPie(langs, color) {
-  $("st-pie").innerHTML = pieSvg(langs.map(k => [k, PIE_CUR[k] || 0]), color, fmtLang);
-}
-
-// Pie markup for [key, weight] pairs — shared by the animated language pie and
-// the static source pie.
+// Pie markup for [key, weight] pairs — shared by both toggleable pies.
 function pieSvg(pairs, color, label) {
   const cx = 100, cy = 100, rad = 96;
   const parts = pairs.filter(([, f]) => f > 0.0005);
@@ -747,20 +862,6 @@ function pieSvg(pairs, color, label) {
     angle = end;
   }
   return out + labels.join("");
-}
-
-// Static pie of filed reports per source, with a plain (non-toggle) legend.
-function renderSourcePie(recs) {
-  const counts = {};
-  for (const r of recs) { const k = r.source || "—"; counts[k] = (counts[k] || 0) + 1; }
-  const names = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
-  const color = {};
-  names.forEach((k, i) => { color[k] = PIE_COLORS[i % PIE_COLORS.length]; });
-  $("st-src-pie").innerHTML = pieSvg(names.map(k => [k, counts[k]]), color, k => k);
-  const legend = $("st-src-legend");
-  legend.innerHTML = names.length
-    ? names.map(k => `<span class="lang-chip" style="background:${color[k]};cursor:default">${escapeHtml(k)} · ${counts[k]}</span>`).join("")
-    : `<div class="muted">No data for this period.</div>`;
 }
 
 function pieLabel(x, y, text) {

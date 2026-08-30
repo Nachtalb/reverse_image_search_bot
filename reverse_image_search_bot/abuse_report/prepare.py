@@ -174,11 +174,16 @@ class PrepareResult:
 
 
 def _present_files(user_id: int) -> tuple[list, int, int]:
-    """Files still on disk for a user, excluding cleared ones.
+    """Files available for a report, excluding cleared ones.
+
+    A file is available when it is still on disk, OR when it is HELD: a
+    watchlisted user's later uploads are encrypted under ``held/`` and never
+    published, precisely so they end up in this round. Held files carry their
+    ciphertext path instead of a plaintext one.
 
     Returns ``(present, recorded, cleared)`` where ``present`` is a list of
-    ``(file_row, path)``, ``recorded`` the total recorded file count, and
-    ``cleared`` how many on-disk files were skipped as cleared.
+    ``(file_row, path_or_None)``, ``recorded`` the total recorded file count,
+    and ``cleared`` how many available files were skipped as cleared.
     """
     files = abuse.files_for_user(user_id)
     updir = upload_dir()
@@ -187,13 +192,14 @@ def _present_files(user_id: int) -> tuple[list, int, int]:
     for f in files:
         if not updir:
             continue
+        held = bool(f.get("hold_path"))
         fp = updir / f["saved_filename"]
-        if not fp.is_file():
+        if not held and not fp.is_file():
             continue
         if f.get("cleared_at"):
             cleared += 1
             continue
-        present.append((f, fp))
+        present.append((f, None if held else fp))
     return present, len(files), cleared
 
 
@@ -206,6 +212,10 @@ def _encrypt_and_remove(
 ) -> int:
     """Encrypt (file_row, path) pairs into report blobs, deleting each plaintext.
 
+    ``path`` is None for a HELD file: its plaintext never existed on disk, so it
+    is decrypted out of the hold instead and the hold copy is dropped once the
+    round owns it.
+
     The ciphertext is written to disk (``report_files/<uuid>/``) and the DB row
     only points at it — nothing enters SQLite until the report is actually
     FILED. The plaintext is unlinked only AFTER its ciphertext is on disk and
@@ -217,17 +227,25 @@ def _encrypt_and_remove(
     ``progress`` (optional) is called with ``(done, total)`` after each file;
     a big user/group takes a while and the admin wants to see it move.
     """
+    from reverse_image_search_bot.abuse_report import hold
+
     cdir = cipher_dir(report_uuid)
     if cdir is None:
         return 0
     encrypted = 0
     total = len(batch)
     for f, fp in batch:
-        try:
-            data = fp.read_bytes()
-        except Exception:
-            logger.warning("failed to read %s", fp, exc_info=True)
-            continue
+        if fp is None:
+            data = hold.load(f)
+            if data is None:
+                logger.warning("held file %s unreadable — skipped", f["file_unique_id"])
+                continue
+        else:
+            try:
+                data = fp.read_bytes()
+            except Exception:
+                logger.warning("failed to read %s", fp, exc_info=True)
+                continue
         nonce, ct = crypto.encrypt_file(data, key)
         cipher_name = f"{f['file_unique_id']}.enc"
         (cdir / cipher_name).write_bytes(ct)
@@ -240,10 +258,15 @@ def _encrypt_and_remove(
             plaintext_sha256=crypto.sha256_hex(data),
             indicator=bool(indicators and f["file_unique_id"] in indicators),
         )
-        try:
-            fp.unlink()
-        except Exception:
-            logger.warning("failed to remove plaintext %s", fp, exc_info=True)
+        if fp is None:
+            # The round now owns these bytes under P1; the hold copy is redundant.
+            hold.drop(f)
+            abuse.clear_file_hold_path(f["file_unique_id"])
+        else:
+            try:
+                fp.unlink()
+            except Exception:
+                logger.warning("failed to remove plaintext %s", fp, exc_info=True)
         encrypted += 1
         if progress is not None:
             progress(encrypted, total)
@@ -258,16 +281,23 @@ def restore_report_files(report_uuid: str, p1: str, skip_ids: set[int] | None = 
     BEFORE writing anything — a wrong key must not scatter garbage into the
     upload directory.
 
+    A file that came from a BANNED user's hold goes back into the hold, not onto
+    the served upload directory — cancelling a round must never publish material
+    that was never public in the first place.
+
     ``skip_ids`` leaves those blobs' plaintext on the floor — used by the
     delete flow, where the selected files are the ones being destroyed and only
     the rest go back online. They are still decrypted and hash-checked, so a
     wrong key is caught before anything is written or deleted.
     """
+    from reverse_image_search_bot.abuse_report import hold as hold_mod
+
     updir = upload_dir()
     if updir is None:
         return "no upload path configured"
     key = crypto.derive_key(p1)
     plaintexts: list[tuple[Path, bytes]] = []
+    rehold: list[tuple[dict, bytes]] = []
     for b in abuse.report_blobs(report_uuid):
         ct = blob_ciphertext(b)
         if ct is None:
@@ -281,12 +311,22 @@ def restore_report_files(report_uuid: str, p1: str, skip_ids: set[int] | None = 
             return "image key incorrect"
         if skip_ids and b["id"] in skip_ids:
             continue
-        plaintexts.append((updir / b["saved_filename"], data))
+        frec = abuse.file_by_unique_id(b["file_unique_id"]) or {}
+        if frec.get("hold_reason") == abuse.HOLD_AFTER_BAN:
+            rehold.append((frec, data))
+        else:
+            plaintexts.append((updir / b["saved_filename"], data))
     for fp, data in plaintexts:
         try:
             fp.write_bytes(data)
         except Exception:
             logger.warning("failed to restore %s", fp, exc_info=True)
+    for frec, data in rehold:
+        stored = hold_mod.store(frec["user_id"], frec["file_unique_id"], data)
+        if stored is None:
+            logger.warning("could not re-hold %s — it stays only in the report", frec["file_unique_id"])
+            continue
+        abuse.set_file_hold(frec["file_unique_id"], abuse.HOLD_AFTER_BAN, stored)
     return None
 
 

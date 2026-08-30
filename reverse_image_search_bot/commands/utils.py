@@ -234,14 +234,12 @@ def _normalize_extension(attachment) -> str:
 _JPEG_ALIASES = {"jfif", "jpe", "jpeg"}
 
 
-async def video_to_url(attachment: Document | Video | Animation | Sticker) -> URL:
+async def video_to_bytes(attachment: Document | Video | Animation | Sticker) -> tuple[bytes, str]:
+    """A JPEG frame from a video upload, plus the filename it would be saved as."""
     filename = f"{attachment.file_unique_id}.jpg"
-    if uploader.file_exists(filename):
-        return uploader.get_url(filename)
-
     if attachment.file_size and attachment.file_size > MAX_TELEGRAM_FILE_SIZE:
         if attachment.thumbnail:
-            return await image_to_url(attachment.thumbnail)
+            return await image_to_bytes(attachment.thumbnail)
         raise ValueError(t("search.files.video_too_large"))
 
     t0 = time()
@@ -254,25 +252,36 @@ async def video_to_url(attachment: Document | Video | Animation | Sticker) -> UR
         raise ValueError("Telegram returned no file_path for the video")
     frame_bytes = await _extract_frame_streaming(video_file.file_path)
     logger.info("video_to_url: got frame in %.1fs", time() - t0)
+    return frame_bytes, filename
 
-    with io.BytesIO(frame_bytes) as file:
+
+async def video_to_url(attachment: Document | Video | Animation | Sticker) -> URL:
+    filename = f"{attachment.file_unique_id}.jpg"
+    if uploader.file_exists(filename):
+        return uploader.get_url(filename)
+
+    data, filename = await video_to_bytes(attachment)
+    with io.BytesIO(data) as file:
         url = upload_file(file, filename)
-    logger.info("video_to_url: done in %.1fs -> %s", time() - t0, url)
+    logger.info("video_to_url: done -> %s", url)
     return url
 
 
-async def image_to_url(attachment: PhotoSize | Sticker | Document) -> URL:
+def image_filename(attachment: PhotoSize | Sticker | Document) -> str:
+    """The on-disk filename an image upload gets (``<file_unique_id>.<ext>``)."""
     if isinstance(attachment, Document):
         extension = (attachment.file_name or "unknown.jpg").lower().rsplit(".", 1)[1].strip(".")
         if extension in _JPEG_ALIASES:
             extension = "jpg"
     else:
         extension = "jpg" if isinstance(attachment, PhotoSize) else "png"
+    return f"{attachment.file_unique_id}.{extension}"
 
-    filename = f"{attachment.file_unique_id}.{extension}"
-    if uploader.file_exists(filename):
-        return uploader.get_url(filename)
 
+async def image_to_bytes(attachment: PhotoSize | Sticker | Document) -> tuple[bytes, str]:
+    """The image bytes of an upload (normalised to jpg/png), plus its filename."""
+    filename = image_filename(attachment)
+    extension = filename.rsplit(".", 1)[1]
     t0 = time()
     logger.info("image_to_url: downloading file %s", attachment.file_unique_id)
     photo_file = await attachment.get_file(read_timeout=_FILE_TIMEOUT, connect_timeout=_FILE_TIMEOUT)
@@ -284,6 +293,15 @@ async def image_to_url(attachment: PhotoSize | Sticker | Document) -> URL:
             with Image.open(file) as image:
                 file.seek(0)
                 image.save(file, extension)
+        return file.getvalue(), filename
+
+
+async def image_to_url(attachment: PhotoSize | Sticker | Document) -> URL:
+    filename = image_filename(attachment)
+    if uploader.file_exists(filename):
+        return uploader.get_url(filename)
+    data, filename = await image_to_bytes(attachment)
+    with io.BytesIO(data) as file:
         url = upload_file(file, filename)
-    logger.info("image_to_url: done in %.1fs -> %s", time() - t0, url)
+    logger.info("image_to_url: done -> %s", url)
     return url
