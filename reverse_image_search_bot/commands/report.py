@@ -72,13 +72,16 @@ def _who(user_id: int) -> str:
 async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Prepare NCMEC report round(s).
 
-    Accepts EITHER a single target (numeric user id, @username, group/channel id,
-    or a filename) OR any blob of text containing Cloudflare file URLs
-    (``https://ris.naa.gg/f/<file>`` — defanged or not, as pasted from a CSAM
-    report). File URLs are regexed out, each resolved to its uploader, and one
-    encrypted report round is created per UNIQUE new uploader. The reply is a
-    compact status list: one line per user with an icon, id, username, and either
-    the report password (P1) for a new report or the filed NCMEC report id.
+    Accepts EITHER targets (numeric user id, @username, ``#uid``/``#cid``/``#gid``
+    tag, group/channel id, or a filename — any number of them) OR any blob of
+    text containing Cloudflare file URLs (``https://ris.naa.gg/f/<file>`` —
+    defanged or not, as pasted from a CSAM report). Every token is resolved and
+    one encrypted report round is created per UNIQUE uploader; a group/channel
+    target stands for everyone who uploaded through it.
+
+    The reply is a compact status list: one line per user with an icon, id,
+    username, and either the report password (P1) for a new report or the filed
+    NCMEC report id.
     """
     assert update.message and update.message.text and update.effective_user
     metrics.commands_total.labels(command="report").inc()
@@ -87,12 +90,12 @@ async def report_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     raw = update.message.text
     body = re.sub(r"^/report(@\S+)?\s*", "", raw, count=1).strip()
 
-    # Any input shape: a single token, a #uid tag, or a whole pasted Cloudflare
+    # Any input shape: one token, several #uid tags, or a whole pasted Cloudflare
     # report full of file URLs — resolve_targets handles them uniformly.
     user_ids, unknown, indicators = resolve_targets(body)
     if not body:
         await update.message.reply_text(
-            "Usage: /report <user_id | @username | group/channel id | filename>\n"
+            "Usage: /report <user_id | @username | #uid… | group/channel id | filename>\n"
             "or paste Cloudflare file URLs (https://ris.naa.gg/f/…) to report each uploader."
         )
         return
@@ -110,17 +113,36 @@ async def report_users(
     unknown: list[str] | None = None,
     indicators: dict[int, list[str]] | None = None,
 ) -> None:
-    """Prepare a report for each user id and reply with the compact status list.
+    """Prepare a report for each target and reply with the compact status list.
 
-    Shared entry point: the public ``/report`` command (single token or bulk
-    Cloudflare URLs) and the deploy-side wrapper (reply-to / #uid / group-channel
-    expansion) both resolve target user ids their own way, then hand them here so
-    the outcome list looks identical everywhere.
+    Shared entry point: every caller resolves targets its own way and hands the
+    ids here, so the outcome list looks identical everywhere.
+
+    A NEGATIVE id is a group or channel, not a user — ``#gid``/``#cid`` tags and
+    pasted chat ids both produce them. Reporting a chat means reporting everyone
+    who uploaded through it, so those ids are expanded to their uploaders here.
+    Passing one to ``prepare_report`` as a user id would open a round against an
+    account that does not exist.
     """
     if not update.message:
         return
     rows: list[dict] = []  # {icon, user_id, username, detail, uuid?}
-    uids = list(dict.fromkeys(user_ids))  # de-dup, preserve order
+    uids: list[int] = []
+    empty_chats: list[int] = []
+    for tid in user_ids:
+        if tid >= 0:
+            uids.append(tid)
+            continue
+        uploaders = abuse.uploaders_for_chat(tid)
+        if not uploaders:
+            empty_chats.append(tid)
+        uids.extend(uploaders)
+    uids = list(dict.fromkeys(uids))  # de-dup, preserve order
+    if not uids:
+        if empty_chats:
+            chats = ", ".join(f"<code>{c}</code>" for c in empty_chats)
+            await update.message.reply_html(f"No uploaders recorded for {chats} — nothing to report.")
+        return
     # Encrypting a round takes a while (PBKDF2 + AES per file) — tell the admin
     # right away, and run the work off the event loop so nothing times out.
     status_msg = None
