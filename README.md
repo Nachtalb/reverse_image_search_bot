@@ -91,3 +91,10 @@ To report a security issue or abuse, see our
 ([RFC 9116](https://www.rfc-editor.org/rfc/rfc9116)). Contact:
 [report@nachtalb.io](mailto:report@nachtalb.io)
 ([PGP key](https://naa.gg/.well-known/report-nachtalb.asc)).
+
+
+## Blocks and policy
+
+All blocks are reviewed manually and are not appealable. Please don't open issues about them.
+
+Users of this bot are subject to Telegram's [Standard Bot Privacy Policy](https://telegram.org/privacy-tpa), [Terms of Service for Bots](https://telegram.org/tos/bots) and [Terms of Service](https://telegram.org/tos).
