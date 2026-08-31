@@ -248,9 +248,10 @@
 <dialog id="delete-dlg">
   <div class="dlg-body">
     <h2>Delete <span id="delete-count">0</span> file(s)?</h2>
-    <div class="muted" style="margin-bottom:14px">The selected files are destroyed and never come back. Everything else in this round is restored to disk. The uploader is not banned and nothing is filed with NCMEC.</div>
+    <div class="muted" style="margin-bottom:14px">The selected files are destroyed and never come back. Everything else in this round is restored to disk. Nothing is filed with NCMEC. <b>Delete &amp; ban</b> additionally bans the uploader and removes everything else of theirs from disk.</div>
     <div class="row">
       <button id="delete-confirm-btn" class="danger">Delete</button>
+      <button id="delete-ban-btn" class="danger">Delete &amp; ban</button>
       <button id="delete-back-btn" class="ghost">Back</button>
     </div>
   </div>
@@ -367,15 +368,15 @@ function renderMeta() {
 
 function renderGallery() {
   const g = $("gallery"); g.innerHTML = "";
-  const filed = META.status === "filed";
+  const decided = isDecided();
   for (const b of META.blobs) {
     const d = document.createElement("div");
     d.className = "thumb"; d.dataset.id = b.id;
     if (b.indicator) d.classList.add("indicator");
     if (b.selected) sel[b.id] = b.classification;
-    // A filed report is immutable: show the reported category on the still-locked
+    // A decided report is immutable: show the outcome on the still-locked
     // thumbnail from the start, so it's visible without decrypting the images.
-    const badge = filed && b.selected ? reportedTag(b.id) : "";
+    const badge = decided && b.selected ? decidedTag(b.id) : "";
     if (badge) d.classList.add("selected");
     d.innerHTML = `<div class="fname">${blobLabel(b)}</div><div class="lock">🔒</div>` + badge;
     g.appendChild(d);
@@ -406,15 +407,15 @@ async function decryptThumb(b) {
   const fname = `<div class="fname">${blobLabel(b)}</div>`;
   // A centered play-triangle overlay flags images that have a source video.
   const vmark = b.has_video ? `<div class="playicon"><span class="disc"></span></div>` : "";
-  // After filing the report is immutable — show the reported category as a
+  // A decided report (filed or deleted) is immutable — show the outcome as a
   // read-only badge (like the review preview) instead of the interactive selector.
-  const filed = META.status === "filed";
-  const clsMarkup = filed ? reportedTag(b.id) : clsBar(b.id);
+  const decided = isDecided();
+  const clsMarkup = decided ? decidedTag(b.id) : clsBar(b.id);
   el.innerHTML = `<img src="${url}" alt="">` + fname + vmark + clsMarkup;
   // Clicking the image opens the full-size viewer (image + optional video).
   el.querySelector("img").onclick = () => openViewer(b.id);
   if (sel[b.id] !== undefined) el.classList.add("selected");
-  if (!filed) wireCls(b.id);
+  if (!decided) wireCls(b.id);
 }
 
 function escapeHtml(s) {
@@ -443,14 +444,23 @@ function clsBar(id) {
     `<span data-cls="${c}" class="${cur === c ? "on" : ""}">${c}</span>`).join("") + `</div>`;
 }
 
-// Read-only reported-category badge for a filed report (immutable). Shows the
-// class code + its meaning, mirroring how the review preview labels each image.
+// A report is DECIDED once it is filed or deleted: both outcomes purge the
+// unselected blobs server-side, so the selection can no longer be changed.
+function isDecided() { return META.status === "filed" || META.status === "deleted"; }
+
+// Read-only outcome badge for a decided report (immutable). A filed report
+// shows the reported class code + its meaning, mirroring how the review preview
+// labels each image; a deleted one just states that the file was destroyed
+// (delete mode grades nothing, so there is no class to show).
 const CLS_LABEL = {
   A1: "prepubescent · sex act", A2: "prepubescent · lascivious",
   B1: "pubescent · sex act", B2: "pubescent · lascivious",
   NR: "not rated",
 };
-function reportedTag(id) {
+function decidedTag(id) {
+  if (META.status === "deleted") {
+    return sel[id] === undefined ? "" : `<div class="reported-cls" title="Destroyed — not filed"><b>deleted</b></div>`;
+  }
   const c = sel[id];
   if (!c) return "";
   return `<div class="reported-cls" title="Reported as ${c} — ${CLS_LABEL[c]}">` +
@@ -530,15 +540,15 @@ viewer.addEventListener("keydown", (ev) => {
 });
 viewer.addEventListener("close", () => $("viewer-vid").pause());
 
-// Classification UI inside the viewer: after filing show the read-only reported
-// category; otherwise the A1–B2 selector, kept in sync with the thumbnail grid.
+// Classification UI inside the viewer: after a decision show the read-only
+// outcome; otherwise the A1–B2 selector, kept in sync with the thumbnail grid.
 function renderViewerCls(blobId) {
   const box = $("viewer-cls");
-  if (META.status === "filed") {
+  if (isDecided()) {
     const c = sel[blobId];
-    box.innerHTML = c
-      ? `<div class="vreported">Reported as <b>${c}</b> — ${escapeHtml(CLS_LABEL[c] || "")}</div>`
-      : "";
+    box.innerHTML = META.status === "deleted"
+      ? (c === undefined ? "" : `<div class="vreported">Deleted — destroyed, not filed</div>`)
+      : (c ? `<div class="vreported">Reported as <b>${c}</b> — ${escapeHtml(CLS_LABEL[c] || "")}</div>` : "");
     return;
   }
   const cur = sel[blobId];
@@ -918,50 +928,57 @@ $("delete-btn").onclick = () => {
 };
 
 $("delete-back-btn").onclick = () => deleteDlg.close();
-$("delete-confirm-btn").onclick = async () => {
-  const btn = $("delete-confirm-btn"); btn.disabled = true;
+$("delete-confirm-btn").onclick = () => runDelete(false);
+$("delete-ban-btn").onclick = () => runDelete(true);
+
+async function runDelete(ban) {
+  const btns = [$("delete-confirm-btn"), $("delete-ban-btn")];
+  btns.forEach(b => b.disabled = true);
   try {
     await saveSelection();
     const r = await api("/api/delete", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image_key: $("p1").value }),
+      body: JSON.stringify({ image_key: $("p1").value, ban }),
     });
     const j = await r.json();
     deleteDlg.close();
-    applyFinalState("deleted", null, j.deleted);
+    applyFinalState("deleted", null, j.deleted, j.banned);
   } catch (e) {
     deleteDlg.close();
     $("action-err").textContent = "Delete failed: " + e.message;
   } finally {
-    btn.disabled = false;
+    btns.forEach(b => b.disabled = false);
   }
-};
+}
 
-function applyFinalState(status, reportId, deleted) {
+function applyFinalState(status, reportId, deleted, banned) {
   if (reportId) { $("r-ncmec").textContent = reportId; }
   META.status = status;
+  if (banned) $("u-ban").textContent = "yes";
   const b = $("status-banner");
   b.className = "status " + status;
   b.textContent = status === "filed"
     ? "✓ Filed with NCMEC — report id " + (reportId || META.ncmec_report_id || "")
     : status === "deleted"
-      ? `Deleted ${deleted ?? ""} file(s) — the rest restored to disk`
+      ? `Deleted ${deleted ?? ""} file(s) — the rest restored to disk` + (banned ? " · uploader banned" : "")
       : "Cancelled — files restored to disk";
   b.classList.remove("hidden");
-  // Keep the decrypt card + gallery available after filing so the reported
+  // Keep the decrypt card + gallery available after a decision so the acted-on
   // images can still be inspected; only the submit/cancel actions are removed.
   $("action-card").classList.add("hidden");
-  if (status === "filed") {
-    applyFiledLayout();
+  // A decided round is immutable — filing and deleting both purge the
+  // unselected blobs server-side, so the grid must stop offering selection.
+  if (status === "filed" || status === "deleted") {
+    applyDecidedLayout();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 }
 
-// Switch an already-decrypted gallery to the immutable filed layout: reported
-// images show a read-only category badge (no selector); unselected images are
-// dropped since finish purges their blobs server-side. Mirrors a fresh reload
-// of a filed report without needing one.
-function applyFiledLayout() {
+// Switch an already-decrypted gallery to the immutable decided layout: the
+// acted-on images show a read-only badge (no selector); the rest are dropped
+// since the decision purges their blobs server-side. Mirrors a fresh reload of
+// a decided report without needing one.
+function applyDecidedLayout() {
   $("gallery-card").querySelector(".cls-legend").classList.add("hidden");
   $("sel-count").classList.add("hidden");
   for (const b of META.blobs) {
@@ -969,7 +986,7 @@ function applyFiledLayout() {
     if (!el) continue;
     if (sel[b.id] === undefined) { el.remove(); continue; }
     const bar = el.querySelector(".cls");
-    if (bar) bar.outerHTML = reportedTag(b.id);
+    if (bar) bar.outerHTML = decidedTag(b.id);
   }
 }
 

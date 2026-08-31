@@ -205,6 +205,56 @@ async def test_delete_destroys_selected_restores_rest_and_keeps_user_unbanned(ab
 
 
 @pytest.mark.asyncio
+async def test_delete_and_ban_bans_the_uploader(abuse, monkeypatch, tmp_path):
+    """`ban: true` deletes AND bans — same dual-write filing does."""
+    from reverse_image_search_bot import settings
+    from reverse_image_search_bot.abuse_report import crypto, server
+
+    updir = tmp_path / "uploads"
+    updir.mkdir()
+    monkeypatch.setattr(settings, "UPLOADER", {"configuration": {"path": str(updir)}})
+    monkeypatch.setattr(server, "_admin_from_request", lambda req: 42)
+
+    abuse.record_user(1)
+    abuse.create_report("u", 1, "")
+    p1 = "the-image-key"
+    key = crypto.derive_key(p1)
+    plaintext = b"doomed"
+    abuse.record_file(file_unique_id="A", saved_filename="A.jpg", user_id=1)
+    nonce, ct = crypto.encrypt_file(plaintext, key)
+    blob_id = abuse.add_report_blob(
+        "u",
+        file_unique_id="A",
+        saved_filename="A.jpg",
+        nonce=nonce,
+        ciphertext=ct,
+        plaintext_sha256=crypto.sha256_hex(plaintext),
+    )
+    abuse.set_blob_selection("u", {blob_id: "NR"})
+
+    bot_data: dict = {}
+    req = _req(
+        headers={"X-Page-Secret": "pw"},
+        match={"uuid": "u"},
+        json_body={"image_key": p1, "ban": True},
+        app={"bot_data": bot_data},
+    )
+    resp = await server.api_delete(req)
+    import json
+
+    body = json.loads(resp.text or "")
+    assert body["deleted"] == 1 and body["banned"] is True
+    assert abuse.get_report("u")["status"] == abuse.REPORT_DELETED
+    # The ban is both durable and live, exactly like filing's.
+    assert abuse.get_user(1).get("banned_at")
+    assert bot_data["banned_users"] == [1]
+    # The deleted material survives the ban sweep — it is the evidence.
+    kept = abuse.report_blobs("u")
+    assert [b["saved_filename"] for b in kept] == ["A.jpg"]
+    assert crypto.decrypt_file(bytes(kept[0]["nonce"]), bytes(kept[0]["ciphertext"]), key) == plaintext
+
+
+@pytest.mark.asyncio
 async def test_delete_with_wrong_key_destroys_nothing(abuse, monkeypatch, tmp_path):
     """A wrong image key must abort before anything is written or deleted."""
     from reverse_image_search_bot import settings

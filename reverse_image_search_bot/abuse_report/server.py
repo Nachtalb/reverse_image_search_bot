@@ -950,15 +950,19 @@ async def api_delete(request: web.Request) -> web.Response:
     encrypted bytes move into the DB exactly as a filed report's do, so the
     decision stays auditable and the material is still available to law
     enforcement. Their plaintext is never written back. Every other file is
-    restored to disk and the report closes as ``deleted``. The uploader is NOT
-    banned, but they are on the watchlist from here on. Deleted files are marked
-    cleared so a later round doesn't drag them back in.
+    restored to disk and the report closes as ``deleted``. Deleted files are
+    marked cleared so a later round doesn't drag them back in.
+
+    The uploader is only banned when the body carries ``ban: true`` — deleting
+    on its own leaves them unbanned but watchlisted, which is the point of this
+    endpoint. Banning here is the same dual-write filing does.
     """
     _require_admin(request)
     rep = _report_or_404(request.match_info["uuid"])
     _require_page_secret(request, rep)
     payload = await request.json()
     p1 = payload.get("image_key", "")
+    ban = payload.get("ban") is True
     if not p1:
         raise web.HTTPBadRequest(text="image key required")
     doomed = [b for b in abuse.report_blobs(rep["report_uuid"]) if b["selected"]]
@@ -976,7 +980,9 @@ async def api_delete(request: web.Request) -> web.Response:
     # Keep the deleted material as evidence, exactly like a filed report: its
     # ciphertext moves into the DB, everything else in the round is dropped.
     _cleanup_after_finish(rep)
-    return web.json_response({"ok": True, "status": abuse.REPORT_DELETED, "deleted": len(doomed)})
+    if ban:
+        _ban_reported_user(request.app.get("bot_data"), rep["user_id"])
+    return web.json_response({"ok": True, "status": abuse.REPORT_DELETED, "deleted": len(doomed), "banned": ban})
 
 
 def _public_file_url(saved_filename: str) -> str:
