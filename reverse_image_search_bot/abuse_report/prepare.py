@@ -354,9 +354,9 @@ def delete_user_files(user_id: int) -> int:
 
     Banning is the end of the line: nothing of theirs stays publicly reachable.
     That includes the still-ENCRYPTED leftovers of any report of theirs that was
-    never filed — an open round's ciphertext is deleted along with its blob rows.
-    Filed reports are untouched: their ciphertext moved into the DB at filing
-    time and is the evidence.
+    never decided — an open round's ciphertext is deleted along with its blob
+    rows. DECIDED reports (filed or deleted) are untouched: their ciphertext
+    moved into the DB when the decision was made and is the evidence.
     """
     updir = upload_dir()
     if updir is None:
@@ -371,7 +371,7 @@ def delete_user_files(user_id: int) -> int:
         except Exception:
             logger.warning("failed to delete %s on ban", fp, exc_info=True)
     for rep in abuse.reports_for_user(user_id):
-        if rep["status"] == abuse.REPORT_FILED:
+        if rep["status"] in abuse.STATS_STATUSES:
             continue
         abuse.purge_report_blobs(rep["report_uuid"])
         purge_cipher_dir(rep["report_uuid"])
@@ -430,5 +430,14 @@ def prepare_report(
 
     abuse.create_report(report_uuid, user_id, "", source_id)
     encrypted = _encrypt_and_remove(report_uuid, present, key, progress, set(indicators or ()))
+    if not encrypted:
+        # Every candidate file failed to encrypt (e.g. a held file whose
+        # ciphertext no longer decrypts). A round with no blobs is unusable —
+        # it just sits `ready` and empty — so undo it rather than hand the admin
+        # an image key for nothing.
+        abuse.purge_report_blobs(report_uuid)
+        purge_cipher_dir(report_uuid)
+        abuse.delete_report(report_uuid)
+        return PrepareResult(error=f"{len(present)} file(s) could not be read — nothing to report")
     abuse.set_report_status(report_uuid, abuse.REPORT_READY)
     return PrepareResult(report_uuid=report_uuid, p1=p1, encrypted=encrypted)

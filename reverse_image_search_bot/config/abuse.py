@@ -1091,6 +1091,18 @@ def purge_report_blobs(report_uuid: str) -> int:
     return cur.rowcount
 
 
+def delete_report(report_uuid: str) -> None:
+    """Remove a report row entirely.
+
+    Only for a round that never held anything — an empty round carries no
+    decision and no evidence, so there is nothing to keep. A report that
+    encrypted even one file is closed by status, never deleted.
+    """
+    conn = _get_conn()
+    with conn:
+        conn.execute("DELETE FROM reports WHERE report_uuid = ?", (report_uuid,))
+
+
 def purge_unselected_blobs(report_uuid: str) -> int:
     """Delete only the NON-reported (unselected) blobs for a report.
 
