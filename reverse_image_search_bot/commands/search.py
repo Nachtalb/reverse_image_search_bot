@@ -272,6 +272,11 @@ async def _hold_upload(message: Message, user) -> None:
             hold_reason=abuse.HOLD_AFTER_BAN,
             hold=stored,
         )
+        # record_file is INSERT OR IGNORE: a file we have seen before keeps its
+        # OLD row, so the fresh nonce above would never reach the DB while the
+        # ciphertext on disk was overwritten with it — AES-GCM then fails with
+        # InvalidTag on read. Point the row at what was actually just written.
+        abuse.set_file_hold(attachment.file_unique_id, abuse.HOLD_AFTER_BAN, stored)
         logger.info("held upload %s from banned user %s", attachment.file_unique_id, user.id)
     except Exception:
         logger.warning("failed to hold upload from banned user %s", user.id, exc_info=True)

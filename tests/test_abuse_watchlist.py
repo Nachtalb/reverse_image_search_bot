@@ -90,6 +90,39 @@ def test_held_upload_is_encrypted_and_never_plaintext_on_disk(env):
     assert hold.load(row) == b"the-bad-bytes"
 
 
+def test_re_holding_a_known_file_keeps_the_row_and_ciphertext_in_step(env):
+    """A banned user re-sends a file the bot has seen before.
+
+    ``hold.store`` writes a FRESH nonce to the same path every time, but
+    ``record_file`` is INSERT OR IGNORE — the pre-existing row keeps the OLD
+    nonce, and the mismatch surfaces as ``cryptography.exceptions.InvalidTag``
+    when the next report round tries to read the hold. The hold write must
+    therefore always be applied to the row, not only on first insert.
+    """
+    from reverse_image_search_bot.abuse_report import hold
+
+    abuse, _updir = env
+    abuse.record_user(7)
+    abuse.set_banned(7, True)
+
+    # Seen once before the ban — an ordinary row, no hold.
+    abuse.record_file("H1", saved_filename="H1.jpg", user_id=7, file_type="photo")
+    assert abuse.file_by_unique_id("H1")["hold_path"] is None
+
+    # Re-uploaded now that they are banned: held, with a brand-new nonce.
+    stored = hold.store(7, "H1", b"the-bad-bytes")
+    assert stored is not None
+    abuse.record_file(
+        "H1", saved_filename="H1.jpg", user_id=7, file_type="photo", hold_reason=abuse.HOLD_AFTER_BAN, hold=stored
+    )
+    abuse.set_file_hold("H1", abuse.HOLD_AFTER_BAN, stored)
+
+    row = abuse.file_by_unique_id("H1")
+    assert row["hold_path"] == stored[0]
+    assert bytes(row["hold_nonce"]) == stored[1]  # the nonce actually on disk
+    assert hold.load(row) == b"the-bad-bytes"  # would raise InvalidTag without the fix
+
+
 def test_held_files_are_pulled_into_the_next_report(env):
     """Preparing a report picks up held material and re-keys it under P1."""
     from reverse_image_search_bot.abuse_report import crypto, hold, prepare
