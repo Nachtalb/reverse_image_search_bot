@@ -272,12 +272,14 @@ $("unlock-btn").onclick = async () => {
   } catch (e) { $("unlock-err").textContent = "" + e.message; P2 = ""; }
 };
 
-// Auto-unlock from a previous session's saved password.
-(function tryAutoUnlock() {
+// Auto-unlock from a previous session's saved password. Called at the very END
+// of this script: it reaches into state (LIST, …) declared further down, and a
+// `let` is in its temporal dead zone until its declaration has been evaluated.
+function tryAutoUnlock() {
   let saved = "";
   try { saved = sessionStorage.getItem("ris_report_pw") || ""; } catch (e) {}
   if (saved) { $("p2").value = saved; $("unlock-btn").click(); }
-})();
+}
 
 function fmtTs(ts) { return ts ? new Date(ts * 1000).toLocaleString() : "—"; }
 
@@ -896,6 +898,8 @@ function renderHeatmap(recs) {
   html += "</table>";
   $("st-heat").innerHTML = max ? html : `<div class="muted">No upload-time data for this period.</div>`;
 }
+
+tryAutoUnlock();
 </script>
 </body>
 </html>

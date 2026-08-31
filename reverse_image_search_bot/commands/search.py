@@ -272,6 +272,11 @@ async def _hold_upload(message: Message, user) -> None:
             hold_reason=abuse.HOLD_AFTER_BAN,
             hold=stored,
         )
+        # record_file is INSERT OR IGNORE: a file we have seen before keeps its
+        # OLD row, so the fresh nonce above would never reach the DB while the
+        # ciphertext on disk was overwritten with it — AES-GCM then fails with
+        # InvalidTag on read. Point the row at what was actually just written.
+        abuse.set_file_hold(attachment.file_unique_id, abuse.HOLD_AFTER_BAN, stored)
         logger.info("held upload %s from banned user %s", attachment.file_unique_id, user.id)
     except Exception:
         logger.warning("failed to hold upload from banned user %s", user.id, exc_info=True)
@@ -381,18 +386,28 @@ async def best_match(
         _best_match_search(update, context, searchable_engines, URL(str(url)), results_gate, L)
     )
 
-    if general_done:
-        await general_done.wait()
-
-    search_message = await context.bot.send_message(
-        text=t("search.searching", L), chat_id=message.chat_id, reply_to_message_id=message.message_id
-    )
-    results_gate.set()
-
+    # From here on the task MUST be awaited or cancelled on every path. Anything
+    # in between can raise (a blocked chat, a flood wait, a network blip) and an
+    # abandoned task then sits pending forever on `results_gate` — until the GC
+    # collects it and asyncio logs "Task was destroyed but it is pending".
     try:
-        match_found = await asyncio.wait_for(search_task, timeout=65)
-    except TimeoutError:
-        match_found = False
+        if general_done:
+            await general_done.wait()
+
+        search_message = await context.bot.send_message(
+            text=t("search.searching", L), chat_id=message.chat_id, reply_to_message_id=message.message_id
+        )
+        results_gate.set()
+
+        try:
+            match_found = await asyncio.wait_for(search_task, timeout=65)
+        except TimeoutError:
+            match_found = False
+    finally:
+        # Releases the gate for a task that never got past it, so cancellation
+        # can actually be delivered instead of leaving it parked on the wait.
+        results_gate.set()
+        search_task.cancel()
 
     engines_used_html = ", ".join([b(en.name) for en in searchable_engines])
     if not match_found:
