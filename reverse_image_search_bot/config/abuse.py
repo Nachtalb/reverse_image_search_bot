@@ -711,6 +711,14 @@ def held_uploaders() -> list[dict]:
     One row per user: profile, how many files are waiting, when the first and
     last arrived, and the outcome that put them on the watchlist (``filed``,
     ``deleted``, or an open round) so the console can say why they are here.
+
+    "Waiting" means: held, not cleared, and no report round has taken it yet.
+    That last clause is the one that is easy to get wrong. ``hold_reason`` is
+    PROVENANCE and deliberately survives a round consuming the file, so keying
+    on it alone leaves every already-reported uploader queued forever. A file a
+    round took has a surviving blob (the evidence a decision keeps) or was
+    cleared; a CANCELLED round purges its blobs, which correctly puts the files
+    back on the list — cancelling means the material still needs a decision.
     """
     conn = _get_conn()
     try:
@@ -722,6 +730,7 @@ def held_uploaders() -> list[dict]:
             " ORDER BY r.status = 'filed' DESC, r.created_at DESC LIMIT 1) AS last_status "
             "FROM files f LEFT JOIN users u ON u.user_id = f.user_id "
             "WHERE f.hold_reason IS NOT NULL AND f.cleared_at IS NULL "
+            "AND NOT EXISTS (SELECT 1 FROM report_blobs b WHERE b.file_unique_id = f.file_unique_id) "
             "GROUP BY f.user_id ORDER BY held DESC"
         ).fetchall()
     except sqlite3.OperationalError:
@@ -730,10 +739,15 @@ def held_uploaders() -> list[dict]:
 
 
 def held_files_for_user(user_id: int) -> list[dict]:
-    """A user's held files (not yet cleared), oldest first."""
+    """A user's held files still waiting for a round, oldest first.
+
+    Same three conditions as :func:`held_uploaders` — keep them in step.
+    """
     conn = _get_conn()
     rows = conn.execute(
-        "SELECT * FROM files WHERE user_id = ? AND hold_reason IS NOT NULL AND cleared_at IS NULL ORDER BY upload_time",
+        "SELECT * FROM files WHERE user_id = ? AND hold_reason IS NOT NULL AND cleared_at IS NULL "
+        "AND NOT EXISTS (SELECT 1 FROM report_blobs b WHERE b.file_unique_id = files.file_unique_id) "
+        "ORDER BY upload_time",
         (user_id,),
     ).fetchall()
     return [dict(r) for r in rows]

@@ -204,3 +204,33 @@ def test_held_uploaders_lists_waiting_counts_and_prior_outcome(env):
     assert waiting[11]["last_status"] == "deleted"
     # Most files first, so the biggest backlog is dealt with first.
     assert [r["user_id"] for r in abuse.held_uploaders()] == [10, 11]
+
+
+def test_a_consumed_hold_leaves_the_waiting_list(env):
+    """A round takes the held file — the user must drop off the queue.
+
+    ``hold_reason`` deliberately SURVIVES the round as provenance, so a waiting
+    query keyed on it alone leaves every already-reported uploader queued
+    forever. What marks the file as dealt with is the report blob.
+    """
+    from reverse_image_search_bot.abuse_report import hold, prepare
+
+    abuse, _updir = env
+    abuse.record_user(12, username="reported_already")
+    stored = hold.store(12, "H9", b"held-bytes")
+    assert stored
+    abuse.record_file("H9", saved_filename="H9.jpg", user_id=12, hold_reason=abuse.HOLD_AFTER_BAN, hold=stored)
+    assert [r["user_id"] for r in abuse.held_uploaders()] == [12]
+
+    result = prepare.prepare_report(12)
+    assert result.ok and result.encrypted == 1
+    row = abuse.file_by_unique_id("H9")
+    assert row["hold_path"] is None  # consumed…
+    assert row["hold_reason"] == abuse.HOLD_AFTER_BAN  # …but provenance kept
+    assert abuse.held_uploaders() == []
+    assert abuse.held_files_for_user(12) == []
+
+    # Cancelling puts it back: the material still needs a decision.
+    assert prepare.restore_report_files(result.report_uuid or "", result.p1 or "") is None
+    abuse.purge_report_blobs(result.report_uuid or "")
+    assert [r["user_id"] for r in abuse.held_uploaders()] == [12]
