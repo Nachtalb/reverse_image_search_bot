@@ -249,6 +249,10 @@
   <div class="dlg-body">
     <h2>Delete <span id="delete-count">0</span> file(s)?</h2>
     <div class="muted" style="margin-bottom:14px">The selected files are destroyed and never come back. Everything else in this round is restored to disk. Nothing is filed with NCMEC. <b>Delete &amp; ban</b> additionally bans the uploader and removes everything else of theirs from disk.</div>
+    <label style="display:flex;gap:8px;align-items:flex-start;font-size:14px;color:#e8e8ea;margin-bottom:14px;cursor:pointer">
+      <input type="checkbox" id="delete-clear" style="margin-top:3px">
+      <span>Mark the remaining images as <b>cleared</b>.</span>
+    </label>
     <div class="row">
       <button id="delete-confirm-btn" class="danger">Delete</button>
       <button id="delete-ban-btn" class="danger">Delete &amp; ban</button>
@@ -924,6 +928,7 @@ $("delete-btn").onclick = () => {
   if (!n) { $("action-err").textContent = "Select the files to delete."; return; }
   if (!$("p1").value) { $("action-err").textContent = "Enter the image key first — the other files are restored from it."; return; }
   $("delete-count").textContent = n;
+  $("delete-clear").checked = false;
   deleteDlg.showModal();
 };
 
@@ -938,7 +943,7 @@ async function runDelete(ban) {
     await saveSelection();
     const r = await api("/api/delete", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image_key: $("p1").value, ban }),
+      body: JSON.stringify({ image_key: $("p1").value, ban, clear_files: $("delete-clear").checked }),
     });
     const j = await r.json();
     deleteDlg.close();
