@@ -956,6 +956,9 @@ async def api_delete(request: web.Request) -> web.Response:
     The uploader is only banned when the body carries ``ban: true`` — deleting
     on its own leaves them unbanned but watchlisted, which is the point of this
     endpoint. Banning here is the same dual-write filing does.
+
+    Optional ``clear_files`` additionally marks every NON-deleted file of the
+    round as cleared, so the restored ones don't come back in future reports.
     """
     _require_admin(request)
     rep = _report_or_404(request.match_info["uuid"])
@@ -963,9 +966,12 @@ async def api_delete(request: web.Request) -> web.Response:
     payload = await request.json()
     p1 = payload.get("image_key", "")
     ban = payload.get("ban") is True
+    # `is True` (not truthiness) so a missing/odd body can never clear files.
+    clear_files = payload.get("clear_files") is True
     if not p1:
         raise web.HTTPBadRequest(text="image key required")
-    doomed = [b for b in abuse.report_blobs(rep["report_uuid"]) if b["selected"]]
+    blobs = abuse.report_blobs(rep["report_uuid"])
+    doomed = [b for b in blobs if b["selected"]]
     if not doomed:
         raise web.HTTPBadRequest(text="select the files to delete first")
     # Restore everything EXCEPT the doomed files. This verifies the key against
@@ -976,6 +982,8 @@ async def api_delete(request: web.Request) -> web.Response:
         raise web.HTTPBadRequest(text=err)
     # The deleted files must not come back in a future round for this user.
     abuse.set_files_cleared([b["file_unique_id"] for b in doomed])
+    if clear_files:
+        abuse.set_files_cleared([b["file_unique_id"] for b in blobs if not b["selected"]])
     abuse.set_report_status(rep["report_uuid"], abuse.REPORT_DELETED, detail=f"{len(doomed)} file(s) deleted")
     # Keep the deleted material as evidence, exactly like a filed report: its
     # ciphertext moves into the DB, everything else in the round is dropped.

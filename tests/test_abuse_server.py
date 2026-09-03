@@ -202,6 +202,51 @@ async def test_delete_destroys_selected_restores_rest_and_keeps_user_unbanned(ab
     kept = abuse.report_blobs("u")
     assert [b["saved_filename"] for b in kept] == ["A.jpg"]
     assert crypto.decrypt_file(bytes(kept[0]["nonce"]), bytes(kept[0]["ciphertext"]), key) == b"doomed"
+    # Only the deleted file is cleared; without clear_files the rest stays reportable.
+    assert abuse.file_by_unique_id("A")["cleared_at"] is not None
+    assert abuse.file_by_unique_id("B")["cleared_at"] is None
+
+
+@pytest.mark.asyncio
+async def test_delete_with_clear_files_clears_the_remaining_files(abuse, monkeypatch, tmp_path):
+    """`clear_files: true` marks the NON-deleted files cleared, like cancel does."""
+    from reverse_image_search_bot import settings
+    from reverse_image_search_bot.abuse_report import crypto, server
+
+    updir = tmp_path / "uploads"
+    updir.mkdir()
+    monkeypatch.setattr(settings, "UPLOADER", {"configuration": {"path": str(updir)}})
+    monkeypatch.setattr(server, "_admin_from_request", lambda req: 42)
+
+    abuse.record_user(1)
+    abuse.create_report("u", 1, "")
+    p1 = "the-image-key"
+    key = crypto.derive_key(p1)
+    ids = {}
+    for name, body in (("A.jpg", b"doomed"), ("B.jpg", b"innocent")):
+        abuse.record_file(file_unique_id=name[0], saved_filename=name, user_id=1)
+        nonce, ct = crypto.encrypt_file(body, key)
+        ids[name] = abuse.add_report_blob(
+            "u",
+            file_unique_id=name[0],
+            saved_filename=name,
+            nonce=nonce,
+            ciphertext=ct,
+            plaintext_sha256=crypto.sha256_hex(body),
+        )
+    abuse.set_blob_selection("u", {ids["A.jpg"]: "NR"})
+
+    req = _req(
+        headers={"X-Page-Secret": "pw"},
+        match={"uuid": "u"},
+        json_body={"image_key": p1, "clear_files": True},
+    )
+    await server.api_delete(req)
+
+    assert abuse.file_by_unique_id("A")["cleared_at"] is not None
+    assert abuse.file_by_unique_id("B")["cleared_at"] is not None
+    # Clearing is bookkeeping only — the innocent file is still back on disk.
+    assert (updir / "B.jpg").read_bytes() == b"innocent"
 
 
 @pytest.mark.asyncio
