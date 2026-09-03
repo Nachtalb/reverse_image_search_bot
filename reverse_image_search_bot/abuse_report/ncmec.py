@@ -48,6 +48,17 @@ _CLASSIFICATION = {
 }
 
 
+def _cap(value: str | None, limit: int) -> str | None:
+    """Truncate Telegram-supplied text to an NCMEC field's max_length.
+
+    Chat titles, usernames and display names are user-controlled and can exceed
+    the model's limits, which would fail validation at review/submit time.
+    """
+    if value is None:
+        return None
+    return value if len(value) <= limit else value[: limit - 1] + "…"
+
+
 class NcmecNotConfigured(RuntimeError):
     pass
 
@@ -112,11 +123,11 @@ def build_reported_subject(
     return PersonOrUserReported(
         esp_identifier=str(reported_user["user_id"]) if reported_user.get("user_id") else None,
         esp_service=settings.NCMEC_ESP_NAME or "Reverse Image Search Bot",
-        screen_name=(f"@{reported_user['username']}" if reported_user.get("username") else None),
-        display_name=display,
+        screen_name=_cap(f"@{reported_user['username']}" if reported_user.get("username") else None, 256),
+        display_name=[d for x in display if (d := _cap(x, 256))],
         profile_url=profile_urls,
         profile_bio=reported_user.get("bio") or None,
-        group_identifier="; ".join(group_bits) or None,
+        group_identifier=_cap("; ".join(group_bits) or None, 255),
         additional_info="\n".join(info_bits) or None,
     )
 
@@ -144,7 +155,7 @@ def build_report(
         InternetDetails(
             chat_im_incident=ChatImIncident(
                 chat_client="Telegram",
-                chat_room_name=chat_room_name or None,
+                chat_room_name=_cap(chat_room_name or None, 255),
             )
         )
     )

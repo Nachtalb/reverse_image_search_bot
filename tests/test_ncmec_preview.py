@@ -145,3 +145,19 @@ def test_preview_per_file_upload_timestamp_and_caption():
     assert f0["additional_info"] == ["User caption: look here"]
     # A file without an upload_time omits the timestamp (never faked to now).
     assert "uploaded_to_esp_timestamp" not in preview["files"][2]
+
+
+def test_long_chat_title_is_truncated_not_rejected():
+    """A >255-char group title must not blow up validation (prod 500 on review)."""
+    long_title = "x" * 400
+    preview = ncmec.preview_payload(
+        _files(),
+        incident_urls=["https://ris.naa.gg/f/AQ.jpg"],
+        reported_user={"user_id": 7},
+        source_chats=[{"chat_type": "channel", "title": long_title, "chat_id": -100123}],
+        chat_room_name=f"channel: {long_title}",
+    )
+    gid = preview["report"]["person_or_user_reported"]["group_identifier"]
+    assert len(gid) == 255 and gid.endswith("…")
+    room = preview["report"]["internet_details"][1]["chat_im_incident"]["chat_room_name"]
+    assert len(room) == 255 and room.endswith("…")
