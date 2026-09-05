@@ -53,6 +53,7 @@ admins_only_configure = "सिर्फ़ ग्रुप एडमिन ह�
 [settings.toggles]
 auto_search = "🔍 ऑटो-सर्च: {status}"
 show_buttons = "🔘 बटन दिखाएँ: {status}"
+auto_crop = "✂️ स्क्रीनशॉट ऑटो-क्रॉप: {status}"
 auto_search_engines = "🔍 ऑटो-सर्च इंजन →"
 auto_search_engines_locked = "🔍 ऑटो-सर्च इंजन 🔒"
 button_engines = "🔘 इंजन बटन →"

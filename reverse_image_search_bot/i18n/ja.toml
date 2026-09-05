@@ -53,6 +53,7 @@ admins_only_configure = "グループ管理者のみがボットを設定でき�
 [settings.toggles]
 auto_search = "🔍 自動検索：{status}"
 show_buttons = "🔘 ボタン表示：{status}"
+auto_crop = "✂️ スクリーンショットを自動トリミング: {status}"
 auto_search_engines = "🔍 自動検索エンジン →"
 auto_search_engines_locked = "🔍 自動検索エンジン 🔒"
 button_engines = "🔘 エンジンボタン →"

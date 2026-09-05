@@ -7,7 +7,9 @@ import subprocess
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from time import time
+from typing import Literal
 
+import autocrop_rs
 import httpx
 import imageio_ffmpeg
 from PIL import Image
@@ -302,11 +304,31 @@ async def image_to_bytes(attachment: PhotoSize | Sticker | Document) -> tuple[by
     return data, filename
 
 
-async def image_to_url(attachment: PhotoSize | Sticker | Document) -> URL:
+async def image_to_url(attachment: PhotoSize | Sticker | Document, auto_crop: bool = False) -> URL:
+    """Upload an image and return its URL.
+
+    With ``auto_crop`` a screenshot is cut down to its content (photo, video
+    frame, viewport) and the crop is uploaded as ``<file_unique_id>_crop.<ext>``
+    instead; images that are not screenshots go up untouched.
+    """
     filename = image_filename(attachment)
-    if uploader.file_exists(filename):
+    stem, extension = filename.rsplit(".", 1)
+    crop_format: Literal["png", "jpeg", "webp"] = (
+        "png" if extension == "png" else "webp" if extension == "webp" else "jpeg"
+    )
+    crop_filename = f"{stem}_crop.{extension}"
+    if auto_crop and uploader.file_exists(crop_filename):
+        return uploader.get_url(crop_filename)
+    if not auto_crop and uploader.file_exists(filename):
         return uploader.get_url(filename)
     data, filename = await image_to_bytes(attachment)
+    if auto_crop:
+        result, cropped = await asyncio.to_thread(autocrop_rs.crop_bytes, data, crop_format)
+        logger.info("image_to_url: autocrop %s score=%.2f box=%s", result.reason, result.score, result.box)
+        if cropped:
+            data, filename = cropped, crop_filename
+        elif uploader.file_exists(filename):
+            return uploader.get_url(filename)
     with io.BytesIO(data) as file:
         url = upload_file(file, filename)
     logger.info("image_to_url: done -> %s", url)

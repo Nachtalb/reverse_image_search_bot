@@ -30,6 +30,7 @@ def _mock_chat_config(**overrides):
     """Build a mock ChatConfig with sensible defaults."""
     defaults = {
         "auto_search_enabled": True,
+        "auto_crop": True,
         "show_buttons": True,
         "show_best_match": True,
         "show_link": True,
@@ -104,6 +105,7 @@ class TestSettingsMainKeyboard:
 
         assert "settings:toggle:auto_search" in callbacks
         assert "settings:toggle:show_buttons" in callbacks
+        assert "settings:toggle:auto_crop" in callbacks
         assert "settings:menu:auto_search_engines" in callbacks
         assert "settings:menu:button_engines" in callbacks
 
@@ -938,7 +940,7 @@ class TestFileHandler:
         ):
             mock_cc.return_value = _mock_chat_config(auto_search_enabled=True)
             await file_handler(update, context)
-            mock_itu.assert_awaited_once_with(large)
+            mock_itu.assert_awaited_once_with(large, auto_crop=True)
 
     async def test_error_in_search_replies_error(self):
         from telegram import PhotoSize

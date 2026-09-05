@@ -123,7 +123,7 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
                     await message.reply_text(t("search.files.animated_not_supported", L))
                     return
                 search_type = file_type
-                image_url = await image_to_url(attachment)
+                image_url = await image_to_url(attachment, auto_crop=ChatConfig(chat_id).auto_crop)
         except ValueError as e:
             await message.reply_text(str(e))
             return

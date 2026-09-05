@@ -53,6 +53,7 @@ admins_only_configure = "শুধু গ্রুপ অ্যাডমিন�
 [settings.toggles]
 auto_search = "🔍 স্বয়ংক্রিয় সার্চ: {status}"
 show_buttons = "🔘 বোতাম দেখান: {status}"
+auto_crop = "✂️ স্ক্রিনশট অটো-ক্রপ: {status}"
 auto_search_engines = "🔍 স্বয়ংক্রিয় সার্চ ইঞ্জিন →"
 auto_search_engines_locked = "🔍 স্বয়ংক্রিয় সার্চ ইঞ্জিন 🔒"
 button_engines = "🔘 ইঞ্জিন বোতাম →"

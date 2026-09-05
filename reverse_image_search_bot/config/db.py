@@ -20,6 +20,7 @@ COLUMNS = [
     ("show_best_match", "INTEGER", True),
     ("show_link", "INTEGER", True),
     ("auto_search_enabled", "INTEGER", True),
+    ("auto_crop", "INTEGER", True),
     ("auto_search_engines", "TEXT", None),  # JSON list or NULL
     ("button_engines", "TEXT", None),  # JSON list or NULL
     ("engine_empty_counts", "TEXT", None),  # JSON dict, None → {} in _to_python
@@ -31,7 +32,7 @@ COLUMNS = [
 # Fields stored as JSON text that need serialization
 _JSON_FIELDS = {"auto_search_engines", "button_engines", "engine_empty_counts"}
 # Fields stored as INTEGER that are actually booleans
-_BOOL_FIELDS = {"show_buttons", "show_best_match", "show_link", "auto_search_enabled", "onboarded"}
+_BOOL_FIELDS = {"show_buttons", "show_best_match", "show_link", "auto_search_enabled", "auto_crop", "onboarded"}
 
 
 def _get_conn() -> sqlite3.Connection:

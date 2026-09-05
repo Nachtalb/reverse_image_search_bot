@@ -53,6 +53,7 @@ admins_only_configure = "فقط مشرفو المجموعة يمكنهم تهي�
 [settings.toggles]
 auto_search = "🔍 بحث تلقائي: {status}"
 show_buttons = "🔘 إظهار الأزرار: {status}"
+auto_crop = "✂️ قص لقطات الشاشة تلقائياً: {status}"
 auto_search_engines = "🔍 محركات البحث التلقائي →"
 auto_search_engines_locked = "🔍 محركات البحث التلقائي 🔒"
 button_engines = "🔘 أزرار المحركات →"
