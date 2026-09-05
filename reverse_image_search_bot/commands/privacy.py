@@ -9,6 +9,7 @@ never reveals whether any material was retained.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import shutil
 import tempfile
@@ -133,6 +134,8 @@ async def _run_takeout(update: Update, context: ContextTypes.DEFAULT_TYPE, subje
                     filename=part.name,
                     caption=t("privacy.takeout_done", L) if i == 0 else None,
                 )
+        with contextlib.suppress(Exception):
+            await query.delete_message()
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
     store = context.chat_data if subject < 0 else context.user_data
