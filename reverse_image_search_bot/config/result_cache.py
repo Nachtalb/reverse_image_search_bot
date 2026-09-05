@@ -30,7 +30,23 @@ _SET_TAG = "__set__"
 _BUTTON_TAG = "__btn__"
 
 
-def ttl_seconds() -> int:
+def is_empty(payload: tuple[dict, dict]) -> bool:
+    """A search that found nothing: no result fields and no metadata."""
+    result, meta = payload
+    return not result and not meta
+
+
+def ttl_seconds(payload: tuple[dict, dict] | None = None) -> int:
+    """Lifetime for a payload.
+
+    A hit is stable — the engine matched something and will keep matching it.
+    A *miss* is not: the engines index new images continuously, so an image with
+    no match today may well have one next week. Caching "nothing found" for the
+    full period would keep answering from a stale negative for weeks, so misses
+    expire far sooner.
+    """
+    if payload is not None and is_empty(payload):
+        return settings.RESULT_CACHE_EMPTY_TTL_HOURS * 3600
     return settings.RESULT_CACHE_TTL_DAYS * 86400
 
 
@@ -87,12 +103,12 @@ def get(engine: str, image_url: str, now: float | None = None) -> tuple[dict, di
     A row that will not decode is treated as a miss and dropped: the caller then
     does a live search, which is the correct degradation.
     """
-    cutoff = int((now if now is not None else time.time()) - ttl_seconds())
+    stamp = int(now if now is not None else time.time())
     row = (
         connection()
         .execute(
-            "SELECT payload FROM best_match_cache WHERE engine = ? AND image_url = ? AND created_at > ?",
-            (engine, image_url, cutoff),
+            "SELECT payload FROM best_match_cache WHERE engine = ? AND image_url = ? AND expires_at > ?",
+            (engine, image_url, stamp),
         )
         .fetchone()
     )
@@ -110,11 +126,14 @@ def get(engine: str, image_url: str, now: float | None = None) -> tuple[dict, di
 
 
 def put(engine: str, image_url: str, payload: tuple[dict, dict], now: float | None = None) -> None:
+    """Store a payload with the expiry its own kind earns (see ``ttl_seconds``)."""
+    stamp = int(now if now is not None else time.time())
     conn = connection()
     conn.execute(
-        "INSERT INTO best_match_cache (engine, image_url, payload, created_at) VALUES (?, ?, ?, ?) "
-        "ON CONFLICT(engine, image_url) DO UPDATE SET payload = excluded.payload, created_at = excluded.created_at",
-        (engine, image_url, encode(payload), int(now if now is not None else time.time())),
+        "INSERT INTO best_match_cache (engine, image_url, payload, created_at, expires_at) VALUES (?, ?, ?, ?, ?) "
+        "ON CONFLICT(engine, image_url) DO UPDATE SET payload = excluded.payload, "
+        "created_at = excluded.created_at, expires_at = excluded.expires_at",
+        (engine, image_url, encode(payload), stamp, stamp + ttl_seconds(payload)),
     )
     conn.commit()
 
@@ -128,9 +147,9 @@ def clear() -> None:
 
 def sweep(now: float | None = None) -> int:
     """Delete expired rows. Called by the daily retention job."""
-    cutoff = int((now if now is not None else time.time()) - ttl_seconds())
+    stamp = int(now if now is not None else time.time())
     conn = connection()
-    removed = conn.execute("DELETE FROM best_match_cache WHERE created_at <= ?", (cutoff,)).rowcount
+    removed = conn.execute("DELETE FROM best_match_cache WHERE expires_at <= ?", (stamp,)).rowcount
     conn.commit()
     return removed
 

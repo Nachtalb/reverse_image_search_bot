@@ -8,6 +8,7 @@ import pytest
 from telegram import InlineKeyboardButton
 from yarl import URL
 
+from reverse_image_search_bot import settings
 from reverse_image_search_bot.config import result_cache
 
 
@@ -93,10 +94,10 @@ class TestStore:
         monkeypatch.setattr(db._local, "conn", None, raising=False)
         assert result_cache.get("SauceNAO", "https://x/1.jpg") is not None
 
-    def test_expired_row_is_a_miss(self, monkeypatch):
+    def test_expired_row_is_a_miss(self):
         result_cache.put("SauceNAO", "https://x/1.jpg", PAYLOAD)
-        monkeypatch.setattr(result_cache, "ttl_seconds", lambda: 60)
-        assert result_cache.get("SauceNAO", "https://x/1.jpg", now=time.time() + 120) is None
+        far = time.time() + result_cache.ttl_seconds(PAYLOAD) + 60
+        assert result_cache.get("SauceNAO", "https://x/1.jpg", now=far) is None
 
     def test_put_overwrites(self):
         result_cache.put("SauceNAO", "https://x/1.jpg", ({"Title": "old"}, {}))
@@ -113,12 +114,93 @@ class TestStore:
         db.connection().commit()
         assert result_cache.get("SauceNAO", "https://x/1.jpg") is None
 
-    def test_sweep_removes_only_expired(self, monkeypatch):
-        result_cache.put("SauceNAO", "https://old.jpg", PAYLOAD)
-        monkeypatch.setattr(result_cache, "ttl_seconds", lambda: 60)
-        result_cache.put("SauceNAO", "https://new.jpg", PAYLOAD, now=time.time() + 120)
-        assert result_cache.sweep(now=time.time() + 120) == 1
-        assert result_cache.get("SauceNAO", "https://new.jpg", now=time.time() + 120) is not None
+    def test_sweep_removes_only_expired(self):
+        now = time.time()
+        past = now - result_cache.ttl_seconds(PAYLOAD) - 60
+        result_cache.put("SauceNAO", "https://old.jpg", PAYLOAD, now=past)
+        result_cache.put("SauceNAO", "https://new.jpg", PAYLOAD, now=now)
+        assert result_cache.sweep(now=now) == 1
+        assert result_cache.get("SauceNAO", "https://new.jpg", now=now) is not None
+
+
+EMPTY: tuple[dict, dict] = ({}, {})
+
+
+class TestEmptyResultTtl:
+    """A search that found nothing must not be trusted for as long as a hit.
+
+    The engines index new images continuously, so an image with no match today
+    may well have one next week; caching the negative for the full period would
+    keep answering "nothing found" from a stale row for weeks.
+    """
+
+    def test_is_empty(self):
+        assert result_cache.is_empty(EMPTY)
+        assert result_cache.is_empty(({}, {}))
+        assert not result_cache.is_empty(PAYLOAD)
+        assert not result_cache.is_empty(({}, {"provider": "SauceNAO"}))
+        assert not result_cache.is_empty(({"Title": "x"}, {}))
+
+    def test_empty_gets_the_short_ttl(self):
+        assert result_cache.ttl_seconds(EMPTY) == settings.RESULT_CACHE_EMPTY_TTL_HOURS * 3600
+        assert result_cache.ttl_seconds(PAYLOAD) == settings.RESULT_CACHE_TTL_DAYS * 86400
+        assert result_cache.ttl_seconds(EMPTY) < result_cache.ttl_seconds(PAYLOAD)
+
+    def test_empty_is_still_served_inside_its_window(self):
+        result_cache.put("SauceNAO", "https://x/1.jpg", EMPTY)
+        assert result_cache.get("SauceNAO", "https://x/1.jpg") == EMPTY
+
+    def test_empty_expires_while_a_hit_survives(self):
+        result_cache.put("SauceNAO", "https://miss.jpg", EMPTY)
+        result_cache.put("SauceNAO", "https://hit.jpg", PAYLOAD)
+        later = time.time() + settings.RESULT_CACHE_EMPTY_TTL_HOURS * 3600 + 60
+        assert result_cache.get("SauceNAO", "https://miss.jpg", now=later) is None
+        assert result_cache.get("SauceNAO", "https://hit.jpg", now=later) is not None
+
+    def test_a_later_hit_overwrites_the_stored_expiry(self):
+        """The image got indexed: re-searching must upgrade the row's lifetime."""
+        result_cache.put("SauceNAO", "https://x/1.jpg", EMPTY)
+        result_cache.put("SauceNAO", "https://x/1.jpg", PAYLOAD)
+        later = time.time() + settings.RESULT_CACHE_EMPTY_TTL_HOURS * 3600 + 60
+        got = result_cache.get("SauceNAO", "https://x/1.jpg", now=later)
+        assert got is not None
+        assert got[0]["Title"] == "Some Title"
+
+    def test_sweep_clears_expired_empties(self):
+        now = time.time()
+        result_cache.put("SauceNAO", "https://miss.jpg", EMPTY)
+        result_cache.put("SauceNAO", "https://hit.jpg", PAYLOAD)
+        later = now + settings.RESULT_CACHE_EMPTY_TTL_HOURS * 3600 + 60
+        assert result_cache.sweep(now=later) == 1
+        assert result_cache.get("SauceNAO", "https://hit.jpg", now=later) is not None
+
+
+class TestMigration:
+    def test_adds_expires_at_to_an_old_cache_table(self, tmp_path, monkeypatch):
+        """A DB created before expires_at must gain it, backfilled from created_at."""
+        from reverse_image_search_bot.config import db
+
+        path = tmp_path / "old.db"
+        old = sqlite3.connect(str(path))
+        old.execute(
+            "CREATE TABLE best_match_cache (engine TEXT NOT NULL, image_url TEXT NOT NULL, "
+            "payload TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (engine, image_url))"
+        )
+        stamp = int(time.time())
+        old.execute(
+            "INSERT INTO best_match_cache VALUES (?, ?, ?, ?)",
+            ("SauceNAO", "https://x/1.jpg", result_cache.encode(PAYLOAD), stamp),
+        )
+        old.commit()
+        old.close()
+
+        monkeypatch.setattr(db, "CONFIG_DB_PATH", path)
+        monkeypatch.setattr(db._local, "conn", None, raising=False)
+
+        row = db.connection().execute("SELECT expires_at FROM best_match_cache").fetchone()
+        assert row["expires_at"] == stamp + settings.RESULT_CACHE_TTL_DAYS * 86400
+        assert result_cache.get("SauceNAO", "https://x/1.jpg") is not None
+        monkeypatch.setattr(db._local, "conn", None, raising=False)
 
 
 class TestDecorator:

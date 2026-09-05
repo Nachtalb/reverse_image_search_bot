@@ -7,6 +7,7 @@ import sqlite3
 import threading
 from pathlib import Path
 
+from reverse_image_search_bot import settings
 from reverse_image_search_bot.settings import CONFIG_DB_PATH
 
 _local = threading.local()
@@ -79,16 +80,30 @@ def _ensure_schema(conn: sqlite3.Connection):
     """)
     # Persistent best-match result cache (see config/result_cache.py). Lives here
     # rather than in abuse.db because it is disposable operational data.
+    # expires_at is stored rather than derived: a miss and a hit earn different
+    # lifetimes, and the reader cannot tell them apart without decoding the row.
     conn.execute("""
         CREATE TABLE IF NOT EXISTS best_match_cache (
             engine     TEXT NOT NULL,
             image_url  TEXT NOT NULL,
             payload    TEXT NOT NULL,
             created_at INTEGER NOT NULL,
+            expires_at INTEGER NOT NULL,
             PRIMARY KEY (engine, image_url)
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_bmc_created ON best_match_cache(created_at)")
+    # ALTER before the index on the new column — a fresh DB has it from CREATE
+    # TABLE, an existing one does not, and indexing a missing column raises.
+    try:
+        conn.execute("ALTER TABLE best_match_cache ADD COLUMN expires_at INTEGER NOT NULL DEFAULT 0")
+        conn.execute(
+            "UPDATE best_match_cache SET expires_at = created_at + ?",
+            (settings.RESULT_CACHE_TTL_DAYS * 86400,),
+        )
+    except sqlite3.OperationalError as e:
+        if "duplicate column name" not in str(e):
+            raise
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_bmc_expires ON best_match_cache(expires_at)")
     # Add any missing columns (try/except for concurrent thread safety)
     for name, sql_type, default in COLUMNS:
         try:

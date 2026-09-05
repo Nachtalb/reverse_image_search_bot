@@ -95,6 +95,10 @@ FILE_RETENTION_DAYS = int(os.getenv("FILE_RETENTION_DAYS", "30"))
 # 24h the old in-RAM cache could afford.
 RESULT_CACHE_TTL_DAYS = int(os.getenv("RESULT_CACHE_TTL_DAYS", "30"))
 
+# A search that found NOTHING expires far sooner: the engines index new images
+# continuously, so "no match" is a statement about today, not about next month.
+RESULT_CACHE_EMPTY_TTL_HOURS = int(os.getenv("RESULT_CACHE_EMPTY_TTL_HOURS", "72"))
+
 
 # Prometheus metrics
 METRICS_ENABLED = os.getenv("METRICS_ENABLED", "true").lower() in ("true", "1", "yes")
