@@ -87,6 +87,9 @@ PERSISTENCE_PATH = (
     Path(os.getenv("PERSISTENCE_PATH", str(_DEFAULT_CONFIG_DIR / "bot_data.pickle"))).expanduser().absolute()
 )
 
+# Plaintext uploads older than this are removed by the daily retention sweep.
+FILE_RETENTION_DAYS = int(os.getenv("FILE_RETENTION_DAYS", "30"))
+
 
 # Prometheus metrics
 METRICS_ENABLED = os.getenv("METRICS_ENABLED", "true").lower() in ("true", "1", "yes")

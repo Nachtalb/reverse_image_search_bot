@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import html
 import io
 import json
@@ -28,7 +29,7 @@ from telegram.ext import (
     filters,
 )
 
-from . import metrics, settings
+from . import metrics, privacy, settings
 from .abuse_report.prepare import delete_user_files
 from .commands import (
     callback_query_handler,
@@ -288,6 +289,11 @@ async def _set_bot_commands(app: Application) -> None:
             logger.warning("Failed to set admin commands for %d", admin_id, exc_info=True)
 
 
+async def retention_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    removed = await asyncio.to_thread(privacy.sweep_expired_uploads)
+    logger.info("retention sweep: removed %d expired upload(s)", removed)
+
+
 async def post_init(app: Application) -> None:
     """Called after Application.initialize() — send restart/startup notifications."""
     loop = asyncio.get_running_loop()
@@ -389,6 +395,10 @@ def main():
     builder.post_init(post_init)
     app = builder.build()
     application = app
+
+    # Daily plaintext-upload retention sweep (03:00 UTC), replacing the external cleanup cron.
+    assert app.job_queue is not None
+    app.job_queue.run_daily(retention_job, time=datetime.time(3, 0, tzinfo=datetime.UTC), name="retention")
 
     # Handlers
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, on_added_to_group))
