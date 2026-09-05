@@ -123,16 +123,94 @@ def _zip_names(path):
         return sorted(zf.namelist()), zf.read("data.json").decode()
 
 
-def test_export_user_lists_history_without_report_fields(world):
-    import json
-
+def test_export_user_lists_history(world):
     data = privacy.export_data(1)
     assert data["user"]["username"] == "alice"
     assert data["settings"]["language"] == "de"
     assert [f["file_unique_id"] for f in data["files"]] == ["F0", "F1", "LINKED", "HELD", "EXPIRED"]
-    text = json.dumps(data)
-    for forbidden in ("banned", "bio", "cleared", "hold", "video_error", "report", "saved_filename", 'file_id"'):
-        assert forbidden not in text, forbidden
+
+
+# The complete set of keys a takeout may ever contain. Anything not listed here
+# is a leak — a new DB column is NOT exported until someone adds it deliberately.
+ALLOWED_TOP = {"exported_at", "user", "chat", "settings", "files"}
+ALLOWED_USER = {"user_id", "username", "first_name", "last_name", "language_code", "first_seen", "last_seen"}
+ALLOWED_CHAT = {"chat_id", "chat_type", "title", "username", "first_seen", "last_seen"}
+ALLOWED_FILE = {
+    "file_unique_id",
+    "original_filename",
+    "file_type",
+    "is_video",
+    "upload_time",
+    "caption",
+    "user_id",
+    "group_id",
+    "channel_id",
+}
+
+
+@pytest.mark.parametrize("subject", [1, -100])
+def test_export_contains_only_allowlisted_keys(world, subject):
+    data = privacy.export_data(subject)
+    assert set(data) <= ALLOWED_TOP
+    if "user" in data:
+        assert set(data["user"]) == ALLOWED_USER
+    if "chat" in data:
+        assert set(data["chat"]) == ALLOWED_CHAT
+    for f in data["files"]:
+        assert set(f) == ALLOWED_FILE
+
+
+def test_takeout_bytes_never_contain_report_material(world, updir, tmp_path):
+    """Seed every report-related field with a unique marker; none may reach the archive."""
+    import zipfile
+
+    abuse = world
+    markers = {
+        "bio": "MARK-BIO",
+        "cleared": "MARK-CLEARED",
+        "video_error": "MARK-VIDEO-ERROR",
+        "hold_path": "held/1/MARK-HOLD.enc",
+        "hold_sha256": "MARK-HOLD-SHA",
+        "file_id": "MARK-FILE-ID",
+        "report_uuid": "MARK-REPORT-UUID",
+        "status_detail": "MARK-STATUS-DETAIL",
+        "blob_sha": "MARK-BLOB-SHA",
+        "blob_ciphertext": b"MARK-CIPHERTEXT",
+        "linked_plaintext": b"MARK-LINKED-PLAINTEXT",
+        "held_plaintext": b"MARK-HELD-PLAINTEXT",
+    }
+    abuse.set_user_bio(1, markers["bio"])
+    abuse.set_banned(1, True)
+    abuse.record_file("CL", saved_filename="CL.jpg", user_id=1, file_type="photo", file_id=markers["file_id"])
+    (updir / "CL.jpg").write_bytes(b"img-CL")
+    abuse.set_files_cleared(["CL"])
+    abuse.set_file_video_error("F1", markers["video_error"])
+    abuse.set_file_hold("F1", "during_investigation", (markers["hold_path"], b"n", markers["hold_sha256"]))
+    abuse.create_report(markers["report_uuid"], 1, "")
+    abuse.set_report_status(markers["report_uuid"], "error", markers["status_detail"])
+    bid = abuse.add_report_blob(
+        markers["report_uuid"],
+        file_unique_id="F0",
+        saved_filename="F0.jpg",
+        nonce=b"n",
+        plaintext_sha256=markers["blob_sha"],
+        ciphertext=markers["blob_ciphertext"],
+    )
+    assert bid
+    (updir / "F0.jpg").write_bytes(markers["linked_plaintext"])  # blob-linked → must not ship
+    (updir / "HELD.jpg").write_bytes(markers["held_plaintext"])  # held → must not ship
+
+    (archive,) = privacy.build_takeout(1, tmp_path)
+    raw = archive.read_bytes()
+    with zipfile.ZipFile(archive) as zf:
+        raw += b"".join(zf.read(n) for n in zf.namelist())
+    for name, marker in markers.items():
+        needle = marker if isinstance(marker, bytes) else marker.encode()
+        assert needle not in raw, f"{name} leaked into takeout"
+    # …while legitimately exportable content is present, so the test is not vacuous.
+    with zipfile.ZipFile(archive) as zf:
+        assert b'"username": "alice"' in zf.read("data.json")
+        assert zf.read("files/CL.jpg") == b"img-CL"  # cleared but unlinked → exportable
 
 
 def test_takeout_ships_only_unlinked_files_on_disk(world, tmp_path):
