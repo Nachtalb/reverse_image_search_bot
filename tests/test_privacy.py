@@ -194,3 +194,14 @@ def test_erase_chat_keeps_uploaders_records(world, updir):
     assert world.get_chat(-100) is None
     assert len(world.files_for_user(1)) == 5
     assert ChatConfig(-100).language is None
+
+
+def test_erase_unreported_user_with_held_file_keeps_that_row(abuse, updir):
+    abuse.record_user(3)
+    abuse.record_file("P", saved_filename="P.jpg", user_id=3, file_type="photo")
+    abuse.record_file("H3", saved_filename="H3.jpg", user_id=3, file_type="photo")
+    abuse.set_file_hold("H3", "after_ban", ("held/3/H3.enc", b"n", "sha"))
+
+    privacy.erase(3)
+    assert [f["file_unique_id"] for f in abuse.files_for_user(3)] == ["H3"]
+    assert abuse.get_user(3) is not None

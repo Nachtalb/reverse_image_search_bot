@@ -585,11 +585,30 @@ def report_linked_file_ids(subject_id: int) -> set[str]:
 
 
 def delete_user_rows(user_id: int) -> None:
-    """Drop a user's file records and profile. Caller guarantees the user is unreported."""
+    """Drop a user's file records and profile — unless anything is tied to a report.
+
+    Caller checks :func:`is_reported`; this re-checks in SQL so a row that
+    belongs to a report (blob-linked or held) can never be deleted by any path.
+    A user with a report round, or with any file row left, keeps their profile.
+    """
     conn = _get_conn()
     with conn:
-        conn.execute("DELETE FROM files WHERE user_id = ?", (user_id,))
-        conn.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+        conn.execute(
+            """
+            DELETE FROM files WHERE user_id = ?
+              AND hold_path IS NULL
+              AND NOT EXISTS (SELECT 1 FROM report_blobs b WHERE b.file_unique_id = files.file_unique_id)
+            """,
+            (user_id,),
+        )
+        conn.execute(
+            """
+            DELETE FROM users WHERE user_id = ?
+              AND NOT EXISTS (SELECT 1 FROM reports r WHERE r.user_id = users.user_id)
+              AND NOT EXISTS (SELECT 1 FROM files f WHERE f.user_id = users.user_id)
+            """,
+            (user_id,),
+        )
 
 
 def delete_chat_row(chat_id: int) -> None:
