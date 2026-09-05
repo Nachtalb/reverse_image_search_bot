@@ -11,7 +11,7 @@ from time import time
 import httpx
 import imageio_ffmpeg
 from PIL import Image
-from telegram import Animation, Document, PhotoSize, Sticker, Video
+from telegram import Animation, Document, File, PhotoSize, Sticker, Video
 from yarl import URL
 
 from reverse_image_search_bot.i18n import t
@@ -278,6 +278,18 @@ def image_filename(attachment: PhotoSize | Sticker | Document) -> str:
     return f"{attachment.file_unique_id}.{extension}"
 
 
+async def file_to_image_bytes(tg_file: File, extension: str) -> bytes:
+    """Download a Telegram file and normalise it to ``extension`` (jpg passes through)."""
+    with io.BytesIO() as file:
+        await tg_file.download_to_memory(file)
+        if extension != "jpg":
+            file.seek(0)
+            with Image.open(file) as image:
+                file.seek(0)
+                image.save(file, extension)
+        return file.getvalue()
+
+
 async def image_to_bytes(attachment: PhotoSize | Sticker | Document) -> tuple[bytes, str]:
     """The image bytes of an upload (normalised to jpg/png), plus its filename."""
     filename = image_filename(attachment)
@@ -285,15 +297,9 @@ async def image_to_bytes(attachment: PhotoSize | Sticker | Document) -> tuple[by
     t0 = time()
     logger.info("image_to_url: downloading file %s", attachment.file_unique_id)
     photo_file = await attachment.get_file(read_timeout=_FILE_TIMEOUT, connect_timeout=_FILE_TIMEOUT)
-    with io.BytesIO() as file:
-        await photo_file.download_to_memory(file)
-        logger.info("image_to_url: downloaded in %.1fs", time() - t0)
-        if extension != "jpg":
-            file.seek(0)
-            with Image.open(file) as image:
-                file.seek(0)
-                image.save(file, extension)
-        return file.getvalue(), filename
+    data = await file_to_image_bytes(photo_file, extension)
+    logger.info("image_to_url: downloaded in %.1fs", time() - t0)
+    return data, filename
 
 
 async def image_to_url(attachment: PhotoSize | Sticker | Document) -> URL:

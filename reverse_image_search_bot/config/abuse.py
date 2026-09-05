@@ -192,9 +192,10 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     _add_column_if_missing(conn, "files", "hold_nonce", "BLOB")
     _add_column_if_missing(conn, "files", "hold_sha256", "TEXT")
 
-    # A PERMANENT source-video fetch failure for this file (over the 20 MB bot
-    # limit, or message deleted). Once set, fetch attempts are skipped — no
-    # retry storm and no repeated admin warnings on every review/submit.
+    # A PERMANENT Telegram fetch failure for this file (over the 20 MB bot
+    # limit, or message deleted), set by the video fetch or the plaintext
+    # re-fetch. Once set, fetch attempts are skipped — no retry storm and no
+    # repeated admin warnings on every review/submit.
     _add_column_if_missing(conn, "files", "video_error", "TEXT")
 
     # A report round for one user. `report_uuid` is the URL token; `page_secret_hash`
@@ -546,8 +547,82 @@ def files_for_user(user_id: int) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def files_for_chat(chat_id: int) -> list[dict]:
+    """Every file uploaded through a given group/channel, oldest first."""
+    conn = _get_conn()
+    rows = conn.execute(
+        "SELECT * FROM files WHERE group_id = ? OR channel_id = ? ORDER BY upload_time", (chat_id, chat_id)
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def is_reported(user_id: int) -> bool:
+    """True if ANY report round exists for this user, whatever its status."""
+    conn = _get_conn()
+    return conn.execute("SELECT 1 FROM reports WHERE user_id = ? LIMIT 1", (user_id,)).fetchone() is not None
+
+
+def report_linked_file_ids(subject_id: int) -> set[str]:
+    """File ids of a user's (or, negative id, a chat's) uploads that belong to a report.
+
+    A file is linked when a report blob references it or when it sits in the hold
+    (a never-published upload of a watched/banned user).
+    """
+    conn = _get_conn()
+    where = "f.group_id = ? OR f.channel_id = ?" if subject_id < 0 else "f.user_id = ?"
+    params = (subject_id, subject_id) if subject_id < 0 else (subject_id,)
+    rows = conn.execute(
+        f"""
+        SELECT f.file_unique_id FROM files f
+        WHERE ({where}) AND (
+            f.hold_path IS NOT NULL
+            OR EXISTS (SELECT 1 FROM report_blobs b WHERE b.file_unique_id = f.file_unique_id)
+        )
+        """,
+        params,
+    ).fetchall()
+    return {r["file_unique_id"] for r in rows}
+
+
+def delete_user_rows(user_id: int) -> None:
+    """Drop a user's file records and profile — unless anything is tied to a report.
+
+    Caller checks :func:`is_reported`; this re-checks in SQL so a row that
+    belongs to a report (blob-linked or held) can never be deleted by any path.
+    A user with a report round, or with any file row left, keeps their profile.
+    """
+    conn = _get_conn()
+    with conn:
+        conn.execute(
+            """
+            DELETE FROM files WHERE user_id = ?
+              AND hold_path IS NULL
+              AND NOT EXISTS (SELECT 1 FROM report_blobs b WHERE b.file_unique_id = files.file_unique_id)
+            """,
+            (user_id,),
+        )
+        conn.execute(
+            """
+            DELETE FROM users WHERE user_id = ?
+              AND NOT EXISTS (SELECT 1 FROM reports r WHERE r.user_id = users.user_id)
+              AND NOT EXISTS (SELECT 1 FROM files f WHERE f.user_id = users.user_id)
+            """,
+            (user_id,),
+        )
+
+
+def delete_chat_row(chat_id: int) -> None:
+    conn = _get_conn()
+    with conn:
+        conn.execute("DELETE FROM chats WHERE chat_id = ?", (chat_id,))
+
+
 def set_file_video_error(file_unique_id: str, reason: str) -> None:
-    """Record a permanent source-video fetch failure (only the first one wins)."""
+    """Record a permanent Telegram fetch failure for this file (only the first one wins).
+
+    Covers both the source-video fetch and the plaintext re-fetch: either way
+    the file_id is dead and no path should retry it.
+    """
     conn = _get_conn()
     with conn:
         conn.execute(

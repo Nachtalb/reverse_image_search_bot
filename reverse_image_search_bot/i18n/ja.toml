@@ -3,7 +3,7 @@ title = "🔎 逆画像検索ボット — ヘルプ"
 how_to_use = "🤔 使い方"
 how_to_use_text = "画像、ステッカー、動画/GIF、またはURLを送信すると、SauceNao、Google、Yandexなどの逆画像検索リンクをお送りします。\nアニメ画像にはSauceNao、その他の画像にはGoogleまたはYandexがおすすめです。"
 commands_title = "🖥️ コマンド"
-commands_list = "/help — ヘルプを表示\n/search — 画像に返信して検索\n/settings — チャット設定\n/feedback — 管理者にフィードバックを送信"
+commands_list = "/help — ヘルプを表示\n/search — 画像に返信して検索\n/settings — チャット設定\n/feedback — 管理者にフィードバックを送信\n/privacy — 保存する内容と保存期間\n/takeout — データをエクスポート\n/delete — データを削除"
 
 [commands]
 ban_usage = "使い方：/ban <user_id>"
@@ -74,7 +74,7 @@ min_one_button = "⚠️ 少なくとも1つのボタンを有効にしておく
 min_one_engine = "⚠️ 少なくとも1つのエンジンを有効にしておく必要があります。"
 
 [start]
-private = "🔎 画像、ステッカー、動画を送ってください — ソースを見つけます。"
+private = "🔎 画像、ステッカー、動画を送ってください — ソースを見つけます。\n\n🔒 データとプライバシー: /privacy"
 group = "🔎 画像、ステッカー、動画を送ってください — ソースを見つけます。\n\n/search · /settings"
 opening_settings = "⚙️ 設定を開いています..."
 
@@ -95,6 +95,9 @@ settings = "このチャットのボット設定"
 help = "ヘルプを表示"
 start = "ボットを起動"
 feedback = "管理者にフィードバックを送信"
+privacy = "保存する内容と保存期間"
+takeout = "データをエクスポート"
+delete = "データを削除"
 
 [feedback]
 prompt = "💬 フィードバックを入力してください。/cancel で中止できます。"
@@ -108,6 +111,22 @@ reply_failed = "❌ ユーザーへの返信に失敗しました。ボットが
 user_followup = "📬 <b>フォローアップ</b>\n送信者: {user} (<code>{user_id}</code>)\n\n{feedback}\n\n💡 <i>このメッセージに返信してユーザーに応答できます。</i>"
 followup_sent = "✅ 返信が管理者に送信されました。"
 followup_failed = "❌ 返信の送信に失敗しました。"
+
+[privacy]
+admins_only = "ここではグループの管理者のみ操作できます。"
+not_yours = "これは他の人のボタンです。"
+takeout_confirm = "📦 あなたのデータをzipでエクスポートしますか？"
+takeout_confirm_chat = "📦 このチャットのデータをzipでエクスポートしますか？"
+takeout_btn = "📦 エクスポート"
+takeout_wait = "⏳ 準備中…"
+takeout_done = "📦 あなたのデータのエクスポートです。詳しくは /privacy をご覧ください。"
+takeout_cooldown = "{hours} 時間前にすでにエクスポートされています。しばらくしてからもう一度お試しください。"
+delete_confirm = "🗑 あなたのデータを削除しますか？この操作は取り消せません。"
+delete_confirm_chat = "🗑 このチャットのデータを削除しますか？この操作は取り消せません。"
+delete_btn = "🗑 削除"
+delete_done = "✅ データを削除しました。詳しくは /privacy をご覧ください。"
+cancel_btn = "✖ キャンセル"
+cancelled = "キャンセルしました。"
 
 [fields]
 title = "タイトル"

@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import html
 import io
 import json
@@ -28,7 +29,7 @@ from telegram.ext import (
     filters,
 )
 
-from . import metrics, settings
+from . import metrics, privacy, settings
 from .abuse_report.prepare import delete_user_files
 from .commands import (
     callback_query_handler,
@@ -50,6 +51,7 @@ from .commands.feedback import (
     feedback_received,
     feedback_reply_handler,
 )
+from .commands.privacy import delete_command, privacy_callback, privacy_command, takeout_command
 from .commands.report import report_command, reports_command
 from .config import abuse
 from .i18n import available_languages, t
@@ -236,6 +238,9 @@ _PUBLIC_COMMANDS = [
     BotCommand("search", t("bot_commands.search")),
     BotCommand("settings", t("bot_commands.settings")),
     BotCommand("feedback", t("bot_commands.feedback")),
+    BotCommand("privacy", t("bot_commands.privacy")),
+    BotCommand("takeout", t("bot_commands.takeout")),
+    BotCommand("delete", t("bot_commands.delete")),
     BotCommand("help", t("bot_commands.help")),
     BotCommand("start", t("bot_commands.start")),
 ]
@@ -286,6 +291,11 @@ async def _set_bot_commands(app: Application) -> None:
             await _set_commands_retrying(app, _ADMIN_COMMANDS, scope=BotCommandScopeChat(chat_id=admin_id))
         except Exception:
             logger.warning("Failed to set admin commands for %d", admin_id, exc_info=True)
+
+
+async def retention_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    removed = await asyncio.to_thread(privacy.sweep_expired_uploads)
+    logger.info("retention sweep: removed %d expired upload(s)", removed)
 
 
 async def post_init(app: Application) -> None:
@@ -390,10 +400,17 @@ def main():
     app = builder.build()
     application = app
 
+    # Daily plaintext-upload retention sweep (03:00 UTC), replacing the external cleanup cron.
+    assert app.job_queue is not None
+    app.job_queue.run_daily(retention_job, time=datetime.time(3, 0, tzinfo=datetime.UTC), name="retention")
+
     # Handlers
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, on_added_to_group))
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("privacy", privacy_command))
+    app.add_handler(CommandHandler("takeout", takeout_command))
+    app.add_handler(CommandHandler("delete", delete_command))
     id_filter = filters.Regex(r"^/id(?:@\S+)?$") & (filters.UpdateType.MESSAGES | filters.UpdateType.CHANNEL_POST)
     app.add_handler(MessageHandler(id_filter, id_command))
     app.add_handler(CommandHandler("ban", ban_command, filters=ADMIN_FILTER), group=1)
@@ -428,6 +445,7 @@ def main():
 
     app.add_handler(CallbackQueryHandler(settings_callback_handler, pattern=r"^settings:"))
     app.add_handler(CallbackQueryHandler(onboard_callback_handler, pattern=r"^onboard:"))
+    app.add_handler(CallbackQueryHandler(privacy_callback, pattern=r"^(takeout|delete):"))
     app.add_handler(CallbackQueryHandler(callback_query_handler))
 
     app.add_handler(

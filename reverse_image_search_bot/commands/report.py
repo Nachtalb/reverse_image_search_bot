@@ -22,7 +22,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, MenuButtonWebAp
 from telegram.ext import ContextTypes
 
 from reverse_image_search_bot import metrics, settings
-from reverse_image_search_bot.abuse_report.prepare import prepare_report, resolve_targets
+from reverse_image_search_bot.abuse_report.prepare import fetch_and_prepare_report, resolve_targets
 from reverse_image_search_bot.config import abuse
 
 logger = logging.getLogger("abuse.commands")
@@ -155,7 +155,7 @@ async def report_users(
         # Plain text — _safe_edit uses edit_text (no parse_mode).
         prefix = f"⏳ user {uid} ({len(rows) + 1}/{len(uids)}) —" if len(uids) > 1 else "⏳"
         on_progress = _progress_pump(status_msg, prefix) if status_msg else None
-        result = await asyncio.to_thread(prepare_report, uid, on_progress, (indicators or {}).get(uid))
+        result = await fetch_and_prepare_report(context.bot, uid, on_progress, (indicators or {}).get(uid))
         if result.ok:
             rows.append(
                 {
@@ -280,7 +280,7 @@ async def start_report(update: Update, context: ContextTypes.DEFAULT_TYPE, user_
     with contextlib.suppress(Exception):
         status_msg = await update.message.reply_text("⏳ Preparing report…")
     on_progress = _progress_pump(status_msg, "⏳") if status_msg else None
-    result = await asyncio.to_thread(prepare_report, user_id, on_progress)
+    result = await fetch_and_prepare_report(context.bot, user_id, on_progress)
     if status_msg is not None:
         with contextlib.suppress(Exception):
             await status_msg.delete()

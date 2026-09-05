@@ -3,7 +3,7 @@ title = "🔎 反向图片搜索机器人 — 帮助"
 how_to_use = "🤔 使用方法"
 how_to_use_text = "发送图片、贴纸、视频/GIF 或链接给我，我会为你提供 SauceNao、Google、Yandex 等反向搜索的直接链接。\n动漫图片推荐使用 SauceNao，其他图片推荐使用 Google 或 Yandex。"
 commands_title = "🖥️ 命令"
-commands_list = "/help — 显示帮助\n/search — 回复图片进行搜索\n/settings — 聊天设置\n/feedback — 向管理员发送反馈"
+commands_list = "/help — 显示帮助\n/search — 回复图片进行搜索\n/settings — 聊天设置\n/feedback — 向管理员发送反馈\n/privacy — 我们存储什么以及保存多久\n/takeout — 导出你的数据\n/delete — 删除你的数据"
 
 [commands]
 ban_usage = "用法：/ban <user_id>"
@@ -74,7 +74,7 @@ min_one_button = "⚠️ 至少需要保留一个按钮。"
 min_one_engine = "⚠️ 至少需要保留一个引擎。"
 
 [start]
-private = "🔎 发送图片、贴纸或视频给我，我会帮你找到来源。"
+private = "🔎 发送图片、贴纸或视频给我，我会帮你找到来源。\n\n🔒 数据与隐私：/privacy"
 group = "🔎 发送图片、贴纸或视频给我，我会帮你找到来源。\n\n/search · /settings"
 opening_settings = "⚙️ 正在打开设置..."
 
@@ -95,6 +95,9 @@ settings = "配置此聊天的机器人设置"
 help = "显示帮助"
 start = "启动机器人"
 feedback = "向管理员发送反馈"
+privacy = "我们存储什么以及保存多久"
+takeout = "导出你的数据"
+delete = "删除你的数据"
 
 [feedback]
 prompt = "💬 请在下方输入您的反馈。发送 /cancel 取消。"
@@ -108,6 +111,22 @@ reply_failed = "❌ 无法发送回复。用户可能已屏蔽机器人。"
 user_followup = "📬 <b>后续消息</b>\n来自：{user}（<code>{user_id}</code>）\n\n{feedback}\n\n💡 <i>回复此消息以回复用户。</i>"
 followup_sent = "✅ 您的回复已发送给管理员。"
 followup_failed = "❌ 无法发送您的回复。"
+
+[privacy]
+admins_only = "在这里只有群管理员可以执行此操作。"
+not_yours = "这是别人的按钮。"
+takeout_confirm = "📦 将你的数据导出为 zip？"
+takeout_confirm_chat = "📦 将此聊天的数据导出为 zip？"
+takeout_btn = "📦 导出"
+takeout_wait = "⏳ 打包中…"
+takeout_done = "📦 这是你的数据导出。更多信息请见 /privacy。"
+takeout_cooldown = "{hours} 小时前已导出过一次。请稍后再试。"
+delete_confirm = "🗑 删除你的数据？此操作无法撤销。"
+delete_confirm_chat = "🗑 删除此聊天的数据？此操作无法撤销。"
+delete_btn = "🗑 删除"
+delete_done = "✅ 数据已删除。更多信息请见 /privacy。"
+cancel_btn = "✖ 取消"
+cancelled = "已取消。"
 
 [fields]
 title = "标题"

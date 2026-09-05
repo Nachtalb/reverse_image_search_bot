@@ -1,4 +1,6 @@
-from reverse_image_search_bot.config.db import load_config, save_field
+from typing import Any, cast
+
+from reverse_image_search_bot.config.db import delete_config, load_config, save_field
 
 
 def single_chat(cls: type[ChatConfig]):
@@ -88,3 +90,11 @@ class ChatConfig:
             return self._config[name]
         else:
             return super().__getattribute__(name)
+
+
+def forget_chat(chat_id: int) -> None:
+    """Drop a chat's stored settings and evict it from the instance cache."""
+    delete_config(chat_id)
+    # @single_chat replaced the name with its factory; the cache lives on the real class.
+    real_cls = cast(Any, ChatConfig).__closure__[0].cell_contents
+    getattr(real_cls, "_loaded_chats", {}).pop(chat_id, None)

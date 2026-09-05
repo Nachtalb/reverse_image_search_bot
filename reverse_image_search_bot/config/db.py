@@ -179,6 +179,12 @@ def save_config(chat_id: int, config: dict) -> None:
     conn.commit()
 
 
+def delete_config(chat_id: int) -> None:
+    conn = _get_conn()
+    with conn:
+        conn.execute("DELETE FROM chat_config WHERE chat_id = ?", (chat_id,))
+
+
 def save_field(chat_id: int, name: str, value) -> None:
     """Insert or update a single field for a chat_id."""
     valid_columns = {col for col, _, _ in COLUMNS}

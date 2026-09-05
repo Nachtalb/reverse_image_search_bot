@@ -3,7 +3,7 @@ title = "🔎 بحث عكسي عن الصور — مساعدة"
 how_to_use = "🤔 كيفية الاستخدام"
 how_to_use_text = "أرسل لي صورة أو ملصق أو فيديو/GIF أو رابط وسأرسل لك روابط بحث عكسي مباشرة عبر SauceNao وGoogle وYandex وغيرها.\nلصور الأنمي أنصح بـ SauceNao، للصور الأخرى Google أو Yandex."
 commands_title = "🖥️ الأوامر"
-commands_list = "/help — عرض المساعدة\n/search — رد على صورة للبحث\n/settings — إعدادات المحادثة\n/feedback — إرسال ملاحظات للمسؤولين"
+commands_list = "/help — عرض المساعدة\n/search — رد على صورة للبحث\n/settings — إعدادات المحادثة\n/feedback — إرسال ملاحظات للمسؤولين\n/privacy — ما نخزّنه ولمدة كم\n/takeout — تصدير بياناتك\n/delete — حذف بياناتك"
 
 [commands]
 ban_usage = "الاستخدام: /ban <user_id>"
@@ -74,7 +74,7 @@ min_one_button = "⚠️ يجب أن يبقى زر واحد على الأقل م
 min_one_engine = "⚠️ يجب أن يبقى محرك واحد على الأقل مفعّلاً."
 
 [start]
-private = "🔎 أرسل لي صورة أو ملصقاً أو فيديو وسأجد مصدره."
+private = "🔎 أرسل لي صورة أو ملصقاً أو فيديو وسأجد مصدره.\n\n🔒 البيانات والخصوصية: /privacy"
 group = "🔎 أرسل لي صورة أو ملصقاً أو فيديو وسأجد مصدره.\n\n/search · /settings"
 opening_settings = "⚙️ جارٍ فتح الإعدادات..."
 
@@ -95,6 +95,9 @@ settings = "إعدادات البوت لهذه المحادثة"
 help = "عرض المساعدة"
 start = "تشغيل البوت"
 feedback = "إرسال ملاحظات للمسؤولين"
+privacy = "ما نخزّنه ولمدة كم"
+takeout = "تصدير بياناتك"
+delete = "حذف بياناتك"
 
 [feedback]
 prompt = "💬 اكتب ملاحظاتك أدناه. أرسل /cancel للإلغاء."
@@ -108,6 +111,22 @@ reply_failed = "❌ فشل إرسال الرد. ربما قام المستخدم
 user_followup = "📬 <b>متابعة</b>\nمن: {user} (<code>{user_id}</code>)\n\n{feedback}\n\n💡 <i>رد على هذه الرسالة للرد على المستخدم.</i>"
 followup_sent = "✅ تم إرسال ردك إلى المسؤولين."
 followup_failed = "❌ فشل إرسال ردك."
+
+[privacy]
+admins_only = "يمكن لمشرفي المجموعة فقط القيام بذلك هنا."
+not_yours = "هذا زر شخص آخر."
+takeout_confirm = "📦 تصدير بياناتك كملف zip؟"
+takeout_confirm_chat = "📦 تصدير بيانات هذه الدردشة كملف zip؟"
+takeout_btn = "📦 تصدير"
+takeout_wait = "⏳ جارٍ التجميع…"
+takeout_done = "📦 تصدير بياناتك. راجع /privacy لمزيد من المعلومات."
+takeout_cooldown = "تم إجراء تصدير بالفعل قبل {hours} ساعة. حاول مرة أخرى لاحقًا."
+delete_confirm = "🗑 حذف بياناتك؟ لا يمكن التراجع عن هذا."
+delete_confirm_chat = "🗑 حذف بيانات هذه الدردشة؟ لا يمكن التراجع عن هذا."
+delete_btn = "🗑 حذف"
+delete_done = "✅ تم حذف البيانات. راجع /privacy لمزيد من المعلومات."
+cancel_btn = "✖ إلغاء"
+cancelled = "تم الإلغاء."
 
 [fields]
 title = "العنوان"

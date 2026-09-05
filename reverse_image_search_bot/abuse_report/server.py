@@ -38,7 +38,7 @@ from reverse_image_search_bot.abuse_report import video as abuse_video
 from reverse_image_search_bot.abuse_report.prepare import (
     blob_ciphertext,
     delete_user_files,
-    prepare_report,
+    fetch_and_prepare_report,
     purge_cipher_dir,
     resolve_targets,
     restore_report_files,
@@ -288,7 +288,9 @@ async def api_reports_create(request: web.Request) -> web.Response:
 
         _prepare_progress[target] = "0/?"
         try:
-            result = await asyncio.to_thread(prepare_report, user_id, note, indicators.get(user_id), source["id"])
+            result = await fetch_and_prepare_report(
+                request.app.get("bot"), user_id, note, indicators.get(user_id), source["id"]
+            )
         finally:
             _prepare_progress.pop(target, None)
         if result.ok:
@@ -466,7 +468,9 @@ async def api_ingest(request: web.Request) -> web.Response:
     user_ids, unknown, indicators = resolve_targets("\n".join(str(t) for t in targets))
     results = []
     for user_id in user_ids:
-        result = await asyncio.to_thread(prepare_report, user_id, None, indicators.get(user_id), source["id"])
+        result = await fetch_and_prepare_report(
+            request.app.get("bot"), user_id, None, indicators.get(user_id), source["id"]
+        )
         if result.ok:
             await _dm_report_created(request.app.get("bot"), None, user_id, result, source["name"])
             results.append({"user_id": user_id, "uuid": result.report_uuid, "encrypted": result.encrypted})

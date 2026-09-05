@@ -296,3 +296,88 @@ def test_filing_clears_unselected_files(env):
     assert abuse.set_files_cleared(unselected) == 1
     assert abuse.file_by_unique_id("F1")["cleared_at"] is not None
     assert abuse.file_by_unique_id("F0")["cleared_at"] is None
+
+
+# --- Re-fetching expired plaintext from Telegram before a round ---------------
+
+
+def _tg_bot(payload: bytes = b"fresh", file_path: str = "https://api.telegram.org/file/x"):
+    from unittest.mock import AsyncMock
+
+    async def download_to_memory(buf):
+        buf.write(payload)
+
+    tg_file = MagicMock(file_path=file_path, download_to_memory=download_to_memory)
+    bot = MagicMock()
+    bot.get_file = AsyncMock(return_value=tg_file)
+    return bot
+
+
+@pytest.mark.asyncio
+async def test_refetch_restores_missing_image_and_round_includes_it(env):
+    from reverse_image_search_bot.abuse_report import prepare
+
+    abuse, _updir, mkfiles = env
+    mkfiles(1, 2)
+    abuse.record_file("GONE", saved_filename="GONE.jpg", user_id=1, file_type="photo", file_id="fid-gone")
+    bot = _tg_bot(b"fresh-bytes")
+
+    result = await prepare.fetch_and_prepare_report(bot, 1)
+
+    bot.get_file.assert_awaited_once()
+    assert bot.get_file.await_args.args[0] == "fid-gone"
+    assert result.ok and result.encrypted == 3
+
+
+@pytest.mark.asyncio
+async def test_refetch_video_extracts_frame(env, monkeypatch):
+    from reverse_image_search_bot.abuse_report import prepare
+    from reverse_image_search_bot.commands import utils as cu
+
+    abuse, updir, _mkfiles = env
+    abuse.record_user(1)
+    abuse.record_file("V", saved_filename="V.jpg", user_id=1, file_type="video", file_id="fid-v", is_video=True)
+    urls = []
+
+    async def fake_frame(url):
+        urls.append(url)
+        return b"\xff\xd8\xffframe"
+
+    monkeypatch.setattr(cu, "_extract_frame_streaming", fake_frame)
+    assert await prepare.refetch_missing(_tg_bot(file_path="https://tg/v.mp4"), 1) == 1
+    assert urls == ["https://tg/v.mp4"]
+    assert (updir / "V.jpg").read_bytes() == b"\xff\xd8\xffframe"
+
+
+@pytest.mark.asyncio
+async def test_refetch_failure_is_memoised_and_not_retried(env):
+    from unittest.mock import AsyncMock
+
+    from reverse_image_search_bot.abuse_report import prepare
+
+    abuse, _updir, _mkfiles = env
+    abuse.record_user(1)
+    abuse.record_file("D", saved_filename="D.jpg", user_id=1, file_type="photo", file_id="fid-dead")
+    bot = MagicMock()
+    bot.get_file = AsyncMock(side_effect=RuntimeError("wrong file_id"))
+
+    assert await prepare.refetch_missing(bot, 1) == 0
+    assert abuse.file_by_unique_id("D")["video_error"] == prepare.FETCH_GONE
+    assert await prepare.refetch_missing(bot, 1) == 0
+    bot.get_file.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_refetch_skips_present_held_and_cleared(env):
+    from reverse_image_search_bot.abuse_report import prepare
+
+    abuse, _updir, mkfiles = env
+    mkfiles(1, 1)  # F0 on disk
+    abuse.record_file("C", saved_filename="C.jpg", user_id=1, file_type="photo", file_id="fid-c")
+    abuse.set_files_cleared(["C"])
+    abuse.record_file("H", saved_filename="H.jpg", user_id=1, file_type="photo", file_id="fid-h")
+    abuse.set_file_hold("H", "after_ban", ("held/1/H.enc", b"n", "sha"))
+    bot = _tg_bot()
+
+    assert await prepare.refetch_missing(bot, 1) == 0
+    bot.get_file.assert_not_awaited()

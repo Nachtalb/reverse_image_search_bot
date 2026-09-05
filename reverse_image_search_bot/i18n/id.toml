@@ -3,7 +3,7 @@ title = "🔎 Bot Pencarian Gambar Terbalik — Bantuan"
 how_to_use = "🤔 Cara menggunakan saya"
 how_to_use_text = "Kirimkan saya gambar, stiker, video/gif atau URL dan saya akan mengirimkan tautan pencarian gambar terbalik langsung untuk SauceNao, Google, Yandex dan sejenisnya.\nUntuk gambar anime saya sarankan SauceNao, untuk gambar lainnya saya sarankan Google atau Yandex."
 commands_title = "🖥️ Perintah"
-commands_list = "/help — Tampilkan bantuan\n/search — Balas sebuah gambar atau video untuk mencari\n/settings — Atur perilaku bot di obrolan ini\n/feedback — Kirim masukan ke admin"
+commands_list = "/help — Tampilkan bantuan\n/search — Balas sebuah gambar atau video untuk mencari\n/settings — Atur perilaku bot di obrolan ini\n/feedback — Kirim masukan ke admin\n/privacy — Apa yang kami simpan dan berapa lama\n/takeout — Ekspor data Anda\n/delete — Hapus data Anda"
 
 [commands]
 ban_usage = "Cara pakai: /ban <user_id>"
@@ -74,7 +74,7 @@ min_one_button = "⚠️ Setidaknya satu tombol harus tetap aktif."
 min_one_engine = "⚠️ Setidaknya satu mesin harus tetap aktif."
 
 [start]
-private = "🔎 Kirimkan saya gambar, stiker, atau video dan saya akan menemukan sumbernya."
+private = "🔎 Kirimkan saya gambar, stiker, atau video dan saya akan menemukan sumbernya.\n\n🔒 Data & privasi: /privacy"
 group = "🔎 Kirimkan saya gambar, stiker, atau video dan saya akan menemukan sumbernya.\n\n/search · /settings"
 opening_settings = "⚙️ Membuka pengaturan..."
 
@@ -108,6 +108,25 @@ settings = "Atur perilaku bot untuk obrolan ini"
 help = "Tampilkan bantuan"
 start = "Mulai bot"
 feedback = "Kirim masukan ke admin"
+privacy = "Apa yang kami simpan dan berapa lama"
+takeout = "Ekspor data Anda"
+delete = "Hapus data Anda"
+
+[privacy]
+admins_only = "Hanya admin grup yang dapat melakukan ini di sini."
+not_yours = "Itu tombol milik orang lain."
+takeout_confirm = "📦 Ekspor data Anda sebagai zip?"
+takeout_confirm_chat = "📦 Ekspor data obrolan ini sebagai zip?"
+takeout_btn = "📦 Ekspor"
+takeout_wait = "⏳ Mengemas…"
+takeout_done = "📦 Ekspor data Anda. Lihat /privacy untuk info lebih lanjut."
+takeout_cooldown = "Ekspor sudah dibuat {hours} jam yang lalu. Coba lagi nanti."
+delete_confirm = "🗑 Hapus data Anda? Tindakan ini tidak dapat dibatalkan."
+delete_confirm_chat = "🗑 Hapus data obrolan ini? Tindakan ini tidak dapat dibatalkan."
+delete_btn = "🗑 Hapus"
+delete_done = "✅ Data dihapus. Lihat /privacy untuk info lebih lanjut."
+cancel_btn = "✖ Batal"
+cancelled = "Dibatalkan."
 
 [fields]
 title = "Judul"

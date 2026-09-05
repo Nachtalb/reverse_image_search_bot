@@ -3,7 +3,7 @@ title = "🔎 Reverse Image Search Bot — Help"
 how_to_use = "🤔 How to use me"
 how_to_use_text = "Send me an image, sticker, video/gif or URL and I will send you direct reverse image search links for SauceNao, Google, Yandex and the like.\nFor anime images I recommend SauceNao, for other images I recommend Google or Yandex."
 commands_title = "🖥️ Commands"
-commands_list = "/help — Show help\n/search — Reply to an image or video to search\n/settings — Configure per-chat behaviour\n/feedback — Send feedback to the admins"
+commands_list = "/help — Show help\n/search — Reply to an image or video to search\n/settings — Configure per-chat behaviour\n/feedback — Send feedback to the admins\n/privacy — What we store and for how long\n/takeout — Export your data\n/delete — Delete your data"
 
 [commands]
 ban_usage = "Usage: /ban <user_id>"
@@ -74,7 +74,7 @@ min_one_button = "⚠️ At least one button must stay enabled."
 min_one_engine = "⚠️ At least one engine must stay enabled."
 
 [start]
-private = "🔎 Send me an image, sticker, or video and I'll find its source."
+private = "🔎 Send me an image, sticker, or video and I'll find its source.\n\n🔒 Data & privacy: /privacy"
 group = "🔎 Send me an image, sticker, or video and I'll find its source.\n\n/search · /settings"
 opening_settings = "⚙️ Opening settings..."
 
@@ -108,6 +108,25 @@ settings = "Configure bot behaviour for this chat"
 help = "Show help"
 start = "Start the bot"
 feedback = "Send feedback to the admins"
+privacy = "What we store and for how long"
+takeout = "Export your data"
+delete = "Delete your data"
+
+[privacy]
+admins_only = "Only group admins can do this here."
+not_yours = "That's someone else's button."
+takeout_confirm = "📦 Export your data as a zip?"
+takeout_confirm_chat = "📦 Export this chat's data as a zip?"
+takeout_btn = "📦 Export"
+takeout_wait = "⏳ Packing…"
+takeout_done = "📦 Your data export. See /privacy for more info."
+takeout_cooldown = "An export was already made {hours} h ago. Try again later."
+delete_confirm = "🗑 Delete your data? This cannot be undone."
+delete_confirm_chat = "🗑 Delete this chat's data? This cannot be undone."
+delete_btn = "🗑 Delete"
+delete_done = "✅ Data deleted. See /privacy for more info."
+cancel_btn = "✖ Cancel"
+cancelled = "Cancelled."
 
 [fields]
 title = "Title"

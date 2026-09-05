@@ -3,7 +3,7 @@ title = "🔎 Bilderrückwärtssuche — Hilfe"
 how_to_use = "🤔 So funktioniert es"
 how_to_use_text = "Sende mir ein Bild, einen Sticker, ein Video/GIF oder eine URL und ich schicke dir direkte Links zur Bilderrückwärtssuche über SauceNao, Google, Yandex und weitere.\nFür Anime-Bilder empfehle ich SauceNao, für andere Bilder Google oder Yandex."
 commands_title = "🖥️ Befehle"
-commands_list = "/help — Hilfe anzeigen\n/search — Auf ein Bild antworten um zu suchen\n/settings — Chat-Einstellungen\n/feedback — Feedback an die Admins senden"
+commands_list = "/help — Hilfe anzeigen\n/search — Auf ein Bild antworten um zu suchen\n/settings — Chat-Einstellungen\n/feedback — Feedback an die Admins senden\n/privacy — Was wir speichern und wie lange\n/takeout — Deine Daten exportieren\n/delete — Deine Daten löschen"
 
 [commands]
 ban_usage = "Verwendung: /ban <user_id>"
@@ -74,7 +74,7 @@ min_one_button = "⚠️ Mindestens ein Button muss aktiv bleiben."
 min_one_engine = "⚠️ Mindestens eine Engine muss aktiv bleiben."
 
 [start]
-private = "🔎 Sende mir ein Bild, einen Sticker oder ein Video und ich finde die Quelle."
+private = "🔎 Sende mir ein Bild, einen Sticker oder ein Video und ich finde die Quelle.\n\n🔒 Daten & Datenschutz: /privacy"
 group = "🔎 Sende mir ein Bild, einen Sticker oder ein Video und ich finde die Quelle.\n\n/search · /settings"
 opening_settings = "⚙️ Öffne Einstellungen..."
 
@@ -95,6 +95,9 @@ settings = "Bot-Einstellungen für diesen Chat"
 help = "Hilfe anzeigen"
 start = "Bot starten"
 feedback = "Feedback an die Admins senden"
+privacy = "Was wir speichern und wie lange"
+takeout = "Deine Daten exportieren"
+delete = "Deine Daten löschen"
 
 [feedback]
 prompt = "💬 Bitte schreibe dein Feedback unten. Sende /cancel zum Abbrechen."
@@ -108,6 +111,22 @@ reply_failed = "❌ Antwort konnte nicht gesendet werden. Der Nutzer hat den Bot
 user_followup = "📬 <b>Nachfrage</b>\nVon: {user} (<code>{user_id}</code>)\n\n{feedback}\n\n💡 <i>Antworte auf diese Nachricht, um dem Nutzer zu antworten.</i>"
 followup_sent = "✅ Deine Antwort wurde an die Admins gesendet."
 followup_failed = "❌ Deine Antwort konnte nicht gesendet werden."
+
+[privacy]
+admins_only = "Das können hier nur Gruppen-Admins."
+not_yours = "Das ist der Button von jemand anderem."
+takeout_confirm = "📦 Deine Daten als Zip exportieren?"
+takeout_confirm_chat = "📦 Die Daten dieses Chats als Zip exportieren?"
+takeout_btn = "📦 Exportieren"
+takeout_wait = "⏳ Wird gepackt…"
+takeout_done = "📦 Dein Datenexport. Mehr Infos unter /privacy."
+takeout_cooldown = "Vor {hours} h wurde bereits ein Export erstellt. Versuch es später noch mal."
+delete_confirm = "🗑 Deine Daten löschen? Das kann nicht rückgängig gemacht werden."
+delete_confirm_chat = "🗑 Die Daten dieses Chats löschen? Das kann nicht rückgängig gemacht werden."
+delete_btn = "🗑 Löschen"
+delete_done = "✅ Daten gelöscht. Mehr Infos unter /privacy."
+cancel_btn = "✖ Abbrechen"
+cancelled = "Abgebrochen."
 
 [fields]
 title = "Titel"

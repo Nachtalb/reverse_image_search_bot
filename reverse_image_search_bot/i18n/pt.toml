@@ -3,7 +3,7 @@ title = "🔎 Pesquisa reversa de imagens — Ajuda"
 how_to_use = "🤔 Como me usar"
 how_to_use_text = "Envie-me uma imagem, sticker, vídeo/GIF ou URL e eu enviarei links diretos de pesquisa reversa via SauceNao, Google, Yandex e outros.\nPara imagens de anime recomendo o SauceNao, para outras imagens Google ou Yandex."
 commands_title = "🖥️ Comandos"
-commands_list = "/help — Mostrar ajuda\n/search — Responda a uma imagem para pesquisar\n/settings — Configurações do chat\n/feedback — Enviar feedback aos administradores"
+commands_list = "/help — Mostrar ajuda\n/search — Responda a uma imagem para pesquisar\n/settings — Configurações do chat\n/feedback — Enviar feedback aos administradores\n/privacy — O que guardamos e por quanto tempo\n/takeout — Exportar os seus dados\n/delete — Apagar os seus dados"
 
 [commands]
 ban_usage = "Uso: /ban <user_id>"
@@ -74,7 +74,7 @@ min_one_button = "⚠️ Pelo menos um botão deve permanecer ativado."
 min_one_engine = "⚠️ Pelo menos um motor deve permanecer ativado."
 
 [start]
-private = "🔎 Envie-me uma imagem, sticker ou vídeo e eu encontrarei a fonte."
+private = "🔎 Envie-me uma imagem, sticker ou vídeo e eu encontrarei a fonte.\n\n🔒 Dados e privacidade: /privacy"
 group = "🔎 Envie-me uma imagem, sticker ou vídeo e eu encontrarei a fonte.\n\n/search · /settings"
 opening_settings = "⚙️ Abrindo configurações..."
 
@@ -95,6 +95,9 @@ settings = "Configurar o comportamento do bot para este chat"
 help = "Mostrar ajuda"
 start = "Iniciar o bot"
 feedback = "Enviar feedback aos administradores"
+privacy = "O que guardamos e por quanto tempo"
+takeout = "Exportar os seus dados"
+delete = "Apagar os seus dados"
 
 [feedback]
 prompt = "💬 Escreva seu feedback abaixo. Envie /cancel para cancelar."
@@ -108,6 +111,22 @@ reply_failed = "❌ Falha ao enviar a resposta. O usuário pode ter bloqueado o 
 user_followup = "📬 <b>Acompanhamento</b>\nDe: {user} (<code>{user_id}</code>)\n\n{feedback}\n\n💡 <i>Responda a esta mensagem para responder ao usuário.</i>"
 followup_sent = "✅ Sua resposta foi enviada aos administradores."
 followup_failed = "❌ Falha ao enviar sua resposta."
+
+[privacy]
+admins_only = "Só admins do grupo podem fazer isso aqui."
+not_yours = "Esse botão é de outra pessoa."
+takeout_confirm = "📦 Exportar seus dados como zip?"
+takeout_confirm_chat = "📦 Exportar os dados deste chat como zip?"
+takeout_btn = "📦 Exportar"
+takeout_wait = "⏳ Empacotando…"
+takeout_done = "📦 Sua exportação de dados. Veja /privacy para mais informações."
+takeout_cooldown = "Uma exportação já foi feita há {hours} h. Tente de novo mais tarde."
+delete_confirm = "🗑 Apagar seus dados? Isso não pode ser desfeito."
+delete_confirm_chat = "🗑 Apagar os dados deste chat? Isso não pode ser desfeito."
+delete_btn = "🗑 Apagar"
+delete_done = "✅ Dados apagados. Veja /privacy para mais informações."
+cancel_btn = "✖ Cancelar"
+cancelled = "Cancelado."
 
 [fields]
 title = "Título"
