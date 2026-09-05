@@ -65,7 +65,7 @@ async def test_takeout_cooldown():
     ctx.user_data["takeout_at"] = time.time() - 3600
     u = _update()
     await pc.takeout_command(u, ctx)
-    assert "try again" in u.effective_message.reply_text.call_args.args[0]
+    assert "Try again" in u.effective_message.reply_text.call_args.args[0]
 
 
 @pytest.mark.asyncio
@@ -99,7 +99,7 @@ async def test_delete_confirmed_erases_subject_and_clears_state(monkeypatch):
     await pc.privacy_callback(u, ctx)
     erase.assert_called_once_with(1)
     assert ctx.user_data == {}
-    assert "Done" in u.callback_query.edit_message_text.call_args.args[0]
+    assert "deleted" in u.callback_query.edit_message_text.call_args.args[0]
 
 
 @pytest.mark.asyncio
