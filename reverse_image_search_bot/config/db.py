@@ -53,6 +53,11 @@ def _get_conn() -> sqlite3.Connection:
     return _local.conn
 
 
+def connection() -> sqlite3.Connection:
+    """The current thread's config-DB connection, schema ensured."""
+    return _get_conn()
+
+
 def _close_all_connections():
     """Close all thread-local connections on interpreter shutdown."""
     with _conn_lock:
@@ -72,6 +77,18 @@ def _ensure_schema(conn: sqlite3.Connection):
             chat_id INTEGER PRIMARY KEY
         )
     """)
+    # Persistent best-match result cache (see config/result_cache.py). Lives here
+    # rather than in abuse.db because it is disposable operational data.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS best_match_cache (
+            engine     TEXT NOT NULL,
+            image_url  TEXT NOT NULL,
+            payload    TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            PRIMARY KEY (engine, image_url)
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_bmc_created ON best_match_cache(created_at)")
     # Add any missing columns (try/except for concurrent thread safety)
     for name, sql_type, default in COLUMNS:
         try:

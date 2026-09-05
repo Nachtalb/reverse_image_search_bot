@@ -90,6 +90,11 @@ PERSISTENCE_PATH = (
 # Plaintext uploads older than this are removed by the daily retention sweep.
 FILE_RETENTION_DAYS = int(os.getenv("FILE_RETENTION_DAYS", "30"))
 
+# How long a cached engine best-match stays usable. The cache is on disk, so a
+# stale entry costs a row rather than resident memory — hence far longer than the
+# 24h the old in-RAM cache could afford.
+RESULT_CACHE_TTL_DAYS = int(os.getenv("RESULT_CACHE_TTL_DAYS", "30"))
+
 
 # Prometheus metrics
 METRICS_ENABLED = os.getenv("METRICS_ENABLED", "true").lower() in ("true", "1", "yes")
