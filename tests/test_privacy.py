@@ -54,9 +54,12 @@ async def test_retention_job_runs_sweep(monkeypatch):
     from reverse_image_search_bot import bot
 
     sweep = MagicMock(return_value=3)
+    compact = MagicMock(return_value=0)
     monkeypatch.setattr(bot.privacy, "sweep_expired_uploads", sweep)
+    monkeypatch.setattr(bot.abuse, "compact", compact)
     await bot.retention_job(MagicMock())
     sweep.assert_called_once_with()
+    compact.assert_called_once_with()
 
 
 @pytest.mark.asyncio

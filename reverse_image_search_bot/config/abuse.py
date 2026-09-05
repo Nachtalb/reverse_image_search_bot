@@ -72,6 +72,23 @@ def _close_all_connections() -> None:
 atexit.register(_close_all_connections)
 
 
+def compact() -> int:
+    """VACUUM + ANALYZE; returns the number of free pages reclaimed.
+
+    Purged blobs and retention deletes leave free pages behind, and the file
+    ends up laid out in insertion order with ciphertext interleaved between the
+    hot tables. On the network PVC a cold read of that layout takes seconds
+    (the statistics page measured 6 s against 1 s once compacted). ANALYZE
+    refreshes the planner statistics so new indexes are actually chosen.
+    VACUUM takes an exclusive lock for its duration — run it off the event loop.
+    """
+    conn = _get_conn()
+    freed = conn.execute("PRAGMA freelist_count").fetchone()[0]
+    conn.execute("VACUUM")
+    conn.execute("ANALYZE")
+    return freed
+
+
 def _add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, decl: str) -> bool:
     """Idempotently add a column to an existing table (simple forward migration).
 
