@@ -29,6 +29,7 @@ dependencies = [
     "ncmec-cybertip>=0.1.1",
     "cryptography>=50.0.0",
     "aiohttp>=3.14.3",
+    "autocrop-rs>=0.1.1",
 ]
 
 [dependency-groups]

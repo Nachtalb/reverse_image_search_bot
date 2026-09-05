@@ -133,6 +133,21 @@ wheels = [
 ]
 
 [[package]]
+name = "autocrop-rs"
+version = "0.1.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/37/16/28c0657eb9d5fb2bf1a0555e2434f874e881295708a6f7f8216a281375fa/autocrop_rs-0.1.1.tar.gz", hash = "sha256:a9c55628531c0b8cf3366f9c25fa8c0187f252e7ff2086f354e4728d3bf9de01", size = 893132, upload-time = "2026-09-05T20:11:18.438Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0f/dc/942a0ad6880d573f94117e2ffb81bdfc914add6ba148a82bf516e6495bae/autocrop_rs-0.1.1-cp311-abi3-macosx_10_12_x86_64.whl", hash = "sha256:fcd9f4c4a16f34be82946a3c37f3b5d696c7a898b15f94e77141617b7e40de31", size = 889565, upload-time = "2026-09-05T20:11:07.613Z" },
+    { url = "https://files.pythonhosted.org/packages/71/54/b503245846a7954b80da005ee1e034ed1aff70d0700cde22198328fd38b1/autocrop_rs-0.1.1-cp311-abi3-macosx_11_0_arm64.whl", hash = "sha256:0c323c343878c5e115c324eb55217f73f0fa254ca98363b078f23247677e6109", size = 842599, upload-time = "2026-09-05T20:11:09.212Z" },
+    { url = "https://files.pythonhosted.org/packages/46/92/a07304671f6e57a9f798de1ef22d513e67257504aa1ac8ebb22abdb09359/autocrop_rs-0.1.1-cp311-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:cfb762439787e9b8d87ea9d8dd5d43c460c8b4b6afbd49d9221f116e1708d383", size = 888183, upload-time = "2026-09-05T20:11:11.076Z" },
+    { url = "https://files.pythonhosted.org/packages/08/fa/1220ee5646f1f5f6d361b6dafc12ebd51c5d1e2780572459686cc04b7113/autocrop_rs-0.1.1-cp311-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:0be09164fb651bb3bd410a752d6f0cce05b7b4e16dbfe40edeb146b01bbc7355", size = 921121, upload-time = "2026-09-05T20:11:12.496Z" },
+    { url = "https://files.pythonhosted.org/packages/5f/51/a2b309c67a4d99fbd3adda69843a13ec677ce10b2a94c6404082cf88c793/autocrop_rs-0.1.1-cp311-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:af74db490a215f0bc34fe2fed24b573207b390ea57873ec98fccee1eb6654d5b", size = 1067140, upload-time = "2026-09-05T20:11:13.956Z" },
+    { url = "https://files.pythonhosted.org/packages/a1/27/88fbbf9b24b02d40d4872ef95374c10e34543e41d08375372808677717a5/autocrop_rs-0.1.1-cp311-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:81b7e841b37d2778d59f13e1ff2e819bff71f2e7f8ba69333c83f30670c0b139", size = 1135663, upload-time = "2026-09-05T20:11:15.446Z" },
+    { url = "https://files.pythonhosted.org/packages/03/98/427a98f3984130ac6b023ce3186353dcfd497c16f8eed1cefcaae84cca3d/autocrop_rs-0.1.1-cp311-abi3-win_amd64.whl", hash = "sha256:e926a096fd8f93787d5f07e086db6d57f3ba6208a72e283f02e03f455305f705", size = 812672, upload-time = "2026-09-05T20:11:16.885Z" },
+]
+
+[[package]]
 name = "bcrypt"
 version = "5.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1301,6 +1316,7 @@ version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
+    { name = "autocrop-rs" },
     { name = "cachetools" },
     { name = "cleverdict" },
     { name = "cryptography" },
@@ -1340,6 +1356,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.14.3" },
+    { name = "autocrop-rs", specifier = ">=0.1.1" },
     { name = "cachetools", specifier = ">=7.1.7" },
     { name = "cleverdict", specifier = ">=1.9.2" },
     { name = "cryptography", specifier = ">=50.0.0" },
