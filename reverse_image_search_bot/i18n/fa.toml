@@ -53,6 +53,7 @@ admins_only_configure = "فقط مدیران گروه می‌توانند ربا
 [settings.toggles]
 auto_search = "🔍 جستجوی خودکار: {status}"
 show_buttons = "🔘 نمایش دکمه‌ها: {status}"
+auto_crop = "✂️ برش خودکار اسکرین‌شات‌ها: {status}"
 auto_search_engines = "🔍 موتورهای جستجوی خودکار ←"
 auto_search_engines_locked = "🔍 موتورهای جستجوی خودکار 🔒"
 button_engines = "🔘 دکمه‌های موتورها ←"

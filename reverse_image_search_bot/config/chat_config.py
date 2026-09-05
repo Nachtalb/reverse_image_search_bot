@@ -34,6 +34,7 @@ class ChatConfig:
         "show_best_match": True,  # show the "Best Match" button
         "show_link": True,  # show the "Go To Image" link button
         "auto_search_enabled": True,  # master autosearch toggle for this chat
+        "auto_crop": True,  # crop screenshots down to their content before searching
         "auto_search_engines": None,  # None = all; list[str] = enabled engine names for autosearch
         "button_engines": None,  # None = all; list[str] = engine names shown as buttons
         "engine_empty_counts": {},  # dict[str, int] consecutive empty result counts per engine
@@ -47,6 +48,7 @@ class ChatConfig:
     show_best_match: bool
     show_link: bool
     auto_search_enabled: bool
+    auto_crop: bool
     auto_search_engines: list | None
     button_engines: list | None
     engine_empty_counts: dict

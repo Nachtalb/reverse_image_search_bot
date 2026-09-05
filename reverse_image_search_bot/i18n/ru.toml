@@ -53,6 +53,7 @@ admins_only_configure = "Только администраторы группы 
 [settings.toggles]
 auto_search = "🔍 Автопоиск: {status}"
 show_buttons = "🔘 Показывать кнопки: {status}"
+auto_crop = "✂️ Автообрезка скриншотов: {status}"
 auto_search_engines = "🔍 Системы автопоиска →"
 auto_search_engines_locked = "🔍 Системы автопоиска 🔒"
 button_engines = "🔘 Кнопки систем →"

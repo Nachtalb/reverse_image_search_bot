@@ -53,6 +53,7 @@ admins_only_configure = "Hanya admin grup yang dapat mengatur bot."
 [settings.toggles]
 auto_search = "🔍 Pencarian otomatis: {status}"
 show_buttons = "🔘 Tampilkan tombol: {status}"
+auto_crop = "✂️ Potong tangkapan layar otomatis: {status}"
 auto_search_engines = "🔍 Mesin pencarian otomatis →"
 auto_search_engines_locked = "🔍 Mesin pencarian otomatis 🔒"
 button_engines = "🔘 Tombol mesin →"

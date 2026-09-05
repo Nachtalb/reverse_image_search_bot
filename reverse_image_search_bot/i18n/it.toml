@@ -53,6 +53,7 @@ admins_only_configure = "Solo gli amministratori del gruppo possono configurare 
 [settings.toggles]
 auto_search = "🔍 Ricerca automatica: {status}"
 show_buttons = "🔘 Mostra pulsanti: {status}"
+auto_crop = "✂️ Ritaglio automatico screenshot: {status}"
 auto_search_engines = "🔍 Motori ricerca automatica →"
 auto_search_engines_locked = "🔍 Motori ricerca automatica 🔒"
 button_engines = "🔘 Pulsanti motori →"

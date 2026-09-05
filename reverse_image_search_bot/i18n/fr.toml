@@ -53,6 +53,7 @@ admins_only_configure = "Seuls les administrateurs du groupe peuvent configurer 
 [settings.toggles]
 auto_search = "🔍 Recherche auto : {status}"
 show_buttons = "🔘 Afficher les boutons : {status}"
+auto_crop = "✂️ Recadrage auto des captures : {status}"
 auto_search_engines = "🔍 Moteurs de recherche auto →"
 auto_search_engines_locked = "🔍 Moteurs de recherche auto 🔒"
 button_engines = "🔘 Boutons de moteurs →"

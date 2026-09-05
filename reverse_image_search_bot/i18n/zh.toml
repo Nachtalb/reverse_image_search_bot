@@ -53,6 +53,7 @@ admins_only_configure = "仅群组管理员可以配置机器人。"
 [settings.toggles]
 auto_search = "🔍 自动搜索：{status}"
 show_buttons = "🔘 显示按钮：{status}"
+auto_crop = "✂️ 自动裁剪截图: {status}"
 auto_search_engines = "🔍 自动搜索引擎 →"
 auto_search_engines_locked = "🔍 自动搜索引擎 🔒"
 button_engines = "🔘 引擎按钮 →"

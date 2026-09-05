@@ -53,6 +53,7 @@ admins_only_configure = "Chỉ quản trị viên nhóm mới có thể thiết 
 [settings.toggles]
 auto_search = "🔍 Tìm kiếm tự động: {status}"
 show_buttons = "🔘 Hiển thị nút: {status}"
+auto_crop = "✂️ Tự động cắt ảnh chụp màn hình: {status}"
 auto_search_engines = "🔍 Công cụ tìm kiếm tự động →"
 auto_search_engines_locked = "🔍 Công cụ tìm kiếm tự động 🔒"
 button_engines = "🔘 Nút công cụ →"

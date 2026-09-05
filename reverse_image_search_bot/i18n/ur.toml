@@ -53,6 +53,7 @@ admins_only_configure = "صرف گروپ کے منتظمین بوٹ کو ترت�
 [settings.toggles]
 auto_search = "🔍 خودکار تلاش: {status}"
 show_buttons = "🔘 بٹن دکھائیں: {status}"
+auto_crop = "✂️ اسکرین شاٹس خودکار کراپ: {status}"
 auto_search_engines = "🔍 خودکار تلاش کے انجن ←"
 auto_search_engines_locked = "🔍 خودکار تلاش کے انجن 🔒"
 button_engines = "🔘 انجن کے بٹن ←"

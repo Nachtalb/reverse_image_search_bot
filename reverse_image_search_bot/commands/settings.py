@@ -39,6 +39,7 @@ def _settings_main_text(chat_config: ChatConfig, L: str = "en") -> str:
 def _settings_main_keyboard(chat_config: ChatConfig, L: str = "en") -> InlineKeyboardMarkup:
     auto = "✅" if chat_config.auto_search_enabled else "❌"
     buttons = "✅" if chat_config.show_buttons else "❌"
+    crop = "✅" if chat_config.auto_crop else "❌"
     as_engines_label = (
         t("settings.toggles.auto_search_engines", L)
         if chat_config.auto_search_enabled
@@ -72,6 +73,11 @@ def _settings_main_keyboard(chat_config: ChatConfig, L: str = "en") -> InlineKey
             ],
             [InlineKeyboardButton(as_engines_label, callback_data=as_engines_cb)],
             [InlineKeyboardButton(btn_engines_label, callback_data=btn_engines_cb)],
+            [
+                InlineKeyboardButton(
+                    t("settings.toggles.auto_crop", L, status=crop), callback_data="settings:toggle:auto_crop"
+                )
+            ],
             [
                 InlineKeyboardButton(
                     t("settings.toggles.language", L, language=lang_display),
@@ -232,6 +238,8 @@ async def settings_callback_handler(update: Update, context: ContextTypes.DEFAUL
                 await query.answer(t("settings.warnings.enable_autosearch_first", L), show_alert=True)
                 return
             chat_config.show_buttons = not chat_config.show_buttons
+        elif value == "auto_crop":
+            chat_config.auto_crop = not chat_config.auto_crop
         elif value == "show_best_match":
             if chat_config.show_best_match and _button_count(chat_config) <= 1:
                 await query.answer(t("settings.warnings.min_one_button", L), show_alert=True)

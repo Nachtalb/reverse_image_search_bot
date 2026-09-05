@@ -53,6 +53,7 @@ admins_only_configure = "Apenas administradores do grupo podem configurar o bot.
 [settings.toggles]
 auto_search = "🔍 Busca automática: {status}"
 show_buttons = "🔘 Mostrar botões: {status}"
+auto_crop = "✂️ Recortar capturas automaticamente: {status}"
 auto_search_engines = "🔍 Motores de busca auto →"
 auto_search_engines_locked = "🔍 Motores de busca auto 🔒"
 button_engines = "🔘 Botões de motores →"
