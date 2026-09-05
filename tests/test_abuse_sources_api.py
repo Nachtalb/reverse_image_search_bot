@@ -218,11 +218,11 @@ async def test_ingest_creates_reports_without_returning_the_image_key(abuse, mon
 
     prepared = {}
 
-    def fake_prepare(user_id, progress, indicators, source_id):
+    async def fake_prepare(bot, user_id, progress, indicators, source_id):
         prepared.update(user_id=user_id, source_id=source_id)
         return _Result()
 
-    monkeypatch.setattr(server, "prepare_report", fake_prepare)
+    monkeypatch.setattr(server, "fetch_and_prepare_report", fake_prepare)
     bot = MagicMock()
     bot.send_message = AsyncMock()
     monkeypatch.setattr("reverse_image_search_bot.settings.ADMIN_IDS", [1, 2])

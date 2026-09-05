@@ -192,9 +192,10 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     _add_column_if_missing(conn, "files", "hold_nonce", "BLOB")
     _add_column_if_missing(conn, "files", "hold_sha256", "TEXT")
 
-    # A PERMANENT source-video fetch failure for this file (over the 20 MB bot
-    # limit, or message deleted). Once set, fetch attempts are skipped — no
-    # retry storm and no repeated admin warnings on every review/submit.
+    # A PERMANENT Telegram fetch failure for this file (over the 20 MB bot
+    # limit, or message deleted), set by the video fetch or the plaintext
+    # re-fetch. Once set, fetch attempts are skipped — no retry storm and no
+    # repeated admin warnings on every review/submit.
     _add_column_if_missing(conn, "files", "video_error", "TEXT")
 
     # A report round for one user. `report_uuid` is the URL token; `page_secret_hash`
@@ -547,7 +548,11 @@ def files_for_user(user_id: int) -> list[dict]:
 
 
 def set_file_video_error(file_unique_id: str, reason: str) -> None:
-    """Record a permanent source-video fetch failure (only the first one wins)."""
+    """Record a permanent Telegram fetch failure for this file (only the first one wins).
+
+    Covers both the source-video fetch and the plaintext re-fetch: either way
+    the file_id is dead and no path should retry it.
+    """
     conn = _get_conn()
     with conn:
         conn.execute(

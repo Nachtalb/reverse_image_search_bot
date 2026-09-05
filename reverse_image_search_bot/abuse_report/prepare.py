@@ -6,12 +6,14 @@ places: the ``/report`` admin command and the ``/reports`` Mini App's "create
 report" form. This module is the single implementation both call, so the two
 entry points can never diverge.
 
-No Telegram imports here — only the DB (``config.abuse``), crypto, and the
-upload path from ``settings``.
+The sync core has no Telegram imports — only the DB (``config.abuse``), crypto,
+and the upload path from ``settings``. ``fetch_and_prepare_report`` is the
+bot-aware entry point that first restores expired plaintext from Telegram.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from collections.abc import Callable
@@ -386,6 +388,9 @@ def prepare_report(
 ) -> PrepareResult:
     """Gather → encrypt → create a ``ready`` report for ``user_id``.
 
+    Sync and Telegram-free; callers with a bot use :func:`fetch_and_prepare_report`
+    so expired plaintext is pulled back from Telegram first.
+
     Returns a :class:`PrepareResult`. On success it carries the new
     ``report_uuid``, the one-time image key ``p1`` (shown once, never stored),
     and the ``encrypted`` file count.
@@ -441,3 +446,55 @@ def prepare_report(
         return PrepareResult(error=f"{len(present)} file(s) could not be read — nothing to report")
     abuse.set_report_status(report_uuid, abuse.REPORT_READY)
     return PrepareResult(report_uuid=report_uuid, p1=p1, encrypted=encrypted)
+
+
+FETCH_GONE = "file no longer available on Telegram"
+
+
+async def refetch_missing(bot, user_id: int) -> int:
+    """Pull expired plaintext uploads back from Telegram so a round can include them.
+
+    The retention sweep removes plaintext after ``FILE_RETENTION_DAYS`` but keeps
+    the row and its ``file_id``. For an image that is a straight download; for a
+    video the plaintext always was a single frame, so a frame is extracted again
+    (the full video is fetched separately at review time, as before). Permanent
+    failures are memoised in ``video_error`` so nothing is retried on every round.
+    """
+    from reverse_image_search_bot.commands.utils import _extract_frame_streaming, file_to_image_bytes
+
+    updir = upload_dir()
+    if updir is None:
+        return 0
+    fetched = 0
+    for f in abuse.files_for_user(user_id):
+        if f.get("hold_path") or f.get("cleared_at") or f.get("video_error") or not f.get("file_id"):
+            continue
+        fp = updir / f["saved_filename"]
+        if fp.is_file():
+            continue
+        try:
+            tg_file = await bot.get_file(f["file_id"], read_timeout=15, connect_timeout=15)
+            if f.get("is_video"):
+                data = await _extract_frame_streaming(tg_file.file_path)
+            else:
+                data = await file_to_image_bytes(tg_file, fp.suffix.lstrip("."))
+        except Exception as e:
+            logger.info("refetch failed for %s: %s", f["file_unique_id"], e)
+            abuse.set_file_video_error(f["file_unique_id"], FETCH_GONE)
+            continue
+        fp.write_bytes(data)
+        fetched += 1
+    return fetched
+
+
+async def fetch_and_prepare_report(
+    bot,
+    user_id: int,
+    progress: Callable[[int, int], None] | None = None,
+    indicators: list[str] | None = None,
+    source_id: int | None = None,
+) -> PrepareResult:
+    """:func:`refetch_missing` then :func:`prepare_report` off the event loop."""
+    if settings.REPORT_BASE_URL and not abuse.active_report_for_user(user_id):
+        await refetch_missing(bot, user_id)
+    return await asyncio.to_thread(prepare_report, user_id, progress, indicators, source_id)

@@ -48,15 +48,15 @@ async def test_chat_target_expands_to_its_uploaders(abuse, monkeypatch):
     prepared = []
     monkeypatch.setattr(rc.abuse, "uploaders_for_chat", lambda cid: [10, 20] if cid == -100123 else [])
 
-    def fake_prepare(uid, progress=None, indicators=None):
+    async def fake_prepare(bot, uid, progress=None, indicators=None):
         prepared.append(uid)
         return MagicMock(ok=False, existing_uuid=None, filed_ncmec_id=None)
 
-    monkeypatch.setattr(rc, "prepare_report", fake_prepare)
+    monkeypatch.setattr(rc, "fetch_and_prepare_report", fake_prepare)
 
     update = _update()
     await rc.report_users(cast(Any, update), cast(Any, _context()), [-100123])
-    # The chat id itself is NEVER handed to prepare_report — it is not a user.
+    # The chat id itself is NEVER handed to prepare — it is not a user.
     assert prepared == [10, 20]
 
 
@@ -67,11 +67,11 @@ async def test_chat_and_user_targets_mix_and_dedupe(abuse, monkeypatch):
     prepared = []
     monkeypatch.setattr(rc.abuse, "uploaders_for_chat", lambda cid: [10, 999])
 
-    def fake_prepare(uid, progress=None, indicators=None):
+    async def fake_prepare(bot, uid, progress=None, indicators=None):
         prepared.append(uid)
         return MagicMock(ok=False, existing_uuid=None, filed_ncmec_id=None)
 
-    monkeypatch.setattr(rc, "prepare_report", fake_prepare)
+    monkeypatch.setattr(rc, "fetch_and_prepare_report", fake_prepare)
 
     update = _update()
     # 999 arrives both directly and via the chat — it must be reported once.
@@ -85,7 +85,12 @@ async def test_chat_with_no_uploaders_says_so_and_prepares_nothing(abuse, monkey
 
     prepared = []
     monkeypatch.setattr(rc.abuse, "uploaders_for_chat", lambda cid: [])
-    monkeypatch.setattr(rc, "prepare_report", lambda *a, **k: prepared.append(a) or MagicMock(ok=False))
+
+    async def fake_prepare(*a, **k):
+        prepared.append(a)
+        return MagicMock(ok=False)
+
+    monkeypatch.setattr(rc, "fetch_and_prepare_report", fake_prepare)
 
     update = _update()
     await rc.report_users(cast(Any, update), cast(Any, _context()), [-100123])
