@@ -6,8 +6,8 @@ from telegram.ext import ContextTypes
 from yarl import URL
 
 from reverse_image_search_bot import settings
+from reverse_image_search_bot.config.result_cache import cached_best_match
 from reverse_image_search_bot.utils import url_button
-from reverse_image_search_bot.utils.async_cache import async_cached
 
 from .data_providers import anilist
 from .errors import RateLimitError
@@ -69,7 +69,7 @@ class TraceEngine(GenericRISEngine):
         else:
             return result.json() if result else {}
 
-    @async_cached(GenericRISEngine._best_match_cache)
+    @cached_best_match
     async def best_match(self, url: str | URL) -> ProviderData:
         self.logger.debug("Started looking for %s", url)
 

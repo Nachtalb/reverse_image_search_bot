@@ -14,7 +14,6 @@ ResponseData = SauceNaoEngine.ResponseData
 @pytest.fixture
 def engine():
     e = SauceNaoEngine()
-    e._best_match_cache.clear()
     return e
 
 

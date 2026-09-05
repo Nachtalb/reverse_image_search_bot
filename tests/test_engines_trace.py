@@ -11,7 +11,6 @@ from reverse_image_search_bot.engines.trace import TraceEngine
 @pytest.fixture
 def engine():
     e = TraceEngine()
-    e._best_match_cache.clear()
     e._use_api_key = False
     return e
 

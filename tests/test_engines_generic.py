@@ -107,7 +107,6 @@ class TestBestMatchImplemented:
 class TestGenericBestMatch:
     async def test_base_best_match_raises(self):
         engine = GenericRISEngine()
-        engine._best_match_cache.clear()
         with pytest.raises(NotImplementedError):
             await engine.best_match("https://example.com/img.jpg")
 

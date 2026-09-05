@@ -210,7 +210,6 @@ class TestAnilistResolve:
 class TestAnimeTraceSearch:
     async def test_keyerror_returns_empty_raw(self):
         engine = AnimeTraceEngine()
-        engine._best_match_cache.clear()
 
         with patch("PicImageSearch.Network") as mock_network:
             mock_ctx = AsyncMock()

@@ -23,7 +23,6 @@ class ConcretePIS(PicImageSearchEngine):
 class TestBestMatch:
     async def test_no_results(self):
         engine = ConcretePIS()
-        engine._best_match_cache.clear()
 
         with patch.object(engine, "_search", new_callable=AsyncMock) as mock:
             mock.return_value = type("Result", (), {"raw": []})()
@@ -33,7 +32,6 @@ class TestBestMatch:
 
     async def test_no_raw_attr(self):
         engine = ConcretePIS()
-        engine._best_match_cache.clear()
 
         with patch.object(engine, "_search", new_callable=AsyncMock) as mock:
             mock.return_value = type("Result", (), {"raw": None})()
@@ -42,7 +40,6 @@ class TestBestMatch:
 
     async def test_keyerror_raises_search_error(self):
         engine = ConcretePIS()
-        engine._best_match_cache.clear()
 
         with patch.object(engine, "_search", new_callable=AsyncMock) as mock:
             mock.side_effect = KeyError("some_field")
@@ -51,7 +48,6 @@ class TestBestMatch:
 
     async def test_extraction_failure_raises_search_error(self):
         engine = ConcretePIS()
-        engine._best_match_cache.clear()
 
         with patch.object(engine, "_search", new_callable=AsyncMock) as mock_search:
             raw_item = type("RawItem", (), {"title": "Test", "url": "https://ex.com", "thumbnail": None})()
@@ -64,7 +60,6 @@ class TestBestMatch:
 
     async def test_successful_extraction(self):
         engine = ConcretePIS()
-        engine._best_match_cache.clear()
 
         with patch.object(engine, "_search", new_callable=AsyncMock) as mock_search:
             raw_item = type(
@@ -153,7 +148,6 @@ class TestBaseSearch:
 class TestParsingError:
     async def test_parsing_error_raises_search_error(self):
         engine = ConcretePIS()
-        engine._best_match_cache.clear()
 
         # Create a fake ParsingError class since we can't reliably import it
         from PicImageSearch.exceptions import ParsingError
@@ -170,7 +164,6 @@ class TestParsingError:
 
     async def test_generic_exception_raises_search_error(self):
         engine = ConcretePIS()
-        engine._best_match_cache.clear()
 
         with (
             patch.object(engine, "_search", new_callable=AsyncMock, side_effect=RuntimeError("unexpected")),
@@ -183,7 +176,6 @@ class TestParsingError:
 class TestExtractionYieldsNothing:
     async def test_extract_returns_empty(self):
         engine = ConcretePIS()
-        engine._best_match_cache.clear()
 
         raw_item = type("RawItem", (), {"title": None, "url": None, "thumbnail": None})()
 

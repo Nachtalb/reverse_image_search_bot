@@ -5,7 +5,7 @@ Each subclass sets `pic_engine_class` and optionally overrides `_extract`.
 
 from yarl import URL
 
-from reverse_image_search_bot.utils.async_cache import async_cached
+from reverse_image_search_bot.config.result_cache import cached_best_match
 from reverse_image_search_bot.utils.url import url_button
 
 from .errors import SearchError
@@ -64,7 +64,7 @@ class PicImageSearchEngine(GenericRISEngine):
 
         return result, meta
 
-    @async_cached(GenericRISEngine._best_match_cache)
+    @cached_best_match
     async def best_match(self, url: str | URL) -> ProviderData:
         self.logger.debug("Started looking for %s", url)
         meta: MetaData = {

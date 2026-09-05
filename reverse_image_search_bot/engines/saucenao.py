@@ -7,9 +7,9 @@ import validators
 from telegram import InlineKeyboardButton
 from yarl import URL
 
+from reverse_image_search_bot.config.result_cache import cached_best_match
 from reverse_image_search_bot.settings import SAUCENAO_API
 from reverse_image_search_bot.utils import tagify, url_button
-from reverse_image_search_bot.utils.async_cache import async_cached
 
 from .data_providers import anilist, booru, mangadex, pixiv
 from .errors import RateLimitError, SearchError
@@ -138,7 +138,7 @@ class SauceNaoEngine(GenericRISEngine):
 
         return result, meta  # ty: ignore[invalid-return-type]
 
-    @async_cached(GenericRISEngine._best_match_cache)
+    @cached_best_match
     async def best_match(self, url: str | URL) -> ProviderData:
         self.logger.debug("Started looking for %s", url)
         meta: MetaData = {

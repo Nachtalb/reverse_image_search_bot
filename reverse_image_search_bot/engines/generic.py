@@ -7,6 +7,7 @@ from cachetools import TTLCache
 from telegram import InlineKeyboardButton
 from yarl import URL
 
+from reverse_image_search_bot.config.result_cache import cached_best_match
 from reverse_image_search_bot.utils.async_cache import async_cached
 
 from .types import InternalResultData, MetaData, ProviderData, ResultData
@@ -29,7 +30,6 @@ class _classproperty:
 
 
 class GenericRISEngine:
-    _best_match_cache = TTLCache(maxsize=1e4, ttl=24 * 60 * 60)
     name: str = "GenericRISEngine"
     description: str = ""
     provider_url: URL = URL()
@@ -86,7 +86,7 @@ class GenericRISEngine:
     def best_match_implemented(cls):
         return "best_match" in cls.__dict__ and cls is not GenericRISEngine
 
-    @async_cached(cache=_best_match_cache)
+    @cached_best_match
     async def best_match(self, url: str | URL) -> ProviderData:
         """Get info about the best matching image found
 

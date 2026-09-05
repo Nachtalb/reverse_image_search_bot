@@ -22,3 +22,18 @@ import pytest
 def _clean_upload_dir():
     """Ensure upload dir exists for tests that touch it."""
     os.makedirs("/tmp/ris_test_uploads", exist_ok=True)
+
+
+@pytest.fixture(autouse=True)
+def _clean_result_cache():
+    """Engine best-match results are cached in the config DB, which outlives the
+    test run — so a stale row would leak between tests (and between runs).
+
+    The thread-local connection is dropped first: tests that repoint
+    CONFIG_DB_PATH close it behind the module's back, and reusing a closed
+    handle raises ProgrammingError.
+    """
+    from reverse_image_search_bot.config import db, result_cache
+
+    db._local.conn = None
+    result_cache.clear()
