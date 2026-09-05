@@ -57,3 +57,18 @@ async def test_retention_job_runs_sweep(monkeypatch):
     monkeypatch.setattr(bot.privacy, "sweep_expired_uploads", sweep)
     await bot.retention_job(MagicMock())
     sweep.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_privacy_command_replies_with_policy():
+    from unittest.mock import AsyncMock, MagicMock
+
+    from reverse_image_search_bot.commands.privacy import privacy_command
+
+    update = MagicMock()
+    update.effective_message.reply_text = AsyncMock()
+    await privacy_command(update, MagicMock())
+    text = update.effective_message.reply_text.call_args.args[0]
+    assert text.startswith("<b>🔒 Privacy</b>")
+    assert "report@nachtalb.io" in text
+    assert len(text) <= 4096

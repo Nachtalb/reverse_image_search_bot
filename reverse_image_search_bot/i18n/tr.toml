@@ -3,7 +3,7 @@ title = "🔎 Tersine Görsel Arama Botu — Yardım"
 how_to_use = "🤔 Beni nasıl kullanırsın"
 how_to_use_text = "Bana bir görsel, çıkartma, video/gif veya URL gönder; sana SauceNao, Google, Yandex ve benzerleri için doğrudan tersine görsel arama bağlantıları göndereyim.\nAnime görselleri için SauceNao'yu, diğer görseller için Google veya Yandex'i öneririm."
 commands_title = "🖥️ Komutlar"
-commands_list = "/help — Yardımı göster\n/search — Aramak için bir görsele veya videoya yanıt ver\n/settings — Sohbete özel davranışı ayarla\n/feedback — Yöneticilere geri bildirim gönder"
+commands_list = "/help — Yardımı göster\n/search — Aramak için bir görsele veya videoya yanıt ver\n/settings — Sohbete özel davranışı ayarla\n/feedback — Yöneticilere geri bildirim gönder\n/privacy — Neyi ne kadar süre sakladığımız"
 
 [commands]
 ban_usage = "Kullanım: /ban <user_id>"
@@ -74,7 +74,7 @@ min_one_button = "⚠️ En az bir düğme etkin kalmalı."
 min_one_engine = "⚠️ En az bir motor etkin kalmalı."
 
 [start]
-private = "🔎 Bana bir görsel, çıkartma veya video gönder, kaynağını bulayım."
+private = "🔎 Bana bir görsel, çıkartma veya video gönder, kaynağını bulayım.\n\n🔒 Veri ve gizlilik: /privacy"
 group = "🔎 Bana bir görsel, çıkartma veya video gönder, kaynağını bulayım.\n\n/search · /settings"
 opening_settings = "⚙️ Ayarlar açılıyor..."
 
@@ -108,6 +108,7 @@ settings = "Bu sohbet için bot davranışını ayarla"
 help = "Yardımı göster"
 start = "Botu başlat"
 feedback = "Yöneticilere geri bildirim gönder"
+privacy = "Neyi ne kadar süre sakladığımız"
 
 [fields]
 title = "Başlık"

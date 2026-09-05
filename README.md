@@ -97,4 +97,8 @@ To report a security issue or abuse, see our
 
 All blocks are reviewed manually and are not appealable. Please don't open issues about them.
 
-Users of this bot are subject to Telegram's [Standard Bot Privacy Policy](https://telegram.org/privacy-tpa), [Terms of Service for Bots](https://telegram.org/tos/bots) and [Terms of Service](https://telegram.org/tos).
+## Privacy
+
+What the bot stores, who else sees it, how long it is kept and how to export or delete it: [privacy policy](reverse_image_search_bot/texts/privacy.html) (also available in the bot via `/privacy`).
+
+Users of this bot are also subject to Telegram's [Standard Bot Privacy Policy](https://telegram.org/privacy-tpa), [Terms of Service for Bots](https://telegram.org/tos/bots) and [Terms of Service](https://telegram.org/tos).

@@ -51,6 +51,7 @@ from .commands.feedback import (
     feedback_received,
     feedback_reply_handler,
 )
+from .commands.privacy import privacy_command
 from .commands.report import report_command, reports_command
 from .config import abuse
 from .i18n import available_languages, t
@@ -237,6 +238,7 @@ _PUBLIC_COMMANDS = [
     BotCommand("search", t("bot_commands.search")),
     BotCommand("settings", t("bot_commands.settings")),
     BotCommand("feedback", t("bot_commands.feedback")),
+    BotCommand("privacy", t("bot_commands.privacy")),
     BotCommand("help", t("bot_commands.help")),
     BotCommand("start", t("bot_commands.start")),
 ]
@@ -404,6 +406,7 @@ def main():
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, on_added_to_group))
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("privacy", privacy_command))
     id_filter = filters.Regex(r"^/id(?:@\S+)?$") & (filters.UpdateType.MESSAGES | filters.UpdateType.CHANNEL_POST)
     app.add_handler(MessageHandler(id_filter, id_command))
     app.add_handler(CommandHandler("ban", ban_command, filters=ADMIN_FILTER), group=1)

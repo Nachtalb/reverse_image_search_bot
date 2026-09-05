@@ -3,7 +3,7 @@ title = "🔎 بحث عكسي عن الصور — مساعدة"
 how_to_use = "🤔 كيفية الاستخدام"
 how_to_use_text = "أرسل لي صورة أو ملصق أو فيديو/GIF أو رابط وسأرسل لك روابط بحث عكسي مباشرة عبر SauceNao وGoogle وYandex وغيرها.\nلصور الأنمي أنصح بـ SauceNao، للصور الأخرى Google أو Yandex."
 commands_title = "🖥️ الأوامر"
-commands_list = "/help — عرض المساعدة\n/search — رد على صورة للبحث\n/settings — إعدادات المحادثة\n/feedback — إرسال ملاحظات للمسؤولين"
+commands_list = "/help — عرض المساعدة\n/search — رد على صورة للبحث\n/settings — إعدادات المحادثة\n/feedback — إرسال ملاحظات للمسؤولين\n/privacy — ما نخزّنه ولمدة كم"
 
 [commands]
 ban_usage = "الاستخدام: /ban <user_id>"
@@ -74,7 +74,7 @@ min_one_button = "⚠️ يجب أن يبقى زر واحد على الأقل م
 min_one_engine = "⚠️ يجب أن يبقى محرك واحد على الأقل مفعّلاً."
 
 [start]
-private = "🔎 أرسل لي صورة أو ملصقاً أو فيديو وسأجد مصدره."
+private = "🔎 أرسل لي صورة أو ملصقاً أو فيديو وسأجد مصدره.\n\n🔒 البيانات والخصوصية: /privacy"
 group = "🔎 أرسل لي صورة أو ملصقاً أو فيديو وسأجد مصدره.\n\n/search · /settings"
 opening_settings = "⚙️ جارٍ فتح الإعدادات..."
 
@@ -95,6 +95,7 @@ settings = "إعدادات البوت لهذه المحادثة"
 help = "عرض المساعدة"
 start = "تشغيل البوت"
 feedback = "إرسال ملاحظات للمسؤولين"
+privacy = "ما نخزّنه ولمدة كم"
 
 [feedback]
 prompt = "💬 اكتب ملاحظاتك أدناه. أرسل /cancel للإلغاء."

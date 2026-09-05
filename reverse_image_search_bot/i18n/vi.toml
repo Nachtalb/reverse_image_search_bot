@@ -3,7 +3,7 @@ title = "🔎 Bot Tìm Kiếm Ảnh Ngược — Trợ giúp"
 how_to_use = "🤔 Cách sử dụng tôi"
 how_to_use_text = "Hãy gửi cho tôi một hình ảnh, nhãn dán, video/gif hoặc URL và tôi sẽ gửi cho bạn các liên kết tìm kiếm ảnh ngược trực tiếp cho SauceNao, Google, Yandex và những trang tương tự.\nVới ảnh anime tôi khuyên dùng SauceNao, với các ảnh khác tôi khuyên dùng Google hoặc Yandex."
 commands_title = "🖥️ Lệnh"
-commands_list = "/help — Hiển thị trợ giúp\n/search — Trả lời một hình ảnh hoặc video để tìm kiếm\n/settings — Thiết lập hành vi cho từng cuộc trò chuyện\n/feedback — Gửi phản hồi tới quản trị viên"
+commands_list = "/help — Hiển thị trợ giúp\n/search — Trả lời một hình ảnh hoặc video để tìm kiếm\n/settings — Thiết lập hành vi cho từng cuộc trò chuyện\n/feedback — Gửi phản hồi tới quản trị viên\n/privacy — Chúng tôi lưu gì và trong bao lâu"
 
 [commands]
 ban_usage = "Cách dùng: /ban <user_id>"
@@ -74,7 +74,7 @@ min_one_button = "⚠️ Phải giữ ít nhất một nút được bật."
 min_one_engine = "⚠️ Phải giữ ít nhất một công cụ được bật."
 
 [start]
-private = "🔎 Hãy gửi cho tôi một hình ảnh, nhãn dán hoặc video và tôi sẽ tìm ra nguồn của nó."
+private = "🔎 Hãy gửi cho tôi một hình ảnh, nhãn dán hoặc video và tôi sẽ tìm ra nguồn của nó.\n\n🔒 Dữ liệu & quyền riêng tư: /privacy"
 group = "🔎 Hãy gửi cho tôi một hình ảnh, nhãn dán hoặc video và tôi sẽ tìm ra nguồn của nó.\n\n/search · /settings"
 opening_settings = "⚙️ Đang mở cài đặt..."
 
@@ -108,6 +108,7 @@ settings = "Thiết lập hành vi của bot cho cuộc trò chuyện này"
 help = "Hiển thị trợ giúp"
 start = "Khởi động bot"
 feedback = "Gửi phản hồi tới quản trị viên"
+privacy = "Chúng tôi lưu gì và trong bao lâu"
 
 [fields]
 title = "Tiêu đề"
