@@ -51,7 +51,7 @@ from .commands.feedback import (
     feedback_received,
     feedback_reply_handler,
 )
-from .commands.privacy import privacy_command
+from .commands.privacy import delete_command, privacy_callback, privacy_command, takeout_command
 from .commands.report import report_command, reports_command
 from .config import abuse
 from .i18n import available_languages, t
@@ -239,6 +239,8 @@ _PUBLIC_COMMANDS = [
     BotCommand("settings", t("bot_commands.settings")),
     BotCommand("feedback", t("bot_commands.feedback")),
     BotCommand("privacy", t("bot_commands.privacy")),
+    BotCommand("takeout", t("bot_commands.takeout")),
+    BotCommand("delete", t("bot_commands.delete")),
     BotCommand("help", t("bot_commands.help")),
     BotCommand("start", t("bot_commands.start")),
 ]
@@ -407,6 +409,8 @@ def main():
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("privacy", privacy_command))
+    app.add_handler(CommandHandler("takeout", takeout_command))
+    app.add_handler(CommandHandler("delete", delete_command))
     id_filter = filters.Regex(r"^/id(?:@\S+)?$") & (filters.UpdateType.MESSAGES | filters.UpdateType.CHANNEL_POST)
     app.add_handler(MessageHandler(id_filter, id_command))
     app.add_handler(CommandHandler("ban", ban_command, filters=ADMIN_FILTER), group=1)
@@ -441,6 +445,7 @@ def main():
 
     app.add_handler(CallbackQueryHandler(settings_callback_handler, pattern=r"^settings:"))
     app.add_handler(CallbackQueryHandler(onboard_callback_handler, pattern=r"^onboard:"))
+    app.add_handler(CallbackQueryHandler(privacy_callback, pattern=r"^(takeout|delete):"))
     app.add_handler(CallbackQueryHandler(callback_query_handler))
 
     app.add_handler(

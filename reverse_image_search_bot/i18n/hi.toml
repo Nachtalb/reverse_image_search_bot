@@ -3,7 +3,7 @@ title = "🔎 रिवर्स इमेज सर्च बॉट — मद�
 how_to_use = "🤔 मुझे कैसे इस्तेमाल करें"
 how_to_use_text = "मुझे कोई इमेज, स्टिकर, वीडियो/GIF या URL भेजें और मैं आपको SauceNao, Google, Yandex और इन जैसे इंजनों के सीधे रिवर्स इमेज सर्च लिंक भेज दूँगा।\nएनीमे इमेज के लिए मैं SauceNao की सलाह देता हूँ, बाकी इमेज के लिए Google या Yandex बेहतर हैं।"
 commands_title = "🖥️ कमांड"
-commands_list = "/help — मदद दिखाएँ\n/search — खोजने के लिए किसी इमेज या वीडियो पर रिप्लाई करें\n/settings — इस चैट के लिए व्यवहार सेट करें\n/feedback — एडमिन को फ़ीडबैक भेजें\n/privacy — हम क्या और कितने समय तक रखते हैं"
+commands_list = "/help — मदद दिखाएँ\n/search — खोजने के लिए किसी इमेज या वीडियो पर रिप्लाई करें\n/settings — इस चैट के लिए व्यवहार सेट करें\n/feedback — एडमिन को फ़ीडबैक भेजें\n/privacy — हम क्या और कितने समय तक रखते हैं\n/takeout — अपना डेटा निर्यात करें\n/delete — अपना डेटा हटाएं"
 
 [commands]
 ban_usage = "इस्तेमाल: /ban <user_id>"
@@ -109,6 +109,24 @@ help = "मदद दिखाएँ"
 start = "बॉट शुरू करें"
 feedback = "एडमिन को फ़ीडबैक भेजें"
 privacy = "हम क्या और कितने समय तक रखते हैं"
+takeout = "अपना डेटा निर्यात करें"
+delete = "अपना डेटा हटाएं"
+
+[privacy]
+admins_only = "Only group admins can run this here."
+not_yours = "This confirmation belongs to someone else."
+takeout_confirm = "📦 I'll pack everything we hold about you — profile, settings and uploads still on our server — into a zip.\n\nContinue?"
+takeout_confirm_chat = "📦 I'll pack everything we hold about this chat — its profile, settings and uploads made here that are still on our server — into a zip.\n\nContinue?"
+takeout_btn = "📦 Create export"
+takeout_wait = "⏳ Packing…"
+takeout_done = "📦 Your data export (JSON + files).\n\nIt contains the profile, settings and upload records we hold, plus the uploads still stored on our server.\n\nSome information may be omitted where disclosure is restricted by law or concerns the rights of others; where this applies we cannot specify further.\n\nIf you think it's incomplete, use /feedback."
+takeout_cooldown = "An export was requested {hours} h ago. Please try again later."
+delete_confirm = "🗑 This deletes your profile, settings and uploads from our server. It cannot be undone.\n\nData we are required to keep for legal purposes is not affected.\n\nContinue?"
+delete_confirm_chat = "🗑 This deletes this chat's profile, settings and the uploads made here from our server. It cannot be undone.\n\nData we are required to keep for legal purposes is not affected.\n\nContinue?"
+delete_btn = "🗑 Delete"
+delete_done = "✅ Done.\n\nData we are not required or entitled to retain has been deleted.\n\nAs described in /privacy, some data may be retained where necessary to comply with a legal obligation or to establish, exercise or defend legal claims. Such data is stored separately and access-restricted.\n\nQuestions? /feedback"
+cancel_btn = "✖ Cancel"
+cancelled = "Cancelled."
 
 [fields]
 title = "शीर्षक"

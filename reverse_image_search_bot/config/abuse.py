@@ -547,6 +547,57 @@ def files_for_user(user_id: int) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def files_for_chat(chat_id: int) -> list[dict]:
+    """Every file uploaded through a given group/channel, oldest first."""
+    conn = _get_conn()
+    rows = conn.execute(
+        "SELECT * FROM files WHERE group_id = ? OR channel_id = ? ORDER BY upload_time", (chat_id, chat_id)
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def is_reported(user_id: int) -> bool:
+    """True if ANY report round exists for this user, whatever its status."""
+    conn = _get_conn()
+    return conn.execute("SELECT 1 FROM reports WHERE user_id = ? LIMIT 1", (user_id,)).fetchone() is not None
+
+
+def report_linked_file_ids(subject_id: int) -> set[str]:
+    """File ids of a user's (or, negative id, a chat's) uploads that belong to a report.
+
+    A file is linked when a report blob references it or when it sits in the hold
+    (a never-published upload of a watched/banned user).
+    """
+    conn = _get_conn()
+    where = "f.group_id = ? OR f.channel_id = ?" if subject_id < 0 else "f.user_id = ?"
+    params = (subject_id, subject_id) if subject_id < 0 else (subject_id,)
+    rows = conn.execute(
+        f"""
+        SELECT f.file_unique_id FROM files f
+        WHERE ({where}) AND (
+            f.hold_path IS NOT NULL
+            OR EXISTS (SELECT 1 FROM report_blobs b WHERE b.file_unique_id = f.file_unique_id)
+        )
+        """,
+        params,
+    ).fetchall()
+    return {r["file_unique_id"] for r in rows}
+
+
+def delete_user_rows(user_id: int) -> None:
+    """Drop a user's file records and profile. Caller guarantees the user is unreported."""
+    conn = _get_conn()
+    with conn:
+        conn.execute("DELETE FROM files WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+
+
+def delete_chat_row(chat_id: int) -> None:
+    conn = _get_conn()
+    with conn:
+        conn.execute("DELETE FROM chats WHERE chat_id = ?", (chat_id,))
+
+
 def set_file_video_error(file_unique_id: str, reason: str) -> None:
     """Record a permanent Telegram fetch failure for this file (only the first one wins).
 

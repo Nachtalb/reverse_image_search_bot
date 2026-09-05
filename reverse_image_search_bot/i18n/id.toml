@@ -3,7 +3,7 @@ title = "🔎 Bot Pencarian Gambar Terbalik — Bantuan"
 how_to_use = "🤔 Cara menggunakan saya"
 how_to_use_text = "Kirimkan saya gambar, stiker, video/gif atau URL dan saya akan mengirimkan tautan pencarian gambar terbalik langsung untuk SauceNao, Google, Yandex dan sejenisnya.\nUntuk gambar anime saya sarankan SauceNao, untuk gambar lainnya saya sarankan Google atau Yandex."
 commands_title = "🖥️ Perintah"
-commands_list = "/help — Tampilkan bantuan\n/search — Balas sebuah gambar atau video untuk mencari\n/settings — Atur perilaku bot di obrolan ini\n/feedback — Kirim masukan ke admin\n/privacy — Apa yang kami simpan dan berapa lama"
+commands_list = "/help — Tampilkan bantuan\n/search — Balas sebuah gambar atau video untuk mencari\n/settings — Atur perilaku bot di obrolan ini\n/feedback — Kirim masukan ke admin\n/privacy — Apa yang kami simpan dan berapa lama\n/takeout — Ekspor data Anda\n/delete — Hapus data Anda"
 
 [commands]
 ban_usage = "Cara pakai: /ban <user_id>"
@@ -109,6 +109,24 @@ help = "Tampilkan bantuan"
 start = "Mulai bot"
 feedback = "Kirim masukan ke admin"
 privacy = "Apa yang kami simpan dan berapa lama"
+takeout = "Ekspor data Anda"
+delete = "Hapus data Anda"
+
+[privacy]
+admins_only = "Only group admins can run this here."
+not_yours = "This confirmation belongs to someone else."
+takeout_confirm = "📦 I'll pack everything we hold about you — profile, settings and uploads still on our server — into a zip.\n\nContinue?"
+takeout_confirm_chat = "📦 I'll pack everything we hold about this chat — its profile, settings and uploads made here that are still on our server — into a zip.\n\nContinue?"
+takeout_btn = "📦 Create export"
+takeout_wait = "⏳ Packing…"
+takeout_done = "📦 Your data export (JSON + files).\n\nIt contains the profile, settings and upload records we hold, plus the uploads still stored on our server.\n\nSome information may be omitted where disclosure is restricted by law or concerns the rights of others; where this applies we cannot specify further.\n\nIf you think it's incomplete, use /feedback."
+takeout_cooldown = "An export was requested {hours} h ago. Please try again later."
+delete_confirm = "🗑 This deletes your profile, settings and uploads from our server. It cannot be undone.\n\nData we are required to keep for legal purposes is not affected.\n\nContinue?"
+delete_confirm_chat = "🗑 This deletes this chat's profile, settings and the uploads made here from our server. It cannot be undone.\n\nData we are required to keep for legal purposes is not affected.\n\nContinue?"
+delete_btn = "🗑 Delete"
+delete_done = "✅ Done.\n\nData we are not required or entitled to retain has been deleted.\n\nAs described in /privacy, some data may be retained where necessary to comply with a legal obligation or to establish, exercise or defend legal claims. Such data is stored separately and access-restricted.\n\nQuestions? /feedback"
+cancel_btn = "✖ Cancel"
+cancelled = "Cancelled."
 
 [fields]
 title = "Judul"

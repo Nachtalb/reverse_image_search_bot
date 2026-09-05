@@ -3,7 +3,7 @@ title = "🔎 Ricerca inversa immagini — Aiuto"
 how_to_use = "🤔 Come usarmi"
 how_to_use_text = "Inviami un'immagine, uno sticker, un video/GIF o un URL e ti invierò link diretti per la ricerca inversa tramite SauceNao, Google, Yandex e altri.\nPer immagini anime consiglio SauceNao, per altre immagini Google o Yandex."
 commands_title = "🖥️ Comandi"
-commands_list = "/help — Mostra aiuto\n/search — Rispondi a un'immagine per cercare\n/settings — Impostazioni chat\n/feedback — Invia un feedback agli amministratori\n/privacy — Cosa conserviamo e per quanto tempo"
+commands_list = "/help — Mostra aiuto\n/search — Rispondi a un'immagine per cercare\n/settings — Impostazioni chat\n/feedback — Invia un feedback agli amministratori\n/privacy — Cosa conserviamo e per quanto tempo\n/takeout — Esporta i tuoi dati\n/delete — Elimina i tuoi dati"
 
 [commands]
 ban_usage = "Utilizzo: /ban <user_id>"
@@ -96,6 +96,8 @@ help = "Mostra aiuto"
 start = "Avvia il bot"
 feedback = "Invia un feedback agli amministratori"
 privacy = "Cosa conserviamo e per quanto tempo"
+takeout = "Esporta i tuoi dati"
+delete = "Elimina i tuoi dati"
 
 [feedback]
 prompt = "💬 Scrivi il tuo feedback qui sotto. Invia /cancel per annullare."
@@ -109,6 +111,22 @@ reply_failed = "❌ Impossibile inviare la risposta. L'utente potrebbe aver bloc
 user_followup = "📬 <b>Seguito</b>\nDa: {user} (<code>{user_id}</code>)\n\n{feedback}\n\n💡 <i>Rispondi a questo messaggio per rispondere all'utente.</i>"
 followup_sent = "✅ La tua risposta è stata inviata agli amministratori."
 followup_failed = "❌ Impossibile inviare la tua risposta."
+
+[privacy]
+admins_only = "Only group admins can run this here."
+not_yours = "This confirmation belongs to someone else."
+takeout_confirm = "📦 I'll pack everything we hold about you — profile, settings and uploads still on our server — into a zip.\n\nContinue?"
+takeout_confirm_chat = "📦 I'll pack everything we hold about this chat — its profile, settings and uploads made here that are still on our server — into a zip.\n\nContinue?"
+takeout_btn = "📦 Create export"
+takeout_wait = "⏳ Packing…"
+takeout_done = "📦 Your data export (JSON + files).\n\nIt contains the profile, settings and upload records we hold, plus the uploads still stored on our server.\n\nSome information may be omitted where disclosure is restricted by law or concerns the rights of others; where this applies we cannot specify further.\n\nIf you think it's incomplete, use /feedback."
+takeout_cooldown = "An export was requested {hours} h ago. Please try again later."
+delete_confirm = "🗑 This deletes your profile, settings and uploads from our server. It cannot be undone.\n\nData we are required to keep for legal purposes is not affected.\n\nContinue?"
+delete_confirm_chat = "🗑 This deletes this chat's profile, settings and the uploads made here from our server. It cannot be undone.\n\nData we are required to keep for legal purposes is not affected.\n\nContinue?"
+delete_btn = "🗑 Delete"
+delete_done = "✅ Done.\n\nData we are not required or entitled to retain has been deleted.\n\nAs described in /privacy, some data may be retained where necessary to comply with a legal obligation or to establish, exercise or defend legal claims. Such data is stored separately and access-restricted.\n\nQuestions? /feedback"
+cancel_btn = "✖ Cancel"
+cancelled = "Cancelled."
 
 [fields]
 title = "Titolo"
