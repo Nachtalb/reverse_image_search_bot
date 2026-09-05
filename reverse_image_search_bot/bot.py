@@ -53,7 +53,7 @@ from .commands.feedback import (
 )
 from .commands.privacy import delete_command, privacy_callback, privacy_command, takeout_command
 from .commands.report import report_command, reports_command
-from .config import abuse
+from .config import abuse, result_cache
 from .i18n import available_languages, t
 from .metrics import start_metrics_server
 
@@ -298,6 +298,8 @@ async def retention_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.info("retention sweep: removed %d expired upload(s)", removed)
     freed = await asyncio.to_thread(abuse.compact)
     logger.info("abuse db compacted: %d free page(s) reclaimed", freed)
+    stale = await asyncio.to_thread(result_cache.sweep)
+    logger.info("result cache: removed %d expired entr(ies)", stale)
 
 
 async def post_init(app: Application) -> None:
