@@ -18,7 +18,9 @@ def _update(chat_type="private", chat_id=1, user_id=1, data=None):
     u.effective_message.reply_text = AsyncMock()
     u.callback_query = None
     if data:
-        u.callback_query = MagicMock(data=data, answer=AsyncMock(), edit_message_text=AsyncMock())
+        u.callback_query = MagicMock(
+            data=data, answer=AsyncMock(), edit_message_text=AsyncMock(), delete_message=AsyncMock()
+        )
     return u
 
 
@@ -131,3 +133,4 @@ async def test_takeout_confirmed_sends_parts_and_cleans_up(monkeypatch, tmp_path
     assert calls[0].kwargs["caption"] and calls[1].kwargs["caption"] is None
     assert not pc.Path(made[0]).exists()
     assert "takeout_at" in ctx.user_data
+    u.callback_query.delete_message.assert_awaited_once()
