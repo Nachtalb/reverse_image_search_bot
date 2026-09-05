@@ -189,3 +189,18 @@ def test_set_file_video_error_first_wins(abuse):
     abuse.set_file_video_error("A", "too big")
     abuse.set_file_video_error("A", "something else")
     assert abuse.file_by_unique_id("A")["video_error"] == "too big"
+
+
+def test_compact_reclaims_free_pages_and_writes_stats(abuse):
+    conn = abuse._get_conn()
+    abuse.record_user(1)
+    for i in range(500):
+        abuse.record_file(f"F{i}", saved_filename=f"F{i}.jpg", user_id=1, file_type="photo")
+    with conn:
+        conn.execute("DELETE FROM files")
+    assert conn.execute("PRAGMA freelist_count").fetchone()[0] > 0
+
+    assert abuse.compact() > 0
+
+    assert conn.execute("PRAGMA freelist_count").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM sqlite_stat1").fetchone()[0] > 0

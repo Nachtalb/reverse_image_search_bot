@@ -296,6 +296,8 @@ async def _set_bot_commands(app: Application) -> None:
 async def retention_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     removed = await asyncio.to_thread(privacy.sweep_expired_uploads)
     logger.info("retention sweep: removed %d expired upload(s)", removed)
+    freed = await asyncio.to_thread(abuse.compact)
+    logger.info("abuse db compacted: %d free page(s) reclaimed", freed)
 
 
 async def post_init(app: Application) -> None:
