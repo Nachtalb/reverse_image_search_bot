@@ -91,6 +91,7 @@ done_full = "✅ <b>フルモード</b>（結果 + ボタン）に設定しま�
 done_manual = "✅ <b>手動モード</b>に設定しました。/search で検索。/settings で変更できます。"
 
 [bot_commands]
+history = "検索履歴を見る"
 search = "画像のソースを検索（画像に返信）"
 settings = "このチャットのボット設定"
 help = "ヘルプを表示"
@@ -159,6 +160,8 @@ creator = "作成者"
 "created_at" = "作成日"
 
 [app]
+open_prompt = "これまでの検索を一か所に。"
+unavailable = "検索履歴は現在利用できません。"
 title = "検索履歴"
 empty = "まだ検索はありません"
 empty_hint = "ボットに画像を送ると、ここに表示されます。"

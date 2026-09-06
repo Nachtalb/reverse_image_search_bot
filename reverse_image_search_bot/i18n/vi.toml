@@ -104,6 +104,7 @@ followup_sent = "✅ Câu trả lời của bạn đã được gửi tới các
 followup_failed = "❌ Không gửi được câu trả lời của bạn."
 
 [bot_commands]
+history = "Xem lịch sử tìm kiếm"
 search = "Tìm nguồn của ảnh (trả lời vào ảnh)"
 settings = "Thiết lập hành vi của bot cho cuộc trò chuyện này"
 help = "Hiển thị trợ giúp"
@@ -159,6 +160,8 @@ creator = "Người tạo"
 "created_at" = "Tạo lúc"
 
 [app]
+open_prompt = "Các tìm kiếm trước đây của bạn, ở một nơi."
+unavailable = "Lịch sử tìm kiếm hiện không khả dụng."
 title = "Lịch sử tìm kiếm"
 empty = "Chưa có tìm kiếm nào"
 empty_hint = "Gửi cho bot một ảnh và nó sẽ xuất hiện ở đây."

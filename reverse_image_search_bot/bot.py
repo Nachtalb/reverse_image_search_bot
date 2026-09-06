@@ -12,7 +12,9 @@ from telegram import (
     BotCommand,
     BotCommandScopeChat,
     BotCommandScopeDefault,
+    MenuButtonWebApp,
     Update,
+    WebAppInfo,
 )
 from telegram.constants import ParseMode
 from telegram.error import BadRequest, Forbidden, RetryAfter, TimedOut
@@ -36,6 +38,7 @@ from .commands import (
     file_handler,
     group_file_handler,
     help_command,
+    history_command,
     id_command,
     on_added_to_group,
     onboard_callback_handler,
@@ -43,6 +46,7 @@ from .commands import (
     settings_callback_handler,
     settings_command,
     start_command,
+    webapp_url,
 )
 from .commands.feedback import (
     WAITING_FOR_FEEDBACK,
@@ -236,6 +240,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
 
 _PUBLIC_COMMANDS = [
     BotCommand("search", t("bot_commands.search")),
+    BotCommand("history", t("bot_commands.history")),
     BotCommand("settings", t("bot_commands.settings")),
     BotCommand("feedback", t("bot_commands.feedback")),
     BotCommand("privacy", t("bot_commands.privacy")),
@@ -340,12 +345,32 @@ async def post_init(app: Application) -> None:
 
     await _set_bot_commands(app)
     await _start_report_server(app)
+    await _set_webapp_menu_button(app)
 
     for admin_id in settings.ADMIN_IDS:
         try:
             await app.bot.send_message(admin_id, t("commands.bot_started"))
         except Exception:
             logger.warning("Failed to notify admin %d of startup", admin_id)
+
+
+async def _set_webapp_menu_button(app: Application) -> None:
+    """Point the DEFAULT menu button at the search-history Mini App.
+
+    Only the default scope is touched. ``/report`` sets a per-chat button for an
+    admin working a specific report, and a per-chat button wins over this one —
+    so the admin flow keeps working untouched.
+    """
+    url = webapp_url()
+    if url is None:
+        return
+    try:
+        await app.bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(text=t("app.title"), web_app=WebAppInfo(url=url))
+        )
+        logger.info("Mini App menu button set to %s", url)
+    except Exception:
+        logger.info("Could not set the Mini App menu button", exc_info=True)
 
 
 # Module-level handle for the aiohttp report-server runner (see note below).
@@ -410,6 +435,7 @@ def main():
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, on_added_to_group))
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("history", history_command))
     app.add_handler(CommandHandler("privacy", privacy_command))
     app.add_handler(CommandHandler("takeout", takeout_command))
     app.add_handler(CommandHandler("delete", delete_command))

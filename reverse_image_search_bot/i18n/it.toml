@@ -91,6 +91,7 @@ done_full = "✅ Impostato: <b>modo completo</b> (risultati + pulsanti). Modific
 done_manual = "✅ Impostato: <b>modo manuale</b>. Usa /search per cercare. Modifica in /settings."
 
 [bot_commands]
+history = "Sfoglia la cronologia ricerche"
 search = "Cerca l'origine dell'immagine (rispondi a un'immagine)"
 settings = "Configura il bot per questa chat"
 help = "Mostra aiuto"
@@ -159,6 +160,8 @@ creator = "Creatore"
 "created_at" = "Creato il"
 
 [app]
+open_prompt = "Le tue ricerche precedenti, in un unico posto."
+unavailable = "La cronologia delle ricerche non è disponibile ora."
 title = "Cronologia ricerche"
 empty = "Ancora nessuna ricerca"
 empty_hint = "Invia un'immagine al bot e comparirà qui."

@@ -104,6 +104,7 @@ followup_sent = "✅ Your reply has been sent to the admins."
 followup_failed = "❌ Failed to send your reply."
 
 [bot_commands]
+history = "Browse your search history"
 search = "Search for image source (reply to image)"
 settings = "Configure bot behaviour for this chat"
 help = "Show help"
@@ -159,6 +160,8 @@ creator = "Creator"
 "created_at" = "Created At"
 
 [app]
+open_prompt = "Your past searches, in one place."
+unavailable = "Search history is not available right now."
 title = "Search history"
 empty = "No searches yet"
 empty_hint = "Send the bot an image and it will show up here."

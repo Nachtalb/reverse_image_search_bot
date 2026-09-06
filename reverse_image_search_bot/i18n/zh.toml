@@ -91,6 +91,7 @@ done_full = "✅ 已设为<b>完整模式</b>（结果 + 按钮）。随时通�
 done_manual = "✅ 已设为<b>手动模式</b>。使用 /search 搜索。随时通过 /settings 更改。"
 
 [bot_commands]
+history = "浏览你的搜索历史"
 search = "搜索图片来源（回复图片）"
 settings = "配置此聊天的机器人设置"
 help = "显示帮助"
@@ -159,6 +160,8 @@ creator = "创作者"
 "created_at" = "创建于"
 
 [app]
+open_prompt = "你过去的搜索，都在这里。"
+unavailable = "搜索历史目前不可用。"
 title = "搜索历史"
 empty = "还没有搜索记录"
 empty_hint = "给机器人发送一张图片，它就会出现在这里。"

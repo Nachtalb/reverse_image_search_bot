@@ -8,6 +8,7 @@ from .handlers import (
     send_wait_for,
     start_command,
 )
+from .history import history_command, webapp_url
 from .onboarding import _is_group, on_added_to_group, onboard_callback_handler
 from .search import _track_engine_result, build_reply, file_handler
 from .settings import (
@@ -36,6 +37,7 @@ __all__ = [
     "file_handler",
     "group_file_handler",
     "help_command",
+    "history_command",
     "id_command",
     "on_added_to_group",
     "onboard_callback_handler",
@@ -44,4 +46,5 @@ __all__ = [
     "settings_callback_handler",
     "settings_command",
     "start_command",
+    "webapp_url",
 ]

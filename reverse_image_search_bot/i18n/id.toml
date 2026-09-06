@@ -104,6 +104,7 @@ followup_sent = "✅ Balasanmu telah dikirim ke admin."
 followup_failed = "❌ Gagal mengirim balasanmu."
 
 [bot_commands]
+history = "Lihat riwayat pencarian"
 search = "Cari sumber gambar (balas ke gambar)"
 settings = "Atur perilaku bot untuk obrolan ini"
 help = "Tampilkan bantuan"
@@ -159,6 +160,8 @@ creator = "Pembuat"
 "created_at" = "Dibuat Pada"
 
 [app]
+open_prompt = "Semua pencarian lamamu di satu tempat."
+unavailable = "Riwayat pencarian sedang tidak tersedia."
 title = "Riwayat pencarian"
 empty = "Belum ada pencarian"
 empty_hint = "Kirim gambar ke bot dan akan muncul di sini."

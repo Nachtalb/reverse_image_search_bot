@@ -104,6 +104,7 @@ followup_sent = "✅ Yanıtın yöneticilere gönderildi."
 followup_failed = "❌ Yanıtın gönderilemedi."
 
 [bot_commands]
+history = "Arama geçmişini görüntüle"
 search = "Görselin kaynağını ara (görsele yanıt ver)"
 settings = "Bu sohbet için bot davranışını ayarla"
 help = "Yardımı göster"
@@ -159,6 +160,8 @@ creator = "Oluşturan"
 "created_at" = "Oluşturulma Tarihi"
 
 [app]
+open_prompt = "Geçmiş aramaların tek bir yerde."
+unavailable = "Arama geçmişi şu anda kullanılamıyor."
 title = "Arama geçmişi"
 empty = "Henüz arama yok"
 empty_hint = "Bota bir görsel gönder, burada görünecek."

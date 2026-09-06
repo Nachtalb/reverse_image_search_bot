@@ -91,6 +91,7 @@ done_full = "✅ Configurado para <b>modo completo</b> (resultados + botões). A
 done_manual = "✅ Configurado para <b>modo manual</b>. Use /search para buscar. Altere a qualquer momento com /settings."
 
 [bot_commands]
+history = "Ver seu histórico de buscas"
 search = "Buscar fonte da imagem (responder a uma imagem)"
 settings = "Configurar o comportamento do bot para este chat"
 help = "Mostrar ajuda"
@@ -159,6 +160,8 @@ creator = "Criador"
 "created_at" = "Criado em"
 
 [app]
+open_prompt = "Suas buscas anteriores, em um só lugar."
+unavailable = "O histórico de buscas não está disponível agora."
 title = "Histórico de buscas"
 empty = "Ainda não há buscas"
 empty_hint = "Envie uma imagem ao bot e ela aparecerá aqui."
