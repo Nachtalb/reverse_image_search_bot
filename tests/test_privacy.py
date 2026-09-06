@@ -135,9 +135,10 @@ def test_export_user_lists_history(world):
 
 # The complete set of keys a takeout may ever contain. Anything not listed here
 # is a leak — a new DB column is NOT exported until someone adds it deliberately.
-ALLOWED_TOP = {"exported_at", "user", "chat", "settings", "files"}
+ALLOWED_TOP = {"exported_at", "user", "chat", "settings", "files", "searches"}
 ALLOWED_USER = {"user_id", "username", "first_name", "last_name", "language_code", "first_seen", "last_seen"}
 ALLOWED_CHAT = {"chat_id", "chat_type", "title", "username", "first_seen", "last_seen"}
+ALLOWED_SEARCH = {"searched_at", "file_unique_id", "results"}
 ALLOWED_FILE = {
     "file_unique_id",
     "original_filename",
@@ -161,6 +162,8 @@ def test_export_contains_only_allowlisted_keys(world, subject):
         assert set(data["chat"]) == ALLOWED_CHAT
     for f in data["files"]:
         assert set(f) == ALLOWED_FILE
+    for s in data["searches"]:
+        assert set(s) == ALLOWED_SEARCH
 
 
 def test_takeout_bytes_never_contain_report_material(world, updir, tmp_path):

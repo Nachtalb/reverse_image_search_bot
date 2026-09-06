@@ -3,9 +3,11 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import html as html_mod
+from collections.abc import Mapping
 from logging import getLogger
 from pathlib import Path
 from time import time
+from typing import Any
 
 from telegram import (
     Animation,
@@ -668,7 +670,7 @@ async def _best_match_search(
     return match_found
 
 
-def _history_entry(engine_name: str, result: ResultData, meta: MetaData) -> dict:
+def _history_entry(engine_name: str, result: Mapping[str, Any], meta: Mapping[str, Any]) -> dict:
     """Flatten one engine's answer into the small JSON the history app renders.
 
     Deliberately not the whole payload: history needs a label, somewhere to go and

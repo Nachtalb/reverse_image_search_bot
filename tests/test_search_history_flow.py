@@ -8,6 +8,7 @@ from telegram import InlineKeyboardButton
 from yarl import URL
 
 from reverse_image_search_bot.commands.search import _history_entry
+from reverse_image_search_bot.engines.types import MetaData
 
 
 class TestHistoryEntry:
@@ -30,7 +31,7 @@ class TestHistoryEntry:
         assert len(entry["title"]) == 200
 
     def test_takes_the_first_button_url_as_the_link(self):
-        meta = {
+        meta: MetaData = {
             "buttons": [
                 InlineKeyboardButton(text="cb", callback_data="nope"),
                 InlineKeyboardButton(text="Source", url="https://example.com/post/1"),
@@ -40,7 +41,7 @@ class TestHistoryEntry:
         assert _history_entry("SauceNAO", {}, meta)["url"] == "https://example.com/post/1"
 
     def test_no_link_when_no_button_has_one(self):
-        meta = {"buttons": [InlineKeyboardButton(text="cb", callback_data="nope")]}
+        meta: MetaData = {"buttons": [InlineKeyboardButton(text="cb", callback_data="nope")]}
         assert "url" not in _history_entry("SauceNAO", {}, meta)
 
     def test_thumbnail_url_is_stringified(self):
@@ -49,7 +50,7 @@ class TestHistoryEntry:
         assert isinstance(entry["thumbnail"], str)
 
     def test_first_thumbnail_when_several(self):
-        meta = {"thumbnail": [URL("https://a/1.jpg"), URL("https://b/2.jpg")]}
+        meta: MetaData = {"thumbnail": [URL("https://a/1.jpg"), URL("https://b/2.jpg")]}
         assert _history_entry("SauceNAO", {}, meta)["thumbnail"] == "https://a/1.jpg"
 
     def test_empty_thumbnail_list_is_omitted(self):
@@ -67,7 +68,7 @@ class TestHistoryEntry:
         import json
 
         result = {"Title": "T", "Source": URL("https://e.com"), "Tags": {"a", "b"}}
-        meta = {
+        meta: MetaData = {
             "thumbnail": URL("https://e.com/t.jpg"),
             "similarity": 90,
             "buttons": [InlineKeyboardButton(text="B", url="https://e.com/1")],

@@ -20,6 +20,7 @@ from reverse_image_search_bot.abuse_report.prepare import upload_dir
 from reverse_image_search_bot.config import abuse
 from reverse_image_search_bot.config.chat_config import forget_chat
 from reverse_image_search_bot.config.db import load_config
+from reverse_image_search_bot.webapp import thumbs
 
 logger = logging.getLogger(__name__)
 
@@ -95,11 +96,23 @@ def export_data(subject_id: int) -> dict:
     for f in files:
         f["is_video"] = bool(f["is_video"])
         f["upload_time"] = _iso(f["upload_time"])
+    # The user's own search history — theirs to take with them.
+    searches = []
+    if subject_id > 0:
+        for s in abuse.user_searches(subject_id, limit=100000):
+            searches.append(
+                {
+                    "searched_at": _iso(s.get("searched_at")),
+                    "file_unique_id": s.get("file_unique_id"),
+                    "results": s.get("results"),
+                }
+            )
     return {
         "exported_at": datetime.datetime.now(datetime.UTC).isoformat(),
         **who,
         "settings": load_config(subject_id),
         "files": files,
+        "searches": searches,
     }
 
 
@@ -143,10 +156,16 @@ def erase(subject_id: int) -> None:
     """
     updir = upload_dir()
     linked = abuse.report_linked_file_ids(subject_id)
+    subject_files = _subject_files(subject_id)
     if updir:
-        for f in _subject_files(subject_id):
+        for f in subject_files:
             if f["file_unique_id"] not in linked:
                 (updir / f["saved_filename"]).unlink(missing_ok=True)
+    # Thumbnails outlive the retention sweep by design (they sit in a
+    # subdirectory), so erasure has to remove them explicitly or a deleted user's
+    # pictures would survive as 320px copies.
+    thumbs.delete_for_files([f["file_unique_id"] for f in subject_files if f["file_unique_id"] not in linked])
+    abuse.delete_searches_for_user(subject_id)
     forget_chat(subject_id)
     if subject_id < 0:
         abuse.delete_chat_row(subject_id)
