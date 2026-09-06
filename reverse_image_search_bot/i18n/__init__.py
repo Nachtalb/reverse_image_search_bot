@@ -89,6 +89,9 @@ _FIELD_KEY_MAP: dict[str, str] = {
     "Score": "fields.score",
     "Creator": "fields.creator",
     "Created At": "fields.created_at",
+    "Best guess": "fields.best_guess",
+    "Match": "fields.match",
+    "Found on": "fields.found_on",
 }
 
 
