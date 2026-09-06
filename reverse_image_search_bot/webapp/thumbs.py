@@ -80,7 +80,7 @@ def get_or_create(file_unique_id: str, saved_filename: str | None) -> Path | Non
     except Exception:
         # A corrupt or unsupported upload is not a bug worth paging anyone over,
         # and WARNING+ goes to the admins over Telegram.
-        logger.info("thumbs: could not render %s", saved_filename, exc_info=True)
+        logger.info("thumbs: could not render %s", file_unique_id, exc_info=True)
         dest.unlink(missing_ok=True)
         return None
     return dest

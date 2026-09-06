@@ -27,6 +27,10 @@ def verify_init_data(init_data: str, bot_token: str, max_age: int = 3600) -> dic
     if not got_hash:
         return None
     check_string = "\n".join(f"{k}={pairs[k]}" for k in sorted(pairs))
+    # HMAC-SHA256 keyed on the bot token is Telegram's published algorithm for
+    # initData, not a choice we get to make: the client computes the same hash
+    # and any other function simply fails to validate. This is a signature check,
+    # not password storage, so the "use a slow KDF" advice does not apply.
     secret = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
     calc = hmac.new(secret, check_string.encode(), hashlib.sha256).hexdigest()
     if not hmac.compare_digest(calc, got_hash):
