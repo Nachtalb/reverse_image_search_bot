@@ -53,6 +53,8 @@ All configuration is done via environment variables.
 | `ANILIST_TOKEN` | — | AniList OAuth token (raises rate limit from 90 to 120 req/min) |
 | `MODE_ACTIVE` | `polling` | Bot mode: `polling` or `webhook` |
 | `CONCURRENT_UPDATES` | `16` | Number of concurrent update handlers |
+| `SEARCH_RATE_LIMIT_MAX` | `10` | Searches a single user may run per window (`0` disables user throttling; admins are always exempt) |
+| `SEARCH_RATE_LIMIT_WINDOW` | `60` | Length of the sliding rate-limit window in seconds |
 | `OLD_CONFIG_DIR` | `~/.config/reverse_image_search_bot` | Legacy config directory (used for JSON→SQLite migration only) |
 | `PIXIV_CONFIG` | `~/.config/reverse_image_search_bot/pixiv.json` | Path to the Pixiv config file |
 | `CONFIG_DB_PATH` | `~/.config/reverse_image_search_bot/config.db` | Path to the configuration database |
