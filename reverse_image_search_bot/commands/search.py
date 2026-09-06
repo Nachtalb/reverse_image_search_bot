@@ -192,6 +192,19 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
                 hold_reason=hold_reason,
             )
 
+        # Open a history entry. PRIVATE chats only: history is the user's personal
+        # record, and what they sent in a group belongs to that group's context,
+        # not to their private list. Best-effort — a history failure must never
+        # cost the user their search.
+        search_id: int | None = None
+        if chat_type == "private" and hold_reason is None:
+            with contextlib.suppress(Exception):
+                search_id = abuse.record_search(
+                    user.id,
+                    chat_id=chat_id,
+                    message_id=message.message_id,
+                    file_unique_id=getattr(attachment, "file_unique_id", None) or URL(str(image_url)).name,
+                )
         # Track usage metrics
         metrics.searches_total.labels(type=search_type, language=language).inc()
         metrics.searches_by_user_total.labels(user_id=str(user.id)).inc()
@@ -208,7 +221,7 @@ async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, messa
             chat_config = ChatConfig(update.effective_chat.id)
             if chat_config.auto_search_enabled:
                 logger.info("file_handler: starting best_match user=%s chat=%s", user.id, chat_id)
-                await best_match(update, context, image_url, general_done)
+                await best_match(update, context, image_url, general_done, search_id=search_id)
             else:
                 await general_task
         except Exception:
@@ -358,6 +371,7 @@ async def best_match(
     context: ContextTypes.DEFAULT_TYPE,
     url: str | URL,
     general_done: asyncio.Event | None = None,
+    search_id: int | None = None,
 ):
     """Find best matches for an image."""
     user = update.effective_user
@@ -383,7 +397,7 @@ async def best_match(
     results_gate = asyncio.Event()
 
     search_task = asyncio.create_task(
-        _best_match_search(update, context, searchable_engines, URL(str(url)), results_gate, L)
+        _best_match_search(update, context, searchable_engines, URL(str(url)), results_gate, L, search_id=search_id)
     )
 
     # From here on the task MUST be awaited or cancelled on every path. Anything
@@ -472,12 +486,15 @@ async def _best_match_search(
     url: URL,
     results_gate: asyncio.Event,
     L: str = "en",
+    search_id: int | None = None,
 ):
     message = update.effective_message
     assert message
     identifiers = []
     thumbnail_identifiers = []
     match_found = False
+    # What the engines found, for the user's history (see abuse.record_search).
+    history: list[dict] = []
 
     metrics.concurrent_searches.inc()
     concurrent_val = metrics.concurrent_searches._value.get()
@@ -572,6 +589,7 @@ async def _best_match_search(
                                     raise
                         if result:
                             match_found = True
+                            history.append(_history_entry(engine.name, result, meta))
                         if identifier:
                             identifiers.append(identifier)
                         if thumbnail_identifier:
@@ -640,10 +658,41 @@ async def _best_match_search(
         for task in pending:
             task.cancel()
         metrics.concurrent_searches.dec()
+        # Best-effort: a history write must never cost the user their results.
+        if search_id and history:
+            with contextlib.suppress(Exception):
+                abuse.set_search_results(search_id, history)
         logger.info("_best_match_search: done chat=%s", message.chat_id)
 
     metrics.search_results_total.labels(has_results=str(match_found).lower()).inc()
     return match_found
+
+
+def _history_entry(engine_name: str, result: ResultData, meta: MetaData) -> dict:
+    """Flatten one engine's answer into the small JSON the history app renders.
+
+    Deliberately not the whole payload: history needs a label, somewhere to go and
+    a picture, not the full provider dump. Everything is coerced to str/int so the
+    row is plain JSON — ``result`` values can be yarl.URL, set or list.
+    """
+    title = next((str(v) for v in result.values() if isinstance(v, str) and v.strip()), "")
+    thumb = meta.get("thumbnail")
+    if isinstance(thumb, list):
+        thumb = thumb[0] if thumb else None
+    link = next(
+        (btn.url for btn in meta.get("buttons", []) if getattr(btn, "url", None)),
+        None,
+    )
+    entry: dict = {"engine": engine_name}
+    if title:
+        entry["title"] = title[:200]
+    if link:
+        entry["url"] = str(link)
+    if thumb:
+        entry["thumbnail"] = str(thumb)
+    if (similarity := meta.get("similarity")) is not None:
+        entry["similarity"] = round(float(similarity), 1)
+    return entry
 
 
 def build_reply(result: ResultData, meta: MetaData, L: str = "en") -> tuple[str, list[InputMediaPhoto] | None]:
