@@ -110,6 +110,12 @@ REPORT_BASE_URL = os.getenv("REPORT_BASE_URL", "").rstrip("/")
 # any authenticated admin (initData still required).
 REPORT_PAGE_PASSWORD = os.getenv("REPORT_PAGE_PASSWORD", "")
 
+# --- Search-history Mini App --------------------------------------------------
+# The user-facing app shares the report server's aiohttp app and port, so it
+# needs REPORT_SERVER_ENABLED as well; REPORT_BASE_URL is where it is reachable.
+WEBAPP_ENABLED = os.getenv("WEBAPP_ENABLED", "false").lower() in ("true", "1", "yes")
+
+
 # NCMEC CyberTipline credentials. Report filing is disabled if unset.
 NCMEC_USERNAME = os.getenv("NCMEC_USERNAME")
 NCMEC_PASSWORD = os.getenv("NCMEC_PASSWORD")

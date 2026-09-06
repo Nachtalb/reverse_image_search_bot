@@ -41,6 +41,7 @@ from reverse_image_search_bot.abuse_report.prepare import (
 )
 from reverse_image_search_bot.config import abuse
 from reverse_image_search_bot.utils.telegram_auth import verify_init_data
+from reverse_image_search_bot.webapp import server as webapp_server
 
 logger = logging.getLogger("abuse.server")
 
@@ -1070,6 +1071,10 @@ def build_app(bot=None, bot_data=None) -> web.Application:
     app.router.add_post("/report/{uuid}/api/submit", api_submit)
     app.router.add_post("/report/{uuid}/api/cancel", api_cancel)
     app.router.add_post("/report/{uuid}/api/delete", api_delete)
+    # The user-facing search-history Mini App shares this server (and its port);
+    # it authenticates the same way but scopes everything to the caller.
+    if settings.WEBAPP_ENABLED:
+        webapp_server.add_routes(app)
     app.router.add_get("/healthz", healthz)
     return app
 

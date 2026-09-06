@@ -794,6 +794,27 @@ def get_user_search(user_id: int, search_id: int) -> dict | None:
     return dict(row) if row else None
 
 
+def user_owns_search_file(user_id: int, file_unique_id: str) -> str | None:
+    """The stored filename, but only if this file is in the caller's own history.
+
+    The thumbnail route takes a file id from the URL, so ownership has to be
+    proven here rather than assumed — otherwise anyone could read anyone's
+    pictures by guessing ids.
+    """
+    conn = _get_conn()
+    row = conn.execute(
+        """
+        SELECT f.saved_filename
+          FROM searches s
+          JOIN files f ON f.file_unique_id = s.file_unique_id
+         WHERE s.user_id = ? AND s.file_unique_id = ?
+         LIMIT 1
+        """,
+        (user_id, file_unique_id),
+    ).fetchone()
+    return row["saved_filename"] if row else None
+
+
 def delete_user_search(user_id: int, search_id: int) -> bool:
     """Forget one entry. Scoped to its owner; the `files` row is untouched."""
     conn = _get_conn()

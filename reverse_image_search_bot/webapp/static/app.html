@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Search history</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #fff);
+    --text: var(--tg-theme-text-color, #000);
+    --hint: var(--tg-theme-hint-color, #999);
+    --link: var(--tg-theme-link-color, #2481cc);
+    --card: var(--tg-theme-secondary-bg-color, #f4f4f5);
+    --danger: #e5484d;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; padding: 0 12px 32px;
+    font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+  .card {
+    display: flex; gap: 12px; align-items: flex-start;
+    background: var(--card); border-radius: 12px;
+    padding: 10px; margin-top: 10px;
+  }
+  .thumb {
+    width: 72px; height: 72px; flex: 0 0 72px;
+    border-radius: 8px; object-fit: cover; background: rgba(127,127,127,.18);
+  }
+  .thumb.missing { display: grid; place-items: center; font-size: 24px; color: var(--hint); }
+  .body { min-width: 0; flex: 1; }
+  .when { color: var(--hint); font-size: 12px; }
+  .hit { margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hit a { color: var(--link); text-decoration: none; }
+  .engine { color: var(--hint); font-size: 12px; margin-right: 4px; }
+  .none { color: var(--hint); margin-top: 4px; font-size: 13px; }
+  .del {
+    background: none; border: 0; color: var(--danger);
+    font-size: 13px; padding: 4px 0 0; cursor: pointer;
+  }
+  .centre { text-align: center; color: var(--hint); padding: 48px 16px; }
+  .centre h2 { color: var(--text); font-size: 17px; margin: 0 0 6px; }
+  #sentinel { height: 1px; }
+</style>
+</head>
+<body>
+<div id="list"></div>
+<div id="sentinel"></div>
+<div id="status" class="centre"></div>
+
+<script>
+(function () {
+  "use strict";
+  var tg = window.Telegram && window.Telegram.WebApp;
+  if (tg) { tg.ready(); tg.expand(); }
+
+  var initData = (tg && tg.initData) || "";
+  var listEl = document.getElementById("list");
+  var statusEl = document.getElementById("status");
+  var S = {};
+  var offset = 0, total = null, loading = false, done = false;
+
+  function api(path, opts) {
+    opts = opts || {};
+    opts.headers = Object.assign({ "X-Init-Data": initData }, opts.headers || {});
+    return fetch(path, opts).then(function (r) {
+      if (!r.ok) throw new Error(r.status + " " + r.statusText);
+      return r.json();
+    });
+  }
+
+  function haptic(kind) {
+    if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred(kind || "light");
+  }
+
+  // Dates are rendered relative — "3 weeks ago" is what you remember a search by,
+  // not a timestamp.
+  var UNITS = [["year", 31536000], ["month", 2592000], ["week", 604800],
+               ["day", 86400], ["hour", 3600], ["minute", 60]];
+  function when(ts) {
+    var diff = Math.round(Date.now() / 1000) - ts;
+    if (diff < 60) return "just now";
+    for (var i = 0; i < UNITS.length; i++) {
+      var n = Math.floor(diff / UNITS[i][1]);
+      if (n >= 1) {
+        try {
+          return new Intl.RelativeTimeFormat(undefined, { numeric: "auto" })
+            .format(-n, UNITS[i][0]);
+        } catch (e) {
+          return n + " " + UNITS[i][0] + (n > 1 ? "s" : "") + " ago";
+        }
+      }
+    }
+    return "just now";
+  }
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  function card(entry) {
+    var wrap = el("div", "card");
+
+    if (entry.has_image) {
+      var img = el("img", "thumb");
+      img.loading = "lazy";           // only what scrolls into view is ever rendered
+      img.decoding = "async";
+      img.alt = "";
+      img.src = "/app/api/thumb/" + encodeURIComponent(entry.file_id) +
+                "?initData=" + encodeURIComponent(initData);
+      img.onerror = function () { wrap.replaceChild(placeholder(), img); };
+      wrap.appendChild(img);
+    } else {
+      wrap.appendChild(placeholder());
+    }
+
+    var body = el("div", "body");
+    body.appendChild(el("div", "when", when(entry.at)));
+
+    if (entry.results && entry.results.length) {
+      entry.results.forEach(function (r) {
+        var line = el("div", "hit");
+        line.appendChild(el("span", "engine", r.engine));
+        if (r.url) {
+          var a = el("a", null, r.title || r.url);
+          a.href = r.url;
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          line.appendChild(a);
+        } else {
+          line.appendChild(el("span", null, r.title || ""));
+        }
+        body.appendChild(line);
+      });
+    } else {
+      body.appendChild(el("div", "none", S["app.no_results"] || "No match was found"));
+    }
+
+    var del = el("button", "del", S["app.delete"] || "Delete");
+    del.onclick = function () {
+      if (!confirm(S["app.delete_confirm"] || "Remove this from your history?")) return;
+      haptic("medium");
+      api("/app/api/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: entry.id })
+      }).then(function () {
+        wrap.remove();
+        if (total != null) total -= 1;
+        if (!listEl.children.length) empty();
+      }).catch(function () {
+        statusEl.textContent = S["app.error"] || "Something went wrong";
+      });
+    };
+    body.appendChild(del);
+
+    wrap.appendChild(body);
+    return wrap;
+  }
+
+  function placeholder() {
+    // The upload was swept by retention; the entry itself survives.
+    return el("div", "thumb missing", "\u{1F5BC}");
+  }
+
+  function empty() {
+    listEl.innerHTML = "";
+    statusEl.innerHTML = "";
+    var box = el("div");
+    box.appendChild(el("h2", null, S["app.empty"] || "No searches yet"));
+    box.appendChild(el("div", null, S["app.empty_hint"] || "Send the bot an image and it will show up here."));
+    statusEl.appendChild(box);
+  }
+
+  function page() {
+    if (loading || done) return;
+    loading = true;
+    statusEl.textContent = S["app.loading"] || "Loading…";
+    api("/app/api/history?limit=20&offset=" + offset).then(function (data) {
+      total = data.total;
+      if (!data.entries.length && offset === 0) { empty(); done = true; return; }
+      data.entries.forEach(function (e) { listEl.appendChild(card(e)); });
+      offset += data.entries.length;
+      done = offset >= total || !data.entries.length;
+      statusEl.textContent = "";
+    }).catch(function (err) {
+      statusEl.textContent = (S["app.error"] || "Something went wrong") + " (" + err.message + ")";
+      done = true;
+    }).then(function () { loading = false; });
+  }
+
+  // Infinite scroll: keeps the page size small so a fast scroll never queues
+  // hundreds of thumbnail renders on the server.
+  if (window.IntersectionObserver) {
+    new IntersectionObserver(function (entries) {
+      if (entries[0].isIntersecting) page();
+    }, { rootMargin: "400px" }).observe(document.getElementById("sentinel"));
+  } else {
+    window.addEventListener("scroll", function () {
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 400) page();
+    });
+  }
+
+  api("/app/api/strings").then(function (d) { S = d.strings || {}; }).catch(function () {})
+    .then(function () { page(); });
+})();
+</script>
+</body>
+</html>
