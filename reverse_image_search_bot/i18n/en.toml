@@ -39,6 +39,10 @@ duplicate_thumbnail = "Duplicate thumbnail omitted"
 rate_limit = "{engine}: {period} limit reached. Try the <b>More</b> button to search directly."
 rate_limit_default_period = "Limit"
 engine_auto_disabled = "🔕 <b>{engine}</b> was automatically disabled for this chat after 5 consecutive empty results. Use /settings to re-enable it."
+previous = "⬅️ Previous"
+next = "Next ➡️"
+result_counter = " · result {index}/{total}"
+page_expired = "This result list has expired, please search again."
 
 [search.auto_disable]
 message = "🟡 5 searches in a row returned no results — auto search has been disabled for this chat. This helps prevent hitting rate limits. The auto search engines are mainly for anime & manga content. Use /settings to re-enable it."

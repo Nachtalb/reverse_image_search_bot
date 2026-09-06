@@ -7,12 +7,11 @@ from yarl import URL
 
 from reverse_image_search_bot import settings
 from reverse_image_search_bot.utils import url_button
-from reverse_image_search_bot.utils.async_cache import async_cached
 
 from .data_providers import anilist
 from .errors import RateLimitError
 from .generic import GenericRISEngine
-from .types import MetaData, ProviderData
+from .types import ProviderData, ProviderMatches
 
 
 class TraceEngine(GenericRISEngine):
@@ -69,29 +68,31 @@ class TraceEngine(GenericRISEngine):
         else:
             return result.json() if result else {}
 
-    @async_cached(GenericRISEngine._best_match_cache)
-    async def best_match(self, url: str | URL) -> ProviderData:
+    async def _all_matches(self, url: str | URL) -> ProviderMatches:
         self.logger.debug("Started looking for %s", url)
 
-        meta: MetaData = {
-            "provider": self.name,
-            "provider_url": self.provider_url,
-        }
         data = await self._fetch_data(url)
 
         if data == 402:
             raise RateLimitError("Trace 402 monthly limit", period="Monthly")
         elif isinstance(data, int) or not data:
             self.logger.debug("Done with search: found nothing")
-            return {}, {}
+            return []
 
-        data = next(iter(data["result"]), None)
-        if not data or data["similarity"] < (self.min_similarity / 100):
+        candidates = [item for item in data.get("result", []) if item["similarity"] >= (self.min_similarity / 100)]
+        if not candidates:
             self.logger.debug("Done with search: found nothing")
-            return {}, {}
+            return []
 
+        matches: ProviderMatches = []
+        for item in candidates[: self.max_results]:
+            matches.append(await self._build_match(item))
+
+        self.logger.debug("Done with search: found %s match(es)", len(matches))
+        return matches
+
+    async def _build_match(self, data: dict) -> ProviderData:
         buttons: list[InlineKeyboardButton] = []
-        result = {}
 
         anilist_id = data["anilist"]
         if isinstance(data["anilist"], dict):
@@ -141,5 +142,4 @@ class TraceEngine(GenericRISEngine):
             }
         )
 
-        self.logger.debug("Done with search: found something")
         return self._clean_best_match(result, meta)

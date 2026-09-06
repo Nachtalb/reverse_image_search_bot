@@ -39,6 +39,10 @@ duplicate_thumbnail = "Đã bỏ qua ảnh thu nhỏ trùng lặp"
 rate_limit = "{engine}: đã đạt giới hạn {period}. Hãy thử nút <b>Thêm</b> để tìm kiếm trực tiếp."
 rate_limit_default_period = "Giới hạn"
 engine_auto_disabled = "🔕 <b>{engine}</b> đã tự động bị tắt cho cuộc trò chuyện này sau 5 lần liên tiếp không có kết quả. Dùng /settings để bật lại."
+previous = "⬅️ Trước"
+next = "Tiếp ➡️"
+result_counter = " · kết quả {index}/{total}"
+page_expired = "Danh sách kết quả này đã hết hạn, vui lòng tìm lại."
 
 [search.auto_disable]
 message = "🟡 5 lần tìm kiếm liên tiếp không có kết quả — tìm kiếm tự động đã bị tắt cho cuộc trò chuyện này. Điều này giúp tránh chạm giới hạn sử dụng. Các công cụ tìm kiếm tự động chủ yếu dành cho nội dung anime & manga. Dùng /settings để bật lại."

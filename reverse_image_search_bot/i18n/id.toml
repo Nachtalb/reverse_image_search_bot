@@ -39,6 +39,10 @@ duplicate_thumbnail = "Thumbnail duplikat dihilangkan"
 rate_limit = "{engine}: batas {period} tercapai. Coba tombol <b>Lainnya</b> untuk mencari secara langsung."
 rate_limit_default_period = "Batas"
 engine_auto_disabled = "🔕 <b>{engine}</b> dinonaktifkan otomatis untuk obrolan ini setelah 5 hasil kosong berturut-turut. Gunakan /settings untuk mengaktifkannya kembali."
+previous = "⬅️ Sebelumnya"
+next = "Berikutnya ➡️"
+result_counter = " · hasil {index}/{total}"
+page_expired = "Daftar hasil ini sudah kedaluwarsa, silakan cari lagi."
 
 [search.auto_disable]
 message = "🟡 5 pencarian berturut-turut tidak menghasilkan apa pun — pencarian otomatis telah dinonaktifkan untuk obrolan ini. Ini membantu mencegah tercapainya batas penggunaan. Mesin pencarian otomatis terutama ditujukan untuk konten anime & manga. Gunakan /settings untuk mengaktifkannya kembali."

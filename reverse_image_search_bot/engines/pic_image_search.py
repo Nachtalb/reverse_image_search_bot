@@ -5,12 +5,11 @@ Each subclass sets `pic_engine_class` and optionally overrides `_extract`.
 
 from yarl import URL
 
-from reverse_image_search_bot.utils.async_cache import async_cached
 from reverse_image_search_bot.utils.url import url_button
 
 from .errors import SearchError
 from .generic import GenericRISEngine, _classproperty
-from .types import InternalProviderData, MetaData, ProviderData
+from .types import InternalProviderData, MetaData, ProviderMatches
 
 __all__ = ["PicImageSearchEngine"]
 
@@ -45,7 +44,11 @@ class PicImageSearchEngine(GenericRISEngine):
             return await engine.search(url=url)
 
     async def _extract(self, raw: list) -> InternalProviderData:
-        """Default extractor — works for most engines with title/url/thumbnail attrs."""
+        """Default extractor — works for most engines with title/url/thumbnail attrs.
+
+        Receives the raw items making up ONE candidate result (usually a single
+        item); subclasses that aggregate several items override this.
+        """
         r = raw[0]
         result = {}
         meta: MetaData = {}
@@ -64,13 +67,17 @@ class PicImageSearchEngine(GenericRISEngine):
 
         return result, meta
 
-    @async_cached(GenericRISEngine._best_match_cache)
-    async def best_match(self, url: str | URL) -> ProviderData:
+    async def _extract_all(self, raw: list) -> list[InternalProviderData]:
+        """Map the full raw result list → several candidate results, best first."""
+        extracted: list[InternalProviderData] = []
+        for item in raw[: self.max_results]:
+            r, m = await self._extract([item])
+            if r:
+                extracted.append((r, m))
+        return extracted
+
+    async def _all_matches(self, url: str | URL) -> ProviderMatches:
         self.logger.debug("Started looking for %s", url)
-        meta: MetaData = {
-            "provider": self.name,
-            "provider_url": self.provider_url,
-        }
 
         try:
             result_obj = await self._search(str(url))
@@ -95,17 +102,25 @@ class PicImageSearchEngine(GenericRISEngine):
 
         if not getattr(result_obj, "raw", None):
             self.logger.debug("Done: no results")
-            return {}, {}
+            return []
 
         try:
-            r, m = await self._extract(result_obj.raw)
+            extracted = await self._extract_all(result_obj.raw)
         except Exception as e:
             raise SearchError(f"Extraction failed: {e}") from e
 
-        if not r:
+        if not extracted:
             self.logger.debug("Done: extraction yielded nothing")
-            return {}, {}
+            return []
 
-        meta.update(m)
-        self.logger.debug("Done: found something")
-        return self._clean_best_match(r, meta)
+        matches: ProviderMatches = []
+        for r, m in extracted:
+            meta: MetaData = {
+                "provider": self.name,
+                "provider_url": self.provider_url,
+            }
+            meta.update(m)
+            matches.append(self._clean_best_match(r, meta))
+
+        self.logger.debug("Done: found %s match(es)", len(matches))
+        return matches

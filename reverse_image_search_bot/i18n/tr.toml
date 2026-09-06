@@ -39,6 +39,10 @@ duplicate_thumbnail = "Yinelenen küçük resim atlandı"
 rate_limit = "{engine}: {period} sınırına ulaşıldı. Doğrudan aramak için <b>Daha fazla</b> düğmesini dene."
 rate_limit_default_period = "Sınır"
 engine_auto_disabled = "🔕 <b>{engine}</b>, art arda 5 boş sonuç sonrasında bu sohbet için otomatik olarak devre dışı bırakıldı. Yeniden etkinleştirmek için /settings kullan."
+previous = "⬅️ Önceki"
+next = "Sonraki ➡️"
+result_counter = " · sonuç {index}/{total}"
+page_expired = "Bu sonuç listesinin süresi doldu, lütfen tekrar arayın."
 
 [search.auto_disable]
 message = "🟡 Art arda 5 arama sonuç vermedi — bu sohbet için otomatik arama devre dışı bırakıldı. Bu, kullanım sınırlarına takılmayı önlemeye yardımcı olur. Otomatik arama motorları esas olarak anime ve manga içerikleri içindir. Yeniden etkinleştirmek için /settings kullan."

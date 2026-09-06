@@ -3,7 +3,14 @@ from typing import TypedDict
 from telegram import InlineKeyboardButton
 from yarl import URL
 
-__all__ = ["InternalProviderData", "InternalResultData", "MetaData", "ProviderData", "ResultData"]
+__all__ = [
+    "InternalProviderData",
+    "InternalResultData",
+    "MetaData",
+    "ProviderData",
+    "ProviderMatches",
+    "ResultData",
+]
 
 InternalResultData = dict[str, str | int | URL | list[str] | set[str] | None]
 ResultData = dict[str, str | int | URL | list[str] | set[str]]
@@ -24,3 +31,5 @@ class MetaData(TypedDict, total=False):
 
 InternalProviderData = tuple[InternalResultData, MetaData]
 ProviderData = tuple[ResultData, MetaData]
+#: Several candidate results of a single engine, best first.
+ProviderMatches = list[ProviderData]

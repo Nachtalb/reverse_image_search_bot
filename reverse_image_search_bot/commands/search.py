@@ -30,13 +30,14 @@ from reverse_image_search_bot.config import ChatConfig, abuse
 from reverse_image_search_bot.engines import engines
 from reverse_image_search_bot.engines.errors import EngineError, RateLimitError, is_transient
 from reverse_image_search_bot.engines.generic import GenericRISEngine, PreWorkEngine
-from reverse_image_search_bot.engines.types import MetaData, ProviderData, ResultData
+from reverse_image_search_bot.engines.types import MetaData, ProviderMatches, ResultData
 from reverse_image_search_bot.i18n import lang as get_lang
 from reverse_image_search_bot.i18n import t, translate_field
 from reverse_image_search_bot.settings import ADMIN_IDS
 from reverse_image_search_bot.utils import chunks
 from reverse_image_search_bot.utils.tags import a, b, code, hidden_a, title
 
+from .result_pager import get_matches, store_matches
 from .utils import (
     _detect_file_type,
     _normalize_extension,
@@ -489,17 +490,17 @@ async def _best_match_search(
     )
     _reply_to_msg_id: int | None = message.message_id
 
-    engine_start_times: dict[asyncio.Task[ProviderData], float] = {}
-    engine_tasks: dict[asyncio.Task[ProviderData], GenericRISEngine] = {}
+    engine_start_times: dict[asyncio.Task[ProviderMatches], float] = {}
+    engine_tasks: dict[asyncio.Task[ProviderMatches], GenericRISEngine] = {}
     for en in search_engines:
         if hasattr(en, "_user_lang"):
             en._user_lang = L  # ty: ignore[invalid-assignment]
-        task = asyncio.create_task(en.best_match(url))
+        task = asyncio.create_task(en.all_matches(url))
         engine_tasks[task] = en
         engine_start_times[task] = time()
 
     try:
-        done_tasks: set[asyncio.Task[ProviderData]] = set()
+        done_tasks: set[asyncio.Task[ProviderMatches]] = set()
         pending = set(engine_tasks.keys())
 
         while pending:
@@ -514,21 +515,16 @@ async def _best_match_search(
                 metrics.search_duration_seconds.labels(provider=engine.name).observe(duration)
                 try:
                     logger.debug("%s Searching for %s", engine.name, url)
-                    result, meta = future.result()
+                    matches = future.result()
+                    result: ResultData = {}
+                    meta: MetaData = {}
+                    if matches:
+                        result, meta = matches[0]
 
                     if meta:
                         logger.debug("Found something UmU")
                         metrics.provider_results_total.labels(provider=engine.name, status="hit").inc()
                         _track_engine_result(message.chat_id, engine.name, found=True)
-
-                        button_list = []
-                        if more_button := engine(str(url), t("search.more_button", L)):
-                            button_list.append(more_button)
-
-                        if buttons := meta.get("buttons"):
-                            button_list.extend(buttons)
-
-                        button_list = list(chunks(button_list, 3))
 
                         identifier = meta.get("identifier")
                         thumbnail_identifier = meta.get("thumbnail_identifier")
@@ -541,9 +537,14 @@ async def _best_match_search(
                         elif identifier in identifiers and thumbnail_identifier in thumbnail_identifiers:
                             continue
 
+                        token = store_matches(engine.name, str(url), matches) if len(matches) > 1 else None
+                        button_list = build_result_buttons(
+                            engine, url, meta, L, token=token, index=0, total=len(matches)
+                        )
+
                         await results_gate.wait()
 
-                        reply, media_group = build_reply(result, meta, L)
+                        reply, media_group = build_reply(result, meta, L, index=0, total=len(matches))
                         _disable_preview = not meta.get("thumbnail") or bool(media_group)
                         try:
                             provider_msg = await message.reply_html(
@@ -646,7 +647,47 @@ async def _best_match_search(
     return match_found
 
 
-def build_reply(result: ResultData, meta: MetaData, L: str = "en") -> tuple[str, list[InputMediaPhoto] | None]:
+def build_result_buttons(
+    engine: GenericRISEngine,
+    url: str | URL,
+    meta: MetaData,
+    L: str = "en",
+    token: str | None = None,
+    index: int = 0,
+    total: int = 1,
+) -> list[list[InlineKeyboardButton]]:
+    """Build the inline keyboard of a result message.
+
+    When ``token`` is given the engine found several candidates and the message
+    gets a Previous/Next row. Only the token and the page index travel in the
+    callback data — the results themselves live in the result pager store,
+    because callback data is capped at 64 bytes.
+    """
+    button_list: list[InlineKeyboardButton] = []
+    if more_button := engine(str(url), t("search.more_button", L)):
+        button_list.append(more_button)
+
+    if buttons := meta.get("buttons"):
+        button_list.extend(buttons)
+
+    rows = list(chunks(button_list, 3))
+
+    if token and total > 1:
+        prev_index = (index - 1) % total
+        next_index = (index + 1) % total
+        rows.append(
+            [
+                InlineKeyboardButton(t("search.results.previous", L), callback_data=f"page {token} {prev_index}"),
+                InlineKeyboardButton(t("search.results.next", L), callback_data=f"page {token} {next_index}"),
+            ]
+        )
+
+    return rows
+
+
+def build_reply(
+    result: ResultData, meta: MetaData, L: str = "en", index: int = 0, total: int = 1
+) -> tuple[str, list[InputMediaPhoto] | None]:
     provider_link = a(b(meta["provider"]), meta["provider_url"])
     reply = t("search.results.provided_by", L, provider=provider_link)
 
@@ -658,6 +699,9 @@ def build_reply(result: ResultData, meta: MetaData, L: str = "en") -> tuple[str,
 
     if similarity := meta.get("similarity"):
         reply += t("search.results.with_similarity", L, similarity=str(similarity))
+
+    if total > 1:
+        reply += t("search.results.result_counter", L, index=index + 1, total=total)
 
     media_group = []
     if thumbnail := meta.get("thumbnail"):
@@ -682,3 +726,50 @@ def build_reply(result: ResultData, meta: MetaData, L: str = "en") -> tuple[str,
         return reply, media_group
 
     return reply, None
+
+
+async def show_result_page(update: Update, context: ContextTypes.DEFAULT_TYPE, token: str, index_raw: str):
+    """Show another candidate result of the same engine in place (Next/Previous)."""
+    query = update.callback_query
+    if not query:
+        return
+    L = get_lang(update)
+
+    stored = get_matches(token)
+    if not stored or not stored.matches:
+        # The pager store is short lived — a button from an old message can
+        # outlive its results.
+        with contextlib.suppress(BadRequest):
+            await query.answer(t("search.results.page_expired", L), show_alert=True)
+        return
+
+    try:
+        index = int(index_raw) % len(stored.matches)
+    except ValueError:
+        with contextlib.suppress(BadRequest):
+            await query.answer(t("search.something_went_wrong", L))
+        return
+
+    engine = next((e for e in engines if e.name == stored.engine_name), None)
+    if engine is None:
+        with contextlib.suppress(BadRequest):
+            await query.answer(t("search.something_went_wrong", L))
+        return
+
+    result, meta = stored.matches[index]
+    total = len(stored.matches)
+    reply, media_group = build_reply(result, meta, L, index=index, total=total)
+    buttons = build_result_buttons(engine, stored.url, meta, L, token=token, index=index, total=total)
+
+    with contextlib.suppress(BadRequest):
+        await query.answer()
+
+    # A message can only ever be edited into text — a multi-thumbnail result was
+    # sent as a separate media group and cannot be re-sent on edit.
+    with contextlib.suppress(BadRequest):
+        await query.edit_message_text(
+            reply,
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(buttons),
+            disable_web_page_preview=not meta.get("thumbnail") or bool(media_group),
+        )

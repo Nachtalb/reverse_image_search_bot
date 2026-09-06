@@ -39,6 +39,10 @@ duplicate_thumbnail = "重复缩略图已省略"
 rate_limit = "{engine}：已达到{period}限制。请点击 <b>更多</b> 按钮直接搜索。"
 rate_limit_default_period = "频率"
 engine_auto_disabled = "🔕 <b>{engine}</b> 在连续 5 次无结果后已自动禁用。使用 /settings 重新启用。"
+previous = "⬅️ 上一个"
+next = "下一个 ➡️"
+result_counter = " · 结果 {index}/{total}"
+page_expired = "该结果列表已过期，请重新搜索。"
 
 [search.auto_disable]
 message = "🟡 连续 5 次搜索无结果 — 已为此聊天禁用自动搜索。这有助于避免触发频率限制。自动搜索引擎主要用于动漫内容。使用 /settings 重新启用。"

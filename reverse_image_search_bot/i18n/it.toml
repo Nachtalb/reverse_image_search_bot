@@ -39,6 +39,10 @@ duplicate_thumbnail = "Miniatura duplicata omessa"
 rate_limit = "{engine}: limite di {period} raggiunto. Usa il pulsante <b>Altro</b> per cercare direttamente."
 rate_limit_default_period = "Limite"
 engine_auto_disabled = "🔕 <b>{engine}</b> è stato disattivato automaticamente dopo 5 risultati vuoti consecutivi. Usa /settings per riattivarlo."
+previous = "⬅️ Precedente"
+next = "Successivo ➡️"
+result_counter = " · risultato {index}/{total}"
+page_expired = "Questo elenco di risultati è scaduto, riprova la ricerca."
 
 [search.auto_disable]
 message = "🟡 5 ricerche consecutive senza risultati — la ricerca automatica è stata disattivata per questa chat. Questo aiuta a evitare i limiti. I motori automatici sono principalmente per anime e manga. Usa /settings per riattivarla."

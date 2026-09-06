@@ -39,6 +39,10 @@ duplicate_thumbnail = "重複するサムネイルを省略"
 rate_limit = "{engine}：{period}制限に達しました。<b>もっと見る</b>ボタンで直接検索してください。"
 rate_limit_default_period = "制限"
 engine_auto_disabled = "🔕 <b>{engine}</b> は5回連続で結果が得られなかったため自動的に無効化されました。/settings で再有効化できます。"
+previous = "⬅️ 前へ"
+next = "次へ ➡️"
+result_counter = " · 結果 {index}/{total}"
+page_expired = "この検索結果は期限切れです。もう一度検索してください。"
 
 [search.auto_disable]
 message = "🟡 5回連続で結果が得られませんでした — このチャットの自動検索が無効化されました。レート制限を防ぐためです。自動検索エンジンは主にアニメ・マンガコンテンツ向けです。/settings で再有効化できます。"

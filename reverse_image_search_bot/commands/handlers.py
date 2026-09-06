@@ -15,7 +15,7 @@ from reverse_image_search_bot.i18n import t
 from reverse_image_search_bot.utils.tags import pre
 
 from .onboarding import _send_onboarding
-from .search import best_match, file_handler
+from .search import best_match, file_handler, show_result_page
 from .utils import _HELP_IMAGE, _detect_file_type
 
 
@@ -138,6 +138,8 @@ async def callback_query_handler(update: Update, context: ContextTypes.DEFAULT_T
             await best_match(update, context, values[0])
         case "wait_for":
             await send_wait_for(update, context, values[0])
+        case "page" if len(values) == 2:
+            await show_result_page(update, context, values[0], values[1])
         case "noop":
             with contextlib.suppress(BadRequest):
                 await update.callback_query.answer()

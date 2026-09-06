@@ -9,12 +9,11 @@ from yarl import URL
 
 from reverse_image_search_bot.settings import SAUCENAO_API
 from reverse_image_search_bot.utils import tagify, url_button
-from reverse_image_search_bot.utils.async_cache import async_cached
 
 from .data_providers import anilist, booru, mangadex, pixiv
 from .errors import RateLimitError, SearchError
 from .generic import GenericRISEngine
-from .types import InternalProviderData, MetaData, ProviderData
+from .types import InternalProviderData, MetaData, ProviderData, ProviderMatches
 
 
 class SauceNaoEngine(GenericRISEngine):
@@ -138,13 +137,8 @@ class SauceNaoEngine(GenericRISEngine):
 
         return result, meta  # ty: ignore[invalid-return-type]
 
-    @async_cached(GenericRISEngine._best_match_cache)
-    async def best_match(self, url: str | URL) -> ProviderData:
+    async def _all_matches(self, url: str | URL) -> ProviderMatches:
         self.logger.debug("Started looking for %s", url)
-        meta: MetaData = {
-            "provider": self.name,
-            "provider_url": self.provider_url,
-        }
         if self.limit_reached and time() - self.limit_reached < 3600:
             raise RateLimitError("SauceNAO daily limit still active", period="Daily")
 
@@ -171,23 +165,32 @@ class SauceNaoEngine(GenericRISEngine):
         )
 
         priority = 21, 371, 37, 5, 9, 12, 25
-        data = next(
-            iter(
-                sorted(
-                    results,
-                    key=lambda r: (
-                        priority.index(r["header"]["index_id"]) if r["header"]["index_id"] in priority else 99,
-                        float(r["header"]["similarity"]) * -1,
-                    ),
-                )
+        candidates = sorted(
+            results,
+            key=lambda r: (
+                priority.index(r["header"]["index_id"]) if r["header"]["index_id"] in priority else 99,
+                float(r["header"]["similarity"]) * -1,
             ),
-            None,
         )
 
-        if not data:
+        if not candidates:
             self.logger.debug("Done with search: found nothing")
-            return {}, {}
+            return []
 
+        matches: ProviderMatches = []
+        for data in candidates[: self.max_results]:
+            match = await self._build_match(data)
+            if match:
+                matches.append(match)
+
+        self.logger.debug("Done with search: found %s match(es)", len(matches))
+        return matches
+
+    async def _build_match(self, data: dict) -> ProviderData | None:
+        meta: MetaData = {
+            "provider": self.name,
+            "provider_url": self.provider_url,
+        }
         data_provider = getattr(self, f"_{data['header']['index_id']}_provider", None)
         if data_provider:
             result, new_meta = await data_provider(data["data"])
@@ -195,6 +198,9 @@ class SauceNaoEngine(GenericRISEngine):
             result, new_meta = self._default_provider(data["data"])
         if not result:
             result, new_meta = self._default_provider(data["data"])
+
+        if not result and not new_meta:
+            return None
 
         meta.update(new_meta)
         thumbnail = meta.get("thumbnail", data["header"]["thumbnail"])
@@ -205,5 +211,4 @@ class SauceNaoEngine(GenericRISEngine):
             }
         )
 
-        self.logger.debug("Done with search: found something")
         return self._clean_best_match(result, meta)

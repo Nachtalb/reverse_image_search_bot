@@ -9,7 +9,7 @@ from yarl import URL
 
 from reverse_image_search_bot.utils.async_cache import async_cached
 
-from .types import InternalResultData, MetaData, ProviderData, ResultData
+from .types import InternalResultData, MetaData, ProviderData, ProviderMatches, ResultData
 
 __all__ = ["GenericRISEngine", "PreWorkEngine"]
 
@@ -37,6 +37,9 @@ class GenericRISEngine:
     recommendation: list[str] = []
 
     url: str = ""
+
+    #: How many candidate results at most to keep for Next/Previous paging.
+    max_results: int = 5
 
     def __init__(
         self,
@@ -84,16 +87,33 @@ class GenericRISEngine:
 
     @_classproperty
     def best_match_implemented(cls):
-        return "best_match" in cls.__dict__ and cls is not GenericRISEngine
+        if cls is GenericRISEngine:
+            return False
+        return (
+            cls._all_matches is not GenericRISEngine._all_matches or cls.best_match is not GenericRISEngine.best_match
+        )
+
+    async def _all_matches(self, url: str | URL) -> ProviderMatches:
+        """Get every candidate match for the given image, best first.
+
+        Engines override this instead of :meth:`best_match`.
+        """
+        raise NotImplementedError()
 
     @async_cached(cache=_best_match_cache)
+    async def all_matches(self, url: str | URL) -> ProviderMatches:
+        """Cached list of candidate matches, best first, empty ones dropped."""
+        matches = await self._all_matches(url)
+        return [(result, meta) for result, meta in matches if result or meta][: self.max_results]
+
     async def best_match(self, url: str | URL) -> ProviderData:
         """Get info about the best matching image found
 
         Returns:
             ProviderData: (result_dict, meta_dict)
         """
-        raise NotImplementedError()
+        matches = await self.all_matches(url)
+        return matches[0] if matches else ({}, {})
 
 
 class PreWorkEngine(GenericRISEngine):
