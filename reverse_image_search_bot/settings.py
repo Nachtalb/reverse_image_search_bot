@@ -87,6 +87,15 @@ PERSISTENCE_PATH = (
     Path(os.getenv("PERSISTENCE_PATH", str(_DEFAULT_CONFIG_DIR / "bot_data.pickle"))).expanduser().absolute()
 )
 
+# --- Incoming per-user search throttling --------------------------------------
+# How many searches a single user may run within SEARCH_RATE_LIMIT_WINDOW
+# seconds. Sliding window, so short bursts are fine. This is the limit WE impose
+# on OUR users; it is unrelated to the AIORateLimiter guarding our outgoing calls
+# to Telegram's API, and to engine-side quotas (SauceNAO/trace.moe).
+# 0 or less disables user throttling entirely.
+SEARCH_RATE_LIMIT_MAX = int(os.getenv("SEARCH_RATE_LIMIT_MAX", "10"))
+SEARCH_RATE_LIMIT_WINDOW = float(os.getenv("SEARCH_RATE_LIMIT_WINDOW", "60"))
+
 # Plaintext uploads older than this are removed by the daily retention sweep.
 FILE_RETENTION_DAYS = int(os.getenv("FILE_RETENTION_DAYS", "30"))
 
