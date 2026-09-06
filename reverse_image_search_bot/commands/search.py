@@ -33,7 +33,7 @@ from reverse_image_search_bot.engines.generic import GenericRISEngine, PreWorkEn
 from reverse_image_search_bot.engines.types import MetaData, ProviderData, ResultData
 from reverse_image_search_bot.i18n import lang as get_lang
 from reverse_image_search_bot.i18n import t, translate_field
-from reverse_image_search_bot.settings import ADMIN_IDS
+from reverse_image_search_bot.ratelimit import search_limiter
 from reverse_image_search_bot.utils import chunks
 from reverse_image_search_bot.utils.tags import a, b, code, hidden_a, title
 
@@ -42,7 +42,6 @@ from .utils import (
     _normalize_extension,
     image_to_bytes,
     image_to_url,
-    last_used,
     video_to_bytes,
     video_to_url,
 )
@@ -365,14 +364,20 @@ async def best_match(
     assert user and message
 
     L = get_lang(update)
-    if user.id not in ADMIN_IDS and (last_time := last_used.get(user.id)) and time() - last_time < 10:
+    # Throttle the user's OWN search rate (sliding window, admins exempt). This is
+    # not the AIORateLimiter on our outgoing Telegram calls, nor an engine quota.
+    decision = search_limiter.check(user.id)
+    if not decision.allowed:
+        if decision.first_block:
+            # info, not warning: handled condition, and only on the transition
+            # into cooldown so admins don't get a message per blocked request.
+            logger.info("search rate limit tripped user=%s retry_after=%.1fs", user.id, decision.retry_after)
         if general_done:
             await general_done.wait()
         await context.bot.send_message(
             text=t("search.slow_down", L), chat_id=message.chat_id, reply_to_message_id=message.message_id
         )
         return
-    last_used[user.id] = time()
 
     chat_config = ChatConfig(message.chat_id)
     searchable_engines = [engine for engine in engines if engine.best_match_implemented]

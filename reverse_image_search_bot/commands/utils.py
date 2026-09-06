@@ -22,8 +22,6 @@ from reverse_image_search_bot.utils import upload_file
 
 logger = logging.getLogger(__name__)
 
-last_used: dict[int, float] = {}
-
 # ffmpeg binary (bundled via imageio-ffmpeg on glibc). Resolved once.
 _FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
 
