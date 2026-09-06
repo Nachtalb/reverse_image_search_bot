@@ -20,14 +20,10 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import hashlib
-import hmac
-import json
 import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from urllib.parse import parse_qsl
 
 from aiohttp import web
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
@@ -44,6 +40,7 @@ from reverse_image_search_bot.abuse_report.prepare import (
     restore_report_files,
 )
 from reverse_image_search_bot.config import abuse
+from reverse_image_search_bot.utils.telegram_auth import verify_init_data
 
 logger = logging.getLogger("abuse.server")
 
@@ -58,38 +55,6 @@ _VALID_CLASSES = {"A1", "A2", "B1", "B2", "NR"}
 
 
 # --- initData validation ------------------------------------------------------
-
-
-def verify_init_data(init_data: str, bot_token: str, max_age: int = 3600) -> dict | None:
-    """Validate Telegram Mini App initData. Returns parsed user dict or None.
-
-    Recipe: secret = HMAC_SHA256("WebAppData", bot_token); the check hash is
-    HMAC_SHA256(secret, data_check_string) where data_check_string is the sorted
-    "k=v\\n…" of all params except `hash`.
-    """
-    if not init_data:
-        return None
-    pairs = dict(parse_qsl(init_data, keep_blank_values=True))
-    got_hash = pairs.pop("hash", None)
-    if not got_hash:
-        return None
-    check_string = "\n".join(f"{k}={pairs[k]}" for k in sorted(pairs))
-    secret = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
-    calc = hmac.new(secret, check_string.encode(), hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(calc, got_hash):
-        return None
-    # auth_date freshness
-    try:
-        import time
-
-        if max_age and (time.time() - int(pairs.get("auth_date", "0"))) > max_age:
-            return None
-    except ValueError:
-        return None
-    try:
-        return json.loads(pairs.get("user", "{}"))
-    except json.JSONDecodeError:
-        return None
 
 
 def _admin_from_request(request: web.Request) -> int | None:

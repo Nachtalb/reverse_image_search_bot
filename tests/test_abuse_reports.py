@@ -295,7 +295,7 @@ def _signed_init_data(bot_token: str, user_json: str, auth_date: int | None = No
 
 
 def test_verify_init_data_valid():
-    from reverse_image_search_bot.abuse_report.server import verify_init_data
+    from reverse_image_search_bot.utils.telegram_auth import verify_init_data
 
     token = "123:abc"
     init = _signed_init_data(token, '{"id":42,"username":"a"}')
@@ -304,14 +304,14 @@ def test_verify_init_data_valid():
 
 
 def test_verify_init_data_bad_hash():
-    from reverse_image_search_bot.abuse_report.server import verify_init_data
+    from reverse_image_search_bot.utils.telegram_auth import verify_init_data
 
     init = _signed_init_data("123:abc", '{"id":42}')
     assert verify_init_data(init, "999:wrong") is None
 
 
 def test_verify_init_data_expired():
-    from reverse_image_search_bot.abuse_report.server import verify_init_data
+    from reverse_image_search_bot.utils.telegram_auth import verify_init_data
 
     token = "123:abc"
     init = _signed_init_data(token, '{"id":42}', auth_date=int(time.time()) - 99999)
@@ -319,6 +319,6 @@ def test_verify_init_data_expired():
 
 
 def test_verify_init_data_empty():
-    from reverse_image_search_bot.abuse_report.server import verify_init_data
+    from reverse_image_search_bot.utils.telegram_auth import verify_init_data
 
     assert verify_init_data("", "123:abc") is None
