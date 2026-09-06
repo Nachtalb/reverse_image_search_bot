@@ -55,6 +55,14 @@ SAUCENAO_API = required_env("SAUCENAO_API")
 TRACE_API = required_env("TRACE_API")
 ANILIST_TOKEN = os.getenv("ANILIST_TOKEN")
 
+# Google Cloud Vision API key used by the Google engine's best match
+# (WEB_DETECTION). Optional — when unset the Google engine stays link-only and
+# only offers the Google Lens button.
+GOOGLE_VISION_API = os.getenv("GOOGLE_VISION_API")
+# Vision's free tier is 1000 units/month. The counter is enforced client-side so
+# we never spill into paid usage.
+GOOGLE_VISION_MONTHLY_LIMIT = int(os.getenv("GOOGLE_VISION_MONTHLY_LIMIT", "1000"))
+
 MODE_ACTIVE = os.getenv("MODE_ACTIVE", "polling")
 
 MODE: dict[str, Any] = {
@@ -89,6 +97,15 @@ PERSISTENCE_PATH = (
 
 # Plaintext uploads older than this are removed by the daily retention sweep.
 FILE_RETENTION_DAYS = int(os.getenv("FILE_RETENTION_DAYS", "30"))
+
+# Persisted monthly usage counter for the Google Vision best match. Defaults
+# next to the config DB so it lands on the persistent volume — $HOME is
+# read-only in the container.
+GOOGLE_VISION_QUOTA_PATH = (
+    Path(os.getenv("GOOGLE_VISION_QUOTA_PATH", str(CONFIG_DB_PATH.parent / "google_vision_quota.json")))
+    .expanduser()
+    .absolute()
+)
 
 
 # Prometheus metrics

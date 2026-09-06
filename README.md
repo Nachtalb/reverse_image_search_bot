@@ -51,6 +51,9 @@ All configuration is done via environment variables.
 | `ADMIN_IDS` | — | Comma-separated Telegram user IDs with admin access |
 | `ERROR_CHAT_ID` | — | Chat to send WARNING+ log records to; when unset they are DMed to `ADMIN_IDS`. Channel/supergroup ids need the `-100` prefix |
 | `ANILIST_TOKEN` | — | AniList OAuth token (raises rate limit from 90 to 120 req/min) |
+| `GOOGLE_VISION_API` | — | [Google Cloud Vision API key](https://cloud.google.com/vision/docs/setup). When unset the Google engine only offers the Lens button; when set it also returns an inline best match via `WEB_DETECTION` |
+| `GOOGLE_VISION_MONTHLY_LIMIT` | `1000` | Client-side monthly request cap (the Vision free tier is 1000 units/month) |
+| `GOOGLE_VISION_QUOTA_PATH` | next to `CONFIG_DB_PATH` | Where the monthly Vision usage counter is persisted |
 | `MODE_ACTIVE` | `polling` | Bot mode: `polling` or `webhook` |
 | `CONCURRENT_UPDATES` | `16` | Number of concurrent update handlers |
 | `OLD_CONFIG_DIR` | `~/.config/reverse_image_search_bot` | Legacy config directory (used for JSON→SQLite migration only) |
