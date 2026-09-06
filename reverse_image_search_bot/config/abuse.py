@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import atexit
 import contextlib
+import json
 import sqlite3
 import threading
 import time
@@ -100,6 +101,30 @@ def _add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, de
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
         return True
     return False
+
+
+def _backfill_searches_from_files(conn: sqlite3.Connection) -> int:
+    """Seed history from past uploads, exactly once.
+
+    Without this, every existing user opens the history app to an empty list even
+    though the bot has years of their uploads on record. Metadata only: this is an
+    INSERT…SELECT of a few columns, NOT an image pass — thumbnails are produced
+    lazily when an entry is actually viewed, so a large corpus costs nothing here.
+
+    Gated on the table being EMPTY rather than on the rows it would copy: once a
+    real search has been recorded there is history, and re-running would duplicate
+    it. Backfilled rows have no ``results`` — the engines' answers were never
+    stored and cannot be recovered.
+    """
+    if conn.execute("SELECT 1 FROM searches LIMIT 1").fetchone() is not None:
+        return 0
+    cur = conn.execute("""
+        INSERT INTO searches (user_id, chat_id, file_unique_id, searched_at, results)
+        SELECT user_id, user_id, file_unique_id, upload_time, NULL
+          FROM files
+         WHERE group_id IS NULL AND channel_id IS NULL AND hold_reason IS NULL
+    """)
+    return cur.rowcount
 
 
 def _ensure_schema(conn: sqlite3.Connection) -> None:
@@ -214,6 +239,25 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     # re-fetch. Once set, fetch attempts are skipped — no retry storm and no
     # repeated admin warnings on every review/submit.
     _add_column_if_missing(conn, "files", "video_error", "TEXT")
+
+    # A user's own search history, shown in the search-history Mini App. Distinct
+    # from `files`: that row is upload provenance for abuse handling and exists
+    # for every upload, while a search is what the user actually asked for and
+    # only covers their PRIVATE chats. `results` is the JSON the engines returned,
+    # so history renders without re-querying anything.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS searches (
+            search_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id        INTEGER NOT NULL REFERENCES users(user_id),
+            chat_id        INTEGER,
+            message_id     INTEGER,
+            file_unique_id TEXT,
+            searched_at    INTEGER NOT NULL,
+            results        TEXT
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_searches_user ON searches(user_id, searched_at DESC)")
+    _backfill_searches_from_files(conn)
 
     # A report round for one user. `report_uuid` is the URL token; `page_secret_hash`
     # gates the report page (P2, stored hashed — the image key P1 is NEVER stored).
@@ -670,6 +714,100 @@ def file_by_unique_id(file_unique_id: str) -> dict | None:
     conn = _get_conn()
     row = conn.execute("SELECT * FROM files WHERE file_unique_id = ?", (file_unique_id,)).fetchone()
     return dict(row) if row else None
+
+
+# --- search history -----------------------------------------------------------
+
+
+def record_search(
+    user_id: int,
+    *,
+    chat_id: int | None = None,
+    message_id: int | None = None,
+    file_unique_id: str | None = None,
+) -> int:
+    """Open a history entry for a search. Returns its id so results can follow."""
+    conn = _get_conn()
+    with conn:
+        cur = conn.execute(
+            "INSERT INTO searches (user_id, chat_id, message_id, file_unique_id, searched_at) VALUES (?, ?, ?, ?, ?)",
+            (user_id, chat_id, message_id, file_unique_id, _now()),
+        )
+    return int(cur.lastrowid or 0)
+
+
+def set_search_results(search_id: int, results: list[dict]) -> None:
+    """Attach the engines' answers to an open entry."""
+    conn = _get_conn()
+    with conn:
+        conn.execute("UPDATE searches SET results = ? WHERE search_id = ?", (json.dumps(results), search_id))
+
+
+def user_searches(user_id: int, *, limit: int = 20, offset: int = 0) -> list[dict]:
+    """One page of a user's own history, newest first.
+
+    Joined to ``files`` for the stored filename so the app can render a thumbnail;
+    an entry whose upload has since been swept still lists, just without an image.
+    """
+    conn = _get_conn()
+    rows = conn.execute(
+        """
+        SELECT s.search_id, s.searched_at, s.file_unique_id, s.results,
+               f.saved_filename, f.file_type, f.is_video
+          FROM searches s
+          LEFT JOIN files f ON f.file_unique_id = s.file_unique_id
+         WHERE s.user_id = ?
+         ORDER BY s.searched_at DESC, s.search_id DESC
+         LIMIT ? OFFSET ?
+        """,
+        (user_id, limit, offset),
+    ).fetchall()
+    out = []
+    for row in rows:
+        entry = dict(row)
+        raw = entry.pop("results", None)
+        try:
+            entry["results"] = json.loads(raw) if raw else []
+        except json.JSONDecodeError:
+            entry["results"] = []
+        out.append(entry)
+    return out
+
+
+def count_user_searches(user_id: int) -> int:
+    conn = _get_conn()
+    return int(conn.execute("SELECT COUNT(*) FROM searches WHERE user_id = ?", (user_id,)).fetchone()[0])
+
+
+def get_user_search(user_id: int, search_id: int) -> dict | None:
+    """One entry, scoped to its owner — the caller can never read someone else's."""
+    conn = _get_conn()
+    row = conn.execute(
+        """
+        SELECT s.search_id, s.searched_at, s.file_unique_id, s.results, f.saved_filename, f.is_video
+          FROM searches s
+          LEFT JOIN files f ON f.file_unique_id = s.file_unique_id
+         WHERE s.search_id = ? AND s.user_id = ?
+        """,
+        (search_id, user_id),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def delete_user_search(user_id: int, search_id: int) -> bool:
+    """Forget one entry. Scoped to its owner; the `files` row is untouched."""
+    conn = _get_conn()
+    with conn:
+        cur = conn.execute("DELETE FROM searches WHERE search_id = ? AND user_id = ?", (search_id, user_id))
+    return cur.rowcount > 0
+
+
+def delete_searches_for_user(user_id: int) -> int:
+    """Drop a user's whole history — used by the erasure path."""
+    conn = _get_conn()
+    with conn:
+        cur = conn.execute("DELETE FROM searches WHERE user_id = ?", (user_id,))
+    return cur.rowcount
 
 
 def find_user_by_filename(filename: str) -> int | None:
